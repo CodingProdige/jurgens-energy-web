@@ -10,16 +10,32 @@ export const metadata: Metadata = {
     "Piessang marketplace foundation for a self-hosted multi-vendor commerce platform.",
 };
 
+function getSurfaceUrl(hostname: string) {
+  const appUrl = new URL(process.env.APP_URL ?? "http://localhost:3000");
+  appUrl.hostname = hostname;
+  appUrl.pathname = "";
+  appUrl.search = "";
+  appUrl.hash = "";
+
+  return appUrl.toString().replace(/\/$/, "");
+}
+
 export default async function Home() {
   const session = await auth();
+  const adminUrl = getSurfaceUrl(
+    process.env.ADMIN_HOSTNAME ?? "admin.localhost",
+  );
+  const sellerUrl = getSurfaceUrl(
+    process.env.SELLER_HOSTNAME ?? "seller.localhost",
+  );
   const links = [
     { href: "/sign-in", label: "Marketplace sign in" },
     { href: "/register", label: "Create marketplace account" },
     { href: "/forgot-password", label: "Marketplace password reset" },
-    { href: "http://seller.localhost:3000", label: "Seller dashboard" },
-    { href: "http://seller.localhost:3000/sign-in", label: "Seller sign in" },
-    { href: "http://admin.localhost:3000", label: "Admin dashboard" },
-    { href: "http://admin.localhost:3000/sign-in", label: "Admin sign in" },
+    { href: sellerUrl, label: "Seller dashboard" },
+    { href: `${sellerUrl}/sign-in`, label: "Seller sign in" },
+    { href: adminUrl, label: "Admin dashboard" },
+    { href: `${adminUrl}/sign-in`, label: "Admin sign in" },
   ];
 
   return (
@@ -77,8 +93,7 @@ export default async function Home() {
           ))}
         </nav>
         <div className="mt-4 text-xs text-muted-foreground">
-          Local dashboard links use `admin.localhost:3000` and
-          `seller.localhost:3000`.
+          Dashboard links follow the configured admin and seller hostnames.
         </div>
       </section>
     </main>
