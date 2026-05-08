@@ -8,6 +8,9 @@ Environment rules live in `docs/environment.md`. This project keeps one root `.e
 
 Brand rules live in `docs/brand.md`. Store source-controlled brand assets in `public/brand/`.
 
+Deployment rules live in `docs/deployment.md`. The production server deploys
+from GitHub Actions through a self-hosted runner.
+
 ## Stack
 
 - Next.js App Router
