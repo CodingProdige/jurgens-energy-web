@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { registerCustomerWithPassword } from "@/app/register/actions";
 import { MarketplaceAuthScreen } from "@/components/auth/marketplace-auth-screen";
+import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 
 export const metadata: Metadata = {
   title: "Create Marketplace Account",
@@ -22,9 +23,11 @@ export default async function RegisterPage() {
   }
 
   return (
-    <MarketplaceAuthScreen
-      action={registerCustomerWithPassword}
-      mode="register"
-    />
+    <MarketplaceGate>
+      <MarketplaceAuthScreen
+        action={registerCustomerWithPassword}
+        mode="register"
+      />
+    </MarketplaceGate>
   );
 }

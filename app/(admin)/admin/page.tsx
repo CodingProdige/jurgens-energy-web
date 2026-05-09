@@ -2,9 +2,6 @@ import {
   BadgeCheckIcon,
   BoxesIcon,
   ClipboardListIcon,
-  LayoutDashboardIcon,
-  LineChartIcon,
-  PackageCheckIcon,
   ShieldCheckIcon,
   StoreIcon,
   UsersIcon,
@@ -16,6 +13,7 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
 import { requireAdminAccess } from "@/src/modules/auth/permissions";
 import { getAdminOverview } from "@/src/modules/admin";
+import { adminNavItems } from "@/src/modules/admin/navigation";
 
 export const metadata: Metadata = {
   title: "Admin Dashboard",
@@ -26,16 +24,6 @@ export const metadata: Metadata = {
     follow: false,
   },
 };
-
-const adminNavItems = [
-  { label: "Overview", href: "/", icon: LayoutDashboardIcon },
-  { label: "Users", href: "/users", icon: UsersIcon },
-  { label: "Sellers", href: "/sellers", icon: StoreIcon },
-  { label: "Products", href: "/products", icon: BoxesIcon },
-  { label: "Orders", href: "/orders", icon: PackageCheckIcon },
-  { label: "Audit logs", href: "/audit-logs", icon: ClipboardListIcon },
-  { label: "Analytics", href: "/analytics", icon: LineChartIcon },
-];
 
 export default async function AdminPage() {
   const session = await requireAdminAccess();

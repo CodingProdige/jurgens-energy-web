@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { signInCustomerWithPassword } from "@/app/sign-in/actions";
 import { MarketplaceAuthScreen } from "@/components/auth/marketplace-auth-screen";
+import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { rememberedEmailCookieName } from "@/src/modules/auth/constants";
 
 export const metadata: Metadata = {
@@ -26,10 +27,12 @@ export default async function SignInPage() {
   }
 
   return (
-    <MarketplaceAuthScreen
-      action={signInCustomerWithPassword}
-      rememberedEmail={rememberedEmail}
-      mode="sign-in"
-    />
+    <MarketplaceGate>
+      <MarketplaceAuthScreen
+        action={signInCustomerWithPassword}
+        rememberedEmail={rememberedEmail}
+        mode="sign-in"
+      />
+    </MarketplaceGate>
   );
 }

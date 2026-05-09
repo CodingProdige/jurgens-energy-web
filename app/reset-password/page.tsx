@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { resetPassword } from "@/app/forgot-password/actions";
 import { ResetPasswordScreen } from "@/components/auth/reset-password-screen";
+import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { isPasswordResetTokenValid } from "@/src/modules/auth/service";
 
 export const metadata: Metadata = {
@@ -25,11 +26,13 @@ export default async function ResetPasswordPage({
   const isTokenValid = token ? await isPasswordResetTokenValid(token) : false;
 
   return (
-    <ResetPasswordScreen
-      action={resetPassword}
-      token={token}
-      isTokenValid={isTokenValid}
-      accent="gold"
-    />
+    <MarketplaceGate>
+      <ResetPasswordScreen
+        action={resetPassword}
+        token={token}
+        isTokenValid={isTokenValid}
+        accent="gold"
+      />
+    </MarketplaceGate>
   );
 }

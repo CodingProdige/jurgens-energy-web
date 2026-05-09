@@ -29,6 +29,13 @@
       "when": 1778049600000,
       "tag": "0003_password_reset_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778301600000,
+      "tag": "0004_marketplace_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 export * from "@/src/db/schema/users";
 export * from "@/src/db/schema/password-reset-tokens";
+export * from "@/src/db/schema/marketplace-settings";
 export * from "@/src/db/schema/sellers";
 export * from "@/src/db/schema/catalog";
 export * from "@/src/db/schema/media";

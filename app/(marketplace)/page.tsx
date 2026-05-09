@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { auth, signOut } from "@/auth";
 import { PiessangLogo } from "@/components/brand/piessang-logo";
+import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 
 export const metadata: Metadata = {
   title: "Marketplace",
@@ -39,7 +40,8 @@ export default async function Home() {
   ];
 
   return (
-    <main className="home-shell">
+    <MarketplaceGate>
+      <main className="home-shell">
       <section className="home-hero">
         <PiessangLogo priority className="mb-6 h-12 w-64" />
         <p className="eyebrow">Self-hosted modular marketplace</p>
@@ -96,6 +98,7 @@ export default async function Home() {
           Dashboard links follow the configured admin and seller hostnames.
         </div>
       </section>
-    </main>
+      </main>
+    </MarketplaceGate>
   );
 }
