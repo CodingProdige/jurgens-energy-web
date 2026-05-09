@@ -2,6 +2,7 @@
 
 import { AuthError } from "next-auth";
 import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { signIn } from "@/auth";
@@ -32,6 +33,20 @@ type SignInOptions = {
   capabilityError: string;
   rememberByDefault?: boolean;
 };
+
+async function getRequestRedirectUrl(pathname: string) {
+  const headerStore = await headers();
+  const forwardedProto = headerStore.get("x-forwarded-proto");
+  const forwardedHost = headerStore.get("x-forwarded-host");
+  const host = forwardedHost ?? headerStore.get("host");
+  const protocol = forwardedProto ?? "http";
+
+  if (!host) {
+    return pathname;
+  }
+
+  return new URL(pathname, `${protocol}://${host}`).toString();
+}
 
 async function signInWithPasswordForSurface(
   _state: SignInState,
@@ -106,10 +121,12 @@ async function signInWithPasswordForSurface(
   }
 
   try {
+    const redirectTo = await getRequestRedirectUrl(options.redirectTo);
+
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: options.redirectTo,
+      redirectTo,
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -119,7 +136,7 @@ async function signInWithPasswordForSurface(
     throw error;
   }
 
-  redirect(options.redirectTo);
+  redirect(await getRequestRedirectUrl(options.redirectTo));
 }
 
 export async function signInCustomerWithPassword(

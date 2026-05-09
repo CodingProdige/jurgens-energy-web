@@ -6,7 +6,10 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { requireAdminAccess } from "@/src/modules/auth/permissions";
 import { adminNavItems } from "@/src/modules/admin/navigation";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
-import { SettingsForm } from "@/app/(admin)/admin/settings/settings-form";
+import {
+  SettingsForm,
+  SocialLinksForm,
+} from "@/app/(admin)/admin/settings/settings-form";
 
 export const metadata: Metadata = {
   title: "Admin Settings",
@@ -41,6 +44,17 @@ export default async function AdminSettingsPage() {
           <SettingsForm
             comingSoonEnabled={settings.comingSoonEnabled}
             hasPassword={Boolean(settings.comingSoonPasswordHash)}
+          />
+        </DashboardPanel>
+
+        <DashboardPanel
+          title="Marketplace social links"
+          description="Set the public Piessang links shown on marketplace surfaces like the coming soon page."
+        >
+          <SocialLinksForm
+            facebookUrl={settings.facebookUrl}
+            instagramUrl={settings.instagramUrl}
+            twitterUrl={settings.twitterUrl}
           />
         </DashboardPanel>
 

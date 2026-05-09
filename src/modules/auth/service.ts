@@ -11,6 +11,7 @@ import {
   users,
   type PlatformRole,
 } from "@/src/db/schema";
+import { addEmailSubscriber } from "@/src/modules/marketing/email-subscribers";
 
 export function isPlatformRole(role: unknown): role is PlatformRole {
   return (
@@ -72,6 +73,12 @@ export async function createCustomerAccount({
     await tx.insert(userRoles).values({
       userId: createdUser.id,
       role: "customer",
+    });
+
+    await addEmailSubscriber({
+      database: tx,
+      email,
+      source: "customer_signup",
     });
 
     return [createdUser];

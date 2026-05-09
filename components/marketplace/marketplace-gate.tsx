@@ -30,5 +30,13 @@ export async function MarketplaceGate({ children }: MarketplaceGateProps) {
     return children;
   }
 
-  return <ComingSoonScreen />;
+  return (
+    <ComingSoonScreen
+      socialLinks={{
+        facebookUrl: settings.facebookUrl,
+        instagramUrl: settings.instagramUrl,
+        twitterUrl: settings.twitterUrl,
+      }}
+    />
+  );
 }

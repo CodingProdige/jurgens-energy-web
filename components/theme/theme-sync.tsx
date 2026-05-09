@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useTheme } from "next-themes";
+import Script from "next/script";
 
 export const themeStorageKey = "piessang_theme";
 const validThemes = new Set(["light", "dark", "system"]);
@@ -90,5 +91,10 @@ export function ThemeCookieBootstrapScript() {
     })();
   `;
 
-  return <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: script }} />;
+  return (
+    <Script
+      id="piessang-theme-cookie-bootstrap"
+      dangerouslySetInnerHTML={{ __html: script }}
+    />
+  );
 }

@@ -12,11 +12,17 @@ export const marketplaceComingSoonCookieName = "piessang_marketplace_preview";
 type MarketplaceSettings = {
   comingSoonEnabled: boolean;
   comingSoonPasswordHash: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
+  twitterUrl: string | null;
 };
 
 const defaultSettings: MarketplaceSettings = {
   comingSoonEnabled: false,
   comingSoonPasswordHash: null,
+  facebookUrl: null,
+  instagramUrl: null,
+  twitterUrl: null,
 };
 
 export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
@@ -24,6 +30,9 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     .select({
       comingSoonEnabled: marketplaceSettings.comingSoonEnabled,
       comingSoonPasswordHash: marketplaceSettings.comingSoonPasswordHash,
+      facebookUrl: marketplaceSettings.facebookUrl,
+      instagramUrl: marketplaceSettings.instagramUrl,
+      twitterUrl: marketplaceSettings.twitterUrl,
     })
     .from(marketplaceSettings)
     .where(eq(marketplaceSettings.id, 1))
@@ -76,6 +85,37 @@ export async function updateMarketplaceComingSoonSettings({
     });
 
   return { ok: true, message: "Marketplace gate settings saved." };
+}
+
+export async function updateMarketplaceSocialLinks({
+  facebookUrl,
+  instagramUrl,
+  twitterUrl,
+}: {
+  facebookUrl?: string;
+  instagramUrl?: string;
+  twitterUrl?: string;
+}) {
+  await db
+    .insert(marketplaceSettings)
+    .values({
+      id: 1,
+      facebookUrl: facebookUrl || null,
+      instagramUrl: instagramUrl || null,
+      twitterUrl: twitterUrl || null,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: marketplaceSettings.id,
+      set: {
+        facebookUrl: facebookUrl || null,
+        instagramUrl: instagramUrl || null,
+        twitterUrl: twitterUrl || null,
+        updatedAt: new Date(),
+      },
+    });
+
+  return { ok: true, message: "Social links saved." };
 }
 
 export async function verifyMarketplaceComingSoonPassword(password: string) {
