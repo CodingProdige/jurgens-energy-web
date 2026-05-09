@@ -30,8 +30,7 @@ import { cn } from "@/lib/utils";
 const initialAccessState: ComingSoonState = {};
 const initialWaitlistState: WaitlistState = {};
 
-const comingSoonVideoSrc =
-  "/brand/video/show_people_in_amazement_all_s_Kling_30__31439%20%281%29.mp4";
+const comingSoonVideoSrc = "/brand/video/coming-soon-amazement.mp4";
 
 const features = [
   {
