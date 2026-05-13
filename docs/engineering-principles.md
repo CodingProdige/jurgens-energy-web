@@ -143,6 +143,158 @@ requireAuthenticatedUser()
 requireSellerAccess(sellerId)
 ```
 
+## Seller Registration Flow
+
+Seller registration starts with an email-first check. The first page of the
+seller registration flow should only ask for the email address, then check the
+database before continuing.
+
+The seller registration flow must preserve user intent:
+
+```text
+Seller application = wants to sell
+Marketplace sign-in = wants to browse or buy
+Admin sign-in = wants admin access
+Seller sign-in = wants seller access
+```
+
+Do not automatically add the `customer` role when someone applies as a seller.
+A seller applicant needs a `users` row for identity, but they do not become a
+marketplace customer unless they later sign in through the marketplace surface
+or explicitly choose customer access.
+
+### Email-First Decision Tree
+
+When a visitor enters an email on the first seller registration step:
+
+```text
+1. Normalize and validate the email.
+2. Check whether a users row exists.
+3. Check whether the account already has seller access.
+4. Check whether the account already has a seller application.
+5. Continue, block, or show status based on the result.
+```
+
+If no user exists:
+
+```text
+create users row
+create seller_applications row
+do not add customer role
+do not add seller_owner role
+add email_subscribers row with source seller_signup
+```
+
+If the email belongs to an existing user who is not signed in:
+
+```text
+prompt them to sign in before continuing the seller application
+```
+
+If the signed-in user is using their own existing account and does not already
+have seller access or a seller application:
+
+```text
+continue seller registration under that authenticated user
+create seller_applications row
+do not add customer role
+do not add seller_owner role
+```
+
+If the signed-in user tries to use a different account email:
+
+```text
+ask them to sign out or use their signed-in email
+```
+
+If the account already has seller access through any of these checks:
+
+```text
+user_roles includes seller_owner or seller_staff
+or seller_staff contains the user
+or sellers.owner_user_id is the user
+```
+
+Then do not create a new seller application. Show a clear state that says the
+account already has seller access and link to seller sign-in.
+
+If the account already has a seller application, do not create a duplicate.
+Show a polished status state instead:
+
+```text
+pending: application received and waiting for review
+approved: application approved, link to seller sign-in
+rejected: application could not be approved, show next-step guidance
+```
+
+Status states should be designed deliberately, using the seller auth visual
+system, rather than throwing a plain error message.
+
+### Marketplace Role Upgrade
+
+When a user signs in through the marketplace surface, that action is enough
+intent to grant marketplace customer access.
+
+If a user successfully signs in on the marketplace and does not already have
+the `customer` role:
+
+```text
+add user_roles row: customer
+```
+
+This allows a seller or admin identity to become a shopper only when they
+actually enter through the marketplace surface.
+
+### SSO Auth Flow
+
+SSO providers must use one shared handler path. Do not create provider-specific
+flows per surface.
+
+```text
+Google button -> shared SSO action -> Auth.js provider -> /auth/sso/complete
+```
+
+The SSO completion route reads the requested intent and applies the same
+surface rules as password sign-in:
+
+```text
+marketplace sign-in/register: allow, add customer role if missing
+seller sign-in: require seller access, otherwise route to seller application
+seller register: continue seller application under the authenticated user
+admin sign-in: require admin or superadmin access
+```
+
+SSO accounts must link by verified email instead of creating duplicate users.
+For example, if a password account later signs in with Google using the same
+verified email address, link Google to that existing `users` row through
+`accounts`. A Google-only account can later create a password through the
+password reset flow.
+
+### Approval Flow
+
+Seller application approval should be an admin action.
+
+On approval:
+
+```text
+create sellers row
+create seller_staff row with role owner
+add user_roles row: seller_owner
+write audit log
+```
+
+On rejection:
+
+```text
+update seller_applications status to rejected
+store reviewer and review timestamp
+write audit log
+```
+
+Banking, payout, tax, identity verification, shipping setup, and product
+onboarding should happen after approval inside the seller dashboard, not during
+the initial seller registration flow.
+
 ## Validation
 
 Use Zod at system boundaries:

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { signInAdminWithGoogle } from "@/app/auth/sso/actions";
 import { signInAdminWithPassword } from "@/app/sign-in/actions";
 import { AdminSignInScreen } from "@/app/(admin)/admin/sign-in/admin-sign-in-screen";
 import { rememberedEmailCookieName } from "@/src/modules/auth/constants";
@@ -44,6 +45,7 @@ export default async function AdminSignInPage() {
   return (
     <AdminSignInScreen
       action={signInAdminWithPassword}
+      googleAction={signInAdminWithGoogle}
       rememberedEmail={rememberedEmail}
     />
   );

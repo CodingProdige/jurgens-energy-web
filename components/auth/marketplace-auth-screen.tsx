@@ -29,6 +29,7 @@ type MarketplaceAuthScreenProps = {
     state: MarketplaceAuthState,
     formData: FormData,
   ) => Promise<MarketplaceAuthState>;
+  googleAction: () => Promise<void>;
   rememberedEmail?: string;
   mode: "sign-in" | "register";
 };
@@ -107,15 +108,23 @@ function GoogleGlyph() {
   );
 }
 
-function GoogleButton({ label }: { label: string }) {
+function GoogleButton({
+  action,
+  label,
+}: {
+  action: () => Promise<void>;
+  label: string;
+}) {
   return (
-    <button
-      type="button"
-      className="inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#d9deea] bg-white px-3 text-[13px] font-extrabold text-[#070b16] transition hover:bg-[#fafafa] dark:border-white/12 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
-    >
-      <GoogleGlyph />
-      {label}
-    </button>
+    <form action={action}>
+      <button
+        type="submit"
+        className="inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#d9deea] bg-white px-3 text-[13px] font-extrabold text-[#070b16] transition hover:bg-[#fafafa] dark:border-white/12 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
+      >
+        <GoogleGlyph />
+        <span className="text-[#070b16] dark:text-white">{label}</span>
+      </button>
+    </form>
   );
 }
 
@@ -219,6 +228,7 @@ function MarketplaceVisual({ mode }: { mode: "sign-in" | "register" }) {
 
 function MarketplaceAuthForm({
   action,
+  googleAction,
   rememberedEmail,
   mode,
 }: MarketplaceAuthScreenProps) {
@@ -227,7 +237,8 @@ function MarketplaceAuthForm({
   const isRegister = mode === "register";
 
   return (
-    <form action={formAction} className="w-full max-w-[420px]">
+    <div className="w-full max-w-[420px]">
+      <form action={formAction}>
       <div className="mb-8">
         <h2 className="text-[28px] font-extrabold leading-tight text-[#070b16] dark:text-white">
           {isRegister ? "Create account" : "Sign in"}
@@ -332,6 +343,7 @@ function MarketplaceAuthForm({
         <LockKeyhole className="size-4" />
         {pending ? "Working..." : isRegister ? "Create account" : "Sign in"}
       </button>
+      </form>
 
       <div className="my-7 flex items-center gap-4">
         <span className="h-px flex-1 bg-[#e2e6ef] dark:bg-white/12" />
@@ -341,7 +353,10 @@ function MarketplaceAuthForm({
         <span className="h-px flex-1 bg-[#e2e6ef] dark:bg-white/12" />
       </div>
 
-      <GoogleButton label={isRegister ? "Sign up with Google" : "Sign in with Google"} />
+      <GoogleButton
+        action={googleAction}
+        label={isRegister ? "Sign up with Google" : "Sign in with Google"}
+      />
 
       <p className="mt-7 text-center text-[14px] font-medium text-[#070b16] dark:text-zinc-300">
         {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
@@ -352,7 +367,7 @@ function MarketplaceAuthForm({
           {isRegister ? "Sign in" : "Create account"}
         </Link>
       </p>
-    </form>
+    </div>
   );
 }
 

@@ -4,7 +4,10 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
 import { signIn } from "@/auth";
-import { createCustomerAccount } from "@/src/modules/auth/service";
+import {
+  createCustomerAccount,
+  findUserByEmail,
+} from "@/src/modules/auth/service";
 import { registerSchema } from "@/src/modules/auth/validation";
 
 export type RegisterState = {
@@ -35,6 +38,15 @@ export async function registerCustomerWithPassword(
       error:
         parsed.error.issues[0]?.message ??
         "Enter your name, a valid email, and a password.",
+    };
+  }
+
+  const existingUser = await findUserByEmail(parsed.data.email);
+
+  if (existingUser) {
+    return {
+      error:
+        "This email already has a Piessang account. Please sign in to continue.",
     };
   }
 

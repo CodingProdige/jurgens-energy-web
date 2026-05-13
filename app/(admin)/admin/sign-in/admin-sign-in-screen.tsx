@@ -23,6 +23,7 @@ const initialState: SignInState = {};
 
 type AdminSignInScreenProps = {
   action: (state: SignInState, formData: FormData) => Promise<SignInState>;
+  googleAction: () => Promise<void>;
   rememberedEmail?: string;
 };
 
@@ -72,13 +73,15 @@ function GoogleGlyph() {
 
 function AdminSignInForm({
   action,
+  googleAction,
   rememberedEmail,
 }: AdminSignInScreenProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form action={formAction} className="w-full max-w-[390px]">
+    <div className="w-full max-w-[390px]">
+      <form action={formAction}>
       <div className="mb-9 text-center lg:text-left">
         <BrandMark className="mx-auto mb-12 w-[126px] lg:hidden" />
         <h1 className="m-0 text-[22px] font-extrabold leading-tight text-[#070b16] dark:text-white">
@@ -167,6 +170,7 @@ function AdminSignInForm({
         <LockKeyhole className="size-4" />
         {pending ? "Signing in..." : "Sign in"}
       </button>
+      </form>
 
       <div className="my-8 flex items-center gap-4">
         <span className="h-px flex-1 bg-[#e2e6ef]" />
@@ -174,13 +178,15 @@ function AdminSignInForm({
         <span className="h-px flex-1 bg-[#e2e6ef]" />
       </div>
 
-      <button
-        type="button"
-        className="inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#d9deea] bg-white text-[13px] font-extrabold text-[#070b16] transition hover:bg-[#fafafa] dark:border-white/12 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
-      >
-        <GoogleGlyph />
-        Sign in with Google
-      </button>
+      <form action={googleAction}>
+        <button
+          type="submit"
+          className="inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#d9deea] bg-white text-[13px] font-extrabold text-[#070b16] transition hover:bg-[#fafafa] dark:border-white/12 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
+        >
+          <GoogleGlyph />
+          <span className="text-[#070b16] dark:text-white">Sign in with Google</span>
+        </button>
+      </form>
 
       <div className="mt-13 text-center">
         <ShieldCheck className="mx-auto size-9 text-[#cca137]" />
@@ -191,12 +197,13 @@ function AdminSignInForm({
           All connections are encrypted and secure
         </p>
       </div>
-    </form>
+    </div>
   );
 }
 
 export function AdminSignInScreen({
   action,
+  googleAction,
   rememberedEmail,
 }: AdminSignInScreenProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
@@ -285,7 +292,11 @@ export function AdminSignInScreen({
 
       <section className="grid min-h-[calc(100vh-430px)] min-w-0 place-items-center bg-white px-7 py-10 dark:bg-[#0f1114] sm:px-12 lg:min-h-screen lg:px-16">
         <div className="w-full max-w-[390px] lg:translate-y-[-8px]">
-          <AdminSignInForm action={action} rememberedEmail={rememberedEmail} />
+          <AdminSignInForm
+            action={action}
+            googleAction={googleAction}
+            rememberedEmail={rememberedEmail}
+          />
         </div>
       </section>
     </main>

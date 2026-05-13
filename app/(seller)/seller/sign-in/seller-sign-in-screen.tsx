@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import {
   BarChart3,
@@ -24,6 +25,7 @@ const sellerGreen = "#58d83f";
 
 type SellerSignInScreenProps = {
   action: (state: SignInState, formData: FormData) => Promise<SignInState>;
+  googleAction: () => Promise<void>;
   rememberedEmail?: string;
 };
 
@@ -73,13 +75,15 @@ function GoogleGlyph() {
 
 function SellerSignInForm({
   action,
+  googleAction,
   rememberedEmail,
 }: SellerSignInScreenProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form action={formAction} className="w-full max-w-[390px]">
+    <div className="w-full max-w-[390px]">
+      <form action={formAction}>
       <div className="mb-9 text-center lg:text-left">
         <BrandMark className="mx-auto mb-9 w-[126px] lg:hidden" />
         <div className="mx-auto mb-6 grid size-[74px] place-items-center rounded-full bg-[#58d83f]/16 text-[#0f8a2c] lg:hidden">
@@ -166,11 +170,12 @@ function SellerSignInForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-7 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#053f17] bg-[linear-gradient(180deg,#08651f,#06491a)] text-[13px] font-extrabold text-white shadow-[0_10px_24px_rgba(6,73,26,0.22)] transition hover:brightness-[1.05] disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-7 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#053f17] bg-[linear-gradient(180deg,#08651f,#06491a)] text-base font-medium text-white shadow-[0_10px_24px_rgba(6,73,26,0.22)] transition hover:brightness-[1.05] disabled:cursor-not-allowed disabled:opacity-70"
       >
         <LockKeyhole className="size-4" />
         {pending ? "Signing in..." : "Sign in"}
       </button>
+      </form>
 
       <div className="my-8 flex items-center gap-4">
         <span className="h-px flex-1 bg-[#e2e6ef]" />
@@ -178,13 +183,27 @@ function SellerSignInForm({
         <span className="h-px flex-1 bg-[#e2e6ef]" />
       </div>
 
-      <button
-        type="button"
-        className="inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#d9deea] bg-white text-[13px] font-extrabold text-[#070b16] transition hover:bg-[#fafafa] dark:border-white/12 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
-      >
-        <GoogleGlyph />
-        Sign in with Google
-      </button>
+      <form action={googleAction}>
+        <button
+          type="submit"
+          className="inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#d9deea] bg-white text-base font-medium text-[#070b16] transition hover:bg-[#fafafa] dark:border-white/12 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
+        >
+          <GoogleGlyph />
+          <span className="text-[#070b16] dark:text-white">
+            Sign in with Google
+          </span>
+        </button>
+      </form>
+
+      <p className="mt-6 text-center text-[13px] font-medium text-[#596176] dark:text-zinc-300">
+        Want to sell on Piessang?{" "}
+        <Link
+          href="/register"
+          className="font-extrabold text-[#11952f] transition hover:text-[#086d22]"
+        >
+          Apply to sell
+        </Link>
+      </p>
 
       <div className="mt-13 text-center">
         <ShieldCheck className="mx-auto size-9 text-[#2eb338]" />
@@ -195,12 +214,13 @@ function SellerSignInForm({
           All connections are encrypted and secure
         </p>
       </div>
-    </form>
+    </div>
   );
 }
 
 export function SellerSignInScreen({
   action,
+  googleAction,
   rememberedEmail,
 }: SellerSignInScreenProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
@@ -288,7 +308,11 @@ export function SellerSignInScreen({
 
       <section className="grid min-h-[calc(100vh-430px)] min-w-0 place-items-center bg-white px-7 py-10 dark:bg-[#0f1114] sm:px-12 lg:min-h-screen lg:px-16">
         <div className="w-full max-w-[390px] lg:translate-y-[-8px]">
-          <SellerSignInForm action={action} rememberedEmail={rememberedEmail} />
+          <SellerSignInForm
+            action={action}
+            googleAction={googleAction}
+            rememberedEmail={rememberedEmail}
+          />
         </div>
       </section>
     </main>

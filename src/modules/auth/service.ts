@@ -30,6 +30,16 @@ export async function findUserByEmail(email: string) {
   return user;
 }
 
+export async function findUserById(userId: string) {
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return user;
+}
+
 export async function getUserRoles(userId: string) {
   const rows = await db
     .select({ role: userRoles.role })
@@ -39,6 +49,18 @@ export async function getUserRoles(userId: string) {
   return rows
     .map((row) => row.role)
     .filter((role): role is PlatformRole => isPlatformRole(role));
+}
+
+export async function ensureUserRole(userId: string, role: PlatformRole) {
+  await db
+    .insert(userRoles)
+    .values({
+      userId,
+      role,
+    })
+    .onConflictDoNothing({
+      target: [userRoles.userId, userRoles.role],
+    });
 }
 
 export async function verifyPassword(password: string, passwordHash: string) {

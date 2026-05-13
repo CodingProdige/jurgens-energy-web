@@ -7,11 +7,13 @@ import { redirect } from "next/navigation";
 
 import { signIn } from "@/auth";
 import {
+  getSharedAuthCookieDomain,
   rememberedEmailCookieName,
   surfaceAccessRememberSeconds,
 } from "@/src/modules/auth/constants";
 import {
   canAccessCapability,
+  ensureUserRole,
   type AccessCapability,
   findUserByEmail,
   getUserRoles,
@@ -83,12 +85,20 @@ async function signInWithPasswordForSurface(
     return { error: options.capabilityError };
   }
 
+  if (
+    options.requiredCapability === "marketplace" &&
+    !roles.includes("customer")
+  ) {
+    await ensureUserRole(user.id, "customer");
+  }
+
   const cookieStore = await cookies();
   const shouldRememberEmail =
     options.rememberByDefault || formData.get("remember") === "on";
 
   if (shouldRememberEmail) {
     cookieStore.set(rememberedEmailCookieName, parsed.data.email, {
+      domain: getSharedAuthCookieDomain(),
       maxAge: 60 * 60 * 24 * 90,
       path: "/",
       sameSite: "lax",
@@ -111,6 +121,7 @@ async function signInWithPasswordForSurface(
       getSurfaceAccessCookieName(options.requiredCapability),
       surfaceAccessToken,
       {
+        domain: getSharedAuthCookieDomain(),
         httpOnly: true,
         maxAge: shouldRememberEmail ? surfaceAccessRememberSeconds : undefined,
         path: "/",

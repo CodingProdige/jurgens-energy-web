@@ -16,6 +16,8 @@ Use these values as the local development baseline:
 APP_URL=http://localhost:3000
 AUTH_URL=http://localhost:3000
 AUTH_SECRET=replace-with-a-long-random-secret
+AUTH_GOOGLE_ID=replace-with-google-client-id
+AUTH_GOOGLE_SECRET=replace-with-google-client-secret
 ADMIN_HOSTNAME=admin.localhost
 SELLER_HOSTNAME=seller.localhost
 
@@ -48,6 +50,8 @@ For self-hosting, update the same `.env` file with production-style values:
 APP_URL=https://piessang.com
 AUTH_URL=https://piessang.com
 AUTH_SECRET=replace-with-a-long-random-production-secret
+AUTH_GOOGLE_ID=replace-with-google-client-id
+AUTH_GOOGLE_SECRET=replace-with-google-client-secret
 
 DOMAIN=piessang.com
 ADMIN_HOSTNAME=admin.piessang.com
@@ -80,6 +84,21 @@ CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5432`. Docker Compose gives the `web` container its internal database URL automatically.
 
 `SENDGRID_FROM_EMAIL` must be a sender identity verified in SendGrid. If either SendGrid value is missing in local development, password reset requests keep showing the dev reset link instead of sending email.
+
+## Google SSO
+
+Create one Google OAuth web client and add redirect URIs for every public auth surface that can start Google sign-in:
+
+```text
+http://localhost:3000/api/auth/callback/google
+http://admin.localhost:3000/api/auth/callback/google
+http://seller.localhost:3000/api/auth/callback/google
+https://piessang.com/api/auth/callback/google
+https://admin.piessang.com/api/auth/callback/google
+https://seller.piessang.com/api/auth/callback/google
+```
+
+Use the OAuth client ID as `AUTH_GOOGLE_ID` and the client secret as `AUTH_GOOGLE_SECRET`.
 
 ## Storage Paths
 

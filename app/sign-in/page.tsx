@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { signInMarketplaceWithGoogle } from "@/app/auth/sso/actions";
 import { signInCustomerWithPassword } from "@/app/sign-in/actions";
 import { MarketplaceAuthScreen } from "@/components/auth/marketplace-auth-screen";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
@@ -30,6 +31,7 @@ export default async function SignInPage() {
     <MarketplaceGate>
       <MarketplaceAuthScreen
         action={signInCustomerWithPassword}
+        googleAction={signInMarketplaceWithGoogle}
         rememberedEmail={rememberedEmail}
         mode="sign-in"
       />

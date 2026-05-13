@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { signInSellerWithGoogle } from "@/app/auth/sso/actions";
 import { signInSellerWithPassword } from "@/app/sign-in/actions";
 import { SellerSignInScreen } from "@/app/(seller)/seller/sign-in/seller-sign-in-screen";
 import { rememberedEmailCookieName } from "@/src/modules/auth/constants";
@@ -44,6 +45,7 @@ export default async function SellerSignInPage() {
   return (
     <SellerSignInScreen
       action={signInSellerWithPassword}
+      googleAction={signInSellerWithGoogle}
       rememberedEmail={rememberedEmail}
     />
   );

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { registerMarketplaceWithGoogle } from "@/app/auth/sso/actions";
 import { registerCustomerWithPassword } from "@/app/register/actions";
 import { MarketplaceAuthScreen } from "@/components/auth/marketplace-auth-screen";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
@@ -26,6 +27,7 @@ export default async function RegisterPage() {
     <MarketplaceGate>
       <MarketplaceAuthScreen
         action={registerCustomerWithPassword}
+        googleAction={registerMarketplaceWithGoogle}
         mode="register"
       />
     </MarketplaceGate>

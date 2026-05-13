@@ -8,10 +8,7 @@ import {
   Lock,
   LockKeyhole,
   Mail,
-  PackageCheck,
-  ShieldCheck,
   Sparkles,
-  Tag,
 } from "lucide-react";
 
 import {
@@ -31,29 +28,6 @@ const initialAccessState: ComingSoonState = {};
 const initialWaitlistState: WaitlistState = {};
 
 const comingSoonVideoSrc = "/brand/video/coming-soon-amazement.mp4";
-
-const features = [
-  {
-    title: "Trusted Sellers",
-    description: "Verified and reliable",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Best Deals",
-    description: "Unbeatable prices",
-    icon: Tag,
-  },
-  {
-    title: "Wide Variety",
-    description: "Everything you need",
-    icon: PackageCheck,
-  },
-  {
-    title: "Secure Shopping",
-    description: "Safe and protected",
-    icon: Lock,
-  },
-] as const;
 
 function BrandMark({ className }: { className?: string }) {
   return (
@@ -115,14 +89,15 @@ function ComingSoonVisual() {
             Coming soon
           </p>
           <h1 className="mt-5 text-[36px] font-extrabold leading-[1.05] sm:text-[42px] lg:text-[48px]">
-            Something{" "}
-            <span className="text-[#ffc400]">Amazing</span>
+            A new{" "}
+            <span className="text-[#ffc400]">global</span>
             <br />
-            is on the way.
+            marketplace is coming.
           </h1>
           <p className="mt-5 max-w-[360px] text-[14px] font-medium leading-6 text-white/86">
-            Piessang Marketplace is almost here. Your one-stop destination for
-            everything you love - from trusted sellers.
+            Piessang is a new global marketplace built to connect shoppers with
+            trusted sellers, standout products, and a simpler way to discover
+            what they love.
           </p>
         </div>
       </div>
@@ -156,14 +131,14 @@ function ComingSoonPanel({
           Coming soon
         </p>
         <h2 className="mt-4 text-[30px] font-extrabold leading-[1.08] text-[#070b16] dark:text-white sm:text-[34px]">
-          Something{" "}
-          <span className="text-[#f0b800]">Amazing</span>
+          A new{" "}
+          <span className="text-[#f0b800]">global</span>
           <br />
-          is on the way.
+          marketplace is coming.
         </h2>
         <p className="mx-auto mt-4 max-w-[360px] text-[14px] leading-6 text-[#596176] dark:text-zinc-300 lg:mx-0">
-          Piessang Marketplace is almost here. Your one-stop destination for
-          everything you love - from trusted sellers.
+          Piessang is built to connect shoppers with trusted sellers, standout
+          products, and a simpler way to discover what they love.
         </p>
       </div>
 
@@ -251,32 +226,6 @@ function ComingSoonPanel({
           </p>
         ) : null}
       </form>
-
-      <div className="mt-9 grid grid-cols-4 overflow-hidden">
-        {features.map((feature, index) => {
-          const Icon = feature.icon;
-
-          return (
-            <div
-              key={feature.title}
-              className={cn(
-                "px-2 text-center",
-                index > 0 && "border-l border-[#e2e6ef] dark:border-white/12",
-              )}
-            >
-              <div className="mx-auto grid size-10 place-items-center rounded-full bg-[#fbe694]/38 text-[#cca137]">
-                <Icon className="size-5" />
-              </div>
-              <h3 className="mt-3 text-[11px] font-extrabold leading-tight text-[#070b16] dark:text-white">
-                {feature.title}
-              </h3>
-              <p className="mt-1 hidden text-[12px] leading-4 text-[#596176] dark:text-zinc-400 sm:block">
-                {feature.description}
-              </p>
-            </div>
-          );
-        })}
-      </div>
 
       <footer className="mt-10 border-t border-[#e2e6ef] pt-7 text-center dark:border-white/12">
         <p className="text-[12px] leading-5 text-[#596176] dark:text-zinc-400">

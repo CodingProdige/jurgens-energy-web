@@ -57,6 +57,20 @@
       "when": 1778328000000,
       "tag": "0007_email_subscribers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778497200000,
+      "tag": "0008_seller_applications",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778583600000,
+      "tag": "0009_seller_application_store_slug",
+      "breakpoints": true
     }
   ]
 }
