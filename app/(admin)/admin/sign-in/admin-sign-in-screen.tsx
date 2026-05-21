@@ -25,6 +25,7 @@ type AdminSignInScreenProps = {
   action: (state: SignInState, formData: FormData) => Promise<SignInState>;
   googleAction: () => Promise<void>;
   rememberedEmail?: string;
+  ssoError?: string;
 };
 
 const featureItems = [
@@ -75,6 +76,7 @@ function AdminSignInForm({
   action,
   googleAction,
   rememberedEmail,
+  ssoError,
 }: AdminSignInScreenProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [showPassword, setShowPassword] = useState(false);
@@ -156,6 +158,13 @@ function AdminSignInForm({
         </p>
       </div>
 
+      {ssoError === "admin_access_required" ? (
+        <p className="mt-5 rounded-[6px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+          This Google account does not have admin access. Use an approved admin
+          account or contact the platform owner.
+        </p>
+      ) : null}
+
       {state.error ? (
         <p className="mt-5 rounded-[6px] border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
           {state.error}
@@ -205,6 +214,7 @@ export function AdminSignInScreen({
   action,
   googleAction,
   rememberedEmail,
+  ssoError,
 }: AdminSignInScreenProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [didVideoEnd, setDidVideoEnd] = useState(false);
@@ -296,6 +306,7 @@ export function AdminSignInScreen({
             action={action}
             googleAction={googleAction}
             rememberedEmail={rememberedEmail}
+            ssoError={ssoError}
           />
         </div>
       </section>

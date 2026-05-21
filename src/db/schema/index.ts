@@ -10,6 +10,8 @@ export * from "@/src/db/schema/products";
 export * from "@/src/db/schema/cart";
 export * from "@/src/db/schema/orders";
 export * from "@/src/db/schema/payments";
+export * from "@/src/db/schema/subscriptions";
 export * from "@/src/db/schema/payouts";
 export * from "@/src/db/schema/reviews";
 export * from "@/src/db/schema/audit-logs";
+export * from "@/src/db/schema/notifications";

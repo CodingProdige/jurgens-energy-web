@@ -1,6 +1,7 @@
 import {
   BoxesIcon,
   ClipboardListIcon,
+  FolderTreeIcon,
   LayoutDashboardIcon,
   LineChartIcon,
   PackageCheckIcon,
@@ -15,6 +16,7 @@ export const adminNavItems: DashboardNavItem[] = [
   { label: "Overview", href: "/", icon: LayoutDashboardIcon },
   { label: "Users", href: "/users", icon: UsersIcon },
   { label: "Sellers", href: "/sellers", icon: StoreIcon },
+  { label: "Categories", href: "/categories", icon: FolderTreeIcon },
   { label: "Products", href: "/products", icon: BoxesIcon },
   { label: "Orders", href: "/orders", icon: PackageCheckIcon },
   { label: "Audit logs", href: "/audit-logs", icon: ClipboardListIcon },

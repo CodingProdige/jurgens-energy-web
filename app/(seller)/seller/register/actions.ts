@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { auth } from "@/auth";
 import { findUserByEmail } from "@/src/modules/auth/service";
+import { verifySsoHandoffToken } from "@/src/modules/auth/sso-handoff";
 import {
   createSellerApplicationForExistingUser,
   createSellerApplicationForNewUser,
@@ -61,6 +62,7 @@ const sellerApplicationSchema = z.object({
     .trim()
     .regex(/^\+[1-9]\d{6,14}$/, "Enter a valid mobile number."),
   postalCode: z.string().trim().min(2).max(40),
+  ssoHandoffToken: z.string().optional(),
   stateProvince: z.string().trim().min(2).max(120),
   storeName: z.string().trim().min(2).max(160),
 });
@@ -178,6 +180,7 @@ export async function submitSellerApplication(
     password: formData.get("password"),
     phone: formData.get("phone"),
     postalCode: formData.get("postalCode"),
+    ssoHandoffToken: formData.get("ssoHandoffToken"),
     stateProvince: formData.get("stateProvince"),
     storeName: formData.get("storeName"),
   });
@@ -192,9 +195,15 @@ export async function submitSellerApplication(
 
   const session = await auth();
   const existingUser = await findUserByEmail(parsed.data.email);
+  const handoff = verifySsoHandoffToken(parsed.data.ssoHandoffToken);
 
   if (existingUser) {
-    if (!session?.user || session.user.id !== existingUser.id) {
+    const hasMatchingSession = session?.user?.id === existingUser.id;
+    const hasMatchingHandoff =
+      handoff?.userId === existingUser.id &&
+      handoff.email.toLowerCase() === existingUser.email.toLowerCase();
+
+    if (!hasMatchingSession && !hasMatchingHandoff) {
       return {
         error: "Please sign in with this account before continuing.",
       };

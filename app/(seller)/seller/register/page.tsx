@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import { auth } from "@/auth";
 import { SellerRegisterScreen } from "@/app/(seller)/seller/register/seller-register-screen";
+import { findUserById } from "@/src/modules/auth/service";
+import { verifySsoHandoffToken } from "@/src/modules/auth/sso-handoff";
 import {
   findSellerApplicationByUserId,
   getSellerAccessState,
@@ -16,10 +18,72 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function SellerRegisterPage() {
+type SellerRegisterPageProps = {
+  searchParams: Promise<{
+    sso?: string;
+  }>;
+};
+
+export default async function SellerRegisterPage({
+  searchParams,
+}: SellerRegisterPageProps) {
+  const { sso } = await searchParams;
   const session = await auth();
 
   if (!session?.user?.id || !session.user.email) {
+    const handoff = verifySsoHandoffToken(sso);
+
+    if (handoff) {
+      const user = await findUserById(handoff.userId);
+
+      if (
+        user?.isActive &&
+        user.email?.toLowerCase() === handoff.email.toLowerCase()
+      ) {
+        const accessState = await getSellerAccessState(user.id);
+
+        if (accessState.hasSellerAccess) {
+          return (
+            <SellerRegisterScreen
+              initialEmailState={{
+                email: user.email,
+                mode: "already_seller",
+                userName: user.name,
+              }}
+              ssoHandoffToken={sso}
+            />
+          );
+        }
+
+        const application = await findSellerApplicationByUserId(user.id);
+
+        if (application) {
+          return (
+            <SellerRegisterScreen
+              initialEmailState={{
+                applicationStatus: application.status,
+                email: user.email,
+                mode: "existing_application",
+                userName: user.name,
+              }}
+              ssoHandoffToken={sso}
+            />
+          );
+        }
+
+        return (
+          <SellerRegisterScreen
+            initialEmailState={{
+              email: user.email,
+              mode: "existing_signed_in",
+              userName: user.name,
+            }}
+            ssoHandoffToken={sso}
+          />
+        );
+      }
+    }
+
     return <SellerRegisterScreen />;
   }
 

@@ -8,6 +8,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { brands, categories } from "@/src/db/schema/catalog";
 import { productVariants } from "@/src/db/schema/products";
 import { sellers } from "@/src/db/schema/sellers";
 import { users } from "@/src/db/schema/users";
@@ -43,7 +44,14 @@ export const orderItems = pgTable("order_items", {
   variantId: uuid("variant_id")
     .notNull()
     .references(() => productVariants.id),
+  categoryId: uuid("category_id").references(() => categories.id),
+  brandId: uuid("brand_id").references(() => brands.id),
   title: text("title").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  commissionRateBps: integer("commission_rate_bps"),
+  commissionAmount: numeric("commission_amount", {
+    precision: 12,
+    scale: 2,
+  }),
 });

@@ -13,7 +13,8 @@ import {
   createSurfaceAccessToken,
   getSurfaceAccessCookieName,
 } from "@/src/modules/auth/surface-access";
-import { isSsoIntent } from "@/src/modules/auth/sso";
+import { createSsoHandoffToken } from "@/src/modules/auth/sso-handoff";
+import { getSurfaceUrl, isSsoIntent } from "@/src/modules/auth/sso";
 import { addEmailSubscriber } from "@/src/modules/marketing/email-subscribers";
 
 type SsoCompletePageProps = {
@@ -39,6 +40,24 @@ async function setSessionSurfaceAccess(
     path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
+  });
+}
+
+function getSellerRegisterUrlWithHandoff(user: {
+  email: string | null;
+  id: string;
+  name: string | null;
+}) {
+  if (!user.email) {
+    return getSurfaceUrl("seller", "/register");
+  }
+
+  return getSurfaceUrl("seller", "/register", {
+    sso: createSsoHandoffToken({
+      email: user.email,
+      name: user.name,
+      userId: user.id,
+    }),
   });
 }
 
@@ -78,21 +97,25 @@ export default async function SsoCompletePage({
 
   if (intent === "admin_sign_in") {
     if (!canAccessCapability({ roles }, "admin")) {
-      redirect("/sign-in?error=admin_access_required");
+      redirect(
+        getSurfaceUrl("admin", "/sign-in", {
+          error: "admin_access_required",
+        }),
+      );
     }
 
     await setSessionSurfaceAccess("admin", user.id);
-    redirect("/");
+    redirect(getSurfaceUrl("admin"));
   }
 
   if (intent === "seller_sign_in") {
     if (!canAccessCapability({ roles }, "seller")) {
-      redirect("/register?from=sso");
+      redirect(getSellerRegisterUrlWithHandoff(user));
     }
 
     await setSessionSurfaceAccess("seller", user.id);
-    redirect("/");
+    redirect(getSurfaceUrl("seller"));
   }
 
-  redirect("/register?from=sso");
+  redirect(getSellerRegisterUrlWithHandoff(user));
 }

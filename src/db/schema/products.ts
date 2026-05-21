@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { categories } from "@/src/db/schema/catalog";
+import { brands, categories } from "@/src/db/schema/catalog";
 import { sellers } from "@/src/db/schema/sellers";
 
 export const productStatus = pgEnum("product_status", [
@@ -25,6 +25,7 @@ export const products = pgTable("products", {
     .notNull()
     .references(() => sellers.id),
   categoryId: uuid("category_id").references(() => categories.id),
+  brandId: uuid("brand_id").references(() => brands.id),
   title: varchar("title", { length: 240 }).notNull(),
   slug: varchar("slug", { length: 240 }).notNull().unique(),
   description: text("description"),

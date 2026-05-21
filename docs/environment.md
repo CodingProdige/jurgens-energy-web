@@ -40,6 +40,7 @@ ADMIN_NAME=Marketplace Admin
 SENDGRID_API_KEY=replace-with-sendgrid-api-key
 SENDGRID_FROM_EMAIL=no-reply@piessang.com
 SENDGRID_FROM_NAME=Piessang
+SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
 ```
 
 ## Self-Hosted Values
@@ -77,6 +78,7 @@ ADMIN_NAME=Marketplace Admin
 SENDGRID_API_KEY=replace-with-sendgrid-api-key
 SENDGRID_FROM_EMAIL=no-reply@piessang.com
 SENDGRID_FROM_NAME=Piessang
+SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
 
 CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 ```
@@ -84,6 +86,8 @@ CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5432`. Docker Compose gives the `web` container its internal database URL automatically.
 
 `SENDGRID_FROM_EMAIL` must be a sender identity verified in SendGrid. If either SendGrid value is missing in local development, password reset requests keep showing the dev reset link instead of sending email.
+
+`SENDGRID_WEBHOOK_PUBLIC_KEY` is the Verification key shown by SendGrid when Signed Event Webhook is enabled. Use the endpoint `https://piessang.com/api/webhooks/sendgrid/events` in SendGrid.
 
 ## Google SSO
 

@@ -7,6 +7,7 @@ type SendGridEmailAddress = {
 
 type SendGridMessage = {
   personalizations: Array<{
+    custom_args?: Record<string, string>;
     to: SendGridEmailAddress[];
     subject: string;
   }>;
@@ -18,7 +19,7 @@ type SendGridMessage = {
 };
 
 type SendEmailResult =
-  | { delivered: true }
+  | { delivered: true; providerMessageId?: string }
   | { delivered: false; reason: "not_configured" | "send_failed" };
 
 export async function sendEmail(message: Omit<SendGridMessage, "from">) {
@@ -51,5 +52,8 @@ export async function sendEmail(message: Omit<SendGridMessage, "from">) {
     return { delivered: false, reason: "send_failed" } satisfies SendEmailResult;
   }
 
-  return { delivered: true } satisfies SendEmailResult;
+  return {
+    delivered: true,
+    providerMessageId: response.headers.get("x-message-id") ?? undefined,
+  } satisfies SendEmailResult;
 }

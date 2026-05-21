@@ -22,7 +22,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function AdminSignInPage() {
+type AdminSignInPageProps = {
+  searchParams: Promise<{
+    error?: string;
+  }>;
+};
+
+export default async function AdminSignInPage({
+  searchParams,
+}: AdminSignInPageProps) {
+  const { error } = await searchParams;
   const session = await auth();
   const cookieStore = await cookies();
   const rememberedEmail = cookieStore.get(rememberedEmailCookieName)?.value;
@@ -47,6 +56,7 @@ export default async function AdminSignInPage() {
       action={signInAdminWithPassword}
       googleAction={signInAdminWithGoogle}
       rememberedEmail={rememberedEmail}
+      ssoError={error}
     />
   );
 }

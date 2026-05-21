@@ -9,6 +9,7 @@ const mimeExtensions: Record<string, string> = {
   "image/webp": "webp",
   "application/pdf": "pdf",
   "text/csv": "csv",
+  "video/mp4": "mp4",
 };
 
 const safeSegmentPattern = /^[a-z0-9][a-z0-9-]*$/;

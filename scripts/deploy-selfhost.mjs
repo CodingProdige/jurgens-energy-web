@@ -25,6 +25,7 @@ if (!existsSync(".env")) {
 
 run("docker", [...composeBaseArgs, "up", "-d", "postgres", "redis"]);
 run("npm", ["run", "db:migrate"]);
+run("npm", ["run", "db:seed:catalog"]);
 
 const hasTunnelToken = Boolean(process.env.CLOUDFLARE_TUNNEL_TOKEN?.trim());
 const upArgs = [...composeBaseArgs];

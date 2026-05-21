@@ -1,10 +1,12 @@
 "use server";
 
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { signIn } from "@/auth";
 import {
   getSsoCompletionPath,
+  getSsoStartUrl,
   isGoogleAuthConfigured,
   type SsoIntent,
 } from "@/src/modules/auth/sso";
@@ -28,6 +30,17 @@ async function signInWithGoogleForIntent(intent: SsoIntent) {
     throw new Error(
       "Google auth is not configured. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET.",
     );
+  }
+
+  const headerStore = await headers();
+  const forwardedHost = headerStore.get("x-forwarded-host");
+  const host = forwardedHost ?? headerStore.get("host");
+  const rootHost = new URL(
+    process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000",
+  ).host;
+
+  if (host && host !== rootHost) {
+    redirect(getSsoStartUrl(intent));
   }
 
   await signIn("google", {

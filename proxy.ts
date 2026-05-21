@@ -11,7 +11,7 @@ const ROOT_STATIC_ASSET_PATHS = new Set([
   "/robots.txt",
   "/sitemap.xml",
 ]);
-const ROOT_STATIC_ASSET_PREFIXES = ["/brand/"];
+const ROOT_STATIC_ASSET_PREFIXES = ["/brand/", "/media/"];
 
 function getHostname(request: NextRequest) {
   const forwardedHost = request.headers.get("x-forwarded-host");

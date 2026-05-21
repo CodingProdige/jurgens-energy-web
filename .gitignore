@@ -20,6 +20,9 @@
 # production
 /build
 
+# local self-hosted media/runtime storage
+/storage
+
 # misc
 .DS_Store
 *.pem

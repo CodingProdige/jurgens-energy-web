@@ -9,11 +9,8 @@ import {
 import type { Metadata } from "next";
 
 import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
-import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
-import { requireAdminAccess } from "@/src/modules/auth/permissions";
 import { getAdminOverview } from "@/src/modules/admin";
-import { adminNavItems } from "@/src/modules/admin/navigation";
 
 export const metadata: Metadata = {
   title: "Admin Dashboard",
@@ -26,21 +23,25 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
-  const session = await requireAdminAccess();
   const overview = await getAdminOverview();
 
   return (
-    <DashboardShell
-      activeHref="/"
-      badge="Admin"
-      description="Review platform activity, seller readiness, user growth, and operational risk from one controlled surface."
-      eyebrow="Protected admin"
-      navItems={adminNavItems}
-      surfaceHref="/"
-      surfaceLabel="Admin"
-      title="Marketplace operations"
-      userLabel={`${session.user.email} (admin)`}
-    >
+    <>
+      <div className="mb-7 flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-zinc-400">
+          <span>Admin</span>
+          <span>/</span>
+          <span>Overview</span>
+        </div>
+        <h1 className="text-[28px] font-bold tracking-normal text-zinc-950 dark:text-white">
+          Marketplace operations
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-zinc-300">
+          Review platform activity, seller readiness, user growth, and
+          operational risk from one controlled surface.
+        </p>
+      </div>
+
       <section
         className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
         aria-label="Marketplace overview"
@@ -107,6 +108,6 @@ export default async function AdminPage() {
           </div>
         </DashboardPanel>
       </section>
-    </DashboardShell>
+    </>
   );
 }

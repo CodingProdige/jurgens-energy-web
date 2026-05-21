@@ -379,8 +379,10 @@ function StatusPanel({
 
 function EmailGate({
   initialState = emailInitialState,
+  ssoHandoffToken,
 }: {
   initialState?: SellerEmailCheckState;
+  ssoHandoffToken?: string;
 }) {
   const [state, action, pending] = useActionState(
     checkSellerRegistrationEmail,
@@ -391,7 +393,12 @@ function EmailGate({
     state.mode === "new_user" ||
     state.mode === "existing_signed_in"
   ) {
-    return <ApplicationForm emailState={state} />;
+    return (
+      <ApplicationForm
+        emailState={state}
+        ssoHandoffToken={ssoHandoffToken}
+      />
+    );
   }
 
   return (
@@ -637,7 +644,13 @@ function StoreNameAvailabilityMessage({
   return null;
 }
 
-function ApplicationForm({ emailState }: { emailState: SellerEmailCheckState }) {
+function ApplicationForm({
+  emailState,
+  ssoHandoffToken,
+}: {
+  emailState: SellerEmailCheckState;
+  ssoHandoffToken?: string;
+}) {
   const [submitState, submitAction, pending] = useActionState(
     submitSellerApplication,
     submitInitialState,
@@ -918,6 +931,11 @@ function ApplicationForm({ emailState }: { emailState: SellerEmailCheckState }) 
       <input type="hidden" name="email" value={emailState.email ?? ""} />
       <input type="hidden" name="countryRegion" value={values.countryRegion} />
       <input type="hidden" name="phone" value={values.phone} />
+      <input
+        type="hidden"
+        name="ssoHandoffToken"
+        value={ssoHandoffToken ?? ""}
+      />
 
       <div className="mb-9 text-center lg:text-left">
         <BrandMark className="mx-auto mb-9 w-[126px] lg:hidden" />
@@ -1306,8 +1324,10 @@ function ApplicationForm({ emailState }: { emailState: SellerEmailCheckState }) 
 
 export function SellerRegisterScreen({
   initialEmailState,
+  ssoHandoffToken,
 }: {
   initialEmailState?: SellerEmailCheckState;
+  ssoHandoffToken?: string;
 }) {
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [didVideoEnd, setDidVideoEnd] = useState(false);
@@ -1392,7 +1412,10 @@ export function SellerRegisterScreen({
       </section>
 
       <section className="grid min-h-[calc(100vh-430px)] min-w-0 place-items-center bg-white px-7 py-10 dark:bg-[#0f1114] sm:px-12 lg:min-h-screen lg:px-16">
-        <EmailGate initialState={initialEmailState} />
+        <EmailGate
+          initialState={initialEmailState}
+          ssoHandoffToken={ssoHandoffToken}
+        />
       </section>
     </main>
   );
