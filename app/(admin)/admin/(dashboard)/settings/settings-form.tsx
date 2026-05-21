@@ -1600,7 +1600,13 @@ function getNotificationActivity(deliveries: AdminNotificationDelivery[]) {
     }
   }
 
-  return days.map(({ date: _date, ...day }) => day);
+  return days.map((day) => ({
+    failed: day.failed,
+    label: day.label,
+    opened: day.opened,
+    sent: day.sent,
+    skipped: day.skipped,
+  }));
 }
 
 function NotificationTemplateEditor({

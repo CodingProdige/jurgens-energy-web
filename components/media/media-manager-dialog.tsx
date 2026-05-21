@@ -19,7 +19,6 @@ import {
   CrownIcon,
   CreditCardIcon,
   DownloadIcon,
-  FileIcon,
   FileImageIcon,
   FileTextIcon,
   FileVideoIcon,
@@ -28,7 +27,6 @@ import {
   Grid2X2Icon,
   ImageIcon,
   ListIcon,
-  LoaderCircleIcon,
   LockIcon,
   MoreVerticalIcon,
   PencilIcon,
@@ -37,7 +35,6 @@ import {
   SearchIcon,
   ShieldCheckIcon,
   SlidersHorizontalIcon,
-  SparklesIcon,
   TagIcon,
   Trash2Icon,
   UploadIcon,
@@ -73,7 +70,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type {
   AdminMediaAsset,

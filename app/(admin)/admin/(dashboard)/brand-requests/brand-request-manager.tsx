@@ -249,7 +249,6 @@ export function BrandRequestDashboard({
   pendingCount,
   rejectedCount,
   requests,
-  totalCount,
 }: BrandRequestDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");

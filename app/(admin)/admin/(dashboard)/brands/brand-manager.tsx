@@ -12,7 +12,6 @@ import {
   SearchIcon,
   SparklesIcon,
   Trash2Icon,
-  XIcon,
 } from "lucide-react";
 
 import {
