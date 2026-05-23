@@ -15,3 +15,4 @@ export * from "@/src/db/schema/payouts";
 export * from "@/src/db/schema/reviews";
 export * from "@/src/db/schema/audit-logs";
 export * from "@/src/db/schema/notifications";
+export * from "@/src/db/schema/admin-staff";

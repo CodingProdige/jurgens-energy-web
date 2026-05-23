@@ -83,6 +83,20 @@ const folderAssignmentsSchema = z.object({
   id: z.string().uuid(),
 });
 
+async function requireAdminMediaManageAccess() {
+  const session = await requireAdminAccess();
+  const capabilities = session.user.adminCapabilities;
+
+  if (
+    !capabilities.includes("admin.catalog.manage") &&
+    !capabilities.includes("admin.settings.manage")
+  ) {
+    throw new Error("You do not have permission to manage media.");
+  }
+
+  return session;
+}
+
 function getFileMediaType(file: File) {
   if (file.type.startsWith("image/")) {
     return "image";
@@ -103,7 +117,7 @@ export async function uploadAdminMedia(
   _state: MediaUploadState,
   formData: FormData,
 ): Promise<MediaUploadState> {
-  const session = await requireAdminAccess();
+  const session = await requireAdminMediaManageAccess();
   const files = formData
     .getAll("file")
     .filter((file): file is File => file instanceof File && file.size > 0);
@@ -153,7 +167,7 @@ export async function uploadAdminMedia(
       );
     }
 
-    revalidatePath("/brands");
+    revalidatePath("/catalog/brands");
 
     return {
       asset: assets[0],
@@ -179,7 +193,7 @@ export async function updateAdminMediaMetadata(
   _state: MediaMetadataState,
   formData: FormData,
 ): Promise<MediaMetadataState> {
-  const session = await requireAdminAccess();
+  const session = await requireAdminMediaManageAccess();
 
   const parsed = metadataSchema.safeParse({
     altText: String(formData.get("altText") ?? ""),
@@ -200,7 +214,7 @@ export async function updateAdminMediaMetadata(
       and(eq(media.id, parsed.data.id), eq(media.ownerUserId, session.user.id)),
     );
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return { ok: true, message: "Media details saved." };
 }
@@ -208,7 +222,7 @@ export async function updateAdminMediaMetadata(
 export async function deleteAdminMediaAsset(
   id: string,
 ): Promise<MediaDeleteState> {
-  const session = await requireAdminAccess();
+  const session = await requireAdminMediaManageAccess();
 
   const parsed = deleteSchema.safeParse({ id });
 
@@ -260,7 +274,7 @@ export async function deleteAdminMediaAsset(
       .map((relativePath) => removeMediaFile(relativePath)),
   );
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return {
     deletedId: asset.id,
@@ -272,7 +286,7 @@ export async function deleteAdminMediaAsset(
 export async function createAdminMediaFolder(
   name: string,
 ): Promise<MediaFolderState> {
-  const session = await requireAdminAccess();
+  const session = await requireAdminMediaManageAccess();
   const parsed = folderSchema.safeParse({ name });
 
   if (!parsed.success) {
@@ -295,7 +309,7 @@ export async function createAdminMediaFolder(
       slug: mediaFolders.slug,
     });
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return { folder, ok: true, message: "Folder created." };
 }
@@ -304,7 +318,7 @@ export async function renameAdminMediaFolder(
   id: string,
   name: string,
 ): Promise<MediaFolderState> {
-  const session = await requireAdminAccess();
+  const session = await requireAdminMediaManageAccess();
   const parsed = folderSchema.safeParse({ id, name });
 
   if (!parsed.success || !parsed.data.id) {
@@ -336,7 +350,7 @@ export async function renameAdminMediaFolder(
     return { ok: false, message: "Folder was not found." };
   }
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return { folder, ok: true, message: "Folder renamed." };
 }
@@ -344,7 +358,7 @@ export async function renameAdminMediaFolder(
 export async function deleteAdminMediaFolder(
   id: string,
 ): Promise<MediaFolderState> {
-  const session = await requireAdminAccess();
+  const session = await requireAdminMediaManageAccess();
   const parsed = z.string().uuid().safeParse(id);
 
   if (!parsed.success) {
@@ -366,7 +380,7 @@ export async function deleteAdminMediaFolder(
     return { ok: false, message: "Folder was not found." };
   }
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return { ok: true, message: "Folder deleted." };
 }
@@ -385,7 +399,7 @@ export async function setAdminMediaAssetFolders(input: {
   folderIds: string[];
   id: string;
 }): Promise<MediaMoveState> {
-  const session = await requireAdminAccess();
+  const session = await requireAdminMediaManageAccess();
   const parsed = folderAssignmentsSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -441,7 +455,7 @@ export async function setAdminMediaAssetFolders(input: {
     );
   }
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return {
     folderId: folderIds[0] ?? null,

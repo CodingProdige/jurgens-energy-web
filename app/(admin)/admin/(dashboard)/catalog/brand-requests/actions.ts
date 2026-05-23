@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import { brandRequests, brands } from "@/src/db/schema";
-import { requireAdminAccess } from "@/src/modules/auth/permissions";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 export type BrandRequestMutationState = {
   message?: string;
@@ -45,11 +45,21 @@ function isUniqueViolation(error: unknown) {
   );
 }
 
+async function requireCatalogManageAccess() {
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  if (!access.ok) {
+    throw new Error("You do not have permission to manage catalog.");
+  }
+
+  return access.session;
+}
+
 export async function approveBrandRequest(
   _state: BrandRequestMutationState,
   formData: FormData,
 ): Promise<BrandRequestMutationState> {
-  const session = await requireAdminAccess();
+  const session = await requireCatalogManageAccess();
   const parsed = requestIdSchema.safeParse({ id: formData.get("id") });
 
   if (!parsed.success) {
@@ -119,8 +129,8 @@ export async function approveBrandRequest(
     throw error;
   }
 
-  revalidatePath("/brand-requests");
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brand-requests");
+  revalidatePath("/catalog/brands");
 
   return { ok: true, message: "Brand request approved." };
 }
@@ -129,7 +139,7 @@ export async function rejectBrandRequest(
   _state: BrandRequestMutationState,
   formData: FormData,
 ): Promise<BrandRequestMutationState> {
-  const session = await requireAdminAccess();
+  const session = await requireCatalogManageAccess();
   const parsed = rejectRequestSchema.safeParse({
     id: formData.get("id"),
     rejectionReason: formData.get("rejectionReason"),
@@ -165,7 +175,7 @@ export async function rejectBrandRequest(
     })
     .where(eq(brandRequests.id, request.id));
 
-  revalidatePath("/brand-requests");
+  revalidatePath("/catalog/brand-requests");
 
   return { ok: true, message: "Brand request rejected." };
 }
@@ -174,7 +184,7 @@ export async function deleteBrandRequest(
   _state: BrandRequestMutationState,
   formData: FormData,
 ): Promise<BrandRequestMutationState> {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
   const parsed = requestIdSchema.safeParse({ id: formData.get("id") });
 
   if (!parsed.success) {
@@ -182,7 +192,7 @@ export async function deleteBrandRequest(
   }
 
   await db.delete(brandRequests).where(eq(brandRequests.id, parsed.data.id));
-  revalidatePath("/brand-requests");
+  revalidatePath("/catalog/brand-requests");
 
   return { ok: true, message: "Brand request deleted." };
 }
@@ -191,7 +201,7 @@ export async function createBrandRequestForTesting(
   _state: BrandRequestMutationState,
   formData: FormData,
 ): Promise<BrandRequestMutationState> {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = z
     .object({
@@ -240,7 +250,7 @@ export async function createBrandRequestForTesting(
     throw error;
   }
 
-  revalidatePath("/brand-requests");
+  revalidatePath("/catalog/brand-requests");
 
   return { ok: true, message: "Brand request created." };
 }

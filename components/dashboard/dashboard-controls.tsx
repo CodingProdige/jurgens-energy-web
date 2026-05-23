@@ -38,6 +38,17 @@ export const dashboardTableSecondaryTextClass =
 export const dashboardTableMutedTextClass =
   "text-sm text-slate-700 dark:text-zinc-300";
 
+export const dashboardTableContainerClass =
+  "[&_[data-slot=table-container]]:overflow-visible md:[&_[data-slot=table-container]]:overflow-x-auto";
+
+export const dashboardTableClass = "table-fixed md:min-w-[920px] md:table-auto";
+
+export const dashboardTableActionHeadClass =
+  "w-[86px] pr-4 text-right md:sticky md:right-0 md:z-20 md:w-[112px] md:bg-white md:pr-5 md:shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.7)] dark:md:bg-[#151719]";
+
+export const dashboardTableActionCellClass =
+  "w-[86px] pr-4 text-right md:sticky md:right-0 md:z-10 md:w-[112px] md:bg-white md:pr-5 md:shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.7)] dark:md:bg-[#151719]";
+
 export function DashboardPageHeader({
   breadcrumbs,
   className,

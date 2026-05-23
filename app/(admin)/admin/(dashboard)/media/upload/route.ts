@@ -115,7 +115,7 @@ export async function POST(request: Request) {
           scope: "admin-media",
         });
 
-    revalidatePath("/brands");
+    revalidatePath("/catalog/brands");
 
     return Response.json({
       asset,

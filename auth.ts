@@ -20,6 +20,10 @@ import {
   isPlatformRole,
   verifyPassword,
 } from "@/src/modules/auth/service";
+import {
+  getAdminStaffAccess,
+  isAdminStaffRole,
+} from "@/src/modules/admin/staff";
 
 const providers: Provider[] = [
   Credentials({
@@ -50,12 +54,15 @@ const providers: Provider[] = [
       }
 
       const roles = await getUserRoles(user.id);
+      const adminStaffAccess = await getAdminStaffAccess(user.id);
 
       return {
         id: user.id,
         name: user.name,
         email: user.email,
         image: user.image,
+        adminCapabilities: adminStaffAccess.capabilities,
+        adminStaffRole: adminStaffAccess.role,
         roles,
       };
     },
@@ -148,11 +155,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user?.id) {
         token.roles = user.roles ?? (await getUserRoles(user.id));
+        const adminStaffAccess =
+          user.adminCapabilities && user.adminStaffRole !== undefined
+            ? {
+                capabilities: user.adminCapabilities,
+                role: user.adminStaffRole,
+              }
+            : await getAdminStaffAccess(user.id);
+        token.adminCapabilities = adminStaffAccess.capabilities;
+        token.adminStaffRole = adminStaffAccess.role;
         return token;
       }
 
       if (token.sub) {
         token.roles = await getUserRoles(token.sub);
+        const adminStaffAccess = await getAdminStaffAccess(token.sub);
+        token.adminCapabilities = adminStaffAccess.capabilities;
+        token.adminStaffRole = adminStaffAccess.role;
       }
 
       return token;
@@ -163,6 +182,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.roles = Array.isArray(token.roles)
           ? token.roles.filter(isPlatformRole)
           : [];
+        session.user.adminCapabilities = Array.isArray(token.adminCapabilities)
+          ? token.adminCapabilities
+          : [];
+        session.user.adminStaffRole = isAdminStaffRole(token.adminStaffRole)
+          ? token.adminStaffRole
+          : null;
       }
 
       return session;

@@ -34,9 +34,25 @@ await sql`
   insert into user_roles (user_id, role)
   values
     (${adminUser.id}, 'customer'),
-    (${adminUser.id}, 'admin')
+    (${adminUser.id}, 'superadmin')
   on conflict (user_id, role)
   do nothing
+`;
+
+await sql`
+  delete from user_roles
+  where user_id = ${adminUser.id}
+    and role = 'admin'
+`;
+
+await sql`
+  insert into admin_staff (user_id, role, roles)
+  values (${adminUser.id}, 'owner', array['owner'])
+  on conflict (user_id)
+  do update set
+    role = excluded.role,
+    roles = excluded.roles,
+    updated_at = now()
 `;
 
 await sql.end();

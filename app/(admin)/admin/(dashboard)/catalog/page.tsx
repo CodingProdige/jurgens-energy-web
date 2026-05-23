@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function AdminCategoriesRedirectPage() {
+export default function AdminCatalogPage() {
   redirect("/catalog/categories");
 }

@@ -35,7 +35,11 @@ import {
   DashboardPageHeader,
   dashboardControlClass,
   dashboardPanelClass,
+  dashboardTableActionCellClass,
+  dashboardTableActionHeadClass,
   dashboardTableCellClass,
+  dashboardTableClass,
+  dashboardTableContainerClass,
   dashboardTableHeadClass,
   dashboardTableHeaderRowClass,
   dashboardTableMutedTextClass,
@@ -50,7 +54,7 @@ import {
   toggleCategoryLock,
   updateCategory,
   type CategoryMutationState,
-} from "@/app/(admin)/admin/(dashboard)/categories/actions";
+} from "@/app/(admin)/admin/(dashboard)/catalog/categories/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1338,8 +1342,8 @@ export function CategoryDashboard({
           </div>
         </section>
 
-        <section className={cn("mt-5 [&_[data-slot=table-container]]:overflow-visible", dashboardPanelClass)}>
-          <Table className="table-fixed md:table-auto">
+        <section className={cn("mt-5", dashboardTableContainerClass, dashboardPanelClass)}>
+          <Table className={dashboardTableClass}>
             <TableHeader>
               <TableRow className={dashboardTableHeaderRowClass}>
                 <TableHead className={dashboardTableHeadClass}>
@@ -1360,7 +1364,7 @@ export function CategoryDashboard({
                 <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
                   Created At
                 </TableHead>
-                <TableHead className={cn(dashboardTableHeadClass, "w-[86px] pr-4 text-right md:w-auto md:pr-5")}>
+                <TableHead className={cn(dashboardTableHeadClass, dashboardTableActionHeadClass)}>
                   Actions
                 </TableHead>
               </TableRow>
@@ -1430,7 +1434,7 @@ export function CategoryDashboard({
                   <TableCell className={cn("hidden md:table-cell", dashboardTableCellClass, dashboardTableMutedTextClass)}>
                     {formatDate(category.createdAt)}
                   </TableCell>
-                  <TableCell className="w-[86px] pr-4 text-right md:w-auto md:pr-5">
+                  <TableCell className={dashboardTableActionCellClass}>
                     <div className="flex justify-end gap-1 md:gap-2">
                       <Button
                         variant="ghost"

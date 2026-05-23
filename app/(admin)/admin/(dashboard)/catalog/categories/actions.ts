@@ -6,7 +6,7 @@ import { asc, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import { categories } from "@/src/db/schema";
-import { requireAdminAccess } from "@/src/modules/auth/permissions";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 export type CategoryMutationState = {
   message?: string;
@@ -76,6 +76,16 @@ function isUniqueViolation(error: unknown) {
   );
 }
 
+async function requireCatalogManageAccess() {
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  if (!access.ok) {
+    throw new Error("You do not have permission to manage catalog.");
+  }
+
+  return access.session;
+}
+
 async function getCategoryBranchIds(categoryPath: string, categoryId: string) {
   const branch = await db.query.categories.findMany({
     where: (category, { or, eq, like }) =>
@@ -112,7 +122,7 @@ export async function checkCategoryNameAvailability(input: {
   name: string;
   parentId?: string | null;
 }) {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = categoryAvailabilitySchema.safeParse({
     currentCategoryId: input.currentCategoryId,
@@ -171,7 +181,7 @@ export async function createCategory(
   _state: CategoryMutationState,
   formData: FormData,
 ): Promise<CategoryMutationState> {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = createCategorySchema.safeParse({
     commissionRateBps: optionalNumber(formData.get("commissionRateBps")),
@@ -234,7 +244,7 @@ export async function createCategory(
     throw error;
   }
 
-  revalidatePath("/categories");
+  revalidatePath("/catalog/categories");
 
   return { ok: true, message: "Category created." };
 }
@@ -243,7 +253,7 @@ export async function updateCategory(
   _state: CategoryMutationState,
   formData: FormData,
 ): Promise<CategoryMutationState> {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = updateCategorySchema.safeParse({
     commissionRateBps: optionalNumber(formData.get("commissionRateBps")),
@@ -396,7 +406,7 @@ export async function updateCategory(
     throw error;
   }
 
-  revalidatePath("/categories");
+  revalidatePath("/catalog/categories");
 
   return { ok: true, message: "Category updated." };
 }
@@ -405,7 +415,7 @@ export async function deleteCategory(
   _state: CategoryMutationState,
   formData: FormData,
 ): Promise<CategoryMutationState> {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = deleteCategorySchema.safeParse({
     id: formData.get("id"),
@@ -453,13 +463,13 @@ export async function deleteCategory(
     await db.delete(categories).where(eq(categories.id, category.id));
   }
 
-  revalidatePath("/categories");
+  revalidatePath("/catalog/categories");
 
   return { ok: true, message: "Category deleted." };
 }
 
 export async function toggleCategoryLock(categoryId: string) {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = z.string().uuid().safeParse(categoryId);
 
@@ -483,7 +493,7 @@ export async function toggleCategoryLock(categoryId: string) {
     })
     .where(eq(categories.id, parsed.data));
 
-  revalidatePath("/categories");
+  revalidatePath("/catalog/categories");
 
   return {
     ok: true,
@@ -492,7 +502,7 @@ export async function toggleCategoryLock(categoryId: string) {
 }
 
 export async function moveCategory(categoryId: string, direction: "up" | "down") {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = moveCategorySchema.safeParse({
     direction,
@@ -559,7 +569,7 @@ export async function moveCategory(categoryId: string, direction: "up" | "down")
     }
   });
 
-  revalidatePath("/categories");
+  revalidatePath("/catalog/categories");
 
   return { ok: true, message: "Category order updated." };
 }

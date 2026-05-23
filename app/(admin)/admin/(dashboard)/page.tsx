@@ -8,8 +8,10 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 
+import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
 import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { getAdminOverview } from "@/src/modules/admin";
 
 export const metadata: Metadata = {
@@ -23,6 +25,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
+  const access = await requireAdminCapability("admin.dashboard.view");
+
+  if (!access.ok) {
+    return <RestrictedAdminPage />;
+  }
+
   const overview = await getAdminOverview();
 
   return (

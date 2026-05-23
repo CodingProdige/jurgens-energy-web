@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import {
+  hasAdminCapability,
+} from "@/src/modules/admin/staff";
+import type { AdminCapability } from "@/src/modules/admin/staff-constants";
+import {
   canAccessCapability,
   type AccessCapability,
 } from "@/src/modules/auth/service";
@@ -44,6 +48,22 @@ export async function requireCapability(capability: AccessCapability) {
 
 export async function requireAdminAccess() {
   return requireCapability("admin");
+}
+
+export async function requireAdminCapability(capability: AdminCapability) {
+  const session = await requireAdminAccess();
+
+  if (!hasAdminCapability(session.user.adminCapabilities, capability)) {
+    return {
+      ok: false,
+      session,
+    } as const;
+  }
+
+  return {
+    ok: true,
+    session,
+  } as const;
 }
 
 export async function requireSellerDashboardAccess() {

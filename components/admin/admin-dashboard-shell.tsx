@@ -16,8 +16,7 @@ import {
   SearchIcon,
   SettingsIcon,
   ShieldCheckIcon,
-  StoreIcon,
-  UsersIcon,
+  UserCogIcon,
   XIcon,
   ZapIcon,
 } from "lucide-react";
@@ -27,15 +26,19 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import type { AdminCapability } from "@/src/modules/admin/staff-constants";
 import type { NotificationCenterState } from "@/src/modules/notifications/in-app";
 
 type AdminNavItem = {
   label: string;
   href?: string;
   icon: ComponentType<{ className?: string }>;
+  capability?: AdminCapability;
   children?: Array<{
+    capability?: AdminCapability;
     label: string;
-    href: string;
+    href?: string;
+    disabled?: boolean;
   }>;
 };
 
@@ -49,30 +52,104 @@ const adminControlClass =
   "border-slate-200 bg-white text-zinc-950 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10";
 
 const navItems: AdminNavItem[] = [
-  { label: "Overview", href: "/", icon: LayoutDashboardIcon },
-  { label: "Orders", href: "/orders", icon: ClipboardListIcon },
-  { label: "Products", href: "/products", icon: BoxesIcon },
-  { label: "Sellers", href: "/sellers", icon: StoreIcon },
+  {
+    label: "Overview",
+    href: "/",
+    icon: LayoutDashboardIcon,
+    capability: "admin.dashboard.view",
+  },
+  {
+    label: "Orders",
+    href: "/orders",
+    icon: ClipboardListIcon,
+    capability: "admin.orders.view",
+  },
+  {
+    label: "Products",
+    href: "/products",
+    icon: BoxesIcon,
+    capability: "admin.catalog.view",
+  },
   {
     label: "Catalog",
     icon: FolderTreeIcon,
     children: [
-      { label: "Categories", href: "/categories" },
-      { label: "Brands", href: "/brands" },
-      { label: "Brand requests", href: "/brand-requests" },
+      {
+        label: "Categories",
+        href: "/catalog/categories",
+        capability: "admin.catalog.view",
+      },
+      { label: "Brands", href: "/catalog/brands", capability: "admin.catalog.view" },
+      {
+        label: "Brand requests",
+        href: "/catalog/brand-requests",
+        capability: "admin.catalog.view",
+      },
     ],
   },
-  { label: "Customers", href: "/users", icon: UsersIcon },
-  { label: "Marketing", href: "/marketing", icon: ZapIcon },
-  { label: "Reviews", href: "/reviews", icon: ShieldCheckIcon },
-  { label: "Payouts", href: "/payouts", icon: PackageCheckIcon },
-  { label: "Analytics", href: "/analytics", icon: BarChart3Icon },
+  {
+    label: "Users & Access",
+    icon: UserCogIcon,
+    children: [
+      { label: "All users", href: "/users/all", capability: "admin.users.view" },
+      {
+        label: "Customers",
+        href: "/users/customers",
+        capability: "admin.users.view",
+      },
+      { label: "Admins", href: "/users/admins", capability: "admin.users.view" },
+      { label: "Sellers", href: "/users/sellers", capability: "admin.users.view" },
+      {
+        label: "Admin staff",
+        href: "/users/staff",
+        capability: "admin.staff.view",
+      },
+      { label: "Seller applications", disabled: true },
+    ],
+  },
+  {
+    label: "Marketing",
+    href: "/marketing",
+    icon: ZapIcon,
+    capability: "admin.marketing.view",
+  },
+  {
+    label: "Reviews",
+    href: "/reviews",
+    icon: ShieldCheckIcon,
+    capability: "admin.reviews.view",
+  },
+  {
+    label: "Payouts",
+    href: "/payouts",
+    icon: PackageCheckIcon,
+    capability: "admin.payouts.view",
+  },
+  {
+    label: "Analytics",
+    href: "/analytics",
+    icon: BarChart3Icon,
+    capability: "admin.analytics.view",
+  },
   {
     label: "Settings",
     icon: SettingsIcon,
-    children: [{ label: "Platform settings", href: "/settings" }],
+    children: [
+      {
+        label: "Platform settings",
+        href: "/settings/platform",
+        capability: "admin.settings.view",
+      },
+    ],
   },
 ];
+
+function hasCapability(
+  capabilities: AdminCapability[],
+  capability?: AdminCapability,
+) {
+  return !capability || capabilities.includes(capability);
+}
 
 function isActivePath(pathname: string, href: string) {
   if (href === "/") {
@@ -107,10 +184,12 @@ function AdminBrand({ className }: { className?: string }) {
 }
 
 function AdminNavList({
+  capabilities,
   pathname,
   onNavigate,
   variant = "dark",
 }: {
+  capabilities: AdminCapability[];
   pathname: string;
   onNavigate?: () => void;
   variant?: "dark" | "responsive";
@@ -123,7 +202,11 @@ function AdminNavList({
         .map((item) => [
           item.label,
           Boolean(
-            item.children?.some((child) => isActivePath(pathname, child.href)),
+            item.children?.some(
+              (child) =>
+                child.href &&
+                isActivePath(pathname, child.href),
+            ),
           ),
         ]),
     );
@@ -138,7 +221,10 @@ function AdminNavList({
 
       for (const item of navItems) {
         if (
-          item.children?.some((child) => isActivePath(pathname, child.href)) &&
+          item.children?.some(
+            (child) =>
+              child.href && isActivePath(pathname, child.href),
+          ) &&
           !next[item.label]
         ) {
           next[item.label] = true;
@@ -156,7 +242,10 @@ function AdminNavList({
         const Icon = item.icon;
         const isActive =
           (item.href ? isActivePath(pathname, item.href) : false) ||
-          item.children?.some((child) => isActivePath(pathname, child.href));
+          item.children?.some(
+            (child) =>
+              child.href && isActivePath(pathname, child.href),
+          );
         const activeClass = isResponsive
           ? "bg-[#c4982d]/12 font-semibold text-[#8a641f] ring-1 ring-[#c4982d]/25 dark:bg-[#c4982d]/18 dark:text-[#f0c760] dark:ring-[#c4982d]/25"
           : "bg-[#c4982d]/16 font-semibold text-white ring-1 ring-[#c4982d]/35";
@@ -212,7 +301,27 @@ function AdminNavList({
                   )}
                 >
                   {item.children.map((child) => {
-                    const isChildActive = isActivePath(pathname, child.href);
+                    const isChildActive = child.href
+                      ? isActivePath(pathname, child.href)
+                      : false;
+                    const isDisabled =
+                      child.disabled || !hasCapability(capabilities, child.capability);
+
+                    if (!child.href || isDisabled) {
+                      return (
+                        <span
+                          key={child.label}
+                          className={cn(
+                            "flex h-9 cursor-not-allowed items-center rounded-md px-3 text-sm opacity-50",
+                            isResponsive
+                              ? "text-zinc-500 dark:text-white/58"
+                              : "text-white/58",
+                          )}
+                        >
+                          {child.label}
+                        </span>
+                      );
+                    }
 
                     return (
                       <Link
@@ -242,6 +351,21 @@ function AdminNavList({
 
         if (!item.href) {
           return null;
+        }
+
+        if (!hasCapability(capabilities, item.capability)) {
+          return (
+            <span
+              key={item.label}
+              className={cn(
+                "flex h-11 cursor-not-allowed items-center gap-3 rounded-lg px-3 text-sm font-medium opacity-45",
+                inactiveClass,
+              )}
+            >
+              <Icon className="size-4" />
+              {item.label}
+            </span>
+          );
         }
 
         return (
@@ -327,11 +451,19 @@ function AdminUserCard({
   );
 }
 
-function Sidebar({ pathname, user }: { pathname: string; user: AdminShellUser }) {
+function Sidebar({
+  capabilities,
+  pathname,
+  user,
+}: {
+  capabilities: AdminCapability[];
+  pathname: string;
+  user: AdminShellUser;
+}) {
   return (
     <aside className="fixed bottom-0 left-0 top-[72px] z-30 hidden w-[236px] border-r border-white/10 bg-[#080b0d] text-white lg:flex lg:flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.28)_transparent]">
-        <AdminNavList pathname={pathname} />
+        <AdminNavList capabilities={capabilities} pathname={pathname} />
       </div>
 
       <div className="shrink-0 px-5 pb-5 pt-3">
@@ -342,11 +474,13 @@ function Sidebar({ pathname, user }: { pathname: string; user: AdminShellUser })
 }
 
 function MobileNavDrawer({
+  capabilities,
   isOpen,
   onClose,
   pathname,
   user,
 }: {
+  capabilities: AdminCapability[];
   isOpen: boolean;
   onClose: () => void;
   pathname: string;
@@ -416,7 +550,12 @@ function MobileNavDrawer({
 
         <div className="-mr-5 min-h-0 flex-1 overflow-y-auto">
           <div className="pr-5">
-            <AdminNavList pathname={pathname} onNavigate={onClose} variant="responsive" />
+            <AdminNavList
+              capabilities={capabilities}
+              pathname={pathname}
+              onNavigate={onClose}
+              variant="responsive"
+            />
           </div>
         </div>
 
@@ -496,10 +635,12 @@ function AdminHeader({
 }
 
 export function AdminDashboardShell({
+  capabilities,
   children,
   notificationCenter,
   user,
 }: {
+  capabilities: AdminCapability[];
   children: ReactNode;
   notificationCenter: NotificationCenterState;
   user: AdminShellUser;
@@ -513,8 +654,9 @@ export function AdminDashboardShell({
         notificationCenter={notificationCenter}
         onOpenMenu={() => setIsMobileNavOpen(true)}
       />
-      <Sidebar pathname={pathname} user={user} />
+      <Sidebar capabilities={capabilities} pathname={pathname} user={user} />
       <MobileNavDrawer
+        capabilities={capabilities}
         isOpen={isMobileNavOpen}
         onClose={() => setIsMobileNavOpen(false)}
         pathname={pathname}

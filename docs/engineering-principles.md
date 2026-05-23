@@ -42,7 +42,20 @@ Cache clients and cache helpers live in `src/cache/*`.
 
 Pages should be thin. They can compose UI, call module services, and handle route-level rendering. They should not contain core marketplace rules.
 
-Use shadcn/ui components first for common interface primitives. If a shadcn component fits, prefer it over custom markup. Create custom components when the UI is domain-specific, when a shadcn primitive does not fit, or when a shared dashboard abstraction keeps admin and seller surfaces coupled.
+Use shadcn/ui components first for common interface primitives. Before creating or changing UI, scan existing local components, shadcn/ui primitives, page-specific managers, and established dashboard/catalog patterns. Reuse or match the existing component and interaction pattern as far as possible. Create custom components only when no existing component or pattern fits, when the UI is domain-specific, when a shadcn primitive does not fit, when a shared dashboard abstraction keeps admin and seller surfaces coupled, or when explicitly requested.
+
+Grouped dashboard pages must be structured as grouped routes with real child pages. Keep grouped navigation, URLs, and file ownership aligned:
+
+```text
+app/(admin)/admin/(dashboard)/catalog/page.tsx
+-> redirects to /catalog/categories
+
+app/(admin)/admin/(dashboard)/catalog/categories/page.tsx
+app/(admin)/admin/(dashboard)/catalog/brands/page.tsx
+app/(admin)/admin/(dashboard)/catalog/brand-requests/page.tsx
+```
+
+Do not model grouped menu items as query filters on a single page when the pages represent different admin surfaces. Each child menu item should have its own page file so its table columns, filters, row actions, permissions, metadata, and data loading can evolve independently. The parent group route may redirect to the default child page.
 
 Admin and seller dashboards should share the same visual system. Keep their layouts, navigation treatment, cards, theme selector, and interaction patterns coupled unless there is a specific product reason to diverge.
 
@@ -129,11 +142,24 @@ Every mutation must:
 - write audit logs for admin/seller-sensitive actions
 - revalidate affected cached data where applicable
 
+## Notifications
+
+All user-facing notifications must use the project notification system. This includes email, in-app, and push notifications from marketplace, seller, and admin surfaces.
+
+Every notification must have a template before it ships. Do not send ad hoc transactional copy directly from feature code. Create or reuse a notification template, render it through the shared notification helpers, and keep delivery policy, required variables, versioning, and delivery tracking in the notification system.
+
+Shared fallback behavior is acceptable only as a defensive safety net for local development or missing migration state; it must not be the primary production path.
+
 ## Permissions
 
 Never trust client roles.
 
 Client UI may hide controls, but server code decides access.
+
+Admin dashboard staff access must be capability-gated. Do not grant broad admin
+power to every employee. Staff invitations, staff roles, protected admin pages,
+and admin mutations must use server-side capability checks, with restricted
+pages shown for direct links and disabled navigation for unavailable surfaces.
 
 Protected reads and writes should call explicit helpers such as:
 

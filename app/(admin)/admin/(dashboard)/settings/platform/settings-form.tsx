@@ -60,7 +60,7 @@ import {
   sendNotificationTemplateTestSettings,
   updateStripePaymentSettings,
   type AdminSettingsState,
-} from "@/app/(admin)/admin/(dashboard)/settings/actions";
+} from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
 import type { AdminPremiumPlan } from "@/src/modules/billing/premium-plans";
 import type { getAdminMediaLibrary } from "@/src/modules/media/admin";
 import type {

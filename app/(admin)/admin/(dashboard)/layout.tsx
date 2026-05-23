@@ -17,6 +17,7 @@ export default async function AdminDashboardLayout({
 
   return (
     <AdminDashboardShell
+      capabilities={session.user.adminCapabilities}
       notificationCenter={notificationCenter}
       user={{
         name: session.user.name,

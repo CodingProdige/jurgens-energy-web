@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireAdminAccess } from "@/src/modules/auth/permissions";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
   updateMarketplaceComingSoonSettings,
   updateMarketplaceMediaSettings,
@@ -28,11 +28,21 @@ export type AdminSettingsState = {
   ok?: boolean;
 };
 
+async function requireSettingsManageAccess() {
+  const access = await requireAdminCapability("admin.settings.manage");
+
+  if (!access.ok) {
+    throw new Error("You do not have permission to manage settings.");
+  }
+
+  return access.session;
+}
+
 export async function updateMarketplaceGateSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireAdminAccess();
+  await requireSettingsManageAccess();
 
   const password = String(formData.get("password") ?? "").trim();
   const enabled = formData.get("enabled") === "on";
@@ -47,7 +57,7 @@ export async function updateMarketplaceGateSettings(
   revalidatePath("/register");
   revalidatePath("/forgot-password");
   revalidatePath("/reset-password");
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -73,7 +83,7 @@ export async function updateMarketplaceSocialLinkSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireAdminAccess();
+  await requireSettingsManageAccess();
 
   const parsed = socialLinksSchema.safeParse({
     facebookUrl: String(formData.get("facebookUrl") ?? ""),
@@ -91,7 +101,7 @@ export async function updateMarketplaceSocialLinkSettings(
   const result = await updateMarketplaceSocialLinks(parsed.data);
 
   revalidatePath("/");
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -111,7 +121,7 @@ export async function updateMediaStorageSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireAdminAccess();
+  await requireSettingsManageAccess();
 
   const parsed = mediaSettingsSchema.safeParse({
     freeStorageQuotaMb: formData.get("freeStorageQuotaMb"),
@@ -140,7 +150,7 @@ export async function updateMediaStorageSettings(
 
   const result = await updateMarketplaceMediaSettings(parsed.data);
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -207,7 +217,7 @@ export async function updateStripePaymentSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireAdminAccess();
+  await requireSettingsManageAccess();
 
   const parsed = stripeSettingsSchema.safeParse({
     livePublishableKey: String(formData.get("livePublishableKey") ?? ""),
@@ -228,7 +238,7 @@ export async function updateStripePaymentSettings(
 
   const result = await updateMarketplaceStripeSettings(parsed.data);
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -285,7 +295,7 @@ export async function savePremiumPlanSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireAdminAccess();
+  await requireSettingsManageAccess();
 
   const parsed = premiumPlanSchema.safeParse({
     billingInterval: String(formData.get("billingInterval") ?? "month"),
@@ -315,7 +325,7 @@ export async function savePremiumPlanSettings(
     isHighlighted: formData.get("isHighlighted") === "on",
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -393,7 +403,7 @@ export async function saveNotificationTemplateSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  const session = await requireAdminAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = notificationTemplateSchema.safeParse({
     htmlBody: String(formData.get("htmlBody") ?? ""),
@@ -434,7 +444,7 @@ export async function saveNotificationTemplateSettings(
 
   await updateNotificationDeliveryPolicy(policy.data);
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return {
     ok: true,
@@ -483,7 +493,7 @@ export async function saveInAppNotificationTemplateSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  const session = await requireAdminAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = inAppNotificationTemplateSchema.safeParse({
     actionLabelTemplate: String(formData.get("actionLabelTemplate") ?? ""),
@@ -525,7 +535,7 @@ export async function saveInAppNotificationTemplateSettings(
 
   await updateNotificationDeliveryPolicy(policy.data);
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return {
     ok: true,
@@ -542,7 +552,7 @@ export async function restoreNotificationTemplateSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  const session = await requireAdminAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = restoreNotificationTemplateSchema.safeParse({
     templateId: String(formData.get("templateId") ?? ""),
@@ -562,7 +572,7 @@ export async function restoreNotificationTemplateSettings(
     ...parsed.data,
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -571,7 +581,7 @@ export async function restoreInAppNotificationTemplateSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  const session = await requireAdminAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = restoreNotificationTemplateSchema.safeParse({
     templateId: String(formData.get("templateId") ?? ""),
@@ -591,7 +601,7 @@ export async function restoreInAppNotificationTemplateSettings(
     ...parsed.data,
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -636,7 +646,7 @@ export async function sendNotificationTemplateTestSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  const session = await requireAdminAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = testNotificationTemplateSchema.safeParse({
     htmlBody: String(formData.get("htmlBody") ?? ""),
@@ -660,7 +670,7 @@ export async function sendNotificationTemplateTestSettings(
     ...parsed.data,
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -697,7 +707,7 @@ export async function sendInAppNotificationTemplateTestSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  const session = await requireAdminAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = testInAppNotificationTemplateSchema.safeParse({
     actionLabelTemplate: String(formData.get("actionLabelTemplate") ?? ""),
@@ -722,7 +732,7 @@ export async function sendInAppNotificationTemplateTestSettings(
     ...parsed.data,
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -765,7 +775,7 @@ export async function saveNotificationGlobalVariableSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  const session = await requireAdminAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = notificationGlobalVariableSchema.safeParse({
     description: String(formData.get("description") ?? ""),
@@ -787,7 +797,7 @@ export async function saveNotificationGlobalVariableSettings(
     ...parsed.data,
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }
@@ -800,7 +810,7 @@ export async function deleteNotificationGlobalVariableSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireAdminAccess();
+  await requireSettingsManageAccess();
 
   const parsed = deleteNotificationGlobalVariableSchema.safeParse({
     id: String(formData.get("id") ?? ""),
@@ -815,7 +825,7 @@ export async function deleteNotificationGlobalVariableSettings(
 
   const result = await deleteNotificationGlobalVariable(parsed.data);
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/platform");
 
   return result;
 }

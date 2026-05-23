@@ -13,6 +13,8 @@ import {
 } from "@/src/db/schema";
 import { addEmailSubscriber } from "@/src/modules/marketing/email-subscribers";
 
+export const PASSWORD_RESET_TOKEN_TTL_MINUTES = 15;
+
 export function isPlatformRole(role: unknown): role is PlatformRole {
   return (
     typeof role === "string" &&
@@ -117,7 +119,9 @@ export async function createPasswordResetToken(userId: string) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashPasswordResetToken(token);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+  const expiresAt = new Date(
+    now.getTime() + PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000,
+  );
 
   await db.transaction(async (tx) => {
     await tx

@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/src/db";
 import { brands } from "@/src/db/schema";
 import { env } from "@/src/config/env";
-import { requireAdminAccess } from "@/src/modules/auth/permissions";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 export type BrandMutationState = {
   message?: string;
@@ -124,6 +124,16 @@ function isUniqueViolation(error: unknown) {
   );
 }
 
+async function requireCatalogManageAccess() {
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  if (!access.ok) {
+    throw new Error("You do not have permission to manage catalog.");
+  }
+
+  return access.session;
+}
+
 async function brandHasProducts(brandId: string, activeOnly = false) {
   const product = await db.query.products.findFirst({
     where: (table, { and, eq }) =>
@@ -139,7 +149,7 @@ export async function checkBrandNameAvailability(input: {
   currentBrandId?: string;
   name: string;
 }) {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = brandAvailabilitySchema.safeParse(input);
 
@@ -180,7 +190,7 @@ export async function generateBrandDescription(input: {
   name: string;
   websiteUrl?: string;
 }) {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = brandDescriptionGenerationSchema.safeParse(input);
 
@@ -260,7 +270,7 @@ export async function createBrand(
   _state: BrandMutationState,
   formData: FormData,
 ): Promise<BrandMutationState> {
-  const session = await requireAdminAccess();
+  const session = await requireCatalogManageAccess();
 
   const parsed = brandSchema.safeParse({
     description: optionalString(formData.get("description")),
@@ -315,7 +325,7 @@ export async function createBrand(
     throw error;
   }
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return { ok: true, message: "Brand created." };
 }
@@ -324,7 +334,7 @@ export async function updateBrand(
   _state: BrandMutationState,
   formData: FormData,
 ): Promise<BrandMutationState> {
-  const session = await requireAdminAccess();
+  const session = await requireCatalogManageAccess();
 
   const parsed = brandSchema.safeParse({
     description: optionalString(formData.get("description")),
@@ -407,7 +417,7 @@ export async function updateBrand(
     throw error;
   }
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return { ok: true, message: "Brand updated." };
 }
@@ -416,7 +426,7 @@ export async function deleteBrand(
   _state: BrandMutationState,
   formData: FormData,
 ): Promise<BrandMutationState> {
-  await requireAdminAccess();
+  await requireCatalogManageAccess();
 
   const parsed = z
     .object({
@@ -445,7 +455,7 @@ export async function deleteBrand(
 
   await db.delete(brands).where(eq(brands.id, existing.id));
 
-  revalidatePath("/brands");
+  revalidatePath("/catalog/brands");
 
   return { ok: true, message: "Brand deleted." };
 }

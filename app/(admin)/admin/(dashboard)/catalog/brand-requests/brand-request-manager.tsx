@@ -15,7 +15,7 @@ import {
   deleteBrandRequest,
   rejectBrandRequest,
   type BrandRequestMutationState,
-} from "@/app/(admin)/admin/(dashboard)/brand-requests/actions";
+} from "@/app/(admin)/admin/(dashboard)/catalog/brand-requests/actions";
 import {
   DashboardButton,
   DashboardInput,
@@ -23,7 +23,11 @@ import {
   DashboardPageHeader,
   DashboardTablePagination,
   dashboardPanelClass,
+  dashboardTableActionCellClass,
+  dashboardTableActionHeadClass,
   dashboardTableCellClass,
+  dashboardTableClass,
+  dashboardTableContainerClass,
   dashboardTableHeadClass,
   dashboardTableHeaderRowClass,
   dashboardTableMutedTextClass,
@@ -381,8 +385,8 @@ export function BrandRequestDashboard({
           </div>
         </div>
 
-        <section className={cn(dashboardPanelClass, "overflow-visible [&_[data-slot=table-container]]:overflow-visible")}>
-          <Table className="table-fixed md:table-auto">
+        <section className={cn(dashboardPanelClass, dashboardTableContainerClass, "overflow-visible")}>
+          <Table className={dashboardTableClass}>
             <TableHeader>
               <TableRow className={dashboardTableHeaderRowClass}>
                 <TableHead className={dashboardTableHeadClass}>
@@ -397,7 +401,7 @@ export function BrandRequestDashboard({
                 <TableHead className={cn(dashboardTableHeadClass, "hidden lg:table-cell")}>
                   Requested At
                 </TableHead>
-                <TableHead className={cn(dashboardTableHeadClass, "w-[86px] pr-4 text-right md:w-auto md:pr-5")}>
+                <TableHead className={cn(dashboardTableHeadClass, dashboardTableActionHeadClass)}>
                   Actions
                 </TableHead>
               </TableRow>
@@ -425,7 +429,7 @@ export function BrandRequestDashboard({
                   <TableCell className={cn("hidden lg:table-cell", dashboardTableCellClass, dashboardTableMutedTextClass)}>
                     {formatDate(request.createdAt)}
                   </TableCell>
-                  <TableCell className="w-[86px] pr-4 text-right md:w-auto md:pr-5">
+                  <TableCell className={dashboardTableActionCellClass}>
                     <div className="relative inline-flex items-center">
                       <Button
                         aria-label={`Open actions for ${request.brandName}`}
