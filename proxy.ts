@@ -10,6 +10,7 @@ const ROOT_STATIC_ASSET_PATHS = new Set([
   "/manifest.webmanifest",
   "/robots.txt",
   "/sitemap.xml",
+  "/sw.js",
 ]);
 const ROOT_STATIC_ASSET_PREFIXES = ["/brand/", "/media/"];
 
@@ -127,7 +128,7 @@ function rewriteSurface(request: NextRequest, surfacePath: string) {
 
   if (
     url.pathname.startsWith(surfacePath) ||
-    url.pathname.startsWith("/api/auth")
+    url.pathname.startsWith("/api/")
   ) {
     return NextResponse.next();
   }

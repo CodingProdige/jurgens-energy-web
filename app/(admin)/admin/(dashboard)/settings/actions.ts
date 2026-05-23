@@ -12,9 +12,13 @@ import {
 } from "@/src/modules/marketplace/settings";
 import { savePremiumPlan } from "@/src/modules/billing/premium-plans";
 import {
+  createInAppNotificationTemplateTest,
   deleteNotificationGlobalVariable,
+  restoreInAppNotificationTemplateVersion,
   restoreNotificationTemplateVersion,
   sendNotificationTemplateTest,
+  updateNotificationDeliveryPolicy,
+  updateInAppNotificationTemplate,
   updateNotificationTemplate,
   upsertNotificationGlobalVariable,
 } from "@/src/modules/notifications/templates";
@@ -352,6 +356,39 @@ const notificationTemplateSchema = z.object({
     .max(10000, "Plain text body is too long."),
 });
 
+const optionalTimeSchema = z
+  .string()
+  .trim()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm time.")
+  .optional()
+  .or(z.literal("").transform(() => undefined));
+
+const notificationDeliveryPolicySchema = z.object({
+  digestEligible: z.boolean(),
+  emailEnabled: z.boolean(),
+  eventKey: z.string().trim().min(3).max(160),
+  inAppEnabled: z.boolean(),
+  priority: z.enum(["low", "normal", "high", "critical"]),
+  pushEnabled: z.boolean(),
+  quietHoursEnabled: z.boolean(),
+  quietHoursEnd: optionalTimeSchema.transform((value) => value ?? null),
+  quietHoursStart: optionalTimeSchema.transform((value) => value ?? null),
+});
+
+function parseNotificationDeliveryPolicy(formData: FormData) {
+  return notificationDeliveryPolicySchema.safeParse({
+    digestEligible: formData.get("deliveryDigestEligible") === "on",
+    emailEnabled: formData.get("deliveryEmailEnabled") === "on",
+    eventKey: String(formData.get("deliveryEventKey") ?? ""),
+    inAppEnabled: formData.get("deliveryInAppEnabled") === "on",
+    priority: String(formData.get("deliveryPriority") ?? "normal"),
+    pushEnabled: formData.get("deliveryPushEnabled") === "on",
+    quietHoursEnabled: formData.get("deliveryQuietHoursEnabled") === "on",
+    quietHoursEnd: String(formData.get("deliveryQuietHoursEnd") ?? ""),
+    quietHoursStart: String(formData.get("deliveryQuietHoursStart") ?? ""),
+  });
+}
+
 export async function saveNotificationTemplateSettings(
   _state: AdminSettingsState,
   formData: FormData,
@@ -376,14 +413,124 @@ export async function saveNotificationTemplateSettings(
     };
   }
 
+  const policy = parseNotificationDeliveryPolicy(formData);
+
+  if (!policy.success) {
+    return {
+      ok: false,
+      message:
+        policy.error.issues[0]?.message ?? "Check the delivery policy.",
+    };
+  }
+
   const result = await updateNotificationTemplate({
     actorUserId: session.user.id,
     ...parsed.data,
   });
 
+  if (!result.ok) {
+    return result;
+  }
+
+  await updateNotificationDeliveryPolicy(policy.data);
+
   revalidatePath("/settings");
 
-  return result;
+  return {
+    ok: true,
+    message: "Notification template and delivery policy saved.",
+  };
+}
+
+const inAppNotificationTemplateSchema = z.object({
+  actionLabelTemplate: z
+    .string()
+    .trim()
+    .max(120, "Action label must be 120 characters or less.")
+    .optional()
+    .transform((value) => value || undefined),
+  actionUrlTemplate: z
+    .string()
+    .trim()
+    .max(1000, "Action URL template is too long.")
+    .optional()
+    .transform((value) => value || undefined),
+  bodyTemplate: z
+    .string()
+    .trim()
+    .min(10, "Notification body is too short.")
+    .max(2000, "Notification body is too long."),
+  id: z.string().trim().uuid(),
+  requiredVariables: z
+    .string()
+    .trim()
+    .max(1000, "Variables list is too long.")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  status: z.enum(["active", "disabled", "archived"]),
+  titleTemplate: z
+    .string()
+    .trim()
+    .min(3, "Notification title is required.")
+    .max(180, "Notification title must be 180 characters or less."),
+});
+
+export async function saveInAppNotificationTemplateSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireAdminAccess();
+
+  const parsed = inAppNotificationTemplateSchema.safeParse({
+    actionLabelTemplate: String(formData.get("actionLabelTemplate") ?? ""),
+    actionUrlTemplate: String(formData.get("actionUrlTemplate") ?? ""),
+    bodyTemplate: String(formData.get("bodyTemplate") ?? ""),
+    id: String(formData.get("id") ?? ""),
+    requiredVariables: String(formData.get("requiredVariables") ?? ""),
+    status: String(formData.get("status") ?? "active"),
+    titleTemplate: String(formData.get("titleTemplate") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ??
+        "Check the in-app notification template.",
+    };
+  }
+
+  const policy = parseNotificationDeliveryPolicy(formData);
+
+  if (!policy.success) {
+    return {
+      ok: false,
+      message:
+        policy.error.issues[0]?.message ?? "Check the delivery policy.",
+    };
+  }
+
+  const result = await updateInAppNotificationTemplate({
+    actorUserId: session.user.id,
+    ...parsed.data,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  await updateNotificationDeliveryPolicy(policy.data);
+
+  revalidatePath("/settings");
+
+  return {
+    ok: true,
+    message: "In-app template and delivery policy saved.",
+  };
 }
 
 const restoreNotificationTemplateSchema = z.object({
@@ -411,6 +558,35 @@ export async function restoreNotificationTemplateSettings(
   }
 
   const result = await restoreNotificationTemplateVersion({
+    actorUserId: session.user.id,
+    ...parsed.data,
+  });
+
+  revalidatePath("/settings");
+
+  return result;
+}
+
+export async function restoreInAppNotificationTemplateSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireAdminAccess();
+
+  const parsed = restoreNotificationTemplateSchema.safeParse({
+    templateId: String(formData.get("templateId") ?? ""),
+    versionId: String(formData.get("versionId") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Choose a template version first.",
+    };
+  }
+
+  const result = await restoreInAppNotificationTemplateVersion({
     actorUserId: session.user.id,
     ...parsed.data,
   });
@@ -481,6 +657,68 @@ export async function sendNotificationTemplateTestSettings(
 
   const result = await sendNotificationTemplateTest({
     actorUserId: session.user.id,
+    ...parsed.data,
+  });
+
+  revalidatePath("/settings");
+
+  return result;
+}
+
+const testInAppNotificationTemplateSchema = z.object({
+  actionLabelTemplate: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((value) => value || undefined),
+  actionUrlTemplate: z
+    .string()
+    .trim()
+    .max(1000)
+    .optional()
+    .transform((value) => value || undefined),
+  bodyTemplate: z.string().trim().min(10).max(2000),
+  requiredVariables: z
+    .string()
+    .trim()
+    .max(1000)
+    .transform((value) =>
+      value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  templateKey: z.string().trim().min(3).max(160),
+  titleTemplate: z.string().trim().min(3).max(180),
+});
+
+export async function sendInAppNotificationTemplateTestSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireAdminAccess();
+
+  const parsed = testInAppNotificationTemplateSchema.safeParse({
+    actionLabelTemplate: String(formData.get("actionLabelTemplate") ?? ""),
+    actionUrlTemplate: String(formData.get("actionUrlTemplate") ?? ""),
+    bodyTemplate: String(formData.get("bodyTemplate") ?? ""),
+    requiredVariables: String(formData.get("requiredVariables") ?? ""),
+    templateKey: String(formData.get("templateKey") ?? ""),
+    titleTemplate: String(formData.get("titleTemplate") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ??
+        "Check the in-app notification test.",
+    };
+  }
+
+  const result = await createInAppNotificationTemplateTest({
+    recipientUserId: session.user.id,
     ...parsed.data,
   });
 

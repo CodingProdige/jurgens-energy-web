@@ -4,6 +4,11 @@ import type { Metadata } from "next";
 import { auth, signOut } from "@/auth";
 import { PiessangLogo } from "@/components/brand/piessang-logo";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import {
+  emptyNotificationCenter,
+  getNotificationCenter,
+} from "@/src/modules/notifications/in-app";
 
 export const metadata: Metadata = {
   title: "Marketplace",
@@ -23,6 +28,12 @@ function getSurfaceUrl(hostname: string) {
 
 export default async function Home() {
   const session = await auth();
+  const notificationCenter = session?.user?.id
+    ? await getNotificationCenter({
+        surface: "marketplace",
+        userId: session.user.id,
+      })
+    : emptyNotificationCenter;
   const adminUrl = getSurfaceUrl(
     process.env.ADMIN_HOSTNAME ?? "admin.localhost",
   );
@@ -42,7 +53,16 @@ export default async function Home() {
   return (
     <MarketplaceGate>
       <main className="home-shell">
-      <section className="home-hero">
+      <section className="home-hero relative">
+        {session?.user ? (
+          <div className="absolute right-4 top-4">
+            <NotificationBell
+              accent="marketplace"
+              initialState={notificationCenter}
+              surface="marketplace"
+            />
+          </div>
+        ) : null}
         <PiessangLogo priority className="mb-6 h-12 w-64" />
         <p className="eyebrow">Self-hosted modular marketplace</p>
         <h1>Marketplace foundation</h1>

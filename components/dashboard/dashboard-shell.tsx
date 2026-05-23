@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
+import type { InAppNotificationSurface } from "@/src/db/schema";
+import type { NotificationCenterState } from "@/src/modules/notifications/in-app";
 
 export type DashboardNavItem = {
   label: string;
@@ -32,6 +35,8 @@ type DashboardShellProps = {
   surfaceHref: string;
   badge?: string;
   accent?: "amber" | "green";
+  notificationCenter?: NotificationCenterState;
+  notificationSurface?: InAppNotificationSurface;
 };
 
 const accentStyles = {
@@ -67,6 +72,8 @@ export function DashboardShell({
   surfaceHref,
   badge,
   accent = "amber",
+  notificationCenter,
+  notificationSurface,
 }: DashboardShellProps) {
   const styles = accentStyles[accent];
 
@@ -182,7 +189,16 @@ export function DashboardShell({
                 {description}
               </p>
             </div>
-            <Button variant="outline">Export</Button>
+            <div className="flex items-center gap-2">
+              {notificationCenter && notificationSurface ? (
+                <NotificationBell
+                  accent={accent}
+                  initialState={notificationCenter}
+                  surface={notificationSurface}
+                />
+              ) : null}
+              <Button variant="outline">Export</Button>
+            </div>
           </header>
 
           <div className="grid gap-4">{children}</div>

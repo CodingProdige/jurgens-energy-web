@@ -65,7 +65,7 @@ const settingSections = [
     key: "notifications",
     title: "Notifications",
     description:
-      "Manage transactional email templates and review delivery history.",
+      "Manage email and in-app notification templates, delivery history, and shared variables.",
     icon: MailIcon,
   },
   {
@@ -95,6 +95,7 @@ type SettingSectionKey = (typeof settingSections)[number]["key"];
 
 type AdminSettingsPageProps = {
   searchParams: Promise<{
+    notification?: string | string[];
     section?: string | string[];
   }>;
 };
@@ -117,7 +118,13 @@ export default async function AdminSettingsPage({
   searchParams,
 }: AdminSettingsPageProps) {
   const session = await requireAdminAccess();
-  const selectedSection = getSection((await searchParams).section);
+  const resolvedSearchParams = await searchParams;
+  const selectedSection = getSection(resolvedSearchParams.section);
+  const selectedNotificationItem = Array.isArray(
+    resolvedSearchParams.notification,
+  )
+    ? resolvedSearchParams.notification[0]
+    : resolvedSearchParams.notification;
   const selectedConfig = getSectionConfig(selectedSection);
   const settings = await getMarketplaceSettings();
   const premiumPlans =
@@ -125,7 +132,7 @@ export default async function AdminSettingsPage({
   const notificationSettings =
     selectedSection === "notifications"
       ? await getAdminNotificationSettings()
-      : { deliveries: [], globalVariables: [], templates: [] };
+      : { deliveries: [], globalVariables: [], inAppTemplates: [], templates: [] };
   const notificationMediaLibrary =
     selectedSection === "notifications"
       ? await getAdminMediaLibrary(session.user.id)
@@ -170,6 +177,7 @@ export default async function AdminSettingsPage({
         <section className="w-full">
           <SettingsSection
             notificationMediaLibrary={notificationMediaLibrary}
+            selectedNotificationItem={selectedNotificationItem ?? null}
             notificationSettings={notificationSettings}
             premiumPlans={premiumPlans}
             section={selectedSection}
@@ -218,12 +226,14 @@ function SettingsSection({
   notificationMediaLibrary,
   notificationSettings,
   premiumPlans,
+  selectedNotificationItem,
   section,
   settings,
 }: {
   notificationMediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
   notificationSettings: Awaited<ReturnType<typeof getAdminNotificationSettings>>;
   premiumPlans: Awaited<ReturnType<typeof getAdminPremiumPlans>>;
+  selectedNotificationItem: string | null;
   section: SettingSectionKey;
   settings: Awaited<ReturnType<typeof getMarketplaceSettings>>;
 }) {
@@ -278,11 +288,13 @@ function SettingsSection({
     return (
       <DashboardPanel
         title="Notifications"
-        description="Manage transactional email templates and review recent SendGrid delivery history."
+        description="Manage email and in-app notification templates, delivery history, and shared variables."
       >
         <NotificationSettingsForm
           deliveries={notificationSettings.deliveries}
           globalVariables={notificationSettings.globalVariables}
+          initialSelectedItem={selectedNotificationItem}
+          inAppTemplates={notificationSettings.inAppTemplates}
           mediaLibrary={notificationMediaLibrary}
           templates={notificationSettings.templates}
         />

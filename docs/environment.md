@@ -41,6 +41,10 @@ SENDGRID_API_KEY=replace-with-sendgrid-api-key
 SENDGRID_FROM_EMAIL=no-reply@piessang.com
 SENDGRID_FROM_NAME=Piessang
 SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
+
+WEB_PUSH_PUBLIC_KEY=replace-with-vapid-public-key
+WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
+WEB_PUSH_SUBJECT=mailto:no-reply@piessang.com
 ```
 
 ## Self-Hosted Values
@@ -80,6 +84,10 @@ SENDGRID_FROM_EMAIL=no-reply@piessang.com
 SENDGRID_FROM_NAME=Piessang
 SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
 
+WEB_PUSH_PUBLIC_KEY=replace-with-vapid-public-key
+WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
+WEB_PUSH_SUBJECT=mailto:no-reply@piessang.com
+
 CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 ```
 
@@ -88,6 +96,14 @@ For host-run commands like migrations, `DATABASE_URL` should point at `localhost
 `SENDGRID_FROM_EMAIL` must be a sender identity verified in SendGrid. If either SendGrid value is missing in local development, password reset requests keep showing the dev reset link instead of sending email.
 
 `SENDGRID_WEBHOOK_PUBLIC_KEY` is the Verification key shown by SendGrid when Signed Event Webhook is enabled. Use the endpoint `https://piessang.com/api/webhooks/sendgrid/events` in SendGrid.
+
+`WEB_PUSH_PUBLIC_KEY` and `WEB_PUSH_PRIVATE_KEY` are the VAPID keys used for browser push notifications. Generate them with:
+
+```sh
+node -e "console.log(require('web-push').generateVAPIDKeys())"
+```
+
+`WEB_PUSH_SUBJECT` should be a contact identity you control, usually a `mailto:` address on your domain.
 
 ## Google SSO
 

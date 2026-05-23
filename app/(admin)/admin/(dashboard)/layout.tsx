@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AdminDashboardShell } from "@/components/admin/admin-dashboard-shell";
 import { requireAdminAccess } from "@/src/modules/auth/permissions";
+import { getNotificationCenter } from "@/src/modules/notifications/in-app";
 
 export default async function AdminDashboardLayout({
   children,
@@ -9,9 +10,14 @@ export default async function AdminDashboardLayout({
   children: ReactNode;
 }) {
   const session = await requireAdminAccess();
+  const notificationCenter = await getNotificationCenter({
+    surface: "admin",
+    userId: session.user.id,
+  });
 
   return (
     <AdminDashboardShell
+      notificationCenter={notificationCenter}
       user={{
         name: session.user.name,
         email: session.user.email,

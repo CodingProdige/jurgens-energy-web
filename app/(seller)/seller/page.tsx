@@ -15,6 +15,7 @@ import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
 import { requireSellerDashboardAccess } from "@/src/modules/auth/permissions";
+import { getNotificationCenter } from "@/src/modules/notifications/in-app";
 
 export const metadata: Metadata = {
   title: "Seller Dashboard",
@@ -38,6 +39,10 @@ const sellerNavItems = [
 
 export default async function SellerDashboardPage() {
   const session = await requireSellerDashboardAccess();
+  const notificationCenter = await getNotificationCenter({
+    surface: "seller",
+    userId: session.user.id,
+  });
 
   return (
     <DashboardShell
@@ -47,6 +52,8 @@ export default async function SellerDashboardPage() {
       description="Manage catalog readiness, order work, payouts, reviews, and seller performance from one focused workspace."
       eyebrow="Protected seller dashboard"
       navItems={sellerNavItems}
+      notificationCenter={notificationCenter}
+      notificationSurface="seller"
       surfaceHref="/"
       surfaceLabel="Seller"
       title="Seller operations"

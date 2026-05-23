@@ -17,6 +17,9 @@ const envSchema = z.object({
   SENDGRID_FROM_EMAIL: z.email().optional(),
   SENDGRID_FROM_NAME: z.string().min(1).default("Piessang"),
   SENDGRID_WEBHOOK_PUBLIC_KEY: z.string().min(1).optional(),
+  WEB_PUSH_PRIVATE_KEY: z.string().min(1).optional(),
+  WEB_PUSH_PUBLIC_KEY: z.string().min(1).optional(),
+  WEB_PUSH_SUBJECT: z.string().min(1).default("mailto:no-reply@piessang.com"),
 });
 
 export const env = envSchema.parse({
@@ -33,4 +36,9 @@ export const env = envSchema.parse({
   SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL,
   SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME,
   SENDGRID_WEBHOOK_PUBLIC_KEY: process.env.SENDGRID_WEBHOOK_PUBLIC_KEY,
+  WEB_PUSH_PRIVATE_KEY: process.env.WEB_PUSH_PRIVATE_KEY,
+  WEB_PUSH_PUBLIC_KEY:
+    process.env.WEB_PUSH_PUBLIC_KEY ??
+    process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY,
+  WEB_PUSH_SUBJECT: process.env.WEB_PUSH_SUBJECT,
 });

@@ -225,4 +225,6 @@ export async function createSellerApplicationForExistingUser(
       source: "seller_signup",
     });
   });
+
+  return { id: userId };
 }

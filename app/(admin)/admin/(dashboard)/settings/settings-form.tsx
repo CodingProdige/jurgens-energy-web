@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   BarChart3Icon,
+  BellIcon,
   BracesIcon,
   Code2Icon,
   CrownIcon,
@@ -24,6 +25,7 @@ import {
   LinkIcon,
   LockIcon,
   MailCheckIcon,
+  MonitorIcon,
   MousePointerClickIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -50,8 +52,11 @@ import {
   savePremiumPlanSettings,
   deleteNotificationGlobalVariableSettings,
   saveNotificationGlobalVariableSettings,
+  saveInAppNotificationTemplateSettings,
   saveNotificationTemplateSettings,
+  restoreInAppNotificationTemplateSettings,
   restoreNotificationTemplateSettings,
+  sendInAppNotificationTemplateTestSettings,
   sendNotificationTemplateTestSettings,
   updateStripePaymentSettings,
   type AdminSettingsState,
@@ -59,6 +64,8 @@ import {
 import type { AdminPremiumPlan } from "@/src/modules/billing/premium-plans";
 import type { getAdminMediaLibrary } from "@/src/modules/media/admin";
 import type {
+  AdminInAppNotificationTemplate,
+  AdminNotificationDeliveryPolicy,
   AdminNotificationDelivery,
   AdminNotificationGlobalVariable,
   AdminNotificationTemplate,
@@ -980,20 +987,140 @@ function PremiumPlanEditor({
 type NotificationSettingsFormProps = {
   deliveries: AdminNotificationDelivery[];
   globalVariables: AdminNotificationGlobalVariable[];
+  initialSelectedItem: string | null;
+  inAppTemplates: AdminInAppNotificationTemplate[];
   mediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
   templates: AdminNotificationTemplate[];
 };
 
+function getDefaultNotificationSelection(
+  templates: AdminNotificationTemplate[],
+  inAppTemplates: AdminInAppNotificationTemplate[],
+) {
+  return templates[0]
+    ? `email:${templates[0].id}`
+    : inAppTemplates[0]
+      ? `in-app:${inAppTemplates[0].id}`
+      : "analytics";
+}
+
+function isValidNotificationSelection(
+  selection: string | null,
+  templates: AdminNotificationTemplate[],
+  inAppTemplates: AdminInAppNotificationTemplate[],
+) {
+  if (!selection) {
+    return false;
+  }
+
+  if (selection === "analytics" || selection === "globals") {
+    return true;
+  }
+
+  if (selection.startsWith("email:")) {
+    return templates.some((template) => `email:${template.id}` === selection);
+  }
+
+  if (selection.startsWith("in-app:")) {
+    return inAppTemplates.some(
+      (template) => `in-app:${template.id}` === selection,
+    );
+  }
+
+  return false;
+}
+
+function getInitialNotificationSelection(
+  initialSelectedItem: string | null,
+  templates: AdminNotificationTemplate[],
+  inAppTemplates: AdminInAppNotificationTemplate[],
+) {
+  return isValidNotificationSelection(
+    initialSelectedItem,
+    templates,
+    inAppTemplates,
+  )
+    ? initialSelectedItem!
+    : getDefaultNotificationSelection(templates, inAppTemplates);
+}
+
+function updateNotificationSelectionUrl(
+  selection: string,
+  mode: "push" | "replace" = "push",
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("section", "notifications");
+  url.searchParams.set("notification", selection);
+
+  const nextUrl = `${url.pathname}?${url.searchParams.toString()}${url.hash}`;
+
+  if (mode === "replace") {
+    window.history.replaceState(null, "", nextUrl);
+    return;
+  }
+
+  window.history.pushState(null, "", nextUrl);
+}
+
 export function NotificationSettingsForm({
   deliveries,
   globalVariables,
+  initialSelectedItem,
+  inAppTemplates,
   mediaLibrary,
   templates,
 }: NotificationSettingsFormProps) {
-  const [selectedItem, setSelectedItem] = useState(
-    templates[0]?.id ?? "analytics",
+  const [selectedItem, setSelectedItem] = useState(() =>
+    getInitialNotificationSelection(
+      initialSelectedItem,
+      templates,
+      inAppTemplates,
+    ),
   );
   const [templateSearch, setTemplateSearch] = useState("");
+  const handleSelectedItemChange = (itemId: string) => {
+    setSelectedItem(itemId);
+    updateNotificationSelectionUrl(itemId);
+  };
+
+  useEffect(() => {
+    if (
+      isValidNotificationSelection(selectedItem, templates, inAppTemplates)
+    ) {
+      return;
+    }
+
+    const fallback = getDefaultNotificationSelection(
+      templates,
+      inAppTemplates,
+    );
+    setSelectedItem(fallback);
+    updateNotificationSelectionUrl(fallback, "replace");
+  }, [inAppTemplates, selectedItem, templates]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextSelectedItem = new URL(window.location.href).searchParams.get(
+        "notification",
+      );
+      setSelectedItem(
+        getInitialNotificationSelection(
+          nextSelectedItem,
+          templates,
+          inAppTemplates,
+        ),
+      );
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [inAppTemplates, templates]);
+
   const normalizedTemplateSearch = templateSearch.trim().toLowerCase();
   const filteredTemplates = normalizedTemplateSearch
     ? templates.filter((template) =>
@@ -1008,8 +1135,29 @@ export function NotificationSettingsForm({
           .includes(normalizedTemplateSearch),
       )
     : templates;
-  const selectedTemplate =
-    templates.find((template) => template.id === selectedItem) ?? null;
+  const filteredInAppTemplates = normalizedTemplateSearch
+    ? inAppTemplates.filter((template) =>
+        [
+          template.name,
+          template.category,
+          template.key,
+          template.surface,
+          template.type,
+          template.description ?? "",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedTemplateSearch),
+      )
+    : inAppTemplates;
+  const selectedEmailTemplate =
+    selectedItem.startsWith("email:")
+      ? templates.find((template) => `email:${template.id}` === selectedItem) ?? null
+      : null;
+  const selectedInAppTemplate =
+    selectedItem.startsWith("in-app:")
+      ? inAppTemplates.find((template) => `in-app:${template.id}` === selectedItem) ?? null
+      : null;
 
   return (
     <div className="grid gap-5">
@@ -1020,12 +1168,12 @@ export function NotificationSettingsForm({
           </span>
           <div>
             <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-              Email-only notification center
+              Notification control center
             </h3>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-              These templates are the source of truth for transactional emails.
-              Seller application events will call these templates through
-              SendGrid and record each delivery attempt.
+              Email templates drive SendGrid messages. In-app templates drive
+              dashboard notifications. Both use the same variable system,
+              version history, test actions, and admin review flow.
             </p>
           </div>
         </div>
@@ -1047,27 +1195,63 @@ export function NotificationSettingsForm({
             />
           </div>
           <div className="grid gap-1">
-            {filteredTemplates.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                onClick={() => setSelectedItem(template.id)}
-                className={cn(
-                  "grid gap-1 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                  selectedItem === template.id
-                    ? "bg-admin-primary/12 text-zinc-950 ring-1 ring-admin-primary/25 dark:bg-admin-primary/20 dark:text-white"
-                    : "text-slate-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white",
-                )}
-              >
-                <span className="truncate font-semibold">{template.name}</span>
-                <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-500">
-                  <span className="truncate">{template.category}</span>
-                  <span>v{template.version}</span>
-                </span>
-              </button>
-            ))}
+            <div className="px-2 pt-1 text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-zinc-500">
+              Email templates
+            </div>
+            {filteredTemplates.map((template) => {
+              const itemId = `email:${template.id}`;
 
-            {filteredTemplates.length === 0 ? (
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => handleSelectedItemChange(itemId)}
+                  className={cn(
+                    "grid gap-1 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    selectedItem === itemId
+                      ? "bg-admin-primary/12 text-zinc-950 ring-1 ring-admin-primary/25 dark:bg-admin-primary/20 dark:text-white"
+                      : "text-slate-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white",
+                  )}
+                >
+                  <span className="truncate font-semibold">{template.name}</span>
+                  <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-500">
+                    <MailCheckIcon className="size-3.5" />
+                    <span className="truncate">{template.category}</span>
+                    <span>v{template.version}</span>
+                  </span>
+                </button>
+              );
+            })}
+
+            <div className="mt-3 px-2 text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-zinc-500">
+              In-app templates
+            </div>
+            {filteredInAppTemplates.map((template) => {
+              const itemId = `in-app:${template.id}`;
+
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => handleSelectedItemChange(itemId)}
+                  className={cn(
+                    "grid gap-1 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                    selectedItem === itemId
+                      ? "bg-admin-primary/12 text-zinc-950 ring-1 ring-admin-primary/25 dark:bg-admin-primary/20 dark:text-white"
+                      : "text-slate-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white",
+                  )}
+                >
+                  <span className="truncate font-semibold">{template.name}</span>
+                  <span className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-500">
+                    <BellIcon className="size-3.5" />
+                    <span className="truncate">{template.surface}</span>
+                    <span>v{template.version}</span>
+                  </span>
+                </button>
+              );
+            })}
+
+            {filteredTemplates.length === 0 && filteredInAppTemplates.length === 0 ? (
               <p className="rounded-lg border border-dashed border-zinc-200 px-3 py-4 text-sm text-slate-500 dark:border-white/10 dark:text-zinc-400">
                 No templates match this search.
               </p>
@@ -1075,7 +1259,7 @@ export function NotificationSettingsForm({
 
             <button
               type="button"
-              onClick={() => setSelectedItem("analytics")}
+              onClick={() => handleSelectedItemChange("analytics")}
               className={cn(
                 "mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors",
                 selectedItem === "analytics"
@@ -1089,7 +1273,7 @@ export function NotificationSettingsForm({
 
             <button
               type="button"
-              onClick={() => setSelectedItem("globals")}
+              onClick={() => handleSelectedItemChange("globals")}
               className={cn(
                 "flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors",
                 selectedItem === "globals"
@@ -1108,12 +1292,18 @@ export function NotificationSettingsForm({
             <NotificationAnalytics deliveries={deliveries} />
           ) : selectedItem === "globals" ? (
             <NotificationGlobalVariables variables={globalVariables} />
-          ) : selectedTemplate ? (
+          ) : selectedEmailTemplate ? (
             <NotificationTemplateEditor
               globalVariables={globalVariables}
               mediaLibrary={mediaLibrary}
-              key={selectedTemplate.id}
-              template={selectedTemplate}
+              key={selectedEmailTemplate.id}
+              template={selectedEmailTemplate}
+            />
+          ) : selectedInAppTemplate ? (
+            <InAppNotificationTemplateEditor
+              globalVariables={globalVariables}
+              key={selectedInAppTemplate.id}
+              template={selectedInAppTemplate}
             />
           ) : (
             <p className="rounded-xl border border-zinc-200 p-4 text-sm text-slate-600 dark:border-white/10 dark:text-zinc-300">
@@ -1132,17 +1322,10 @@ function NotificationGlobalVariables({
 }: {
   variables: AdminNotificationGlobalVariable[];
 }) {
-  const systemVariables = variables.filter(
-    (variable) => variable.source === "system",
-  );
-  const customVariables = variables.filter(
-    (variable) => variable.source === "custom",
-  );
-
   return (
-    <div className="grid gap-5">
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="mb-4 flex items-start gap-3">
+    <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/15 text-admin-primary">
             <Globe2Icon className="size-4" />
           </span>
@@ -1151,75 +1334,208 @@ function NotificationGlobalVariables({
               Global template variables
             </h3>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Create reusable values that can be inserted into any email
-              template with double braces, for example {"{{supportEmail}}"}.
+              Create reusable values that can be inserted into any email or
+              in-app template with double braces, for example{" "}
+              {"{{supportEmail}}"}.
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Values are resolved at render time. Updating a value applies the
+              next time a notification is rendered; renaming a custom key also
+              updates every template placeholder currently using it.
             </p>
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          {systemVariables.map((variable) => (
-            <div
-              key={variable.key}
-              className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-white/10 dark:bg-white/[0.03]"
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <Globe2Icon className="size-4 text-admin-primary" />
-                <p className="truncate text-sm font-bold text-zinc-950 dark:text-white">
-                  {variable.label}
-                </p>
-              </div>
-              <p className="truncate font-mono text-xs text-admin-primary">
-                {`{{${variable.key}}}`}
-              </p>
-              <p className="mt-2 truncate text-xs text-slate-500 dark:text-zinc-400">
-                {variable.value}
-              </p>
-            </div>
-          ))}
-        </div>
+        <Dialog>
+          <DialogTrigger
+            render={
+              <Button type="button" className="w-fit gap-2">
+                <PlusIcon className="size-4" />
+                Add global
+              </Button>
+            }
+          />
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create global variable</DialogTitle>
+              <DialogDescription>
+                Add a reusable value that templates can reference with double
+                braces.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogBody>
+              <NotificationGlobalVariableForm embedded />
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <NotificationGlobalVariableForm />
-
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-              Custom globals
-            </h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              These values are stored in PostgreSQL and merged into every
-              transactional email render.
-            </p>
-          </div>
-          <Badge className="bg-admin-primary/15 text-admin-primary">
-            {customVariables.length}
-          </Badge>
-        </div>
-
-        {customVariables.length > 0 ? (
-          <div className="grid gap-3">
-            {customVariables.map((variable) => (
-              <NotificationGlobalVariableForm
-                key={variable.id ?? variable.key}
-                variable={variable}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-lg border border-dashed border-zinc-200 p-4 text-sm text-slate-600 dark:border-white/10 dark:text-zinc-300">
-            No custom global variables have been created yet.
-          </p>
-        )}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {variables.map((variable) => (
+          <NotificationGlobalVariableCard
+            key={`${variable.source}-${variable.key}`}
+            variable={variable}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function NotificationGlobalVariableForm({
+function NotificationGlobalVariableCard({
   variable,
 }: {
+  variable: AdminNotificationGlobalVariable;
+}) {
+  const [deleteState, deleteAction, isDeleting] = useActionState(
+    deleteNotificationGlobalVariableSettings,
+    initialState,
+  );
+  const isSystem = variable.source === "system";
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center gap-2">
+            <Globe2Icon className="size-4 shrink-0 text-admin-primary" />
+            <p className="truncate text-sm font-bold text-zinc-950 dark:text-white">
+              {variable.label}
+            </p>
+          </div>
+          <p className="truncate font-mono text-xs text-admin-primary">
+            {`{{${variable.key}}}`}
+          </p>
+        </div>
+        <Badge
+          className={cn(
+            isSystem
+              ? "bg-zinc-500/10 text-zinc-600 dark:text-zinc-300"
+              : "bg-admin-primary/15 text-admin-primary",
+          )}
+        >
+          {isSystem ? "System" : "Custom"}
+        </Badge>
+      </div>
+
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-zinc-300">
+        {variable.value}
+      </p>
+      {variable.description ? (
+        <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+          {variable.description}
+        </p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200 pt-3 dark:border-white/10">
+        <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
+          Used in {variable.usageCount}{" "}
+          {variable.usageCount === 1 ? "template" : "templates"}
+        </span>
+
+        {isSystem ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-zinc-400">
+            <LockIcon className="size-3.5" />
+            Env managed
+          </span>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Dialog>
+              <DialogTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 px-3 text-xs"
+                  >
+                    Edit
+                  </Button>
+                }
+              />
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit global variable</DialogTitle>
+                  <DialogDescription>
+                    Saving updates the value used by every template referencing{" "}
+                    {`{{${variable.key}}}`}.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogBody>
+                  <NotificationGlobalVariableForm variable={variable} embedded />
+                </DialogBody>
+              </DialogContent>
+            </Dialog>
+
+            {variable.id ? (
+              <Dialog>
+                <DialogTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 px-3 text-xs text-red-600 hover:text-red-700 dark:text-red-300"
+                    >
+                      Delete
+                    </Button>
+                  }
+                />
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete global variable</DialogTitle>
+                    <DialogDescription>
+                      This removes {`{{${variable.key}}}`} from the global
+                      variable list. Templates that still reference this key
+                      will no longer receive a value for it.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogBody>
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200">
+                      This variable is currently used in {variable.usageCount}{" "}
+                      {variable.usageCount === 1 ? "template" : "templates"}.
+                    </div>
+                  </DialogBody>
+                  <DialogFooter>
+                    <form action={deleteAction}>
+                      <input type="hidden" name="id" value={variable.id} />
+                      <Button
+                        type="submit"
+                        disabled={isDeleting}
+                        variant="outline"
+                        className="gap-2 text-red-600 hover:text-red-700 dark:text-red-300"
+                      >
+                        <Trash2Icon className="size-4" />
+                        {isDeleting ? "Deleting..." : "Delete global"}
+                      </Button>
+                    </form>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {deleteState.message ? (
+        <p
+          className={cn(
+            "mt-3 rounded-lg border p-2 text-xs",
+            deleteState.ok
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+              : "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-200",
+          )}
+        >
+          {deleteState.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function NotificationGlobalVariableForm({
+  embedded = false,
+  variable,
+}: {
+  embedded?: boolean;
   variable?: AdminNotificationGlobalVariable;
 }) {
   const [state, formAction, isPending] = useActionState(
@@ -1233,10 +1549,16 @@ function NotificationGlobalVariableForm({
   const isExisting = Boolean(variable?.id);
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+    <div
+      className={cn(
+        !embedded &&
+          "rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]",
+      )}
+    >
       <form action={formAction} className="grid gap-4">
         <input type="hidden" name="id" value={variable?.id ?? ""} />
-        <div className="flex items-start gap-3">
+        {!embedded ? (
+          <div className="flex items-start gap-3">
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/15 text-admin-primary">
             {isExisting ? (
               <Globe2Icon className="size-4" />
@@ -1252,7 +1574,8 @@ function NotificationGlobalVariableForm({
               Use a stable camelCase key. System global keys are reserved.
             </p>
           </div>
-        </div>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="grid gap-2">
@@ -1334,7 +1657,7 @@ function NotificationGlobalVariableForm({
         </div>
       </form>
 
-      {variable?.id ? (
+      {variable?.id && !embedded ? (
         <form action={deleteAction} className="mt-3">
           <input type="hidden" name="id" value={variable.id} />
           <Button
@@ -1609,6 +1932,148 @@ function getNotificationActivity(deliveries: AdminNotificationDelivery[]) {
   }));
 }
 
+function DeliveryPolicyFields({
+  policy,
+}: {
+  policy: AdminNotificationDeliveryPolicy;
+}) {
+  return (
+    <section className="grid gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+      <input type="hidden" name="deliveryEventKey" value={policy.eventKey} />
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="text-sm font-bold text-zinc-950 dark:text-white">
+            Delivery policy
+          </h4>
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Control which channels this event uses when the platform calls its
+            notification key.
+          </p>
+        </div>
+        <code className="rounded-md bg-white px-2 py-1 text-xs text-slate-500 dark:bg-white/[0.06] dark:text-zinc-400">
+          {policy.eventKey}
+        </code>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        {[
+          {
+            description: "Creates a bell notification inside Piessang.",
+            label: "In-app",
+            name: "deliveryInAppEnabled",
+            value: policy.inAppEnabled,
+          },
+          {
+            description: "Sends the matching email template.",
+            label: "Email",
+            name: "deliveryEmailEnabled",
+            value: policy.emailEnabled,
+          },
+          {
+            description: "Sends browser push to subscribed devices.",
+            label: "Push",
+            name: "deliveryPushEnabled",
+            value: policy.pushEnabled,
+          },
+        ].map((channel) => (
+          <label
+            key={channel.name}
+            className="flex gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-white/[0.04]"
+          >
+            <input
+              name={channel.name}
+              type="checkbox"
+              defaultChecked={channel.value}
+              className="mt-1 size-4 accent-admin-primary"
+            />
+            <span>
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                {channel.label}
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                {channel.description}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-2">
+          <Label htmlFor={`${policy.eventKey}-priority`}>Priority</Label>
+          <select
+            id={`${policy.eventKey}-priority`}
+            name="deliveryPriority"
+            defaultValue={policy.priority}
+            className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-950 outline-none transition focus:border-admin-primary focus:ring-3 focus:ring-admin-primary/20 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+          >
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+
+        <label className="flex gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+          <input
+            name="deliveryQuietHoursEnabled"
+            type="checkbox"
+            defaultChecked={policy.quietHoursEnabled}
+            className="mt-1 size-4 accent-admin-primary"
+          />
+          <span>
+            <span className="font-semibold text-zinc-950 dark:text-white">
+              Quiet hours
+            </span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Hold non-critical sends during this window.
+            </span>
+          </span>
+        </label>
+
+        <div className="grid gap-2">
+          <Label htmlFor={`${policy.eventKey}-quiet-start`}>Quiet start</Label>
+          <Input
+            id={`${policy.eventKey}-quiet-start`}
+            name="deliveryQuietHoursStart"
+            type="time"
+            defaultValue={policy.quietHoursStart ?? ""}
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor={`${policy.eventKey}-quiet-end`}>Quiet end</Label>
+          <Input
+            id={`${policy.eventKey}-quiet-end`}
+            name="deliveryQuietHoursEnd"
+            type="time"
+            defaultValue={policy.quietHoursEnd ?? ""}
+          />
+        </div>
+      </div>
+
+      <label className="flex gap-3 rounded-lg border border-zinc-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+        <input
+          name="deliveryDigestEligible"
+          type="checkbox"
+          defaultChecked={policy.digestEligible}
+          className="mt-1 size-4 accent-admin-primary"
+        />
+        <span>
+          <span className="font-semibold text-zinc-950 dark:text-white">
+            Digest eligible
+          </span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Allow this event to be batched into a future digest instead of
+            always sending immediately.
+          </span>
+        </span>
+      </label>
+    </section>
+  );
+}
+
 function NotificationTemplateEditor({
   globalVariables,
   mediaLibrary,
@@ -1831,6 +2296,8 @@ function NotificationTemplateEditor({
           </Select>
         </div>
         </div>
+
+        <DeliveryPolicyFields policy={template.deliveryPolicy} />
 
         <div className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
         <div className="flex items-start gap-3">
@@ -2129,6 +2596,394 @@ function NotificationTemplateEditor({
   );
 }
 
+function InAppNotificationTemplateEditor({
+  globalVariables,
+  template,
+}: {
+  globalVariables: AdminNotificationGlobalVariable[];
+  template: AdminInAppNotificationTemplate;
+}) {
+  const [status, setStatus] = useState(template.status);
+  const [titleTemplate, setTitleTemplate] = useState(template.titleTemplate);
+  const [bodyTemplate, setBodyTemplate] = useState(template.bodyTemplate);
+  const [actionLabelTemplate, setActionLabelTemplate] = useState(
+    template.actionLabelTemplate ?? "",
+  );
+  const [actionUrlTemplate, setActionUrlTemplate] = useState(
+    template.actionUrlTemplate ?? "",
+  );
+  const [variablesText, setVariablesText] = useState(
+    template.requiredVariables.join(", "),
+  );
+  const [activeTemplateField, setActiveTemplateField] = useState<
+    "title" | "body" | "actionLabel" | "actionUrl"
+  >("body");
+  const [state, formAction, isPending] = useActionState(
+    saveInAppNotificationTemplateSettings,
+    initialState,
+  );
+  const variables = variablesText
+    .split(",")
+    .map((variable) => variable.trim())
+    .filter(Boolean);
+  const allVariables = Array.from(
+    new Set([...variables, ...globalVariables.map((item) => item.key)]),
+  );
+  const globalVariableValues = Object.fromEntries(
+    globalVariables.map((variable) => [variable.key, variable.value]),
+  );
+  const renderedTitle = renderTemplateStringPreview(
+    titleTemplate,
+    allVariables,
+    globalVariableValues,
+  );
+  const renderedBody = renderTemplateStringPreview(
+    bodyTemplate,
+    allVariables,
+    globalVariableValues,
+  );
+  const renderedActionLabel = renderTemplateStringPreview(
+    actionLabelTemplate,
+    allVariables,
+    globalVariableValues,
+  );
+  const renderedActionUrl = renderTemplateStringPreview(
+    actionUrlTemplate,
+    allVariables,
+    globalVariableValues,
+  );
+
+  function insertVariable(variable: string, target = activeTemplateField) {
+    const token = `{{${variable}}}`;
+    const appendToken = (current: string) =>
+      `${current}${current.endsWith(" ") || current.length === 0 ? "" : " "}${token}`;
+
+    if (target === "title") {
+      setTitleTemplate(appendToken);
+      return;
+    }
+
+    if (target === "actionLabel") {
+      setActionLabelTemplate(appendToken);
+      return;
+    }
+
+    if (target === "actionUrl") {
+      setActionUrlTemplate(appendToken);
+      return;
+    }
+
+    setBodyTemplate(appendToken);
+  }
+
+  function handleVariableDrop(
+    event: DragEvent<HTMLInputElement | HTMLTextAreaElement>,
+    target: "title" | "body" | "actionLabel" | "actionUrl",
+  ) {
+    event.preventDefault();
+    const variable = event.dataTransfer.getData("text/piessang-variable");
+
+    if (variable) {
+      insertVariable(variable, target);
+    }
+  }
+
+  return (
+    <div className="grid gap-5">
+      <form
+        action={formAction}
+        className="grid gap-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]"
+      >
+        <input type="hidden" name="id" value={template.id} />
+        <input type="hidden" name="status" value={status} />
+
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-bold text-zinc-950 dark:text-white">
+                {template.name}
+              </h3>
+              <Badge className="bg-admin-primary/15 text-admin-primary">
+                v{template.version}
+              </Badge>
+              <Badge className="bg-emerald-500/15 capitalize text-emerald-700 dark:text-emerald-200">
+                {template.surface}
+              </Badge>
+              <Badge
+                className={cn(
+                  template.status === "active"
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200"
+                    : "bg-zinc-500/12 text-zinc-600 dark:text-zinc-300",
+                )}
+              >
+                {template.status}
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              {template.description}
+            </p>
+            <p className="mt-1 truncate font-mono text-xs text-slate-500 dark:text-zinc-500">
+              {template.key}
+            </p>
+          </div>
+
+          <div className="grid gap-2 md:w-48">
+            <Label>Status</Label>
+            <Select
+              value={status}
+              onValueChange={(value) =>
+                setStatus(value as AdminInAppNotificationTemplate["status"])
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="disabled">Disabled</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <DeliveryPolicyFields policy={template.deliveryPolicy} />
+
+        <div className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/15 text-admin-primary">
+              <BracesIcon className="size-4" />
+            </span>
+            <div>
+              <h4 className="text-sm font-bold text-zinc-950 dark:text-white">
+                Available template variables
+              </h4>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Drag a variable into title, body, action label, or action URL.
+                Click inserts into the last focused field.
+              </p>
+            </div>
+          </div>
+
+          {variables.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {variables.map((variable) => (
+                <button
+                  key={variable}
+                  type="button"
+                  draggable
+                  onClick={() => insertVariable(variable)}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(
+                      "text/piessang-variable",
+                      variable,
+                    );
+                    event.dataTransfer.effectAllowed = "copy";
+                  }}
+                  className="inline-flex cursor-grab items-center gap-2 rounded-lg border border-admin-primary/25 bg-white px-3 py-2 font-mono text-xs font-semibold text-admin-primary shadow-sm transition hover:border-admin-primary/50 hover:bg-admin-primary/10 active:cursor-grabbing dark:bg-white/[0.04]"
+                >
+                  <MousePointerClickIcon className="size-3.5" />
+                  {`{{${variable}}}`}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600 dark:text-zinc-300">
+              This template does not currently declare any variables.
+            </p>
+          )}
+
+          {globalVariables.length > 0 ? (
+            <div className="grid gap-2 border-t border-zinc-200 pt-3 dark:border-white/10">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+                Global variables
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {globalVariables.map((variable) => (
+                  <button
+                    key={`${variable.source}-${variable.key}`}
+                    type="button"
+                    draggable
+                    onClick={() => insertVariable(variable.key)}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData(
+                        "text/piessang-variable",
+                        variable.key,
+                      );
+                      event.dataTransfer.effectAllowed = "copy";
+                    }}
+                    title={variable.description ?? variable.label}
+                    className="inline-flex cursor-grab items-center gap-2 rounded-lg border border-admin-primary/25 bg-white px-3 py-2 font-mono text-xs font-semibold text-admin-primary shadow-sm transition hover:border-admin-primary/50 hover:bg-admin-primary/10 active:cursor-grabbing dark:bg-white/[0.04]"
+                  >
+                    <Globe2Icon className="size-3.5" />
+                    {`{{${variable.key}}}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor={`${template.id}-title`}>Title</Label>
+            <Input
+              id={`${template.id}-title`}
+              name="titleTemplate"
+              value={titleTemplate}
+              onChange={(event) => setTitleTemplate(event.target.value)}
+              onFocus={() => setActiveTemplateField("title")}
+              onDrop={(event) => handleVariableDrop(event, "title")}
+              onDragOver={(event) => event.preventDefault()}
+              maxLength={180}
+              required
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor={`${template.id}-variables`}>
+              Template variables
+            </Label>
+            <Input
+              id={`${template.id}-variables`}
+              name="requiredVariables"
+              value={variablesText}
+              onChange={(event) => setVariablesText(event.target.value)}
+              maxLength={1000}
+              placeholder="name, storeName, sellerDashboardUrl"
+            />
+          </div>
+
+          <div className="grid gap-2 lg:col-span-2">
+            <Label htmlFor={`${template.id}-body`}>Notification body</Label>
+            <CodeEditor
+              id={`${template.id}-body`}
+              name="bodyTemplate"
+              label="In-app body"
+              value={bodyTemplate}
+              onValueChange={setBodyTemplate}
+              onFocus={() => setActiveTemplateField("body")}
+              onDrop={(event) => handleVariableDrop(event, "body")}
+              onDragOver={(event) => event.preventDefault()}
+              maxLength={2000}
+              required
+              className="min-h-40"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor={`${template.id}-action-label`}>
+              Action label
+            </Label>
+            <Input
+              id={`${template.id}-action-label`}
+              name="actionLabelTemplate"
+              value={actionLabelTemplate}
+              onChange={(event) => setActionLabelTemplate(event.target.value)}
+              onFocus={() => setActiveTemplateField("actionLabel")}
+              onDrop={(event) => handleVariableDrop(event, "actionLabel")}
+              onDragOver={(event) => event.preventDefault()}
+              maxLength={120}
+              placeholder="Open dashboard"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor={`${template.id}-action-url`}>Action URL</Label>
+            <Input
+              id={`${template.id}-action-url`}
+              name="actionUrlTemplate"
+              value={actionUrlTemplate}
+              onChange={(event) => setActionUrlTemplate(event.target.value)}
+              onFocus={() => setActiveTemplateField("actionUrl")}
+              onDrop={(event) => handleVariableDrop(event, "actionUrl")}
+              onDragOver={(event) => event.preventDefault()}
+              maxLength={1000}
+              placeholder="{{sellerDashboardUrl}}"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/15 text-admin-primary">
+              <MonitorIcon className="size-4" />
+            </span>
+            <div>
+              <h4 className="text-sm font-bold text-zinc-950 dark:text-white">
+                Rendered in-app preview
+              </h4>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Variables render with sample values so you can see the actual
+                notification card before saving.
+              </p>
+            </div>
+          </div>
+
+          <div className="max-w-md rounded-2xl border border-zinc-200 bg-zinc-50 p-4 shadow-sm dark:border-white/10 dark:bg-zinc-950">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-admin-primary/15 text-admin-primary">
+                <BellIcon className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-zinc-950 dark:text-white">
+                  {renderedTitle || "Notification title"}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
+                  {renderedBody || "Notification body"}
+                </p>
+                {renderedActionLabel ? (
+                  <p className="mt-3 inline-flex rounded-lg bg-admin-primary px-3 py-2 text-xs font-bold text-white">
+                    {renderedActionLabel}
+                  </p>
+                ) : null}
+                {renderedActionUrl ? (
+                  <p className="mt-2 truncate font-mono text-[11px] text-slate-500 dark:text-zinc-500">
+                    {renderedActionUrl}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {state.message ? (
+          <p
+            className={cn(
+              "rounded-lg border p-3 text-sm",
+              state.ok
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+                : "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-200",
+            )}
+          >
+            {state.message}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button type="submit" disabled={isPending} className="w-fit gap-2">
+            <SaveIcon className="size-4" />
+            {isPending ? "Saving..." : "Save template"}
+          </Button>
+          <InAppNotificationTemplateTestDialog
+            actionLabelTemplate={actionLabelTemplate}
+            actionUrlTemplate={actionUrlTemplate}
+            bodyTemplate={bodyTemplate}
+            requiredVariables={variablesText}
+            templateKey={template.key}
+            titleTemplate={titleTemplate}
+          />
+        </div>
+      </form>
+
+      <InAppNotificationVersionHistory
+        templateId={template.id}
+        versions={template.versions}
+      />
+    </div>
+  );
+}
+
 function CodeEditor({
   className,
   label,
@@ -2349,6 +3204,19 @@ function renderTemplatePreviewHtml(
   </head>
   <body>${renderedBody}</body>
 </html>`;
+}
+
+function renderTemplateStringPreview(
+  value: string,
+  variables: string[],
+  globalVariableValues: Record<string, string> = {},
+) {
+  return variables.reduce((current, variable) => {
+    return current.replaceAll(
+      `{{${variable}}}`,
+      getTemplateVariableSample(variable, globalVariableValues),
+    );
+  }, value);
 }
 
 function getTemplateVariableSample(
@@ -2606,6 +3474,198 @@ function NotificationVersionHistory({
                   </Badge>
                   <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">
                     {version.subject}
+                  </p>
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                  Saved {version.createdAt.toLocaleString()}
+                </p>
+                {version.requiredVariables.length > 0 ? (
+                  <p className="mt-1 truncate font-mono text-xs text-slate-500 dark:text-zinc-500">
+                    {version.requiredVariables
+                      .map((variable) => `{{${variable}}}`)
+                      .join(" ")}
+                  </p>
+                ) : null}
+              </div>
+
+              <form action={formAction}>
+                <input type="hidden" name="templateId" value={templateId} />
+                <input type="hidden" name="versionId" value={version.id} />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={isPending}
+                  className="w-full gap-2 sm:w-fit"
+                >
+                  <RotateCcwIcon className="size-4" />
+                  {isPending ? "Restoring..." : "Restore"}
+                </Button>
+              </form>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-zinc-200 p-4 text-sm text-slate-600 dark:border-white/10 dark:text-zinc-300">
+          No previous versions yet. The first previous version appears after
+          you save an edit to this template.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function InAppNotificationTemplateTestDialog({
+  actionLabelTemplate,
+  actionUrlTemplate,
+  bodyTemplate,
+  requiredVariables,
+  templateKey,
+  titleTemplate,
+}: {
+  actionLabelTemplate: string;
+  actionUrlTemplate: string;
+  bodyTemplate: string;
+  requiredVariables: string;
+  templateKey: string;
+  titleTemplate: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, isPending] = useActionState(
+    sendInAppNotificationTemplateTestSettings,
+    initialState,
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button type="button" variant="outline" className="w-fit gap-2">
+            <SendIcon className="size-4" />
+            Create test
+          </Button>
+        }
+      />
+      <DialogContent>
+        <form action={formAction} className="contents">
+          <input type="hidden" name="templateKey" value={templateKey} />
+          <input
+            type="hidden"
+            name="titleTemplate"
+            value={titleTemplate}
+          />
+          <input type="hidden" name="bodyTemplate" value={bodyTemplate} />
+          <input
+            type="hidden"
+            name="actionLabelTemplate"
+            value={actionLabelTemplate}
+          />
+          <input
+            type="hidden"
+            name="actionUrlTemplate"
+            value={actionUrlTemplate}
+          />
+          <input
+            type="hidden"
+            name="requiredVariables"
+            value={requiredVariables}
+          />
+
+          <DialogHeader>
+            <DialogTitle>Create test notification</DialogTitle>
+            <DialogDescription>
+              Create this in-app notification for your admin account using
+              sample variable values.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogBody className="grid gap-4">
+            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300">
+              The test notification appears in your admin notification stream
+              and is marked as a test in its metadata.
+            </div>
+
+            {state.message ? (
+              <p
+                className={cn(
+                  "rounded-lg border p-3 text-sm",
+                  state.ok
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+                    : "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-200",
+                )}
+              >
+                {state.message}
+              </p>
+            ) : null}
+          </DialogBody>
+
+          <DialogFooter>
+            <Button type="submit" disabled={isPending} className="gap-2">
+              <SendIcon className="size-4" />
+              {isPending ? "Creating..." : "Create test notification"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InAppNotificationVersionHistory({
+  templateId,
+  versions,
+}: {
+  templateId: string;
+  versions: AdminInAppNotificationTemplate["versions"];
+}) {
+  const [state, formAction, isPending] = useActionState(
+    restoreInAppNotificationTemplateSettings,
+    initialState,
+  );
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="mb-4 flex items-start gap-3">
+        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+          <HistoryIcon className="size-4" />
+        </span>
+        <div>
+          <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+            Version history
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Restore an earlier in-app notification snapshot. Restoring creates
+            a new current version, so history stays intact.
+          </p>
+        </div>
+      </div>
+
+      {state.message ? (
+        <p
+          className={cn(
+            "mb-4 rounded-lg border p-3 text-sm",
+            state.ok
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
+              : "border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-200",
+          )}
+        >
+          {state.message}
+        </p>
+      ) : null}
+
+      {versions.length > 0 ? (
+        <div className="grid gap-2">
+          {versions.map((version) => (
+            <div
+              key={version.id}
+              className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="bg-admin-primary/15 text-admin-primary">
+                    v{version.version}
+                  </Badge>
+                  <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">
+                    {version.titleTemplate}
                   </p>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">

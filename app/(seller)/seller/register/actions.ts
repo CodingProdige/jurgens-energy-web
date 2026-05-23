@@ -15,6 +15,8 @@ import {
   getSellerAccessState,
   isSellerStoreSlugAvailable,
 } from "@/src/modules/sellers/applications";
+import { getAdminNotificationRecipientIds } from "@/src/modules/notifications/in-app";
+import { notify } from "@/src/modules/notifications/templates";
 
 export type SellerApplicationStatus = "pending" | "approved" | "rejected";
 
@@ -82,6 +84,31 @@ function isUniqueViolation(error: unknown) {
     "code" in error &&
     error.code === "23505"
   );
+}
+
+async function notifySellerApplicationSubmitted({
+  applicantUserId,
+  storeName,
+}: {
+  applicantUserId: string;
+  storeName: string;
+}) {
+  const adminRecipientIds = await getAdminNotificationRecipientIds();
+
+  await Promise.all([
+    notify({
+      data: { storeName },
+      event: "seller.application.submitted",
+      recipientUserId: applicantUserId,
+    }),
+    ...adminRecipientIds.map((recipientUserId) =>
+      notify({
+        data: { storeName },
+        event: "admin.seller_application.submitted",
+        recipientUserId,
+      }),
+    ),
+  ]);
 }
 
 export async function checkSellerRegistrationEmail(
@@ -196,6 +223,7 @@ export async function submitSellerApplication(
   const session = await auth();
   const existingUser = await findUserByEmail(parsed.data.email);
   const handoff = verifySsoHandoffToken(parsed.data.ssoHandoffToken);
+  let applicantUserId: string | null = null;
 
   if (existingUser) {
     const hasMatchingSession = session?.user?.id === existingUser.id;
@@ -234,7 +262,11 @@ export async function submitSellerApplication(
     }
 
     try {
-      await createSellerApplicationForExistingUser(existingUser.id, parsed.data);
+      const applicant = await createSellerApplicationForExistingUser(
+        existingUser.id,
+        parsed.data,
+      );
+      applicantUserId = applicant.id;
     } catch (error) {
       if (isUniqueViolation(error)) {
         return {
@@ -272,11 +304,12 @@ export async function submitSellerApplication(
     }
 
     try {
-      await createSellerApplicationForNewUser({
+      const applicant = await createSellerApplicationForNewUser({
         ...parsed.data,
         fullName: parsed.data.fullName,
         password: parsed.data.password,
       });
+      applicantUserId = applicant.id;
     } catch (error) {
       if (isUniqueViolation(error)) {
         return {
@@ -286,6 +319,17 @@ export async function submitSellerApplication(
       }
 
       throw error;
+    }
+  }
+
+  if (applicantUserId) {
+    try {
+      await notifySellerApplicationSubmitted({
+        applicantUserId,
+        storeName: parsed.data.storeName,
+      });
+    } catch (error) {
+      console.error("Failed to create seller application notifications", error);
     }
   }
 

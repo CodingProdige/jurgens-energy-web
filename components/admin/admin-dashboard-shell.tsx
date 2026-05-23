@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import {
   BarChart3Icon,
-  BellIcon,
   BoxesIcon,
   ChevronDownIcon,
   MenuIcon,
@@ -23,10 +22,12 @@ import {
   ZapIcon,
 } from "lucide-react";
 
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import type { NotificationCenterState } from "@/src/modules/notifications/in-app";
 
 type AdminNavItem = {
   label: string;
@@ -427,7 +428,13 @@ function MobileNavDrawer({
   );
 }
 
-function AdminHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
+function AdminHeader({
+  notificationCenter,
+  onOpenMenu,
+}: {
+  notificationCenter: NotificationCenterState;
+  onOpenMenu: () => void;
+}) {
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex h-[72px] items-center gap-3 border-b border-slate-200 bg-white px-4 shadow-sm dark:border-white/10 dark:bg-[#0f1114] sm:px-6 lg:px-7">
       <Button
@@ -475,16 +482,11 @@ function AdminHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
             Quick Actions
             <ChevronDownIcon className="size-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative h-9 w-9 rounded-full text-zinc-700 hover:bg-slate-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
-          >
-            <BellIcon className="size-4" />
-            <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#c4982d] text-[11px] font-bold text-white">
-              8
-            </span>
-          </Button>
+          <NotificationBell
+            accent="amber"
+            initialState={notificationCenter}
+            surface="admin"
+          />
           <ThemeToggle compact className="sm:hidden" />
           <ThemeToggle className="hidden sm:inline-flex" />
         </div>
@@ -495,9 +497,11 @@ function AdminHeader({ onOpenMenu }: { onOpenMenu: () => void }) {
 
 export function AdminDashboardShell({
   children,
+  notificationCenter,
   user,
 }: {
   children: ReactNode;
+  notificationCenter: NotificationCenterState;
   user: AdminShellUser;
 }) {
   const pathname = usePathname();
@@ -505,7 +509,10 @@ export function AdminDashboardShell({
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-white pt-[72px] text-[#111827] dark:bg-[#0f1114] dark:text-white lg:pl-[236px]">
-      <AdminHeader onOpenMenu={() => setIsMobileNavOpen(true)} />
+      <AdminHeader
+        notificationCenter={notificationCenter}
+        onOpenMenu={() => setIsMobileNavOpen(true)}
+      />
       <Sidebar pathname={pathname} user={user} />
       <MobileNavDrawer
         isOpen={isMobileNavOpen}
