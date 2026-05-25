@@ -9,6 +9,7 @@ export * from "@/src/db/schema/media";
 export * from "@/src/db/schema/products";
 export * from "@/src/db/schema/cart";
 export * from "@/src/db/schema/orders";
+export * from "@/src/db/schema/shipping";
 export * from "@/src/db/schema/payments";
 export * from "@/src/db/schema/subscriptions";
 export * from "@/src/db/schema/payouts";

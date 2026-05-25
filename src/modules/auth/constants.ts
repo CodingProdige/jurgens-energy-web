@@ -32,7 +32,7 @@ function getConfiguredRootDomain() {
 
 export function getSharedAuthCookieDomain() {
   if (process.env.NODE_ENV !== "production") {
-    return "localhost";
+    return undefined;
   }
 
   const rootDomain = getConfiguredRootDomain();

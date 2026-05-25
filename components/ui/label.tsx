@@ -4,7 +4,46 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Label({ className, ...props }: React.ComponentProps<"label">) {
+function RequiredIndicator() {
+  return (
+    <span aria-hidden="true" className="text-red-500">
+      *
+    </span>
+  )
+}
+
+function renderRequiredChildren(children: React.ReactNode): React.ReactNode {
+  if (typeof children === "string" && children.trimEnd().endsWith("*")) {
+    const label = children.trimEnd().slice(0, -1).trimEnd()
+
+    return (
+      <>
+        {label}
+        <RequiredIndicator />
+      </>
+    )
+  }
+
+  if (Array.isArray(children)) {
+    const lastIndex = children.length - 1
+    const lastChild = children[lastIndex]
+
+    if (
+      typeof lastChild === "string" &&
+      lastChild.trimEnd().endsWith("*")
+    ) {
+      return [
+        ...children.slice(0, lastIndex),
+        lastChild.trimEnd().slice(0, -1).trimEnd(),
+        <RequiredIndicator key="required-indicator" />,
+      ]
+    }
+  }
+
+  return children
+}
+
+function Label({ className, children, ...props }: React.ComponentProps<"label">) {
   return (
     <label
       data-slot="label"
@@ -13,8 +52,10 @@ function Label({ className, ...props }: React.ComponentProps<"label">) {
         className
       )}
       {...props}
-    />
+    >
+      {renderRequiredChildren(children)}
+    </label>
   )
 }
 
-export { Label }
+export { Label, RequiredIndicator }

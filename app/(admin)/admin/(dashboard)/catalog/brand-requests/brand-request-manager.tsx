@@ -4,7 +4,6 @@ import { useActionState, useMemo, useState } from "react";
 import {
   CheckIcon,
   DownloadIcon,
-  MoreVerticalIcon,
   SearchIcon,
   Trash2Icon,
   XIcon,
@@ -19,7 +18,6 @@ import {
 import {
   DashboardButton,
   DashboardInput,
-  DashboardMetricStrip,
   DashboardPageHeader,
   DashboardTablePagination,
   dashboardPanelClass,
@@ -35,6 +33,11 @@ import {
   dashboardTableRowClass,
   dashboardTableSecondaryTextClass,
 } from "@/components/dashboard/dashboard-controls";
+import {
+  DashboardCompactMetrics,
+  type DashboardMetricDefinition,
+} from "@/components/dashboard/dashboard-compact-metrics";
+import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -256,12 +259,44 @@ export function BrandRequestDashboard({
 }: BrandRequestDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
-  const [openActionId, setOpenActionId] = useState<string | null>(null);
   const [approveRequest, setApproveRequest] = useState<AdminBrandRequest | null>(null);
   const [rejectRequest, setRejectRequest] = useState<AdminBrandRequest | null>(null);
   const [deleteRequest, setDeleteRequest] = useState<AdminBrandRequest | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const requestMetrics = useMemo<DashboardMetricDefinition[]>(
+    () => [
+      {
+        color: "blue",
+        description: "All seller-submitted brand requests.",
+        id: "total",
+        label: "Total requests",
+        value: requests.length,
+      },
+      {
+        color: "amber",
+        description: "Brand requests waiting for admin review.",
+        id: "pending",
+        label: "Pending",
+        value: pendingCount,
+      },
+      {
+        color: "emerald",
+        description: "Brand requests approved by an admin.",
+        id: "approved",
+        label: "Approved",
+        value: approvedCount,
+      },
+      {
+        color: "red",
+        description: "Brand requests rejected by an admin.",
+        id: "rejected",
+        label: "Rejected",
+        value: rejectedCount,
+      },
+    ],
+    [approvedCount, pendingCount, rejectedCount, requests.length],
+  );
 
   const filteredRequests = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
@@ -331,12 +366,9 @@ export function BrandRequestDashboard({
       />
 
       <div className="grid gap-4">
-        <DashboardMetricStrip
-          metrics={[
-            { label: "Pending", value: pendingCount },
-            { label: "Approved", value: approvedCount },
-            { label: "Rejected", value: rejectedCount },
-          ]}
+        <DashboardCompactMetrics
+          metrics={requestMetrics}
+          storageKey="piessang:admin:catalog-brand-request-metrics"
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -430,31 +462,16 @@ export function BrandRequestDashboard({
                     {formatDate(request.createdAt)}
                   </TableCell>
                   <TableCell className={dashboardTableActionCellClass}>
-                    <div className="relative inline-flex items-center">
-                      <Button
-                        aria-label={`Open actions for ${request.brandName}`}
-                        variant="ghost"
-                        size="icon-sm"
-                        className="rounded-full text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-                        onClick={() =>
-                          setOpenActionId((current) =>
-                            current === request.id ? null : request.id,
-                          )
-                        }
-                        type="button"
+                    <div className="inline-flex items-center">
+                      <DashboardRowActionMenu
+                        ariaLabel={`Open actions for ${request.brandName}`}
+                        className="w-56"
                       >
-                        <MoreVerticalIcon className="size-4" />
-                      </Button>
-                      {openActionId === request.id ? (
-                        <div className="absolute right-0 top-9 z-20 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-xl dark:border-white/10 dark:bg-[#151719]">
                           <button
                             type="button"
                             disabled={request.status !== "pending"}
                             className="flex w-full items-center gap-3 px-4 py-3 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-zinc-200 dark:hover:bg-white/10"
-                            onClick={() => {
-                              setApproveRequest(request);
-                              setOpenActionId(null);
-                            }}
+                            onClick={() => setApproveRequest(request)}
                           >
                             <CheckIcon className="size-4" />
                             Approve
@@ -463,10 +480,7 @@ export function BrandRequestDashboard({
                             type="button"
                             disabled={request.status !== "pending"}
                             className="flex w-full items-center gap-3 px-4 py-3 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-zinc-200 dark:hover:bg-white/10"
-                            onClick={() => {
-                              setRejectRequest(request);
-                              setOpenActionId(null);
-                            }}
+                            onClick={() => setRejectRequest(request)}
                           >
                             <XIcon className="size-4" />
                             Reject
@@ -474,16 +488,12 @@ export function BrandRequestDashboard({
                           <button
                             type="button"
                             className="flex w-full items-center gap-3 border-t border-red-100 bg-red-50/80 px-4 py-3 text-sm text-red-600 transition hover:bg-red-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
-                            onClick={() => {
-                              setDeleteRequest(request);
-                              setOpenActionId(null);
-                            }}
+                            onClick={() => setDeleteRequest(request)}
                           >
                             <Trash2Icon className="size-4" />
                             Delete
                           </button>
-                        </div>
-                      ) : null}
+                      </DashboardRowActionMenu>
                     </div>
                   </TableCell>
                 </TableRow>

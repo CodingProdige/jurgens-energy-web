@@ -5,12 +5,11 @@ import {
   DownloadIcon,
   Edit3Icon,
   FilterIcon,
+  ImageIcon,
   KeyRoundIcon,
-  MoreVerticalIcon,
-  SearchIcon,
-  ShieldCheckIcon,
   Trash2Icon,
   UserRoundIcon,
+  SearchIcon,
   XIcon,
 } from "lucide-react";
 
@@ -18,13 +17,11 @@ import {
   sendAdminUserPasswordReset,
   setAdminUserActive,
   updateAdminUserProfile,
-  updateAdminUserRoles,
   type UserMutationState,
 } from "@/app/(admin)/admin/(dashboard)/users/actions";
 import {
   DashboardButton,
   DashboardInput,
-  DashboardMetricStrip,
   DashboardPageHeader,
   DashboardTablePagination,
   dashboardPanelClass,
@@ -40,9 +37,14 @@ import {
   dashboardTableRowClass,
   dashboardTableSecondaryTextClass,
 } from "@/components/dashboard/dashboard-controls";
+import {
+  DashboardCompactMetrics,
+  type DashboardMetricDefinition,
+} from "@/components/dashboard/dashboard-compact-metrics";
+import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
+import { MediaManagerDialog } from "@/components/media/media-manager-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogBody,
@@ -71,11 +73,22 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { PlatformRole } from "@/src/db/schema";
+import type {
+  AdminMediaAsset,
+  AdminMediaFolder,
+  MediaStorageSettings,
+} from "@/src/modules/media/admin";
 import type { AdminUser, AdminUsersData } from "@/src/modules/users/admin";
 
 type UserPageKind = "admins" | "all" | "customers" | "sellers";
 type UserManagerProps = AdminUsersData & {
   canManage: boolean;
+  mediaLibrary: {
+    assets: AdminMediaAsset[];
+    folders: AdminMediaFolder[];
+    storage: MediaStorageSettings;
+    usedStorageBytes: number;
+  };
   page: UserPageKind;
 };
 
@@ -89,12 +102,6 @@ const roleLabels: Record<PlatformRole, string> = {
   seller_staff: "Seller staff",
   superadmin: "Superadmin",
 };
-const marketplaceRoleOptions: PlatformRole[] = [
-  "customer",
-  "seller_owner",
-  "seller_staff",
-];
-
 const roleFilterLabels: Record<RoleFilter, string> = {
   ...roleLabels,
   admins: "Admin access",
@@ -171,10 +178,6 @@ function getDisplayName(user: AdminUser) {
   return user.name?.trim() || "Unnamed user";
 }
 
-function getMarketplaceRoles(roles: PlatformRole[]) {
-  return roles.filter((role) => marketplaceRoleOptions.includes(role));
-}
-
 function RoleBadges({ roles }: { roles: PlatformRole[] }) {
   if (roles.length === 0) {
     return (
@@ -201,10 +204,66 @@ function RoleBadges({ roles }: { roles: PlatformRole[] }) {
         {roleLabels[primaryRole]}
       </Badge>
       {secondaryRoles.length > 0 ? (
-        <Badge className="h-6 rounded-md border-0 bg-zinc-100 px-2 text-xs font-semibold text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
-          +{secondaryRoles.length}
-        </Badge>
+        <span className="group/roles relative inline-flex">
+          <Badge
+            className="h-6 cursor-default rounded-md border-0 bg-zinc-100 px-2 text-xs font-semibold text-zinc-600 dark:bg-white/10 dark:text-zinc-300"
+            tabIndex={0}
+          >
+            +{secondaryRoles.length}
+          </Badge>
+          <span className="pointer-events-none absolute left-full top-1/2 z-40 ml-2 hidden -translate-y-1/2 items-center gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl group-hover/roles:flex group-focus-within/roles:flex dark:border-white/10 dark:bg-[#151719]">
+            {secondaryRoles.map((role) => (
+              <Badge
+                key={role}
+                className={cn(
+                  "h-6 rounded-md border-0 px-2 text-xs font-semibold",
+                  roleBadgeClass[role],
+                )}
+              >
+                {roleLabels[role]}
+              </Badge>
+            ))}
+          </span>
+        </span>
       ) : null}
+    </div>
+  );
+}
+
+function UserAvatar({
+  className,
+  image,
+  user,
+}: {
+  className?: string;
+  image?: string | null;
+  user: AdminUser;
+}) {
+  const initials = getInitials(user);
+  const imageUrl = image ?? user.image;
+
+  if (imageUrl) {
+    return (
+      <div
+        aria-label={`${getDisplayName(user)} profile picture`}
+        className={cn(
+          "shrink-0 rounded-full border border-[#fbe694]/70 bg-cover bg-center bg-no-repeat shadow-sm dark:border-[#fbe694]/25",
+          className,
+        )}
+        role="img"
+        style={{ backgroundImage: `url("${imageUrl}")` }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full bg-[#fbe694] text-xs font-bold text-[#5d4711] dark:bg-[#fbe694]/20 dark:text-[#fbe694]",
+        className,
+      )}
+    >
+      {initials}
     </div>
   );
 }
@@ -297,7 +356,7 @@ function UserFilterPanel({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed left-4 right-4 top-24 z-50 max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-4 text-left shadow-2xl [scrollbar-width:thin] dark:border-white/10 dark:bg-[#151719] md:absolute md:left-auto md:right-0 md:top-12 md:max-h-[min(32rem,calc(100dvh-8rem))] md:w-80">
+    <div className="absolute left-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(32rem,calc(100dvh-8rem))] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-4 text-left shadow-2xl [scrollbar-width:thin] dark:border-white/10 dark:bg-[#151719] md:left-auto md:right-0 md:w-80">
       <div className="sticky -top-4 z-10 -mx-4 -mt-4 mb-4 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 dark:border-white/10 dark:bg-[#151719]">
         <div>
           <p className="text-sm font-bold text-zinc-950 dark:text-white">
@@ -519,12 +578,24 @@ function UserMutationMessage({ state }: { state: UserMutationState }) {
 }
 
 function UserProfileForm({
+  mediaLibrary,
   onDone,
   user,
 }: {
+  mediaLibrary: UserManagerProps["mediaLibrary"];
   onDone: () => void;
   user: AdminUser;
 }) {
+  const [isMediaManagerOpen, setIsMediaManagerOpen] = useState(false);
+  const emailManagedByProvider = user.accountProviders.length > 0;
+  const [selectedProfileImage, setSelectedProfileImage] =
+    useState<AdminMediaAsset | null>(() =>
+      user.image
+        ? (mediaLibrary.assets.find((asset) => asset.publicUrl === user.image) ??
+          null)
+        : null,
+    );
+  const [profileImageUrl, setProfileImageUrl] = useState(user.image ?? "");
   const [state, formAction, isPending] = useActionState(
     updateAdminUserProfile,
     initialUserMutationState,
@@ -536,10 +607,77 @@ function UserProfileForm({
     }
   }, [onDone, state.ok]);
 
+  useEffect(() => {
+    const matchingAsset =
+      user.image
+        ? (mediaLibrary.assets.find((asset) => asset.publicUrl === user.image) ??
+          null)
+        : null;
+
+    setSelectedProfileImage(matchingAsset);
+    setProfileImageUrl(user.image ?? "");
+  }, [mediaLibrary.assets, user]);
+
+  function selectProfileImage(asset: AdminMediaAsset) {
+    setSelectedProfileImage(asset);
+    setProfileImageUrl(asset.publicUrl);
+  }
+
   return (
-    <form action={formAction}>
-      <DialogBody className="grid gap-4">
+    <form action={formAction} className="flex min-h-0 flex-1 flex-col">
+      <DialogBody className="grid min-w-0 gap-4">
         <input name="id" type="hidden" value={user.id} />
+        <input name="image" type="hidden" value={profileImageUrl} />
+        <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-white/10 sm:gap-4">
+          <div className="relative shrink-0">
+            <UserAvatar
+              image={profileImageUrl}
+              user={user}
+              className="size-16 text-base"
+            />
+            <Button
+              aria-label="Select profile picture"
+              className="absolute -bottom-1 -right-1 size-8 rounded-full border border-slate-200 bg-white p-0 text-slate-700 shadow-sm hover:bg-slate-50 dark:border-white/10 dark:bg-[#151719] dark:text-zinc-200 dark:hover:bg-white/10"
+              onClick={() => setIsMediaManagerOpen(true)}
+              type="button"
+              variant="ghost"
+            >
+              <Edit3Icon className="size-4" />
+            </Button>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">
+              {getDisplayName(user)}
+            </p>
+            <p className="truncate text-sm text-slate-600 dark:text-zinc-400">
+              {user.email}
+            </p>
+          </div>
+          <div className="shrink-0 self-start">
+            <DashboardRowActionMenu ariaLabel="Open profile picture actions">
+              <button
+                className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06]"
+                onClick={() => setIsMediaManagerOpen(true)}
+                type="button"
+              >
+                <ImageIcon className="size-4" />
+                Select image
+              </button>
+              <button
+                className="flex h-12 w-full items-center gap-3 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:text-zinc-100 dark:hover:bg-white/[0.06] dark:disabled:text-zinc-500"
+                disabled={!profileImageUrl}
+                onClick={() => {
+                  setSelectedProfileImage(null);
+                  setProfileImageUrl("");
+                }}
+                type="button"
+              >
+                <Trash2Icon className="size-4" />
+                Remove image
+              </button>
+            </DashboardRowActionMenu>
+          </div>
+        </div>
         <div className="grid gap-1.5">
           <Label htmlFor="user-name" className={modalLabelClass}>
             Name
@@ -561,7 +699,12 @@ function UserProfileForm({
             name="email"
             type="email"
             defaultValue={user.email}
-            className={modalFieldClass}
+            className={cn(
+              modalFieldClass,
+              emailManagedByProvider &&
+                "cursor-not-allowed bg-slate-50 text-slate-500 dark:bg-white/[0.04] dark:text-zinc-400",
+            )}
+            readOnly={emailManagedByProvider}
             required
           />
         </div>
@@ -581,82 +724,83 @@ function UserProfileForm({
             </SelectContent>
           </Select>
         </div>
+        <div className="min-w-0 rounded-xl border border-slate-200 p-3 text-sm dark:border-white/10">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
+                Providers
+              </p>
+              <div className="mt-1">
+                <ProviderBadge
+                  hasPassword={user.hasPassword}
+                  providers={user.accountProviders}
+                />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
+                Seller access
+              </p>
+              <p className="mt-1 text-slate-700 dark:text-zinc-300">
+                {user.sellerAccessCount > 0 || user.sellerOwnerCount > 0
+                  ? `${user.sellerAccessCount} staff / ${user.sellerOwnerCount} owner`
+                : "None"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
+                Status
+              </p>
+              <div className="mt-1">
+                <StatusBadge isActive={user.isActive} />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
+                Roles
+              </p>
+              <div className="mt-1">
+                <RoleBadges roles={user.roles} />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
+                Joined
+              </p>
+              <p className="mt-1 text-slate-700 dark:text-zinc-300">
+                {formatDate(user.createdAt)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
+                Updated
+              </p>
+              <p className="mt-1 text-slate-700 dark:text-zinc-300">
+                {formatDate(user.updatedAt)}
+              </p>
+            </div>
+          </div>
+        </div>
         <UserMutationMessage state={state} />
       </DialogBody>
-      <DialogFooter
-        className="border-slate-200 bg-white/95 dark:border-white/10 dark:bg-[#101214]/95"
-        showCloseButton
-      >
+      <DialogFooter showCloseButton>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving..." : "Save changes"}
         </Button>
       </DialogFooter>
-    </form>
-  );
-}
-
-function UserAccessForm({
-  onDone,
-  user,
-}: {
-  onDone: () => void;
-  user: AdminUser;
-}) {
-  const [selectedRoles, setSelectedRoles] = useState<PlatformRole[]>(
-    getMarketplaceRoles(user.roles),
-  );
-  const [state, formAction, isPending] = useActionState(
-    updateAdminUserRoles,
-    initialUserMutationState,
-  );
-
-  useEffect(() => {
-    setSelectedRoles(getMarketplaceRoles(user.roles));
-  }, [user]);
-
-  useEffect(() => {
-    if (state.ok) {
-      onDone();
-    }
-  }, [onDone, state.ok]);
-
-  function toggleRole(role: PlatformRole, checked: boolean) {
-    setSelectedRoles((current) =>
-      checked ? Array.from(new Set([...current, role])) : current.filter((item) => item !== role),
-    );
-  }
-
-  return (
-    <form action={formAction}>
-      <DialogBody className="grid gap-4">
-        <input name="id" type="hidden" value={user.id} />
-        {selectedRoles.map((role) => (
-          <input key={role} name="roles" type="hidden" value={role} />
-        ))}
-        <div className="grid gap-2">
-          {marketplaceRoleOptions.map((role) => (
-            <label
-              key={role}
-              className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-zinc-800 dark:border-white/10 dark:text-zinc-100"
-            >
-              <Checkbox
-                checked={selectedRoles.includes(role)}
-                onCheckedChange={(checked) => toggleRole(role, checked === true)}
-              />
-              {roleLabels[role]}
-            </label>
-          ))}
-        </div>
-        <UserMutationMessage state={state} />
-      </DialogBody>
-      <DialogFooter
-        className="border-slate-200 bg-white/95 dark:border-white/10 dark:bg-[#101214]/95"
-        showCloseButton
-      >
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving..." : "Save access"}
-        </Button>
-      </DialogFooter>
+      <MediaManagerDialog
+        acceptedMediaTypes={["image"]}
+        assets={mediaLibrary.assets}
+        folders={mediaLibrary.folders}
+        onOpenChange={setIsMediaManagerOpen}
+        onSelect={selectProfileImage}
+        open={isMediaManagerOpen}
+        selectedAssetId={selectedProfileImage?.id}
+        storage={mediaLibrary.storage}
+        surface="admin"
+        title="Select profile picture"
+        usedStorageBytes={mediaLibrary.usedStorageBytes}
+      />
     </form>
   );
 }
@@ -668,7 +812,7 @@ function PasswordResetForm({ user }: { user: AdminUser }) {
   );
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="flex min-h-0 flex-1 flex-col">
       <DialogBody className="grid gap-4">
         <input name="id" type="hidden" value={user.id} />
         <p className="text-sm text-slate-600 dark:text-zinc-300">
@@ -681,10 +825,7 @@ function PasswordResetForm({ user }: { user: AdminUser }) {
           </div>
         ) : null}
       </DialogBody>
-      <DialogFooter
-        className="border-slate-200 bg-white/95 dark:border-white/10 dark:bg-[#101214]/95"
-        showCloseButton
-      >
+      <DialogFooter showCloseButton>
         <Button type="submit" disabled={isPending || !user.isActive}>
           {isPending ? "Sending..." : "Send reset link"}
         </Button>
@@ -713,7 +854,7 @@ function UserStatusForm({
   }, [onDone, state.ok]);
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="flex min-h-0 flex-1 flex-col">
       <DialogBody className="grid gap-4">
         <input name="id" type="hidden" value={user.id} />
         <input name="isActive" type="hidden" value={nextStatus} />
@@ -724,10 +865,7 @@ function UserStatusForm({
         </p>
         <UserMutationMessage state={state} />
       </DialogBody>
-      <DialogFooter
-        className="border-slate-200 bg-white/95 dark:border-white/10 dark:bg-[#101214]/95"
-        showCloseButton
-      >
+      <DialogFooter showCloseButton>
         <Button
           type="submit"
           disabled={isPending}
@@ -742,6 +880,7 @@ function UserStatusForm({
 
 export function UserManager({
   canManage,
+  mediaLibrary,
   page,
   users,
 }: UserManagerProps) {
@@ -749,17 +888,12 @@ export function UserManager({
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [activeActionUserId, setActiveActionUserId] = useState<string | null>(
-    null,
-  );
   const [profileUser, setProfileUser] = useState<AdminUser | null>(null);
-  const [accessUser, setAccessUser] = useState<AdminUser | null>(null);
   const [passwordUser, setPasswordUser] = useState<AdminUser | null>(null);
   const [statusUser, setStatusUser] = useState<AdminUser | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const pageLabel = userPageLabels[page];
-  const canReviewAccessOnPage = canManage && page !== "admins";
   const activeFilterCount =
     (roleFilter === "all" ? 0 : 1) + (statusFilter === "all" ? 0 : 1);
   const pageUsers = useMemo(
@@ -788,29 +922,165 @@ export function UserManager({
   ).length;
   const pageCustomerWithOtherAccessCount =
     pageCustomerUserCount - pageCustomerOnlyCount;
-  const secondaryMetrics =
-    page === "customers"
-      ? [
-          { label: "Customer accounts", value: pageCustomerUserCount.toLocaleString() },
-          { label: "Customer only", value: pageCustomerOnlyCount.toLocaleString() },
-          {
-            label: "With other access",
-            value: pageCustomerWithOtherAccessCount.toLocaleString(),
-          },
-        ]
-      : page === "admins"
-        ? null
-        : page === "sellers"
-          ? [
-              { label: "Seller access", value: pageSellerUserCount.toLocaleString() },
-              { label: "Seller owners", value: pageSellerOwnerCount.toLocaleString() },
-              { label: "Seller staff", value: pageSellerStaffCount.toLocaleString() },
-            ]
-          : [
-              { label: "Admin access", value: pageAdminUserCount.toLocaleString() },
-              { label: "Seller access", value: pageSellerUserCount.toLocaleString() },
-              { label: "Customers", value: pageCustomerUserCount.toLocaleString() },
-            ];
+  const noRoleUserCount = pageUsers.filter((user) => user.roles.length === 0).length;
+  const googleProviderCount = pageUsers.filter((user) =>
+    user.accountProviders.includes("google"),
+  ).length;
+  const passwordProviderCount = pageUsers.filter((user) => user.hasPassword).length;
+  const userMetricStorageKey = `piessang:admin:user-metrics:${page}`;
+  const availableMetrics = useMemo<DashboardMetricDefinition[]>(() => {
+    const baseMetrics: DashboardMetricDefinition[] = [
+      {
+        color: "blue",
+        description: "All users included on this page after the page-level user grouping is applied.",
+        id: "total",
+        label: getUserPageMetricLabel(page),
+        value: pageUsers.length,
+      },
+      {
+        color: "emerald",
+        description: "Users on this page whose account is currently enabled.",
+        id: "enabled",
+        label: "Enabled",
+        value: pageActiveUserCount,
+      },
+      {
+        color: "red",
+        description: "Users on this page whose account is currently disabled.",
+        id: "disabled",
+        label: "Disabled",
+        value: pageInactiveUserCount,
+      },
+      {
+        color: "amber",
+        description: "Users on this page with a linked Google sign-in provider.",
+        id: "google",
+        label: "Google",
+        value: googleProviderCount,
+      },
+      {
+        color: "slate",
+        description: "Users on this page with password sign-in available.",
+        id: "password",
+        label: "Password",
+        value: passwordProviderCount,
+      },
+      {
+        color: "slate",
+        description: "Users on this page without any assigned platform role.",
+        id: "no-role",
+        label: "No role",
+        value: noRoleUserCount,
+      },
+    ];
+
+    if (page === "customers") {
+      return [
+        ...baseMetrics,
+        {
+          color: "blue",
+          description: "Users on this page with the customer role.",
+          id: "customers",
+          label: "Customers",
+          value: pageCustomerUserCount,
+        },
+        {
+          color: "emerald",
+          description: "Customer users without admin or seller access roles.",
+          id: "customer-only",
+          label: "Customer only",
+          value: pageCustomerOnlyCount,
+        },
+        {
+          color: "violet",
+          description: "Customer users who also have another platform access role.",
+          id: "customer-other-access",
+          label: "Other access",
+          value: pageCustomerWithOtherAccessCount,
+        },
+      ];
+    }
+
+    if (page === "admins") {
+      return [
+        ...baseMetrics,
+        {
+          color: "violet",
+          description: "Users on this page with admin or superadmin platform access.",
+          id: "admin-access",
+          label: "Admin access",
+          value: pageAdminUserCount,
+        },
+      ];
+    }
+
+    if (page === "sellers") {
+      return [
+        ...baseMetrics,
+        {
+          color: "amber",
+          description: "Users on this page with seller owner or seller staff platform access.",
+          id: "seller-access",
+          label: "Seller access",
+          value: pageSellerUserCount,
+        },
+        {
+          color: "blue",
+          description: "Users on this page who own at least one seller account.",
+          id: "seller-owners",
+          label: "Seller owners",
+          value: pageSellerOwnerCount,
+        },
+        {
+          color: "violet",
+          description: "Users on this page assigned as staff on at least one seller account.",
+          id: "seller-staff",
+          label: "Seller staff",
+          value: pageSellerStaffCount,
+        },
+      ];
+    }
+
+    return [
+      ...baseMetrics,
+      {
+        color: "violet",
+        description: "Users on this page with admin or superadmin platform access.",
+        id: "admin-access",
+        label: "Admin access",
+        value: pageAdminUserCount,
+      },
+      {
+        color: "amber",
+        description: "Users on this page with seller owner or seller staff platform access.",
+        id: "seller-access",
+        label: "Seller access",
+        value: pageSellerUserCount,
+      },
+      {
+        color: "blue",
+        description: "Users on this page with the customer role.",
+        id: "customers",
+        label: "Customers",
+        value: pageCustomerUserCount,
+      },
+    ];
+  }, [
+    googleProviderCount,
+    noRoleUserCount,
+    page,
+    pageActiveUserCount,
+    pageAdminUserCount,
+    pageCustomerOnlyCount,
+    pageCustomerUserCount,
+    pageCustomerWithOtherAccessCount,
+    pageInactiveUserCount,
+    pageSellerOwnerCount,
+    pageSellerStaffCount,
+    pageSellerUserCount,
+    pageUsers.length,
+    passwordProviderCount,
+  ]);
 
   const filteredUsers = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
@@ -869,7 +1139,6 @@ export function UserManager({
 
   function closeUserDialogs() {
     setProfileUser(null);
-    setAccessUser(null);
     setPasswordUser(null);
     setStatusUser(null);
   }
@@ -881,23 +1150,10 @@ export function UserManager({
         title={pageLabel}
       />
 
-      <DashboardMetricStrip
-        metrics={[
-          {
-            label: getUserPageMetricLabel(page),
-            value: pageUsers.length.toLocaleString(),
-          },
-          { label: "Enabled", value: pageActiveUserCount.toLocaleString() },
-          { label: "Disabled", value: pageInactiveUserCount.toLocaleString() },
-        ]}
+      <DashboardCompactMetrics
+        metrics={availableMetrics}
+        storageKey={userMetricStorageKey}
       />
-
-      {secondaryMetrics ? (
-        <DashboardMetricStrip
-          className="mt-4 md:mt-5"
-          metrics={secondaryMetrics}
-        />
-      ) : null}
 
       <section className="mt-4 grid gap-3 md:mt-5 md:flex md:items-center md:justify-between">
         <div className="relative w-full md:max-w-[420px]">
@@ -913,39 +1169,43 @@ export function UserManager({
           />
         </div>
 
-        <div className="relative grid grid-cols-2 gap-2 md:flex md:items-center">
-          <DashboardButton
-            onClick={() => setIsFilterPanelOpen((isOpen) => !isOpen)}
-            type="button"
-          >
-            <FilterIcon className="size-3.5" />
-            Filter
-            {activeFilterCount > 0 ? (
-              <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#c4982d] px-1 text-[10px] font-bold text-white">
-                {activeFilterCount}
-              </span>
+        <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
+          <div className="relative min-w-0">
+            <DashboardButton
+              className="w-full md:w-auto"
+              onClick={() => setIsFilterPanelOpen((isOpen) => !isOpen)}
+              type="button"
+            >
+              <FilterIcon className="size-3.5" />
+              Filter
+              {activeFilterCount > 0 ? (
+                <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#c4982d] px-1 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </DashboardButton>
+            {isFilterPanelOpen ? (
+              <>
+                <button
+                  aria-label="Close user filters"
+                  className="fixed inset-0 z-40 cursor-default"
+                  onClick={() => setIsFilterPanelOpen(false)}
+                  type="button"
+                />
+                <UserFilterPanel
+                  activeFilterCount={activeFilterCount}
+                  roleFilter={roleFilter}
+                  statusFilter={statusFilter}
+                  onChangeRole={updateRoleFilter}
+                  onChangeStatus={updateStatusFilter}
+                  onClear={clearFilters}
+                  onClose={() => setIsFilterPanelOpen(false)}
+                />
+              </>
             ) : null}
-          </DashboardButton>
-          {isFilterPanelOpen ? (
-            <>
-              <button
-                aria-label="Close user filters"
-                className="fixed inset-0 z-40 cursor-default"
-                onClick={() => setIsFilterPanelOpen(false)}
-                type="button"
-              />
-              <UserFilterPanel
-                activeFilterCount={activeFilterCount}
-                roleFilter={roleFilter}
-                statusFilter={statusFilter}
-                onChangeRole={updateRoleFilter}
-                onChangeStatus={updateStatusFilter}
-                onClear={clearFilters}
-                onClose={() => setIsFilterPanelOpen(false)}
-              />
-            </>
-          ) : null}
+          </div>
           <DashboardButton
+            className="w-full md:w-auto"
             type="button"
             onClick={() => exportUsers(filteredUsers)}
             disabled={filteredUsers.length === 0}
@@ -983,9 +1243,7 @@ export function UserManager({
                   <TableRow key={user.id} className={dashboardTableRowClass}>
                     <TableCell className={cn("min-w-0", dashboardTableCellClass)}>
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#fbe694] text-xs font-bold text-[#5d4711] dark:bg-[#fbe694]/20 dark:text-[#fbe694]">
-                          {getInitials(user)}
-                        </div>
+                        <UserAvatar user={user} className="size-9" />
                         <div className="min-w-0">
                           <p className={cn(dashboardTablePrimaryTextClass, "truncate")}>
                             {getDisplayName(user)}
@@ -1029,94 +1287,45 @@ export function UserManager({
                             className="text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
                             aria-label={`Edit ${getDisplayName(user)}`}
                             onClick={() => {
-                              setActiveActionUserId(null);
                               setProfileUser(user);
                             }}
                             type="button"
                           >
                             <Edit3Icon className="size-4" />
                           </Button>
-                          <div className="relative">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-                              aria-label={`Open actions for ${getDisplayName(user)}`}
-                              onMouseDown={(event) => event.preventDefault()}
-                              onClick={(event) => {
-                                event.currentTarget.blur();
-                                setActiveActionUserId((current) =>
-                                  current === user.id ? null : user.id,
-                                );
-                              }}
+                          <DashboardRowActionMenu
+                            ariaLabel={`Open actions for ${getDisplayName(user)}`}
+                          >
+                            <button
+                              className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06] dark:disabled:text-zinc-500"
+                              onClick={() => setProfileUser(user)}
                               type="button"
                             >
-                              <MoreVerticalIcon className="size-4" />
-                            </Button>
-                            {activeActionUserId === user.id ? (
-                              <>
-                                <button
-                                  aria-label="Close user actions"
-                                  className="fixed inset-0 z-40 cursor-default"
-                                  onClick={() => setActiveActionUserId(null)}
-                                  type="button"
-                                />
-                                <div className="absolute right-0 top-9 z-50 max-h-[min(22rem,calc(100dvh-8rem))] w-64 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white text-left text-zinc-950 shadow-2xl [scrollbar-width:thin] dark:border-white/10 dark:bg-[#151719] dark:text-white">
-                                  <button
-                                    className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06] dark:disabled:text-zinc-500"
-                                    onClick={() => {
-                                      setActiveActionUserId(null);
-                                      setProfileUser(user);
-                                    }}
-                                    type="button"
-                                  >
-                                    <UserRoundIcon className="size-4" />
-                                    View profile
-                                  </button>
-                                  {canReviewAccessOnPage ? (
-                                    <button
-                                      className="flex h-12 w-full items-center gap-3 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:text-zinc-100 dark:hover:bg-white/[0.06] dark:disabled:text-zinc-500"
-                                      onClick={() => {
-                                        setActiveActionUserId(null);
-                                        setAccessUser(user);
-                                      }}
-                                      type="button"
-                                    >
-                                      <ShieldCheckIcon className="size-4" />
-                                  Marketplace access
-                                    </button>
-                                  ) : null}
-                                  <button
-                                    className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06] dark:disabled:text-zinc-500"
-                                    onClick={() => {
-                                      setActiveActionUserId(null);
-                                      setPasswordUser(user);
-                                    }}
-                                    type="button"
-                                  >
-                                    <KeyRoundIcon className="size-4" />
-                                    Reset password
-                                  </button>
-                                  <button
-                                    className={cn(
-                                      "flex h-12 w-full items-center gap-3 border-t px-4 text-sm font-medium transition",
-                                      user.isActive
-                                        ? "border-red-100 bg-red-50/70 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
-                                        : "border-emerald-100 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15",
-                                    )}
-                                    onClick={() => {
-                                      setActiveActionUserId(null);
-                                      setStatusUser(user);
-                                    }}
-                                    type="button"
-                                  >
-                                    <Trash2Icon className="size-4" />
-                                    {user.isActive ? "Deactivate" : "Activate"}
-                                  </button>
-                                </div>
-                              </>
-                            ) : null}
-                          </div>
+                              <UserRoundIcon className="size-4" />
+                              View profile
+                            </button>
+                            <button
+                              className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06] dark:disabled:text-zinc-500"
+                              onClick={() => setPasswordUser(user)}
+                              type="button"
+                            >
+                              <KeyRoundIcon className="size-4" />
+                              Reset password
+                            </button>
+                            <button
+                              className={cn(
+                                "flex h-12 w-full items-center gap-3 border-t px-4 text-sm font-medium transition",
+                                user.isActive
+                                  ? "border-red-100 bg-red-50/70 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
+                                  : "border-emerald-100 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15",
+                              )}
+                              onClick={() => setStatusUser(user)}
+                              type="button"
+                            >
+                              <Trash2Icon className="size-4" />
+                              {user.isActive ? "Deactivate" : "Activate"}
+                            </button>
+                          </DashboardRowActionMenu>
                         </div>
                       ) : (
                         <span className={dashboardTableSecondaryTextClass}>
@@ -1158,21 +1367,11 @@ export function UserManager({
                 Update the profile and account status for {profileUser.email}.
               </DialogDescription>
             </DialogHeader>
-            <UserProfileForm user={profileUser} onDone={closeUserDialogs} />
-          </DialogContent>
-        ) : null}
-      </Dialog>
-
-      <Dialog open={Boolean(accessUser)} onOpenChange={(open) => !open && setAccessUser(null)}>
-        {accessUser ? (
-          <DialogContent className={modalContentClass}>
-            <DialogHeader>
-              <DialogTitle>Marketplace access</DialogTitle>
-              <DialogDescription>
-                Manage customer and seller marketplace roles for {accessUser.email}.
-              </DialogDescription>
-            </DialogHeader>
-            <UserAccessForm user={accessUser} onDone={closeUserDialogs} />
+            <UserProfileForm
+              mediaLibrary={mediaLibrary}
+              user={profileUser}
+              onDone={closeUserDialogs}
+            />
           </DialogContent>
         ) : null}
       </Dialog>

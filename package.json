@@ -26,8 +26,9 @@
     "db:studio": "node --env-file=.env ./node_modules/drizzle-kit/bin.cjs studio",
     "db:view": "npm run db:studio",
     "db:seed:admin": "node --env-file=.env scripts/seed-admin.mjs",
+    "db:seed:seller": "node --env-file=.env scripts/seed-seller.mjs",
     "db:seed:catalog": "node --env-file=.env scripts/seed-catalog.mjs",
-    "db:setup": "npm run infra:up && npm run db:migrate && npm run db:seed:admin && npm run db:seed:catalog",
+    "db:setup": "npm run infra:up && npm run db:migrate && npm run db:seed:admin && npm run db:seed:seller && npm run db:seed:catalog",
     "local:start": "npm run db:setup && npm run dev",
     "local:stop": "npm run dev:stop"
   },

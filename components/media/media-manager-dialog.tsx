@@ -1067,6 +1067,7 @@ export function MediaManagerDialog({
                         onUploadError={handleUploadError}
                         onUploadProgress={handleUploadProgress}
                         onUploadStart={handleUploadStart}
+                        surface={surface}
                       />
                     </TabsContent>
                   </div>
@@ -2278,6 +2279,7 @@ function MediaUploadForm({
   onUploadError,
   onUploadProgress,
   onUploadStart,
+  surface,
 }: {
   accent: (typeof mediaManagerAccentClasses)[MediaManagerSurface];
   acceptedMediaTypes: MediaType[];
@@ -2293,6 +2295,7 @@ function MediaUploadForm({
     status: PendingUploadStatus;
   }) => void;
   onUploadStart: (uploads: PendingMediaUpload[]) => void;
+  surface: MediaManagerSurface;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
@@ -2337,6 +2340,7 @@ function MediaUploadForm({
         onComplete: onUploadComplete,
         onError: onUploadError,
         onProgress: onUploadProgress,
+        surface,
       });
     });
   }
@@ -2489,6 +2493,7 @@ function MediaDetails({
       },
       onProgress: () => {},
       replaceAssetId: asset.id,
+      surface,
     });
   }
 
@@ -3980,6 +3985,7 @@ function uploadFileWithProgress({
   onError,
   onProgress,
   replaceAssetId,
+  surface,
 }: {
   acceptedMediaTypes: MediaType[];
   file: File;
@@ -3996,11 +4002,20 @@ function uploadFileWithProgress({
     status: PendingUploadStatus;
   }) => void;
   replaceAssetId?: string;
+  surface: MediaManagerSurface;
 }) {
   const formData = new FormData();
   const request = new XMLHttpRequest();
+  const scope =
+    surface === "admin"
+      ? "admin-media"
+      : surface === "seller"
+        ? "seller-media"
+        : "marketplace-media";
+  const endpoint =
+    surface === "seller" ? "/uploads/media" : "/admin/media/upload";
 
-  formData.append("scope", "admin-media");
+  formData.append("scope", scope);
   acceptedMediaTypes.forEach((mediaType) =>
     formData.append("acceptedMediaTypes", mediaType),
   );
@@ -4056,7 +4071,7 @@ function uploadFileWithProgress({
     onError({ id, message: "The upload connection failed." });
   };
 
-  request.open("POST", "/admin/media/upload");
+  request.open("POST", endpoint);
   request.send(formData);
 }
 

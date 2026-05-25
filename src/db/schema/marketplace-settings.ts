@@ -41,5 +41,12 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   stripeSandboxWebhookSecretEncrypted: text(
     "stripe_sandbox_webhook_secret_encrypted",
   ),
+  shippingEnabled: boolean("shipping_enabled").notNull().default(false),
+  shippingMarginBps: integer("shipping_margin_bps").notNull().default(0),
+  shippingBufferBps: integer("shipping_buffer_bps").notNull().default(0),
+  bobgoEnabled: boolean("bobgo_enabled").notNull().default(false),
+  bobgoMode: varchar("bobgo_mode", { length: 16 }).notNull().default("sandbox"),
+  bobgoApiKeyEncrypted: text("bobgo_api_key_encrypted"),
+  bobgoWebhookSecretEncrypted: text("bobgo_webhook_secret_encrypted"),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

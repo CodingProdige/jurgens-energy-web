@@ -19,7 +19,6 @@ import {
   Edit3Icon,
   FilterIcon,
   LockIcon,
-  MoreVerticalIcon,
   PlusIcon,
   SaveIcon,
   SearchIcon,
@@ -31,7 +30,6 @@ import {
 import {
   DashboardButton,
   DashboardInput,
-  DashboardMetricStrip,
   DashboardPageHeader,
   dashboardControlClass,
   dashboardPanelClass,
@@ -46,6 +44,11 @@ import {
   dashboardTablePrimaryTextClass,
   dashboardTableRowClass,
 } from "@/components/dashboard/dashboard-controls";
+import {
+  DashboardCompactMetrics,
+  type DashboardMetricDefinition,
+} from "@/components/dashboard/dashboard-compact-metrics";
+import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
 import {
   checkCategoryNameAvailability,
   createCategory,
@@ -1132,8 +1135,6 @@ export function CategoryDashboard({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeActionCategory, setActiveActionCategory] =
-    useState<FlatCategory | null>(null);
   const [activeEditCategory, setActiveEditCategory] =
     useState<FlatCategory | null>(null);
   const [activeSubcategoryParent, setActiveSubcategoryParent] =
@@ -1145,6 +1146,63 @@ export function CategoryDashboard({
   const filteredTree = useMemo(
     () => filterCategoryTree(tree, query, filters),
     [filters, query, tree],
+  );
+  const categoryMetrics = useMemo<DashboardMetricDefinition[]>(
+    () => {
+      const flattenedCategories = flattenCategoriesForExport(tree);
+      const activeCount = flattenedCategories.filter(
+        (row) => row.category.status === "active",
+      ).length;
+      const lockedCount = flattenedCategories.filter(
+        (row) => row.category.isLocked,
+      ).length;
+
+      return [
+        {
+          color: "blue",
+          description: "All catalog categories, including root categories and subcategories.",
+          id: "categories",
+          label: "Categories",
+          value: flattenedCategories.length,
+        },
+        {
+          color: "emerald",
+          description: "Top-level catalog categories without a parent category.",
+          id: "root-categories",
+          label: "Root categories",
+          value: rootCategoryCount,
+        },
+        {
+          color: "amber",
+          description: "Nested categories that belong to another category.",
+          id: "subcategories",
+          label: "Subcategories",
+          value: subcategoryCount,
+        },
+        {
+          color: "violet",
+          description: "Products assigned to this catalog taxonomy.",
+          id: "products",
+          label: "Products",
+          value: totalProducts,
+        },
+        {
+          color: "emerald",
+          description: "Categories currently marked active.",
+          id: "active",
+          label: "Active",
+          value: activeCount,
+        },
+        {
+          color: "slate",
+          description: "Locked categories that cannot be edited until unlocked.",
+          id: "locked",
+          label: "Locked",
+          value: lockedCount,
+        },
+      ];
+    },
+    [rootCategoryCount, subcategoryCount, totalProducts, tree],
   );
   const totalPages = Math.max(1, Math.ceil(filteredTree.length / pageSize));
   const activePage = Math.min(currentPage, totalPages);
@@ -1178,29 +1236,24 @@ export function CategoryDashboard({
   }
 
   function openCategorySettings(category: FlatCategory) {
-    setActiveActionCategory(null);
     setActiveEditCategory(category);
   }
 
   function openSubcategoryDialog(category: FlatCategory) {
-    setActiveActionCategory(null);
     setActiveSubcategoryParent(category);
   }
 
   function openDeleteDialog(category: FlatCategory) {
-    setActiveActionCategory(null);
     setActiveDeleteCategory(category);
   }
 
   function toggleLock(category: FlatCategory) {
-    setActiveActionCategory(null);
     startRowActionTransition(() => {
       void toggleCategoryLock(category.id).then(() => router.refresh());
     });
   }
 
   function moveCategoryRow(category: FlatCategory, direction: "up" | "down") {
-    setActiveActionCategory(null);
     startRowActionTransition(() => {
       void moveCategory(category.id, direction).then((result) => {
         if (!result.ok && result.message) {
@@ -1275,21 +1328,9 @@ export function CategoryDashboard({
           breadcrumbs={["Catalog", "Categories"]}
         />
 
-        <DashboardMetricStrip
-          metrics={[
-            {
-              label: "Root categories",
-              value: rootCategoryCount.toLocaleString(),
-            },
-            {
-              label: "Subcategories",
-              value: subcategoryCount.toLocaleString(),
-            },
-            {
-              label: "Products",
-              value: totalProducts.toLocaleString(),
-            },
-          ]}
+        <DashboardCompactMetrics
+          metrics={categoryMetrics}
+          storageKey="piessang:admin:catalog-category-metrics"
         />
 
         <section className="mt-4 grid gap-3 md:mt-5 md:flex md:items-center md:justify-between">
@@ -1456,26 +1497,9 @@ export function CategoryDashboard({
                             <Edit3Icon className="size-4" />
                           )}
                       </Button>
-                      <div className="relative">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-                        aria-label={`Open actions for ${category.name}`}
-                        onClick={() => setActiveActionCategory(category)}
-                        type="button"
+                      <DashboardRowActionMenu
+                        ariaLabel={`Open actions for ${category.name}`}
                       >
-                          <MoreVerticalIcon className="size-4" />
-                      </Button>
-                      {activeActionCategory?.id === category.id ? (
-                        <>
-                          <button
-                            aria-label="Close category actions"
-                            className="fixed inset-0 z-40 cursor-default"
-                            onClick={() => setActiveActionCategory(null)}
-                            type="button"
-                          />
-                          <div className="absolute right-0 top-9 z-50 max-h-[min(22rem,calc(100dvh-8rem))] w-64 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white text-left text-zinc-950 shadow-2xl [scrollbar-width:thin] dark:border-white/10 dark:bg-[#151719] dark:text-white">
                             <button
                               className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:text-slate-400 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06] dark:disabled:text-zinc-500"
                               disabled={isRowActionPending}
@@ -1541,10 +1565,7 @@ export function CategoryDashboard({
                               <Trash2Icon className="size-4" />
                               Delete
                             </button>
-                          </div>
-                        </>
-                      ) : null}
-                      </div>
+                      </DashboardRowActionMenu>
                     </div>
                   </TableCell>
                 </TableRow>

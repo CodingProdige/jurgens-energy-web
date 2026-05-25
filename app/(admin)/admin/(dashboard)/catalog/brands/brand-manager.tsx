@@ -6,7 +6,6 @@ import {
   DownloadIcon,
   Edit3Icon,
   ImageIcon,
-  MoreVerticalIcon,
   PlusIcon,
   SaveIcon,
   SearchIcon,
@@ -25,7 +24,6 @@ import {
 import {
   DashboardButton,
   DashboardInput,
-  DashboardMetricStrip,
   DashboardPageHeader,
   DashboardTablePagination,
   dashboardTableActionCellClass,
@@ -41,6 +39,11 @@ import {
   dashboardTableSecondaryTextClass,
   dashboardPanelClass,
 } from "@/components/dashboard/dashboard-controls";
+import {
+  DashboardCompactMetrics,
+  type DashboardMetricDefinition,
+} from "@/components/dashboard/dashboard-compact-metrics";
+import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
 import { MediaManagerDialog } from "@/components/media/media-manager-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -530,9 +533,48 @@ export function BrandDashboard({
   const [editingBrand, setEditingBrand] = useState<AdminBrand | null>(null);
   const [deletingBrand, setDeletingBrand] = useState<AdminBrand | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [openActionId, setOpenActionId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const brandMetrics = useMemo<DashboardMetricDefinition[]>(
+    () => [
+      {
+        color: "blue",
+        description: "All brands in the marketplace catalog.",
+        id: "brands",
+        label: "Brands",
+        value: totalBrandCount,
+      },
+      {
+        color: "emerald",
+        description: "Brands currently marked active.",
+        id: "active",
+        label: "Active",
+        value: activeBrandCount,
+      },
+      {
+        color: "amber",
+        description: "Products assigned to catalog brands.",
+        id: "products",
+        label: "Products",
+        value: totalProducts,
+      },
+      {
+        color: "slate",
+        description: "Brands currently hidden from the marketplace catalog.",
+        id: "hidden",
+        label: "Hidden",
+        value: brands.filter((brand) => brand.status === "hidden").length,
+      },
+      {
+        color: "red",
+        description: "Brands archived from normal catalog workflows.",
+        id: "archived",
+        label: "Archived",
+        value: brands.filter((brand) => brand.status === "archived").length,
+      },
+    ],
+    [activeBrandCount, brands, totalBrandCount, totalProducts],
+  );
 
   const filteredBrands = useMemo(() => {
     const normalizedTerm = searchTerm.trim().toLowerCase();
@@ -554,22 +596,6 @@ export function BrandDashboard({
     (activePage - 1) * pageSize,
     activePage * pageSize,
   );
-
-  useEffect(() => {
-    if (!openActionId) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpenActionId(null);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [openActionId]);
 
   function exportBrandsCsv() {
     const headers = [
@@ -609,12 +635,9 @@ export function BrandDashboard({
       <DashboardPageHeader title="Brands" breadcrumbs={["Catalog", "Brands"]} />
 
       <div className="grid gap-4">
-        <DashboardMetricStrip
-          metrics={[
-            { label: "Brands", value: totalBrandCount },
-            { label: "Active", value: activeBrandCount },
-            { label: "Products", value: totalProducts },
-          ]}
+        <DashboardCompactMetrics
+          metrics={brandMetrics}
+          storageKey="piessang:admin:catalog-brand-metrics"
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -739,7 +762,7 @@ export function BrandDashboard({
                     {formatDate(brand.createdAt)}
                   </TableCell>
                   <TableCell className={dashboardTableActionCellClass}>
-                    <div className="relative inline-flex items-center gap-1">
+                    <div className="inline-flex items-center gap-1">
                       <Button
                         aria-label={`Edit ${brand.name}`}
                         variant="ghost"
@@ -750,36 +773,14 @@ export function BrandDashboard({
                       >
                         <Edit3Icon className="size-4" />
                       </Button>
-                      <Button
-                        aria-label={`Open actions for ${brand.name}`}
-                        variant="ghost"
-                        size="icon-sm"
-                        className="rounded-full text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-                        onClick={() =>
-                          setOpenActionId((current) =>
-                            current === brand.id ? null : brand.id,
-                          )
-                        }
-                        type="button"
+                      <DashboardRowActionMenu
+                        ariaLabel={`Open actions for ${brand.name}`}
+                        className="w-56"
                       >
-                        <MoreVerticalIcon className="size-4" />
-                      </Button>
-                      {openActionId === brand.id ? (
-                        <>
-                          <button
-                            aria-label="Close brand actions"
-                            className="fixed inset-0 z-10 cursor-default"
-                            onClick={() => setOpenActionId(null)}
-                            type="button"
-                          />
-                          <div className="absolute right-0 top-9 z-20 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-xl dark:border-white/10 dark:bg-[#151719]">
                             <button
                               type="button"
                               className="flex w-full items-center gap-3 px-4 py-3 text-sm text-zinc-800 transition hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-white/10"
-                              onClick={() => {
-                                setEditingBrand(brand);
-                                setOpenActionId(null);
-                              }}
+                              onClick={() => setEditingBrand(brand)}
                             >
                               <Edit3Icon className="size-4" />
                               Settings
@@ -787,17 +788,12 @@ export function BrandDashboard({
                             <button
                               type="button"
                               className="flex w-full items-center gap-3 border-t border-red-100 bg-red-50/80 px-4 py-3 text-sm text-red-600 transition hover:bg-red-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
-                              onClick={() => {
-                                setDeletingBrand(brand);
-                                setOpenActionId(null);
-                              }}
+                              onClick={() => setDeletingBrand(brand)}
                             >
                               <Trash2Icon className="size-4" />
                               Delete
                             </button>
-                          </div>
-                        </>
-                      ) : null}
+                      </DashboardRowActionMenu>
                     </div>
                   </TableCell>
                 </TableRow>

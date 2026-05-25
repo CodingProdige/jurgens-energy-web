@@ -90,6 +90,46 @@ const sharedAuthCookieOptions = sharedAuthCookieDomain
     }
   : undefined;
 
+const localSurfaceHostnames = new Set([
+  "admin.localhost",
+  "admin.127.0.0.1",
+  "seller.localhost",
+  "seller.127.0.0.1",
+]);
+
+function getConfiguredSurfaceHostnames() {
+  return [
+    process.env.ADMIN_HOSTNAME,
+    process.env.SELLER_HOSTNAME,
+    process.env.DOMAIN ? `admin.${process.env.DOMAIN}` : undefined,
+    process.env.DOMAIN ? `seller.${process.env.DOMAIN}` : undefined,
+  ]
+    .filter(Boolean)
+    .map((host) =>
+      host!
+        .replace(/^https?:\/\//, "")
+        .split("/")[0]
+        ?.split(":")[0]
+        ?.toLowerCase(),
+    )
+    .filter(Boolean);
+}
+
+function isAllowedAuthRedirect(url: string, baseUrl: string) {
+  try {
+    const targetUrl = new URL(url, baseUrl);
+    const base = new URL(baseUrl);
+
+    return (
+      targetUrl.origin === base.origin ||
+      localSurfaceHostnames.has(targetUrl.hostname.toLowerCase()) ||
+      getConfiguredSurfaceHostnames().includes(targetUrl.hostname.toLowerCase())
+    );
+  } catch {
+    return false;
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   adapter: DrizzleAdapter(db, {
@@ -141,6 +181,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
     : undefined,
   callbacks: {
+    redirect({ url, baseUrl }) {
+      if (isAllowedAuthRedirect(url, baseUrl)) {
+        return new URL(url, baseUrl).toString();
+      }
+
+      return baseUrl;
+    },
     signIn({ account, profile, user }) {
       if (account?.provider === "google") {
         const email = user.email ?? (profile?.email as string | undefined);

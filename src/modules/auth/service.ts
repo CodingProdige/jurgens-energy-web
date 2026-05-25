@@ -5,8 +5,10 @@ import bcrypt from "bcryptjs";
 
 import { db } from "@/src/db";
 import {
+  accounts,
   passwordResetTokens,
   platformRoles,
+  sellerApplications,
   userRoles,
   users,
   type PlatformRole,
@@ -63,6 +65,52 @@ export async function ensureUserRole(userId: string, role: PlatformRole) {
     .onConflictDoNothing({
       target: [userRoles.userId, userRoles.role],
     });
+}
+
+export async function deleteOAuthOnlyUserWithoutAccess(userId: string) {
+  const [user] = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user || user.passwordHash) {
+    return false;
+  }
+
+  const [account] = await db
+    .select({ userId: accounts.userId })
+    .from(accounts)
+    .where(eq(accounts.userId, userId))
+    .limit(1);
+
+  if (!account) {
+    return false;
+  }
+
+  const [role] = await db
+    .select({ role: userRoles.role })
+    .from(userRoles)
+    .where(eq(userRoles.userId, userId))
+    .limit(1);
+
+  if (role) {
+    return false;
+  }
+
+  const [sellerApplication] = await db
+    .select({ id: sellerApplications.id })
+    .from(sellerApplications)
+    .where(eq(sellerApplications.userId, userId))
+    .limit(1);
+
+  if (sellerApplication) {
+    return false;
+  }
+
+  await db.delete(users).where(eq(users.id, userId));
+
+  return true;
 }
 
 export async function verifyPassword(password: string, passwordHash: string) {

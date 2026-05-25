@@ -59,6 +59,20 @@ Do not model grouped menu items as query filters on a single page when the pages
 
 Admin and seller dashboards should share the same visual system. Keep their layouts, navigation treatment, cards, theme selector, and interaction patterns coupled unless there is a specific product reason to diverge.
 
+Dashboard analytics, counts, and metric titles must include a small light-grey circular info icon next to the title. The icon should open a compact hover/focus popup that explains exactly what the analytic counts or represents. Keep the explanation short, contextual to the current page, and implemented with an existing shared tooltip/popover pattern before creating custom UI.
+
+Modals, popovers, dropdowns, and floating panels must never let their body content overflow the visible container. Use the shared dialog/popover primitives first, keep headers and footers fixed inside the component, put long content in the shared scrollable body area, and clamp floating panels to the viewport. On mobile, forms, metadata grids, action rows, and long labels must wrap, truncate, or collapse before they can push outside the modal/popover.
+
+No page, panel, form, table, toolbar, dropdown, modal, popover, editor, or action row may push content off the visible screen. Responsive layouts must use `min-w-0`, wrapping, truncation, viewport-aware widths, or mobile-specific stacking so every control remains reachable without horizontal page overflow. Before shipping responsive UI, check narrow widths and fix any clipped button text, select values, editor toolbars, counters, or floating content.
+
+Selectors, comboboxes, dropdowns, command menus, and similar floating lists must be constrained to the visible viewport/body with padding on every side, and their content must scroll inside the popup when the list is long. They must not overlap fixed headers, escape beyond the page edge, or rely on page-level horizontal scrolling to access options.
+
+Inline form field action buttons must match the height of the input, select, or textarea control they are attached to. If a button sits beside a field in the same row, use the same height token or explicit height class as the field so the controls align cleanly across desktop and mobile breakpoints.
+
+Required field asterisk indicators must always be red across every surface. Use the shared label/required-marker pattern instead of plain text asterisks so required fields are visually consistent in admin, seller, marketplace, and auth flows.
+
+Shipping rates must be based on explicit product parcel data. Do not use fallback parcel weight or dimensions for shippable products. A shippable variant must provide weight, length, width, and height before checkout can quote shipping, because inaccurate parcel data creates courier adjustments and shipping margin risk. Optional handling flags such as ships-alone and fragile can refine the flow, but the core parcel dimensions are required.
+
 Follow `docs/brand.md` for Piessang colors and brand asset locations. Prefer brand semantic tokens over ad hoc colors.
 
 Preferred flow:

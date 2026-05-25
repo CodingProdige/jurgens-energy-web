@@ -85,7 +85,11 @@ export function DashboardButton({
   return (
     <Button
       variant="outline"
-      className={cn("h-8 gap-1.5 rounded-md px-3 text-xs", dashboardControlClass, className)}
+      className={cn(
+        "h-8 gap-1.5 rounded-md px-3 text-[14px] font-normal leading-none",
+        dashboardControlClass,
+        className,
+      )}
       {...props}
     />
   );

@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
+import { auth, signOut } from "@/auth";
 import {
   canAccessCapability,
+  deleteOAuthOnlyUserWithoutAccess,
   ensureUserRole,
   findUserById,
   getUserRoles,
@@ -97,11 +98,12 @@ export default async function SsoCompletePage({
 
   if (intent === "admin_sign_in") {
     if (!canAccessCapability({ roles }, "admin")) {
-      redirect(
-        getSurfaceUrl("admin", "/sign-in", {
+      await deleteOAuthOnlyUserWithoutAccess(user.id);
+      await signOut({
+        redirectTo: getSurfaceUrl("admin", "/sign-in", {
           error: "admin_access_required",
         }),
-      );
+      });
     }
 
     await setSessionSurfaceAccess("admin", user.id);

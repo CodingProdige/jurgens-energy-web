@@ -1,13 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import {
   BookOpenIcon,
   DownloadIcon,
   Edit3Icon,
   FilterIcon,
   MailPlusIcon,
-  MoreVerticalIcon,
   SearchIcon,
   ShieldCheckIcon,
   ShieldOffIcon,
@@ -25,7 +24,6 @@ import {
 import {
   DashboardButton,
   DashboardInput,
-  DashboardMetricStrip,
   DashboardPageHeader,
   dashboardPanelClass,
   dashboardTableActionCellClass,
@@ -40,6 +38,11 @@ import {
   dashboardTableRowClass,
   dashboardTableSecondaryTextClass,
 } from "@/components/dashboard/dashboard-controls";
+import {
+  DashboardCompactMetrics,
+  type DashboardMetricDefinition,
+} from "@/components/dashboard/dashboard-compact-metrics";
+import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -584,10 +587,82 @@ export function AdminStaffManager({
   const [isReadmeOpen, setIsReadmeOpen] = useState(false);
   const [roleMember, setRoleMember] = useState<StaffMember | null>(null);
   const [statusMember, setStatusMember] = useState<StaffMember | null>(null);
-  const [activeActionStaffId, setActiveActionStaffId] = useState<string | null>(
-    null,
-  );
   const enabledStaffCount = staff.filter((member) => member.isActive).length;
+  const disabledStaffCount = staff.length - enabledStaffCount;
+  const pendingInviteCount = invitations.length;
+  const staffMetrics = useMemo<DashboardMetricDefinition[]>(
+    () => {
+      const countRole = (role: AdminStaffRole) =>
+        staff.filter((member) => getStaffRoles(member).includes(role)).length;
+
+      return [
+        {
+          color: "blue",
+          description: "All users with admin dashboard staff access.",
+          id: "staff-members",
+          label: "Staff members",
+          value: staff.length,
+        },
+        {
+          color: "emerald",
+          description: "Staff members whose admin dashboard access is enabled.",
+          id: "enabled",
+          label: "Enabled",
+          value: enabledStaffCount,
+        },
+        {
+          color: "red",
+          description: "Staff members whose admin dashboard access is disabled.",
+          id: "disabled",
+          label: "Disabled",
+          value: disabledStaffCount,
+        },
+        {
+          color: "amber",
+          description: "Admin staff invitations that have not been accepted yet.",
+          id: "pending-invites",
+          label: "Pending invites",
+          value: pendingInviteCount,
+        },
+        {
+          color: "violet",
+          description: "Staff members with full superadmin access.",
+          id: "superadmins",
+          label: "Superadmins",
+          value: countRole("owner"),
+        },
+        {
+          color: "slate",
+          description: "Staff members with read-only admin dashboard access.",
+          id: "readonly",
+          label: "Read-only",
+          value: countRole("readonly"),
+        },
+        {
+          color: "blue",
+          description: "Staff members with the Admin role.",
+          id: "admins",
+          label: "Admins",
+          value: countRole("manager"),
+        },
+        {
+          color: "emerald",
+          description: "Staff members with the Operations role.",
+          id: "operations",
+          label: "Operations",
+          value: countRole("operations"),
+        },
+        {
+          color: "amber",
+          description: "Staff members with the Catalog manager role.",
+          id: "catalog",
+          label: "Catalog",
+          value: countRole("catalog"),
+        },
+      ];
+    },
+    [disabledStaffCount, enabledStaffCount, pendingInviteCount, staff],
+  );
   const activeFilterCount =
     (roleFilter === "all" ? 0 : 1) + (statusFilter === "all" ? 0 : 1);
 
@@ -646,12 +721,9 @@ export function AdminStaffManager({
         title="Admin staff"
       />
 
-      <DashboardMetricStrip
-        metrics={[
-          { label: "Staff members", value: staff.length.toLocaleString() },
-          { label: "Enabled", value: enabledStaffCount.toLocaleString() },
-          { label: "Pending invites", value: invitations.length.toLocaleString() },
-        ]}
+      <DashboardCompactMetrics
+        metrics={staffMetrics}
+        storageKey="piessang:admin:staff-metrics"
       />
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -778,7 +850,9 @@ export function AdminStaffManager({
                       {formatDate(member.createdAt)}
                     </span>
                   </TableCell>
-                  <TableCell className={dashboardTableActionCellClass}>
+                  <TableCell
+                    className={dashboardTableActionCellClass}
+                  >
                     {canManageRow ? (
                       <div className="flex justify-end gap-1 md:gap-2">
                         <Button
@@ -787,74 +861,41 @@ export function AdminStaffManager({
                           className="text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
                           aria-label={`Edit roles for ${member.email}`}
                           onClick={() => {
-                            setActiveActionStaffId(null);
                             setRoleMember(member);
                           }}
                           type="button"
                         >
                           <Edit3Icon className="size-4" />
                         </Button>
-                        <div className="relative">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-                            aria-label={`Open actions for ${member.email}`}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={(event) => {
-                              event.currentTarget.blur();
-                              setActiveActionStaffId((current) =>
-                                current === member.id ? null : member.id,
-                              );
-                            }}
+                        <DashboardRowActionMenu
+                          ariaLabel={`Open actions for ${member.email}`}
+                        >
+                          <button
+                            className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06]"
+                            onClick={() => setRoleMember(member)}
                             type="button"
                           >
-                            <MoreVerticalIcon className="size-4" />
-                          </Button>
-                          {activeActionStaffId === member.id ? (
-                            <>
-                              <button
-                                aria-label="Close staff actions"
-                                className="fixed inset-0 z-40 cursor-default"
-                                onClick={() => setActiveActionStaffId(null)}
-                                type="button"
-                              />
-                              <div className="absolute right-0 top-9 z-50 max-h-[min(22rem,calc(100dvh-8rem))] w-64 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white text-left text-zinc-950 shadow-2xl [scrollbar-width:thin] dark:border-white/10 dark:bg-[#151719] dark:text-white">
-                                <button
-                                  className="flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06]"
-                                  onClick={() => {
-                                    setActiveActionStaffId(null);
-                                    setRoleMember(member);
-                                  }}
-                                  type="button"
-                                >
-                                  <Edit3Icon className="size-4" />
-                                  Edit roles
-                                </button>
-                                <button
-                                  className={cn(
-                                    "flex h-12 w-full items-center gap-3 border-t px-4 text-sm font-medium transition",
-                                    member.isActive
-                                      ? "border-red-100 bg-red-50/70 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
-                                      : "border-emerald-100 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15",
-                                  )}
-                                  onClick={() => {
-                                    setActiveActionStaffId(null);
-                                    setStatusMember(member);
-                                  }}
-                                  type="button"
-                                >
-                                  {member.isActive ? (
-                                    <ShieldOffIcon className="size-4" />
-                                  ) : (
-                                    <ShieldCheckIcon className="size-4" />
-                                  )}
-                                  {member.isActive ? "Disable access" : "Enable access"}
-                                </button>
-                              </div>
-                            </>
-                          ) : null}
-                        </div>
+                            <Edit3Icon className="size-4" />
+                            Edit roles
+                          </button>
+                          <button
+                            className={cn(
+                              "flex h-12 w-full items-center gap-3 border-t px-4 text-sm font-medium transition",
+                              member.isActive
+                                ? "border-red-100 bg-red-50/70 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
+                                : "border-emerald-100 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200 dark:hover:bg-emerald-500/15",
+                            )}
+                            onClick={() => setStatusMember(member)}
+                            type="button"
+                          >
+                            {member.isActive ? (
+                              <ShieldOffIcon className="size-4" />
+                            ) : (
+                              <ShieldCheckIcon className="size-4" />
+                            )}
+                            {member.isActive ? "Disable access" : "Enable access"}
+                          </button>
+                        </DashboardRowActionMenu>
                       </div>
                     ) : (
                       <span className={dashboardTableSecondaryTextClass}>

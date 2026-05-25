@@ -19,6 +19,11 @@ export const productStatus = pgEnum("product_status", [
   "archived",
 ]);
 
+export const productFulfillmentMode = pgEnum("product_fulfillment_mode", [
+  "seller_fulfilled",
+  "piessang_fulfilled",
+]);
+
 export const products = pgTable("products", {
   id: uuid("id").defaultRandom().primaryKey(),
   sellerId: uuid("seller_id")
@@ -30,6 +35,9 @@ export const products = pgTable("products", {
   slug: varchar("slug", { length: 240 }).notNull().unique(),
   description: text("description"),
   status: productStatus("status").notNull().default("draft"),
+  fulfillmentMode: productFulfillmentMode("fulfillment_mode")
+    .notNull()
+    .default("seller_fulfilled"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
@@ -43,6 +51,12 @@ export const productVariants = pgTable("product_variants", {
   title: varchar("title", { length: 180 }).notNull(),
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
   stockOnHand: integer("stock_on_hand").notNull().default(0),
+  weightGrams: integer("weight_grams"),
+  lengthMm: integer("length_mm"),
+  widthMm: integer("width_mm"),
+  heightMm: integer("height_mm"),
+  shipsAlone: boolean("ships_alone").notNull().default(false),
+  isFragile: boolean("is_fragile").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });

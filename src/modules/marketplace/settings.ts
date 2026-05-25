@@ -22,6 +22,13 @@ type MarketplaceSettings = {
   maxVideoUploadFileMb: number;
   maxVideoWidth: number;
   premiumStorageQuotaMb: number;
+  bobgoEnabled: boolean;
+  bobgoMode: "live" | "sandbox";
+  hasBobgoApiKey: boolean;
+  hasBobgoWebhookSecret: boolean;
+  shippingBufferBps: number;
+  shippingEnabled: boolean;
+  shippingMarginBps: number;
   stripeLivePublishableKey: string | null;
   stripeMode: "live" | "sandbox";
   stripeSandboxPublishableKey: string | null;
@@ -45,6 +52,13 @@ const defaultSettings: MarketplaceSettings = {
   maxVideoUploadFileMb: 100,
   maxVideoWidth: 1280,
   premiumStorageQuotaMb: 5120,
+  bobgoEnabled: false,
+  bobgoMode: "sandbox",
+  hasBobgoApiKey: false,
+  hasBobgoWebhookSecret: false,
+  shippingBufferBps: 0,
+  shippingEnabled: false,
+  shippingMarginBps: 0,
   stripeLivePublishableKey: null,
   stripeMode: "sandbox",
   stripeSandboxPublishableKey: null,
@@ -70,6 +84,14 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       maxVideoUploadFileMb: marketplaceSettings.maxVideoUploadFileMb,
       maxVideoWidth: marketplaceSettings.maxVideoWidth,
       premiumStorageQuotaMb: marketplaceSettings.premiumStorageQuotaMb,
+      bobgoApiKeyEncrypted: marketplaceSettings.bobgoApiKeyEncrypted,
+      bobgoEnabled: marketplaceSettings.bobgoEnabled,
+      bobgoMode: marketplaceSettings.bobgoMode,
+      bobgoWebhookSecretEncrypted:
+        marketplaceSettings.bobgoWebhookSecretEncrypted,
+      shippingBufferBps: marketplaceSettings.shippingBufferBps,
+      shippingEnabled: marketplaceSettings.shippingEnabled,
+      shippingMarginBps: marketplaceSettings.shippingMarginBps,
       stripeLivePublishableKey: marketplaceSettings.stripeLivePublishableKey,
       stripeLiveSecretKeyEncrypted:
         marketplaceSettings.stripeLiveSecretKeyEncrypted,
@@ -95,6 +117,9 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
 
   return {
     ...settings,
+    bobgoMode: settings.bobgoMode === "live" ? "live" : "sandbox",
+    hasBobgoApiKey: Boolean(settings.bobgoApiKeyEncrypted),
+    hasBobgoWebhookSecret: Boolean(settings.bobgoWebhookSecretEncrypted),
     stripeMode: settings.stripeMode === "live" ? "live" : "sandbox",
     hasStripeLiveSecretKey: Boolean(settings.stripeLiveSecretKeyEncrypted),
     hasStripeLiveWebhookSecret: Boolean(
@@ -225,9 +250,83 @@ export async function updateMarketplaceStripeSettings({
   return { ok: true, message: "Stripe payment settings saved." };
 }
 
+export async function updateMarketplaceShippingSettings({
+  bobgoApiKey,
+  bobgoEnabled,
+  bobgoMode,
+  bobgoWebhookSecret,
+  shippingBufferBps,
+  shippingEnabled,
+  shippingMarginBps,
+}: {
+  bobgoApiKey?: string;
+  bobgoEnabled: boolean;
+  bobgoMode: "live" | "sandbox";
+  bobgoWebhookSecret?: string;
+  shippingBufferBps: number;
+  shippingEnabled: boolean;
+  shippingMarginBps: number;
+}) {
+  if (shippingMarginBps < 0 || shippingMarginBps > 10000) {
+    return {
+      ok: false,
+      message: "Shipping margin must be between 0% and 100%.",
+    };
+  }
+
+  if (shippingBufferBps < 0 || shippingBufferBps > 10000) {
+    return {
+      ok: false,
+      message: "Shipping buffer must be between 0% and 100%.",
+    };
+  }
+
+  const existing = await getRawMarketplaceSettings();
+  const nextBobgoApiKey =
+    bobgoApiKey && bobgoApiKey.length > 0
+      ? encryptSecret(bobgoApiKey)
+      : existing?.bobgoApiKeyEncrypted;
+  const nextBobgoWebhookSecret =
+    bobgoWebhookSecret && bobgoWebhookSecret.length > 0
+      ? encryptSecret(bobgoWebhookSecret)
+      : existing?.bobgoWebhookSecretEncrypted;
+
+  await db
+    .insert(marketplaceSettings)
+    .values({
+      id: 1,
+      bobgoApiKeyEncrypted: nextBobgoApiKey ?? null,
+      bobgoEnabled,
+      bobgoMode,
+      bobgoWebhookSecretEncrypted: nextBobgoWebhookSecret ?? null,
+      shippingBufferBps,
+      shippingEnabled,
+      shippingMarginBps,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: marketplaceSettings.id,
+      set: {
+        bobgoApiKeyEncrypted: nextBobgoApiKey ?? null,
+        bobgoEnabled,
+        bobgoMode,
+        bobgoWebhookSecretEncrypted: nextBobgoWebhookSecret ?? null,
+        shippingBufferBps,
+        shippingEnabled,
+        shippingMarginBps,
+        updatedAt: new Date(),
+      },
+    });
+
+  return { ok: true, message: "Shipping settings saved." };
+}
+
 async function getRawMarketplaceSettings() {
   const [settings] = await db
     .select({
+      bobgoApiKeyEncrypted: marketplaceSettings.bobgoApiKeyEncrypted,
+      bobgoWebhookSecretEncrypted:
+        marketplaceSettings.bobgoWebhookSecretEncrypted,
       stripeLiveSecretKeyEncrypted:
         marketplaceSettings.stripeLiveSecretKeyEncrypted,
       stripeLiveWebhookSecretEncrypted:

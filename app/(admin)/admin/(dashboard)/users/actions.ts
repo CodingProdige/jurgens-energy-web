@@ -6,7 +6,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/src/db";
-import { auditLogs, platformRoles, userRoles, users, type PlatformRole } from "@/src/db/schema";
+import { accounts, auditLogs, users, type PlatformRole } from "@/src/db/schema";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { createPasswordResetToken, getUserRoles } from "@/src/modules/auth/service";
 import { sendPasswordResetEmail } from "@/src/modules/auth/password-reset-email";
@@ -24,20 +24,22 @@ const userIdSchema = z.object({
 const updateUserProfileSchema = z.object({
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   id: z.string().uuid(),
+  image: z
+    .string()
+    .trim()
+    .max(2048)
+    .optional()
+    .refine(
+      (value) =>
+        !value ||
+        value.startsWith("/") ||
+        value.startsWith("http://") ||
+        value.startsWith("https://"),
+      "Use an absolute URL or a site-relative image path.",
+    ),
   isActive: z.enum(["active", "inactive"]),
   name: z.string().trim().max(160).optional(),
 });
-
-const updateUserRolesSchema = z.object({
-  id: z.string().uuid(),
-  roles: z.array(z.enum(platformRoles)).default([]),
-});
-
-const marketplaceRoles: PlatformRole[] = [
-  "customer",
-  "seller_owner",
-  "seller_staff",
-];
 
 function optionalString(value: FormDataEntryValue | null) {
   const stringValue = String(value ?? "").trim();
@@ -103,6 +105,15 @@ async function findTargetUser(userId: string) {
   });
 }
 
+async function getLinkedAccountProviders(userId: string) {
+  const rows = await db
+    .select({ provider: accounts.provider })
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+
+  return rows.map((row) => row.provider);
+}
+
 function revalidateUserPages() {
   revalidatePath("/users");
   revalidatePath("/users/all");
@@ -125,6 +136,7 @@ export async function updateAdminUserProfile(
   const parsed = updateUserProfileSchema.safeParse({
     email: formData.get("email"),
     id: formData.get("id"),
+    image: optionalString(formData.get("image")),
     isActive: formData.get("isActive"),
     name: optionalString(formData.get("name")),
   });
@@ -146,12 +158,25 @@ export async function updateAdminUserProfile(
     return { ok: false, message: "You cannot deactivate your own admin account." };
   }
 
+  const linkedProviders = await getLinkedAccountProviders(parsed.data.id);
+
+  if (
+    linkedProviders.length > 0 &&
+    targetUser.email.toLowerCase() !== parsed.data.email
+  ) {
+    return {
+      ok: false,
+      message: "Email is managed by the linked sign-in provider.",
+    };
+  }
+
   try {
     await db.transaction(async (tx) => {
       await tx
         .update(users)
         .set({
           email: parsed.data.email,
+          image: parsed.data.image ?? null,
           isActive: parsed.data.isActive === "active",
           name: parsed.data.name ?? null,
           updatedAt: new Date(),
@@ -165,6 +190,7 @@ export async function updateAdminUserProfile(
         entityId: parsed.data.id,
         metadata: JSON.stringify({
           emailChanged: targetUser.email !== parsed.data.email,
+          imageChanged: targetUser.image !== (parsed.data.image ?? null),
           statusChanged: targetUser.isActive !== (parsed.data.isActive === "active"),
         }),
       });
@@ -180,83 +206,6 @@ export async function updateAdminUserProfile(
   revalidateUserPages();
 
   return { ok: true, message: "User updated." };
-}
-
-export async function updateAdminUserRoles(
-  _state: UserMutationState,
-  formData: FormData,
-): Promise<UserMutationState> {
-  const access = await requireAdminCapability("admin.users.manage");
-
-  if (!access.ok) {
-    return { ok: false, message: "You do not have permission to manage users." };
-  }
-
-  const session = access.session;
-  const parsed = updateUserRolesSchema.safeParse({
-    id: formData.get("id"),
-    roles: formData.getAll("roles"),
-  });
-
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: parsed.error.issues[0]?.message ?? "Check the selected roles.",
-    };
-  }
-
-  const targetUser = await findTargetUser(parsed.data.id);
-
-  if (!targetUser) {
-    return { ok: false, message: "User was not found." };
-  }
-
-  const currentRoles = await getUserRoles(parsed.data.id);
-  const preservedAdminRoles = currentRoles.filter(
-    (role) => role === "admin" || role === "superadmin",
-  );
-  const nextMarketplaceRoles = parsed.data.roles.filter((role) =>
-    marketplaceRoles.includes(role),
-  );
-  const nextRoles = Array.from(
-    new Set([...preservedAdminRoles, ...nextMarketplaceRoles]),
-  );
-
-  if (
-    session.user.id === parsed.data.id &&
-    currentRoles.some((role) => role === "admin" || role === "superadmin") &&
-    !nextRoles.some((role) => role === "admin" || role === "superadmin")
-  ) {
-    return { ok: false, message: "You cannot remove your own admin access." };
-  }
-
-  await db.transaction(async (tx) => {
-    await tx.delete(userRoles).where(eq(userRoles.userId, parsed.data.id));
-
-    if (nextRoles.length > 0) {
-      await tx.insert(userRoles).values(
-        nextRoles.map((role) => ({
-          role,
-          userId: parsed.data.id,
-        })),
-      );
-    }
-
-    await tx.insert(auditLogs).values({
-      actorUserId: session.user.id,
-      action: "admin.user.update_roles",
-      entityType: "user",
-      entityId: parsed.data.id,
-      metadata: JSON.stringify({
-        from: currentRoles,
-        to: nextRoles,
-      }),
-    });
-  });
-
-  revalidateUserPages();
-
-  return { ok: true, message: "User roles updated." };
 }
 
 export async function sendAdminUserPasswordReset(

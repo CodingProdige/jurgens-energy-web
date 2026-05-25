@@ -23,6 +23,7 @@ import {
   createSurfaceAccessToken,
   getSurfaceAccessCookieName,
 } from "@/src/modules/auth/surface-access";
+import { getSurfaceUrl } from "@/src/modules/auth/sso";
 import { signInSchema } from "@/src/modules/auth/validation";
 
 export type SignInState = {
@@ -168,7 +169,7 @@ export async function signInAdminWithPassword(
 ) {
   return signInWithPasswordForSurface(state, formData, {
     requiredCapability: "admin",
-    redirectTo: "/",
+    redirectTo: getSurfaceUrl("admin"),
     capabilityError: "This sign-in is only for admin accounts.",
   });
 }
@@ -179,7 +180,7 @@ export async function signInSellerWithPassword(
 ) {
   return signInWithPasswordForSurface(state, formData, {
     requiredCapability: "seller",
-    redirectTo: "/",
+    redirectTo: getSurfaceUrl("seller"),
     capabilityError: "This sign-in is only for seller workspace accounts.",
   });
 }
