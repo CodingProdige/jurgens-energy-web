@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { SellerDashboardShell } from "@/components/seller/seller-dashboard-shell";
 import { requireSellerDashboardAccess } from "@/src/modules/auth/permissions";
+import { getCurrencyPreference } from "@/src/modules/currency/server";
 import { getNotificationCenter } from "@/src/modules/notifications/in-app";
 import { getSellerSetupState } from "@/src/modules/sellers/dashboard";
 
@@ -16,10 +17,12 @@ export default async function SellerDashboardLayout({
     userId: session.user.id,
   });
   const setup = await getSellerSetupState(session.user.id);
+  const currencyPreference = await getCurrencyPreference();
 
   return (
     <SellerDashboardShell
       attentionHrefs={setup.attentionHrefs}
+      currencyPreference={currencyPreference}
       notificationCenter={notificationCenter}
       user={{
         name: session.user.name,

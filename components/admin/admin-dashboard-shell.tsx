@@ -20,6 +20,7 @@ import {
   type DashboardSurfaceUser,
 } from "@/components/dashboard/dashboard-surface-shell";
 import type { AdminCapability } from "@/src/modules/admin/staff-constants";
+import type { CurrencyPreference } from "@/src/modules/currency";
 import type { NotificationCenterState } from "@/src/modules/notifications/in-app";
 
 const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
@@ -127,11 +128,13 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
 export function AdminDashboardShell({
   capabilities,
   children,
+  currencyPreference,
   notificationCenter,
   user,
 }: {
   capabilities: AdminCapability[];
   children: ReactNode;
+  currencyPreference: CurrencyPreference;
   notificationCenter: NotificationCenterState;
   user: DashboardSurfaceUser;
 }) {
@@ -140,6 +143,7 @@ export function AdminDashboardShell({
       accent="amber"
       brandAriaLabel="Piessang admin dashboard"
       capabilities={capabilities}
+      currencyPreference={currencyPreference}
       navItems={navItems}
       notificationCenter={notificationCenter}
       notificationCenterHref="/notifications"

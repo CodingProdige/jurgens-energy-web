@@ -13,12 +13,14 @@ import {
   ZapIcon,
 } from "lucide-react";
 
+import { CurrencySelector } from "@/components/currency/currency-selector";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { InAppNotificationSurface } from "@/src/db/schema";
+import type { CurrencyPreference } from "@/src/modules/currency";
 import type { NotificationCenterState } from "@/src/modules/notifications/in-app";
 
 export type DashboardSurfaceAccent = "amber" | "green";
@@ -562,6 +564,7 @@ function MobileNavDrawer<TCapability extends string>({
 function SurfaceHeader({
   accent,
   brandAriaLabel,
+  currencyPreference,
   notificationCenter,
   notificationCenterHref,
   notificationSurface,
@@ -571,6 +574,7 @@ function SurfaceHeader({
 }: {
   accent: DashboardSurfaceAccent;
   brandAriaLabel: string;
+  currencyPreference: CurrencyPreference;
   notificationCenter: NotificationCenterState;
   notificationCenterHref?: string;
   notificationSurface: InAppNotificationSurface;
@@ -631,6 +635,11 @@ function SurfaceHeader({
             initialState={notificationCenter}
             surface={notificationSurface}
           />
+          <CurrencySelector
+            className="hidden xl:flex"
+            initialPreference={currencyPreference}
+            variant="dashboard"
+          />
           <ThemeToggle compact className="sm:hidden" />
           <ThemeToggle className="hidden sm:inline-flex" />
         </div>
@@ -644,6 +653,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
   attentionHrefs,
   brandAriaLabel,
   capabilities,
+  currencyPreference,
   children,
   navItems,
   notificationCenter,
@@ -658,6 +668,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
   attentionHrefs?: readonly string[];
   brandAriaLabel: string;
   capabilities?: readonly TCapability[];
+  currencyPreference: CurrencyPreference;
   children: ReactNode;
   navItems: DashboardSurfaceNavItem<TCapability>[];
   notificationCenter: NotificationCenterState;
@@ -677,6 +688,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
       <SurfaceHeader
         accent={accent}
         brandAriaLabel={brandAriaLabel}
+        currencyPreference={currencyPreference}
         notificationCenter={notificationCenter}
         notificationCenterHref={notificationCenterHref}
         notificationSurface={notificationSurface}

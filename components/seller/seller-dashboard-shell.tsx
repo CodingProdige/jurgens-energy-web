@@ -19,6 +19,7 @@ import {
   type DashboardSurfaceNavItem,
   type DashboardSurfaceUser,
 } from "@/components/dashboard/dashboard-surface-shell";
+import type { CurrencyPreference } from "@/src/modules/currency";
 import type { NotificationCenterState } from "@/src/modules/notifications/in-app";
 
 const navItems: DashboardSurfaceNavItem[] = [
@@ -47,11 +48,13 @@ const navItems: DashboardSurfaceNavItem[] = [
 export function SellerDashboardShell({
   attentionHrefs,
   children,
+  currencyPreference,
   notificationCenter,
   user,
 }: {
   attentionHrefs?: string[];
   children: ReactNode;
+  currencyPreference: CurrencyPreference;
   notificationCenter: NotificationCenterState;
   user: DashboardSurfaceUser;
 }) {
@@ -60,6 +63,7 @@ export function SellerDashboardShell({
       accent="green"
       attentionHrefs={attentionHrefs}
       brandAriaLabel="Piessang seller dashboard"
+      currencyPreference={currencyPreference}
       navItems={navItems}
       notificationCenter={notificationCenter}
       notificationCenterHref="/notifications"

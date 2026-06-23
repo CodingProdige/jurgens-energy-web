@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { themeStorageKey } from "@/components/theme/theme-sync";
@@ -24,6 +24,13 @@ export const metadata: Metadata = {
     capable: true,
     title: "Piessang",
   },
+};
+
+export const viewport: Viewport = {
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  width: "device-width",
 };
 
 export default function RootLayout({
