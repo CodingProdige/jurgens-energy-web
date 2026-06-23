@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type MouseEvent,
   type ReactNode,
   useActionState,
   useEffect,
@@ -29,6 +30,7 @@ import {
   ListIcon,
   LockIcon,
   MoreVerticalIcon,
+  PauseIcon,
   PencilIcon,
   PlayIcon,
   RefreshCwIcon,
@@ -38,6 +40,8 @@ import {
   TagIcon,
   Trash2Icon,
   UploadIcon,
+  Volume2Icon,
+  VolumeXIcon,
   XIcon,
   ZapIcon,
 } from "lucide-react";
@@ -51,6 +55,7 @@ import {
   updateAdminMediaMetadata,
   type MediaMetadataState,
 } from "@/app/(admin)/admin/(dashboard)/media/actions";
+import { deleteOwnerMediaAsset } from "@/components/media/actions";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -80,10 +85,12 @@ import type {
 
 type MediaManagerDialogProps = {
   acceptedMediaTypes?: MediaType[];
+  allowMultipleSelection?: boolean;
   assets: AdminMediaAsset[];
   folders?: AdminMediaFolder[];
   onOpenChange: (open: boolean) => void;
   onSelect: (asset: AdminMediaAsset) => void;
+  onSelectMany?: (assets: AdminMediaAsset[]) => void;
   open: boolean;
   selectedAssetId?: string | null;
   storage: MediaStorageSettings;
@@ -204,10 +211,12 @@ const mediaManagerAccentClasses = {
 
 export function MediaManagerDialog({
   acceptedMediaTypes = ["document", "image", "video"],
+  allowMultipleSelection = false,
   assets,
   folders: initialFolders = [],
   onOpenChange,
   onSelect,
+  onSelectMany,
   open,
   selectedAssetId,
   storage,
@@ -216,6 +225,8 @@ export function MediaManagerDialog({
   usedStorageBytes,
 }: MediaManagerDialogProps) {
   const accent = mediaManagerAccentClasses[surface];
+  const deleteMediaAsset =
+    surface === "seller" ? deleteOwnerMediaAsset : deleteAdminMediaAsset;
   const [libraryAssets, setLibraryAssets] = useState(assets);
   const [localUsedStorageBytes, setLocalUsedStorageBytes] =
     useState(usedStorageBytes);
@@ -252,9 +263,15 @@ export function MediaManagerDialog({
     selectedAssetIds.length === 1
       ? libraryAssets.find((asset) => asset.id === selectedAssetIds[0]) ?? null
       : null;
+  const selectedAssets = selectedAssetIds
+    .map((assetId) => libraryAssets.find((asset) => asset.id === assetId))
+    .filter((asset): asset is AdminMediaAsset => Boolean(asset));
   const hasDetailsPanel = Boolean(selectedAsset);
   const selectedAssetIsSelectable =
     selectedAsset ? isAssetSelectable(selectedAsset, acceptedMediaTypes) : false;
+  const selectedAssetsAreSelectable =
+    selectedAssets.length > 0 &&
+    selectedAssets.every((asset) => isAssetSelectable(asset, acceptedMediaTypes));
   const imageCount = libraryAssets.filter((asset) =>
     asset.mimeType.startsWith("image/"),
   ).length;
@@ -286,6 +303,13 @@ export function MediaManagerDialog({
 
     return counts;
   }, [libraryAssets]);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedAssetIds([]);
+    }
+  }, [open]);
+
   const filteredAssets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const filteredByLibrary = libraryAssets.filter((asset) => {
@@ -540,7 +564,7 @@ export function MediaManagerDialog({
 
     const asset = deleteRequest.asset;
     setIsDeleting(true);
-    const result = await deleteAdminMediaAsset(asset.id);
+    const result = await deleteMediaAsset(asset.id);
     setIsDeleting(false);
 
     if (!result.ok) {
@@ -598,7 +622,7 @@ export function MediaManagerDialog({
     setIsDeleting(true);
 
     for (const asset of assetsToDelete) {
-      const result = await deleteAdminMediaAsset(asset.id);
+      const result = await deleteMediaAsset(asset.id);
 
       if (!result.ok) {
         setIsDeleting(false);
@@ -627,6 +651,16 @@ export function MediaManagerDialog({
   }
 
   function useSelectedAsset() {
+    if (allowMultipleSelection && onSelectMany) {
+      if (!selectedAssetsAreSelectable) {
+        return;
+      }
+
+      onSelectMany(selectedAssets);
+      onOpenChange(false);
+      return;
+    }
+
     if (!selectedAsset || !selectedAssetIsSelectable) {
       return;
     }
@@ -878,7 +912,7 @@ export function MediaManagerDialog({
                   </div>
 
                   {mobilePanel === "details" ? (
-                    <div className="min-h-0 overflow-y-auto p-5 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
+                    <div className="min-h-0 min-w-0 overflow-y-auto p-5 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
                       <div className="mb-5 flex items-center justify-between">
                         <button
                           className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-950 dark:text-white"
@@ -1074,7 +1108,7 @@ export function MediaManagerDialog({
                 </main>
 
                 {hasDetailsPanel ? (
-                  <aside className="hidden min-h-0 min-w-0 overflow-y-auto border-l border-slate-200 bg-slate-50/60 p-5 [scrollbar-width:none] dark:border-white/10 dark:bg-[#101820]/70 lg:block [&::-webkit-scrollbar]:hidden">
+                  <aside className="hidden min-h-0 w-80 min-w-0 max-w-80 shrink-0 overflow-y-auto overflow-x-hidden border-l border-slate-200 bg-slate-50/60 p-5 [scrollbar-width:none] dark:border-white/10 dark:bg-[#101820]/70 lg:block [&::-webkit-scrollbar]:hidden">
                     <MediaDetails
                       asset={selectedAsset}
                       acceptedMediaTypes={acceptedMediaTypes}
@@ -1133,7 +1167,11 @@ export function MediaManagerDialog({
                   "h-10 min-w-28 justify-center rounded-lg font-bold",
                   accent.button,
                 )}
-                disabled={!selectedAssetIsSelectable}
+                disabled={
+                  allowMultipleSelection
+                    ? !selectedAssetsAreSelectable
+                    : !selectedAssetIsSelectable
+                }
                 onClick={useSelectedAsset}
                 type="button"
               >
@@ -2131,6 +2169,38 @@ function MediaAssetCard({
 }) {
   const selectable = isAssetSelectable(asset, acceptedMediaTypes);
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const isVideo = asset.mimeType.startsWith("video/");
+
+  function toggleVideoPlayback(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+
+    const video = videoRef.current;
+
+    if (!video) {
+      setIsPlaying(true);
+      window.requestAnimationFrame(() => {
+        void videoRef.current?.play();
+      });
+      return;
+    }
+
+    if (video.paused) {
+      setIsPlaying(true);
+      void video.play();
+      return;
+    }
+
+    video.pause();
+    setIsPlaying(false);
+  }
+
+  function toggleVideoSound(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    setIsMuted((current) => !current);
+  }
 
   return (
     <div
@@ -2142,10 +2212,23 @@ function MediaAssetCard({
         viewMode === "list" && "grid grid-cols-[5rem_minmax(0,1fr)_auto]",
       )}
     >
-      <button
-        className={cn("block w-full text-left", viewMode === "list" && "contents")}
+      <div
+        className={cn(
+          "block w-full text-left",
+          selectable && "cursor-pointer",
+          viewMode === "list" && "contents",
+        )}
+        onKeyDown={(event) => {
+          if (!selectable || (event.key !== "Enter" && event.key !== " ")) {
+            return;
+          }
+
+          event.preventDefault();
+          onSelect();
+        }}
         onClick={() => selectable && onSelect()}
-        type="button"
+        role="button"
+        tabIndex={selectable ? 0 : -1}
       >
         <div
           className={cn(
@@ -2153,11 +2236,49 @@ function MediaAssetCard({
             viewMode === "list" && "aspect-auto h-20",
           )}
         >
-          <MediaPreview asset={asset} />
-          {asset.mimeType.startsWith("video/") ? (
-            <span className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-black/70 text-white">
-              <PlayIcon className="size-3.5 fill-current" />
-            </span>
+          {isVideo && (isPlaying || !asset.thumbnailUrl) ? (
+            <video
+              aria-label={asset.altText ?? asset.originalFileName ?? "Video preview"}
+              className="size-full object-cover"
+              muted={isMuted}
+              onEnded={() => setIsPlaying(false)}
+              onPause={() => setIsPlaying(false)}
+              onPlay={() => setIsPlaying(true)}
+              playsInline
+              preload="metadata"
+              ref={videoRef}
+              src={asset.publicUrl}
+            />
+          ) : (
+            <MediaPreview asset={asset} />
+          )}
+          {isVideo ? (
+            <div className="absolute right-2 top-2 flex items-center gap-1">
+              <button
+                aria-label={isPlaying ? "Pause video" : "Play video"}
+                className="grid size-7 place-items-center rounded-full bg-black/70 text-white shadow-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                onClick={toggleVideoPlayback}
+                type="button"
+              >
+                {isPlaying ? (
+                  <PauseIcon className="size-3.5 fill-current" />
+                ) : (
+                  <PlayIcon className="ml-0.5 size-3.5 fill-current" />
+                )}
+              </button>
+              <button
+                aria-label={isMuted ? "Unmute video" : "Mute video"}
+                className="grid size-7 place-items-center rounded-full bg-black/70 text-white shadow-sm transition hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                onClick={toggleVideoSound}
+                type="button"
+              >
+                {isMuted ? (
+                  <VolumeXIcon className="size-3.5" />
+                ) : (
+                  <Volume2Icon className="size-3.5" />
+                )}
+              </button>
+            </div>
           ) : null}
           {selectable && active ? (
             <span
@@ -2191,7 +2312,7 @@ function MediaAssetCard({
             {asset.usageCount > 0 ? "In use" : "Unused"}
           </p>
         </div>
-      </button>
+      </div>
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
@@ -2516,17 +2637,17 @@ function MediaDetails({
   }
 
   return (
-    <div className="grid min-w-0 gap-4">
+    <div className="grid min-w-0 max-w-full gap-4 overflow-hidden">
       <p className="text-sm font-bold text-zinc-950 dark:text-white">File details</p>
       {asset.mimeType.startsWith("video/") ? (
         <video
-          className="aspect-video w-full rounded-lg border border-slate-200 object-cover dark:border-white/10"
+          className="aspect-video w-full max-w-full rounded-lg border border-slate-200 object-cover dark:border-white/10"
           controls
           poster={asset.thumbnailUrl ?? undefined}
           src={asset.publicUrl}
         />
       ) : isDocumentAsset(asset) ? (
-        <div className="grid aspect-video w-full place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+        <div className="grid aspect-video w-full max-w-full place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
           <span className="grid place-items-center gap-2">
             <FileTextIcon className="size-12" />
             <span className="text-xs font-bold uppercase">
@@ -2537,15 +2658,18 @@ function MediaDetails({
       ) : (
         <img
           alt={asset.altText ?? asset.originalFileName ?? ""}
-          className="aspect-video w-full rounded-lg border border-slate-200 object-cover dark:border-white/10"
+          className="aspect-video w-full max-w-full rounded-lg border border-slate-200 object-cover dark:border-white/10"
           src={asset.publicUrl}
         />
       )}
-      <div>
-        <p className="break-words text-sm font-bold text-zinc-950 dark:text-white">
+      <div className="min-w-0">
+        <p
+          className="truncate text-sm font-bold text-zinc-950 dark:text-white"
+          title={asset.originalFileName ?? "Untitled media"}
+        >
           {asset.originalFileName ?? "Untitled media"}
         </p>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-1 min-w-0 break-words text-xs text-slate-500 dark:text-slate-400">
           {formatBytes(asset.byteSize)} · {asset.width ?? "-"} ×{" "}
           {asset.height ?? "-"} · {asset.mimeType}
           {asset.durationMs ? ` · ${formatDuration(asset.durationMs)}` : ""}
@@ -2563,7 +2687,7 @@ function MediaDetails({
             : "Not used anywhere yet"}
         </p>
       </div>
-      <div className="grid gap-2">
+      <div className="grid min-w-0 gap-2">
         <Label className="text-zinc-950 dark:text-white">URL</Label>
         <div className="flex h-10 min-w-0 items-center overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
           <span className="min-w-0 flex-1 truncate px-3 text-xs text-slate-600 dark:text-slate-300">
@@ -2596,7 +2720,7 @@ function MediaDetails({
           {copiedUrl ? "Copied URL" : ""}
         </p>
       </div>
-      <form action={action} className="grid gap-3">
+      <form action={action} className="grid min-w-0 gap-3">
         <input type="hidden" name="id" value={asset.id} />
         <div className="grid gap-2">
           <Label className="text-zinc-950 dark:text-white" htmlFor={`altText-${asset.id}`}>Alt text</Label>
@@ -2607,7 +2731,7 @@ function MediaDetails({
             maxLength={240}
             defaultValue={asset.altText ?? ""}
             placeholder="Describe this media for accessibility"
-            className="border-slate-200 bg-white text-zinc-950 placeholder:text-slate-400 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:placeholder:text-slate-500"
+            className="min-w-0 border-slate-200 bg-white text-zinc-950 placeholder:text-slate-400 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:placeholder:text-slate-500"
           />
         </div>
         <Button
@@ -2649,7 +2773,7 @@ function MediaDetails({
         }}
         type="file"
       />
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
         <MediaDetailAction
           icon={RefreshCwIcon}
           label="Replace file"
@@ -3877,7 +4001,7 @@ function PendingUploadCard({
     <div className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] text-left opacity-90">
       <button
         aria-label={`Remove ${upload.name}`}
-        className="absolute right-2 top-2 z-20 grid size-7 place-items-center rounded-full border border-white/10 bg-black/70 text-white/70 opacity-0 shadow-sm transition hover:bg-white/10 hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
+        className="absolute right-2 top-2 z-20 grid size-7 place-items-center rounded-full border border-slate-200 bg-white/95 text-slate-700 opacity-100 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-red-500/30 dark:border-white/10 dark:bg-[#101214]/95 dark:text-zinc-200 dark:hover:border-red-400/30 dark:hover:bg-red-500/15 dark:hover:text-red-200"
         onClick={onRemove}
         type="button"
       >

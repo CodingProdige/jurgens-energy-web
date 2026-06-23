@@ -274,8 +274,6 @@ export function canAccessCapability(
 
   return (
     roles.includes("seller_owner") ||
-    roles.includes("seller_staff") ||
-    roles.includes("admin") ||
-    roles.includes("superadmin")
+    roles.includes("seller_staff")
   );
 }

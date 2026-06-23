@@ -26,10 +26,14 @@ export function DashboardRowActionMenu({
   ariaLabel,
   children,
   className,
+  trigger,
+  triggerClassName,
 }: {
   ariaLabel: string;
   children: ReactNode;
   className?: string;
+  trigger?: ReactNode;
+  triggerClassName?: string;
 }) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -118,7 +122,10 @@ export function DashboardRowActionMenu({
         ref={triggerRef}
         variant="ghost"
         size="icon-sm"
-        className="text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
+        className={cn(
+          "text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10",
+          triggerClassName,
+        )}
         aria-label={ariaLabel}
         onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {
@@ -127,7 +134,7 @@ export function DashboardRowActionMenu({
         }}
         type="button"
       >
-        <MoreVerticalIcon className="size-4" />
+        {trigger ?? <MoreVerticalIcon className="size-4" />}
       </Button>
       {isOpen
         ? createPortal(

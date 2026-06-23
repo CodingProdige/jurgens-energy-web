@@ -25,7 +25,17 @@ const navItems: DashboardSurfaceNavItem[] = [
   { label: "Overview", href: "/", icon: LayoutDashboardIcon },
   { label: "Orders", href: "/orders", icon: ClipboardListIcon },
   { label: "Products", href: "/products", icon: BoxesIcon },
-  { label: "Shipping", href: "/shipping", icon: TruckIcon },
+  {
+    label: "Shipping",
+    href: "/shipping",
+    icon: TruckIcon,
+    children: [
+      { label: "Parcel presets", href: "/shipping/parcel-presets" },
+      { label: "Shipments", href: "/shipping/shipments" },
+      { label: "Collections", href: "/shipping/collections" },
+      { label: "Collection profile", href: "/shipping/collection-profile" },
+    ],
+  },
   { label: "Fulfillment", href: "/fulfillment", icon: PackageCheckIcon },
   { label: "Storefront", href: "/storefront", icon: StoreIcon },
   { label: "Reviews", href: "/reviews", icon: ShieldCheckIcon },
@@ -35,10 +45,12 @@ const navItems: DashboardSurfaceNavItem[] = [
 ];
 
 export function SellerDashboardShell({
+  attentionHrefs,
   children,
   notificationCenter,
   user,
 }: {
+  attentionHrefs?: string[];
   children: ReactNode;
   notificationCenter: NotificationCenterState;
   user: DashboardSurfaceUser;
@@ -46,9 +58,11 @@ export function SellerDashboardShell({
   return (
     <DashboardSurfaceShell
       accent="green"
+      attentionHrefs={attentionHrefs}
       brandAriaLabel="Piessang seller dashboard"
       navItems={navItems}
       notificationCenter={notificationCenter}
+      notificationCenterHref="/notifications"
       notificationSurface="seller"
       searchAriaLabel="Search seller dashboard"
       searchPlaceholder="Search anything... (Orders, Products, Shipments, etc.)"

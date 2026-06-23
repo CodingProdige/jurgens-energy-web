@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  ArrowLeftIcon,
   ChevronRightIcon,
   CreditCardIcon,
   CrownIcon,
@@ -11,19 +10,24 @@ import {
   LayersIcon,
   MailIcon,
   Share2Icon,
+  TruckIcon,
 } from "lucide-react";
 
+import { DashboardBackButton } from "@/components/dashboard/dashboard-controls";
 import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
 import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
 import { Card, CardContent } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
-import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import {
+  getMarketplaceAdminSecrets,
+  getMarketplaceSettings,
+} from "@/src/modules/marketplace/settings";
 import {
   SettingsForm,
   MediaStorageSettingsForm,
   NotificationSettingsForm,
   PremiumPlansSettingsForm,
   SocialLinksForm,
+  ShippingSettingsForm,
   StripeSettingsForm,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/settings-form";
 import { getAdminPremiumPlans } from "@/src/modules/billing/premium-plans";
@@ -54,6 +58,13 @@ const settingSections = [
     description:
       "Switch payment mode and manage live or sandbox Stripe credentials.",
     icon: CreditCardIcon,
+  },
+  {
+    key: "shipping",
+    title: "Shipping",
+    description:
+      "Manage Piessang shipping margins and encrypted Bob Go provider credentials.",
+    icon: TruckIcon,
   },
   {
     key: "marketplace-gate",
@@ -134,6 +145,10 @@ export default async function AdminSettingsPage({
     : resolvedSearchParams.notification;
   const selectedConfig = getSectionConfig(selectedSection);
   const settings = await getMarketplaceSettings();
+  const secrets =
+    selectedSection === "stripe-payments" || selectedSection === "shipping"
+      ? await getMarketplaceAdminSecrets()
+      : null;
   const premiumPlans =
     selectedSection === "premium-plans" ? await getAdminPremiumPlans() : [];
   const notificationSettings =
@@ -160,16 +175,7 @@ export default async function AdminSettingsPage({
           ) : null}
         </div>
         {selectedConfig ? (
-          <Link
-            href="/settings/platform"
-            className={buttonVariants({
-              className: "mb-2 h-8 w-fit gap-2 rounded-lg px-3 text-sm",
-              variant: "outline",
-            })}
-          >
-            <ArrowLeftIcon className="size-3.5" />
-            Back to settings
-          </Link>
+          <DashboardBackButton href="/settings/platform" label="Back to settings" />
         ) : null}
         <h1 className="text-[28px] font-bold tracking-normal text-zinc-950 dark:text-white">
           {selectedConfig?.title ?? "Settings"}
@@ -188,6 +194,7 @@ export default async function AdminSettingsPage({
             notificationSettings={notificationSettings}
             premiumPlans={premiumPlans}
             section={selectedSection}
+            secrets={secrets}
             settings={settings}
           />
         </section>
@@ -235,6 +242,7 @@ function SettingsSection({
   premiumPlans,
   selectedNotificationItem,
   section,
+  secrets,
   settings,
 }: {
   notificationMediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
@@ -242,6 +250,7 @@ function SettingsSection({
   premiumPlans: Awaited<ReturnType<typeof getAdminPremiumPlans>>;
   selectedNotificationItem: string | null;
   section: SettingSectionKey;
+  secrets: Awaited<ReturnType<typeof getMarketplaceAdminSecrets>> | null;
   settings: Awaited<ReturnType<typeof getMarketplaceSettings>>;
 }) {
   if (section === "premium-plans") {
@@ -269,9 +278,55 @@ function SettingsSection({
           hasStripeLiveWebhookSecret={settings.hasStripeLiveWebhookSecret}
           hasStripeSandboxSecretKey={settings.hasStripeSandboxSecretKey}
           hasStripeSandboxWebhookSecret={settings.hasStripeSandboxWebhookSecret}
+          stripeLiveSecretKey={secrets?.stripeLiveSecretKey ?? null}
+          stripeLiveWebhookSecret={secrets?.stripeLiveWebhookSecret ?? null}
           stripeLivePublishableKey={settings.stripeLivePublishableKey}
           stripeMode={settings.stripeMode}
+          stripeSandboxSecretKey={secrets?.stripeSandboxSecretKey ?? null}
+          stripeSandboxWebhookSecret={secrets?.stripeSandboxWebhookSecret ?? null}
           stripeSandboxPublishableKey={settings.stripeSandboxPublishableKey}
+        />
+      </DashboardPanel>
+    );
+  }
+
+  if (section === "shipping") {
+    return (
+      <DashboardPanel
+        title="Shipping"
+        description="Manage Piessang shipping controls and encrypted Bob Go credentials."
+      >
+        <ShippingSettingsForm
+          bobgoBookingMode={settings.bobgoBookingMode}
+          bobgoEnabled={settings.bobgoEnabled}
+          bobgoMode={settings.bobgoMode}
+          bobgoWebhookFulfillmentCreated={
+            settings.bobgoWebhookFulfillmentCreated
+          }
+          bobgoWebhookShipmentChargedAmountChanged={
+            settings.bobgoWebhookShipmentChargedAmountChanged
+          }
+          bobgoWebhookShipmentChargedWeightChanged={
+            settings.bobgoWebhookShipmentChargedWeightChanged
+          }
+          bobgoWebhookShipmentHealthStatusUpdated={
+            settings.bobgoWebhookShipmentHealthStatusUpdated
+          }
+          bobgoWebhookShipmentSubmissionStatusUpdated={
+            settings.bobgoWebhookShipmentSubmissionStatusUpdated
+          }
+          bobgoWebhookTrackingUpdated={settings.bobgoWebhookTrackingUpdated}
+          hasBobgoLiveApiKey={settings.hasBobgoLiveApiKey}
+          hasBobgoLiveWebhookSecret={settings.hasBobgoLiveWebhookSecret}
+          hasBobgoSandboxApiKey={settings.hasBobgoSandboxApiKey}
+          hasBobgoSandboxWebhookSecret={settings.hasBobgoSandboxWebhookSecret}
+          bobgoLiveApiKey={secrets?.bobgoLiveApiKey ?? null}
+          bobgoLiveWebhookSecret={secrets?.bobgoLiveWebhookSecret ?? null}
+          bobgoSandboxApiKey={secrets?.bobgoSandboxApiKey ?? null}
+          bobgoSandboxWebhookSecret={secrets?.bobgoSandboxWebhookSecret ?? null}
+          shippingBufferBps={settings.shippingBufferBps}
+          shippingEnabled={settings.shippingEnabled}
+          shippingMarginBps={settings.shippingMarginBps}
         />
       </DashboardPanel>
     );

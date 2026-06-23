@@ -17,6 +17,7 @@ import {
   Code2Icon,
   CrownIcon,
   CreditCardIcon,
+  EyeOffIcon,
   EyeIcon,
   Globe2Icon,
   HistoryIcon,
@@ -35,6 +36,7 @@ import {
   SparklesIcon,
   Redo2Icon,
   Trash2Icon,
+  TruckIcon,
   Undo2Icon,
 } from "lucide-react";
 import {
@@ -59,6 +61,7 @@ import {
   sendInAppNotificationTemplateTestSettings,
   sendNotificationTemplateTestSettings,
   updateStripePaymentSettings,
+  updateShippingIntegrationSettings,
   type AdminSettingsState,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
 import type { AdminPremiumPlan } from "@/src/modules/billing/premium-plans";
@@ -107,6 +110,55 @@ type SettingsFormProps = {
   hasPassword: boolean;
 };
 
+function SecretTextInput({
+  className,
+  defaultValue,
+  icon,
+  id,
+  minLength,
+  name,
+  placeholder,
+}: {
+  className?: string;
+  defaultValue?: string | null;
+  icon?: "key";
+  id: string;
+  minLength?: number;
+  name: string;
+  placeholder: string;
+}) {
+  const [isVisible, setIsVisible] = useState(false);
+  const Icon = isVisible ? EyeOffIcon : EyeIcon;
+
+  return (
+    <div className="relative">
+      {icon === "key" ? (
+        <KeyRoundIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+      ) : null}
+      <Input
+        id={id}
+        name={name}
+        type={isVisible ? "text" : "password"}
+        autoComplete="off"
+        defaultValue={defaultValue ?? ""}
+        minLength={minLength}
+        placeholder={placeholder}
+        className={cn(icon === "key" ? "pl-10 pr-12" : "pr-12", className)}
+      />
+      <Button
+        aria-label={isVisible ? "Hide value" : "Show value"}
+        className="absolute right-2 top-1/2 size-7 -translate-y-1/2 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+        onClick={() => setIsVisible((current) => !current)}
+        size="icon-sm"
+        type="button"
+        variant="ghost"
+      >
+        <Icon className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
 const initialState: AdminSettingsState = {};
 
 export function SettingsForm({
@@ -142,11 +194,9 @@ export function SettingsForm({
         <Label htmlFor="password">Preview password</Label>
         <div className="relative">
           <LockIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-          <Input
+          <SecretTextInput
             id="password"
             name="password"
-            type="password"
-            autoComplete="new-password"
             minLength={8}
             placeholder={
               hasPassword
@@ -451,8 +501,12 @@ type StripeSettingsFormProps = {
   hasStripeSandboxSecretKey: boolean;
   hasStripeSandboxWebhookSecret: boolean;
   stripeLivePublishableKey: string | null;
+  stripeLiveSecretKey: string | null;
+  stripeLiveWebhookSecret: string | null;
   stripeMode: "live" | "sandbox";
   stripeSandboxPublishableKey: string | null;
+  stripeSandboxSecretKey: string | null;
+  stripeSandboxWebhookSecret: string | null;
 };
 
 export function StripeSettingsForm({
@@ -461,8 +515,12 @@ export function StripeSettingsForm({
   hasStripeSandboxSecretKey,
   hasStripeSandboxWebhookSecret,
   stripeLivePublishableKey,
+  stripeLiveSecretKey,
+  stripeLiveWebhookSecret,
   stripeMode,
   stripeSandboxPublishableKey,
+  stripeSandboxSecretKey,
+  stripeSandboxWebhookSecret,
 }: StripeSettingsFormProps) {
   const [mode, setMode] = useState<"live" | "sandbox">(stripeMode);
   const [state, formAction, isPending] = useActionState(
@@ -501,6 +559,8 @@ export function StripeSettingsForm({
           hasWebhookSecret={hasStripeLiveWebhookSecret}
           mode="live"
           publishableKey={stripeLivePublishableKey}
+          secretKey={stripeLiveSecretKey}
+          webhookSecret={stripeLiveWebhookSecret}
           title="Live credentials"
         />
 
@@ -511,6 +571,8 @@ export function StripeSettingsForm({
           hasWebhookSecret={hasStripeSandboxWebhookSecret}
           mode="sandbox"
           publishableKey={stripeSandboxPublishableKey}
+          secretKey={stripeSandboxSecretKey}
+          webhookSecret={stripeSandboxWebhookSecret}
           title="Sandbox credentials"
         />
       </div>
@@ -542,7 +604,9 @@ function StripeCredentialPanel({
   hasWebhookSecret,
   mode,
   publishableKey,
+  secretKey,
   title,
+  webhookSecret,
 }: {
   active: boolean;
   description: string;
@@ -550,7 +614,9 @@ function StripeCredentialPanel({
   hasWebhookSecret: boolean;
   mode: "live" | "sandbox";
   publishableKey: string | null;
+  secretKey: string | null;
   title: string;
+  webhookSecret: string | null;
 }) {
   const prefix = mode === "live" ? "live" : "sandbox";
 
@@ -580,7 +646,7 @@ function StripeCredentialPanel({
       <div className="grid gap-4">
         <div className="grid gap-2">
           <Label htmlFor={`${prefix}PublishableKey`}>Publishable key</Label>
-          <Input
+          <SecretTextInput
             id={`${prefix}PublishableKey`}
             name={`${prefix}PublishableKey`}
             placeholder={mode === "live" ? "pk_live_..." : "pk_test_..."}
@@ -590,47 +656,505 @@ function StripeCredentialPanel({
 
         <div className="grid gap-2">
           <Label htmlFor={`${prefix}SecretKey`}>Secret key</Label>
-          <div className="relative">
-            <KeyRoundIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-            <Input
-              id={`${prefix}SecretKey`}
-              name={`${prefix}SecretKey`}
-              type="password"
-              autoComplete="off"
-              placeholder={
-                hasSecretKey
-                  ? "Saved - leave blank to keep current secret"
-                  : mode === "live"
-                    ? "sk_live_..."
-                    : "sk_test_..."
-              }
-              className="pl-10"
-            />
-          </div>
+          <SecretTextInput
+            id={`${prefix}SecretKey`}
+            name={`${prefix}SecretKey`}
+            icon="key"
+            defaultValue={secretKey}
+            placeholder={
+              hasSecretKey
+                ? "Saved - leave blank to keep current secret"
+                : mode === "live"
+                  ? "sk_live_..."
+                  : "sk_test_..."
+            }
+          />
         </div>
 
         <div className="grid gap-2">
           <Label htmlFor={`${prefix}WebhookSecret`}>
             Webhook signing secret
           </Label>
-          <div className="relative">
-            <KeyRoundIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-            <Input
-              id={`${prefix}WebhookSecret`}
-              name={`${prefix}WebhookSecret`}
-              type="password"
-              autoComplete="off"
-              placeholder={
-                hasWebhookSecret
-                  ? "Saved - leave blank to keep current secret"
-                  : "whsec_..."
+          <SecretTextInput
+            id={`${prefix}WebhookSecret`}
+            name={`${prefix}WebhookSecret`}
+            icon="key"
+            defaultValue={webhookSecret}
+            placeholder={
+              hasWebhookSecret
+                ? "Saved - leave blank to keep current secret"
+                : "whsec_..."
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ShippingSettingsFormProps = {
+  bobgoLiveApiKey: string | null;
+  bobgoLiveWebhookSecret: string | null;
+  bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
+  bobgoEnabled: boolean;
+  bobgoMode: "live" | "sandbox";
+  bobgoSandboxApiKey: string | null;
+  bobgoSandboxWebhookSecret: string | null;
+  bobgoWebhookFulfillmentCreated: boolean;
+  bobgoWebhookShipmentChargedAmountChanged: boolean;
+  bobgoWebhookShipmentChargedWeightChanged: boolean;
+  bobgoWebhookShipmentHealthStatusUpdated: boolean;
+  bobgoWebhookShipmentSubmissionStatusUpdated: boolean;
+  bobgoWebhookTrackingUpdated: boolean;
+  hasBobgoLiveApiKey: boolean;
+  hasBobgoLiveWebhookSecret: boolean;
+  hasBobgoSandboxApiKey: boolean;
+  hasBobgoSandboxWebhookSecret: boolean;
+  shippingBufferBps: number;
+  shippingEnabled: boolean;
+  shippingMarginBps: number;
+};
+
+export function ShippingSettingsForm({
+  bobgoLiveApiKey,
+  bobgoLiveWebhookSecret,
+  bobgoBookingMode,
+  bobgoEnabled,
+  bobgoMode,
+  bobgoSandboxApiKey,
+  bobgoSandboxWebhookSecret,
+  bobgoWebhookFulfillmentCreated,
+  bobgoWebhookShipmentChargedAmountChanged,
+  bobgoWebhookShipmentChargedWeightChanged,
+  bobgoWebhookShipmentHealthStatusUpdated,
+  bobgoWebhookShipmentSubmissionStatusUpdated,
+  bobgoWebhookTrackingUpdated,
+  hasBobgoLiveApiKey,
+  hasBobgoLiveWebhookSecret,
+  hasBobgoSandboxApiKey,
+  hasBobgoSandboxWebhookSecret,
+  shippingBufferBps,
+  shippingEnabled,
+  shippingMarginBps,
+}: ShippingSettingsFormProps) {
+  const [bookingMode, setBookingMode] = useState<
+    "disabled" | "quote_only" | "quote_and_book"
+  >(
+    bobgoBookingMode === "quote_only" ||
+      bobgoBookingMode === "quote_and_book"
+      ? bobgoBookingMode
+      : "disabled",
+  );
+  const [apiMode, setApiMode] = useState<"live" | "sandbox">(
+    bobgoMode === "live" ? "live" : "sandbox",
+  );
+  const [isBobgoEnabled, setIsBobgoEnabled] = useState(bobgoEnabled);
+  const [isShippingEnabled, setIsShippingEnabled] = useState(shippingEnabled);
+  const [shippingBufferValue, setShippingBufferValue] = useState(
+    String(shippingBufferBps),
+  );
+  const [shippingMarginValue, setShippingMarginValue] = useState(
+    String(shippingMarginBps),
+  );
+  const [webhookTopics, setWebhookTopics] = useState({
+    bobgoWebhookFulfillmentCreated,
+    bobgoWebhookShipmentChargedAmountChanged,
+    bobgoWebhookShipmentChargedWeightChanged,
+    bobgoWebhookShipmentHealthStatusUpdated,
+    bobgoWebhookShipmentSubmissionStatusUpdated,
+    bobgoWebhookTrackingUpdated,
+  });
+  const [state, formAction, isPending] = useActionState(
+    updateShippingIntegrationSettings,
+    initialState,
+  );
+
+  return (
+    <form action={formAction} className="grid gap-5">
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="mb-5 flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+            <TruckIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Piessang shipping controls
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Choose whether checkout can quote shipping, whether Piessang can
+              book Bob Go shipments, and how much margin or buffer is added to
+              provider rates.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <label className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={isShippingEnabled}
+              name="shippingEnabled"
+              onCheckedChange={(checked) =>
+                setIsShippingEnabled(checked === true)
               }
-              className="pl-10"
+            />
+            Show shipping rates at checkout
+          </label>
+          <label className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={isBobgoEnabled}
+              name="bobgoEnabled"
+              onCheckedChange={(checked) => setIsBobgoEnabled(checked === true)}
+            />
+            Enable Bob Go provider integration
+          </label>
+          <div className="grid gap-2 lg:col-span-2">
+            <Label htmlFor="bobgoMode">API environment</Label>
+            <Select
+              name="bobgoMode"
+              value={apiMode}
+              onValueChange={(value) => {
+                if (value === "live" || value === "sandbox") {
+                  setApiMode(value);
+                }
+              }}
+            >
+              <SelectTrigger id="bobgoMode" className="w-full">
+                <SelectValue placeholder="Select API environment" />
+              </SelectTrigger>
+              <SelectContent
+                align="start"
+                className="min-w-[240px] max-w-[calc(100vw-2rem)]"
+              >
+                <SelectItem value="sandbox" className="whitespace-nowrap">
+                  Sandbox API
+                </SelectItem>
+                <SelectItem value="live" className="whitespace-nowrap">
+                  Live API
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs leading-5 text-slate-500">
+              Sandbox uses https://api.sandbox.bobgo.co.za/v2/. Production uses
+              https://api.bobgo.co.za/v2/. The selected environment controls
+              which bearer token and webhook secret Piessang uses.
+            </p>
+          </div>
+          <div className="grid gap-2 lg:col-span-2">
+            <Label htmlFor="bobgoBookingMode">Booking mode</Label>
+            <Select
+              name="bobgoBookingMode"
+              value={bookingMode}
+              onValueChange={(value) => {
+                if (
+                  value === "disabled" ||
+                  value === "quote_only" ||
+                  value === "quote_and_book"
+                ) {
+                  setBookingMode(value);
+                }
+              }}
+            >
+              <SelectTrigger id="bobgoBookingMode" className="w-full">
+                <SelectValue placeholder="Select booking mode" />
+              </SelectTrigger>
+              <SelectContent
+                align="start"
+                className="min-w-[240px] max-w-[calc(100vw-2rem)]"
+              >
+                <SelectItem value="disabled" className="whitespace-nowrap">
+                  Disabled
+                </SelectItem>
+                <SelectItem value="quote_only" className="whitespace-nowrap">
+                  Quote only
+                </SelectItem>
+                <SelectItem value="quote_and_book">
+                  Quote and book shipments
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs leading-5 text-slate-500">
+              Quote only lets checkout request rates without creating shipments.
+              Quote and book lets paid orders create Bob Go shipments and
+              waybills.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="shippingMarginBps">Shipping margin (bps)</Label>
+            <Input
+              id="shippingMarginBps"
+              name="shippingMarginBps"
+              type="number"
+              min={0}
+              max={10000}
+              value={shippingMarginValue}
+              onChange={(event) => setShippingMarginValue(event.target.value)}
+            />
+            <p className="text-xs leading-5 text-slate-500">
+              Markup applied to the courier rate before customers see it. 100
+              bps = 1%.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="shippingBufferBps">Shipping buffer (bps)</Label>
+            <Input
+              id="shippingBufferBps"
+              name="shippingBufferBps"
+              type="number"
+              min={0}
+              max={10000}
+              value={shippingBufferValue}
+              onChange={(event) => setShippingBufferValue(event.target.value)}
+            />
+            <p className="text-xs leading-5 text-slate-500">
+              Extra buffer for adjustment risk before margin is applied. 100 bps
+              = 1%.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <BobGoCredentialPanel
+          active={apiMode === "sandbox"}
+          apiBaseUrl="https://api.sandbox.bobgo.co.za/v2/"
+          apiKey={bobgoSandboxApiKey}
+          description="Used with your Bob Go sandbox account for development, rate checks, booking tests, and webhook testing."
+          hasApiKey={hasBobgoSandboxApiKey}
+          hasWebhookSecret={hasBobgoSandboxWebhookSecret}
+          mode="sandbox"
+          title="Sandbox credentials"
+          webhookSecret={bobgoSandboxWebhookSecret}
+        />
+
+        <BobGoCredentialPanel
+          active={apiMode === "live"}
+          apiBaseUrl="https://api.bobgo.co.za/v2/"
+          apiKey={bobgoLiveApiKey}
+          description="Used for real checkout rates, real shipment bookings, waybills, tracking, and webhook processing."
+          hasApiKey={hasBobgoLiveApiKey}
+          hasWebhookSecret={hasBobgoLiveWebhookSecret}
+          mode="live"
+          title="Production credentials"
+          webhookSecret={bobgoLiveWebhookSecret}
+        />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+              <BellIcon className="size-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                Required webhook topics
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Create Bob Go subscriptions for these events and point each one
+                to /api/webhooks/bobgo.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <BobGoWebhookCheckbox
+              checked={webhookTopics.bobgoWebhookTrackingUpdated}
+              name="bobgoWebhookTrackingUpdated"
+              label="Tracking updated"
+              onCheckedChange={(checked) =>
+                setWebhookTopics((current) => ({
+                  ...current,
+                  bobgoWebhookTrackingUpdated: checked,
+                }))
+              }
+            />
+            <BobGoWebhookCheckbox
+              checked={webhookTopics.bobgoWebhookFulfillmentCreated}
+              name="bobgoWebhookFulfillmentCreated"
+              label="Fulfillment created"
+              onCheckedChange={(checked) =>
+                setWebhookTopics((current) => ({
+                  ...current,
+                  bobgoWebhookFulfillmentCreated: checked,
+                }))
+              }
+            />
+            <BobGoWebhookCheckbox
+              checked={
+                webhookTopics.bobgoWebhookShipmentSubmissionStatusUpdated
+              }
+              name="bobgoWebhookShipmentSubmissionStatusUpdated"
+              label="Shipment submission status updated"
+              onCheckedChange={(checked) =>
+                setWebhookTopics((current) => ({
+                  ...current,
+                  bobgoWebhookShipmentSubmissionStatusUpdated: checked,
+                }))
+              }
+            />
+            <BobGoWebhookCheckbox
+              checked={webhookTopics.bobgoWebhookShipmentChargedAmountChanged}
+              name="bobgoWebhookShipmentChargedAmountChanged"
+              label="Shipment charged amount changed"
+              onCheckedChange={(checked) =>
+                setWebhookTopics((current) => ({
+                  ...current,
+                  bobgoWebhookShipmentChargedAmountChanged: checked,
+                }))
+              }
+            />
+            <BobGoWebhookCheckbox
+              checked={webhookTopics.bobgoWebhookShipmentChargedWeightChanged}
+              name="bobgoWebhookShipmentChargedWeightChanged"
+              label="Shipment charged weight changed"
+              onCheckedChange={(checked) =>
+                setWebhookTopics((current) => ({
+                  ...current,
+                  bobgoWebhookShipmentChargedWeightChanged: checked,
+                }))
+              }
+            />
+            <BobGoWebhookCheckbox
+              checked={webhookTopics.bobgoWebhookShipmentHealthStatusUpdated}
+              name="bobgoWebhookShipmentHealthStatusUpdated"
+              label="Shipment health status updated"
+              onCheckedChange={(checked) =>
+                setWebhookTopics((current) => ({
+                  ...current,
+                  bobgoWebhookShipmentHealthStatusUpdated: checked,
+                }))
+              }
             />
           </div>
         </div>
       </div>
+      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300">
+        Keep Bob Go tracking emails disabled where possible. Bob Go should send
+        Piessang webhook events, then Piessang sends customer and seller
+        notifications through our notification templates.
+      </div>
+      {state.message ? (
+        <p
+          className={
+            state.ok
+              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+          }
+        >
+          {state.message}
+        </p>
+      ) : null}
+      <Button type="submit" disabled={isPending} className="w-fit gap-2">
+        <SaveIcon className="size-4" />
+        {isPending ? "Saving..." : "Save shipping settings"}
+      </Button>
+    </form>
+  );
+}
+
+function BobGoCredentialPanel({
+  active,
+  apiBaseUrl,
+  apiKey,
+  description,
+  hasApiKey,
+  hasWebhookSecret,
+  mode,
+  title,
+  webhookSecret,
+}: {
+  active: boolean;
+  apiBaseUrl: string;
+  apiKey: string | null;
+  description: string;
+  hasApiKey: boolean;
+  hasWebhookSecret: boolean;
+  mode: "live" | "sandbox";
+  title: string;
+  webhookSecret: string | null;
+}) {
+  const prefix = mode === "live" ? "bobgoLive" : "bobgoSandbox";
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-4 transition-colors",
+        active
+          ? "border-admin-primary/45 bg-admin-primary/8 dark:border-admin-primary/60 dark:bg-admin-primary/10"
+          : "border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.04]",
+      )}
+    >
+      <div className="mb-5 flex items-start gap-3">
+        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+          <KeyRoundIcon className="size-4" />
+        </span>
+        <div>
+          <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+            {title}
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            {description}
+          </p>
+          <p className="mt-2 rounded-md bg-zinc-100 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-white/10 dark:text-zinc-300">
+            {apiBaseUrl}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor={`${prefix}ApiKey`}>Bearer token</Label>
+          <SecretTextInput
+            id={`${prefix}ApiKey`}
+            name={`${prefix}ApiKey`}
+            icon="key"
+            defaultValue={apiKey}
+            placeholder={
+              hasApiKey
+                ? "Saved - leave blank to keep current token"
+                : "Paste Bob Go bearer token"
+            }
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${prefix}WebhookSecret`}>
+            Webhook signing secret
+          </Label>
+          <SecretTextInput
+            id={`${prefix}WebhookSecret`}
+            name={`${prefix}WebhookSecret`}
+            icon="key"
+            defaultValue={webhookSecret}
+            placeholder={
+              hasWebhookSecret
+                ? "Saved - leave blank to keep current secret"
+                : "Paste webhook signing secret"
+            }
+          />
+        </div>
+      </div>
     </div>
+  );
+}
+
+function BobGoWebhookCheckbox({
+  checked,
+  label,
+  name,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  label: string;
+  name: string;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+      <Checkbox
+        checked={checked}
+        name={name}
+        onCheckedChange={(nextChecked) => onCheckedChange(nextChecked === true)}
+      />
+      {label}
+    </label>
   );
 }
 

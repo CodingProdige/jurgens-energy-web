@@ -8,6 +8,7 @@ import {
   ChevronDownIcon,
   MenuIcon,
   SearchIcon,
+  StarIcon,
   XIcon,
   ZapIcon,
 } from "lucide-react";
@@ -84,6 +85,14 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function SetupAttentionMarker() {
+  return (
+    <span className="pointer-events-none absolute left-1 top-1 text-amber-400 drop-shadow-sm">
+      <StarIcon className="size-2.5 fill-current" />
+    </span>
+  );
+}
+
 function SurfaceBrand({
   ariaLabel,
   className,
@@ -112,6 +121,7 @@ function SurfaceBrand({
 
 function SurfaceNavList<TCapability extends string>({
   accent,
+  attentionHrefs,
   capabilities,
   navItems,
   pathname,
@@ -119,6 +129,7 @@ function SurfaceNavList<TCapability extends string>({
   variant = "dark",
 }: {
   accent: DashboardSurfaceAccent;
+  attentionHrefs?: readonly string[];
   capabilities: readonly TCapability[];
   navItems: DashboardSurfaceNavItem<TCapability>[];
   pathname: string;
@@ -127,6 +138,11 @@ function SurfaceNavList<TCapability extends string>({
 }) {
   const isResponsive = variant === "responsive";
   const styles = accentStyles[accent];
+  const hasAttention = (href?: string) =>
+    Boolean(
+      href &&
+        attentionHrefs?.some((attentionHref) => isActivePath(attentionHref, href)),
+    );
   const getInitialOpenGroups = () =>
     Object.fromEntries(
       navItems
@@ -174,6 +190,9 @@ function SurfaceNavList<TCapability extends string>({
           item.children?.some(
             (child) => child.href && isActivePath(pathname, child.href),
           );
+        const itemNeedsAttention =
+          hasAttention(item.href) ||
+          Boolean(item.children?.some((child) => hasAttention(child.href)));
         const activeClass = isResponsive ? styles.activeResponsive : styles.activeDark;
         const inactiveClass = isResponsive
           ? "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 dark:text-white/70 dark:hover:bg-white/[0.08] dark:hover:text-white"
@@ -194,10 +213,11 @@ function SurfaceNavList<TCapability extends string>({
                   }))
                 }
                 className={cn(
-                  "flex h-11 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition",
+                  "relative flex h-11 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition",
                   isActive ? activeClass : inactiveClass,
                 )}
               >
+                {itemNeedsAttention ? <SetupAttentionMarker /> : null}
                 <span className="flex items-center gap-3">
                   <Icon className={cn("size-4", isActive ? styles.icon : "text-current")} />
                   {item.label}
@@ -225,6 +245,7 @@ function SurfaceNavList<TCapability extends string>({
                     const isChildActive = child.href
                       ? isActivePath(pathname, child.href)
                       : false;
+                    const childNeedsAttention = hasAttention(child.href);
                     const isDisabled =
                       child.disabled || !hasCapability(capabilities, child.capability);
 
@@ -233,12 +254,13 @@ function SurfaceNavList<TCapability extends string>({
                         <span
                           key={child.label}
                           className={cn(
-                            "flex h-9 cursor-not-allowed items-center rounded-md px-3 text-sm opacity-50",
+                            "relative flex h-9 cursor-not-allowed items-center rounded-md px-3 text-sm opacity-50",
                             isResponsive
                               ? "text-zinc-500 dark:text-white/58"
                               : "text-white/58",
                           )}
                         >
+                          {childNeedsAttention ? <SetupAttentionMarker /> : null}
                           {child.label}
                         </span>
                       );
@@ -250,7 +272,7 @@ function SurfaceNavList<TCapability extends string>({
                         href={child.href}
                         onClick={onNavigate}
                         className={cn(
-                          "flex h-9 items-center rounded-md px-3 text-sm transition",
+                          "relative flex h-9 items-center rounded-md px-3 text-sm transition",
                           isResponsive
                             ? "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-white/58 dark:hover:bg-white/[0.06] dark:hover:text-white"
                             : "text-white/58 hover:bg-white/[0.05] hover:text-white",
@@ -258,6 +280,7 @@ function SurfaceNavList<TCapability extends string>({
                             (isResponsive ? styles.childResponsive : styles.childDark),
                         )}
                       >
+                        {childNeedsAttention ? <SetupAttentionMarker /> : null}
                         {child.label}
                       </Link>
                     );
@@ -276,11 +299,12 @@ function SurfaceNavList<TCapability extends string>({
           return (
             <span
               key={item.label}
-              className={cn(
-                "flex h-11 cursor-not-allowed items-center gap-3 rounded-lg px-3 text-sm font-medium opacity-45",
+            className={cn(
+                "relative flex h-11 cursor-not-allowed items-center gap-3 rounded-lg px-3 text-sm font-medium opacity-45",
                 inactiveClass,
               )}
             >
+              {itemNeedsAttention ? <SetupAttentionMarker /> : null}
               <Icon className="size-4" />
               {item.label}
             </span>
@@ -293,10 +317,11 @@ function SurfaceNavList<TCapability extends string>({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
+              "relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
               isActive ? activeClass : inactiveClass,
             )}
           >
+            {itemNeedsAttention ? <SetupAttentionMarker /> : null}
             <Icon className={cn("size-4", isActive && styles.icon)} />
             {item.label}
           </Link>
@@ -384,6 +409,7 @@ function SurfaceUserCard({
 
 function Sidebar<TCapability extends string>({
   accent,
+  attentionHrefs,
   capabilities,
   navItems,
   pathname,
@@ -391,6 +417,7 @@ function Sidebar<TCapability extends string>({
   userFallbackLabel,
 }: {
   accent: DashboardSurfaceAccent;
+  attentionHrefs?: readonly string[];
   capabilities: readonly TCapability[];
   navItems: DashboardSurfaceNavItem<TCapability>[];
   pathname: string;
@@ -402,6 +429,7 @@ function Sidebar<TCapability extends string>({
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.28)_transparent]">
         <SurfaceNavList
           accent={accent}
+          attentionHrefs={attentionHrefs}
           capabilities={capabilities}
           navItems={navItems}
           pathname={pathname}
@@ -421,6 +449,7 @@ function Sidebar<TCapability extends string>({
 
 function MobileNavDrawer<TCapability extends string>({
   accent,
+  attentionHrefs,
   brandAriaLabel,
   capabilities,
   isOpen,
@@ -431,6 +460,7 @@ function MobileNavDrawer<TCapability extends string>({
   userFallbackLabel,
 }: {
   accent: DashboardSurfaceAccent;
+  attentionHrefs?: readonly string[];
   brandAriaLabel: string;
   capabilities: readonly TCapability[];
   isOpen: boolean;
@@ -506,6 +536,7 @@ function MobileNavDrawer<TCapability extends string>({
           <div className="pr-5">
             <SurfaceNavList
               accent={accent}
+              attentionHrefs={attentionHrefs}
               capabilities={capabilities}
               navItems={navItems}
               pathname={pathname}
@@ -532,6 +563,7 @@ function SurfaceHeader({
   accent,
   brandAriaLabel,
   notificationCenter,
+  notificationCenterHref,
   notificationSurface,
   onOpenMenu,
   searchAriaLabel,
@@ -540,6 +572,7 @@ function SurfaceHeader({
   accent: DashboardSurfaceAccent;
   brandAriaLabel: string;
   notificationCenter: NotificationCenterState;
+  notificationCenterHref?: string;
   notificationSurface: InAppNotificationSurface;
   onOpenMenu: () => void;
   searchAriaLabel: string;
@@ -594,6 +627,7 @@ function SurfaceHeader({
           </Button>
           <NotificationBell
             accent={accent}
+            centerHref={notificationCenterHref}
             initialState={notificationCenter}
             surface={notificationSurface}
           />
@@ -607,11 +641,13 @@ function SurfaceHeader({
 
 export function DashboardSurfaceShell<TCapability extends string = string>({
   accent,
+  attentionHrefs,
   brandAriaLabel,
   capabilities,
   children,
   navItems,
   notificationCenter,
+  notificationCenterHref,
   notificationSurface,
   searchAriaLabel,
   searchPlaceholder,
@@ -619,11 +655,13 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
   userFallbackLabel,
 }: {
   accent: DashboardSurfaceAccent;
+  attentionHrefs?: readonly string[];
   brandAriaLabel: string;
   capabilities?: readonly TCapability[];
   children: ReactNode;
   navItems: DashboardSurfaceNavItem<TCapability>[];
   notificationCenter: NotificationCenterState;
+  notificationCenterHref?: string;
   notificationSurface: InAppNotificationSurface;
   searchAriaLabel: string;
   searchPlaceholder: string;
@@ -640,6 +678,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
         accent={accent}
         brandAriaLabel={brandAriaLabel}
         notificationCenter={notificationCenter}
+        notificationCenterHref={notificationCenterHref}
         notificationSurface={notificationSurface}
         onOpenMenu={() => setIsMobileNavOpen(true)}
         searchAriaLabel={searchAriaLabel}
@@ -647,6 +686,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
       />
       <Sidebar
         accent={accent}
+        attentionHrefs={attentionHrefs}
         capabilities={effectiveCapabilities}
         navItems={navItems}
         pathname={pathname}
@@ -655,6 +695,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
       />
       <MobileNavDrawer
         accent={accent}
+        attentionHrefs={attentionHrefs}
         brandAriaLabel={brandAriaLabel}
         capabilities={effectiveCapabilities}
         isOpen={isMobileNavOpen}

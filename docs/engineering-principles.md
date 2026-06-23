@@ -59,6 +59,8 @@ Do not model grouped menu items as query filters on a single page when the pages
 
 Admin and seller dashboards should share the same visual system. Keep their layouts, navigation treatment, cards, theme selector, and interaction patterns coupled unless there is a specific product reason to diverge.
 
+Dashboard page headers must contain only the page title, breadcrumbs, and directly related header text. Do not place page actions, toolbars, forms, filters, stats, cards, or unrelated containers in the same row as the title and breadcrumbs. Put page-level actions in their own action row below the header and above the main page content, using the existing dashboard button patterns.
+
 Dashboard analytics, counts, and metric titles must include a small light-grey circular info icon next to the title. The icon should open a compact hover/focus popup that explains exactly what the analytic counts or represents. Keep the explanation short, contextual to the current page, and implemented with an existing shared tooltip/popover pattern before creating custom UI.
 
 Modals, popovers, dropdowns, and floating panels must never let their body content overflow the visible container. Use the shared dialog/popover primitives first, keep headers and footers fixed inside the component, put long content in the shared scrollable body area, and clamp floating panels to the viewport. On mobile, forms, metadata grids, action rows, and long labels must wrap, truncate, or collapse before they can push outside the modal/popover.
@@ -71,7 +73,13 @@ Inline form field action buttons must match the height of the input, select, or 
 
 Required field asterisk indicators must always be red across every surface. Use the shared label/required-marker pattern instead of plain text asterisks so required fields are visually consistent in admin, seller, marketplace, and auth flows.
 
+Seller-entered product and variant prices must always be VAT-inclusive. Every price, compare-at price, bulk price action, import review, and pricing tooltip must make this clear in the label or helper copy. Discount breakdowns should be shown beside price inputs whenever compare-at pricing is available, and compare-at values must be treated as markdown display prices, not ex-VAT adjustments.
+
+Media preview tiles for product, variant, brand, profile, and picker-selected media should use a stable 1:1 square ratio unless a product requirement explicitly needs another format. The media itself should fill the preview container, with predictable cropping, so grids stay aligned and previews do not appear tiny, padded, or inconsistent.
+
 Shipping rates must be based on explicit product parcel data. Do not use fallback parcel weight or dimensions for shippable products. A shippable variant must provide weight, length, width, and height before checkout can quote shipping, because inaccurate parcel data creates courier adjustments and shipping margin risk. Optional handling flags such as ships-alone and fragile can refine the flow, but the core parcel dimensions are required.
+
+All shipping metric fields must make their unit of measurement visible in the label or directly attached control. Use grams for weight and millimetres for dimensions unless the underlying shipping model is intentionally changed. Sanitize shipping metric inputs through a shared decimal numeric path so sellers cannot submit unit text or arbitrary strings, while still allowing decimal values such as `2.3`. Stock and count fields remain whole-number inputs unless a specific product rule says otherwise.
 
 Follow `docs/brand.md` for Piessang colors and brand asset locations. Prefer brand semantic tokens over ad hoc colors.
 

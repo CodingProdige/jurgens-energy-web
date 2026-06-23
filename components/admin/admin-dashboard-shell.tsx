@@ -37,9 +37,19 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
   },
   {
     label: "Products",
-    href: "/products",
     icon: BoxesIcon,
-    capability: "admin.catalog.view",
+    children: [
+      {
+        label: "All products",
+        href: "/products/all",
+        capability: "admin.catalog.view",
+      },
+      {
+        label: "Product reviews",
+        href: "/products/reviews",
+        capability: "admin.catalog.view",
+      },
+    ],
   },
   {
     label: "Catalog",
@@ -108,14 +118,9 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
   },
   {
     label: "Settings",
+    href: "/settings/platform",
     icon: SettingsIcon,
-    children: [
-      {
-        label: "Platform settings",
-        href: "/settings/platform",
-        capability: "admin.settings.view",
-      },
-    ],
+    capability: "admin.settings.view",
   },
 ];
 
@@ -137,6 +142,7 @@ export function AdminDashboardShell({
       capabilities={capabilities}
       navItems={navItems}
       notificationCenter={notificationCenter}
+      notificationCenterHref="/notifications"
       notificationSurface="admin"
       searchAriaLabel="Search admin dashboard"
       searchPlaceholder="Search anything... (Orders, Products, Sellers, etc.)"

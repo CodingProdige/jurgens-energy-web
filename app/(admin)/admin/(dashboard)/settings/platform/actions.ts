@@ -8,6 +8,7 @@ import {
   updateMarketplaceComingSoonSettings,
   updateMarketplaceMediaSettings,
   updateMarketplaceSocialLinks,
+  updateMarketplaceShippingSettings,
   updateMarketplaceStripeSettings,
 } from "@/src/modules/marketplace/settings";
 import { savePremiumPlan } from "@/src/modules/billing/premium-plans";
@@ -237,6 +238,76 @@ export async function updateStripePaymentSettings(
   }
 
   const result = await updateMarketplaceStripeSettings(parsed.data);
+
+  revalidatePath("/settings/platform");
+
+  return result;
+}
+
+const shippingSettingsSchema = z.object({
+  bobgoApiKey: z.string().trim().optional().transform((value) => value || undefined),
+  bobgoBookingMode: z.enum(["disabled", "quote_only", "quote_and_book"]),
+  bobgoEnabled: z.coerce.boolean().default(false),
+  bobgoLiveApiKey: z.string().trim().optional().transform((value) => value || undefined),
+  bobgoLiveWebhookSecret: z.string().trim().optional().transform((value) => value || undefined),
+  bobgoMode: z.enum(["live", "sandbox"]).default("sandbox"),
+  bobgoSandboxApiKey: z.string().trim().optional().transform((value) => value || undefined),
+  bobgoSandboxWebhookSecret: z.string().trim().optional().transform((value) => value || undefined),
+  bobgoWebhookFulfillmentCreated: z.coerce.boolean().default(false),
+  bobgoWebhookSecret: z.string().trim().optional().transform((value) => value || undefined),
+  bobgoWebhookShipmentChargedAmountChanged: z.coerce.boolean().default(false),
+  bobgoWebhookShipmentChargedWeightChanged: z.coerce.boolean().default(false),
+  bobgoWebhookShipmentHealthStatusUpdated: z.coerce.boolean().default(false),
+  bobgoWebhookShipmentSubmissionStatusUpdated: z.coerce.boolean().default(false),
+  bobgoWebhookTrackingUpdated: z.coerce.boolean().default(false),
+  shippingBufferBps: z.coerce.number().int().min(0).max(10000),
+  shippingEnabled: z.coerce.boolean().default(false),
+  shippingMarginBps: z.coerce.number().int().min(0).max(10000),
+});
+
+export async function updateShippingIntegrationSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  await requireSettingsManageAccess();
+
+  const parsed = shippingSettingsSchema.safeParse({
+    bobgoApiKey: String(formData.get("bobgoApiKey") ?? ""),
+    bobgoBookingMode: String(formData.get("bobgoBookingMode") ?? "disabled"),
+    bobgoEnabled: formData.get("bobgoEnabled") === "on",
+    bobgoLiveApiKey: String(formData.get("bobgoLiveApiKey") ?? ""),
+    bobgoLiveWebhookSecret: String(formData.get("bobgoLiveWebhookSecret") ?? ""),
+    bobgoMode: String(formData.get("bobgoMode") ?? "sandbox"),
+    bobgoSandboxApiKey: String(formData.get("bobgoSandboxApiKey") ?? ""),
+    bobgoSandboxWebhookSecret: String(
+      formData.get("bobgoSandboxWebhookSecret") ?? "",
+    ),
+    bobgoWebhookFulfillmentCreated:
+      formData.get("bobgoWebhookFulfillmentCreated") === "on",
+    bobgoWebhookSecret: String(formData.get("bobgoWebhookSecret") ?? ""),
+    bobgoWebhookShipmentChargedAmountChanged:
+      formData.get("bobgoWebhookShipmentChargedAmountChanged") === "on",
+    bobgoWebhookShipmentChargedWeightChanged:
+      formData.get("bobgoWebhookShipmentChargedWeightChanged") === "on",
+    bobgoWebhookShipmentHealthStatusUpdated:
+      formData.get("bobgoWebhookShipmentHealthStatusUpdated") === "on",
+    bobgoWebhookShipmentSubmissionStatusUpdated:
+      formData.get("bobgoWebhookShipmentSubmissionStatusUpdated") === "on",
+    bobgoWebhookTrackingUpdated:
+      formData.get("bobgoWebhookTrackingUpdated") === "on",
+    shippingBufferBps: formData.get("shippingBufferBps"),
+    shippingEnabled: formData.get("shippingEnabled") === "on",
+    shippingMarginBps: formData.get("shippingMarginBps"),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Check the shipping settings.",
+    };
+  }
+
+  const result = await updateMarketplaceShippingSettings(parsed.data);
 
   revalidatePath("/settings/platform");
 

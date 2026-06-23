@@ -1,7 +1,8 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/src/db";
-import { productVariants, products } from "@/src/db/schema";
+import { media, productMedia, productVariants, products } from "@/src/db/schema";
+import { getMediaPublicUrl } from "@/src/modules/media";
 import { getMissingParcelFields } from "@/src/modules/shipping";
 import { getPrimarySellerForUser } from "@/src/modules/sellers/dashboard";
 
@@ -26,10 +27,23 @@ export type SellerProductRow = {
   createdAt: Date;
   fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
   id: string;
+  primaryImage: {
+    altText: string | null;
+    url: string;
+  } | null;
   readyVariantCount: number;
   shippingReady: boolean;
   slug: string;
-  status: "draft" | "active" | "archived";
+  status:
+    | "active"
+    | "admin_suspended"
+    | "approved"
+    | "archived"
+    | "changes_requested"
+    | "draft"
+    | "live"
+    | "paused"
+    | "pending_review";
   title: string;
   totalStock: number;
   updatedAt: Date;
@@ -52,6 +66,7 @@ export type SellerProductsPageData = {
   seller: {
     displayName: string;
     id: string;
+    isPiessangFulfillmentEnabled: boolean;
   } | null;
 };
 
@@ -108,17 +123,49 @@ export async function getSellerProductsPageData(
     .leftJoin(productVariants, eq(productVariants.productId, products.id))
     .where(eq(products.sellerId, seller.id))
     .orderBy(asc(products.title), asc(productVariants.title));
+  const productIds = [...new Set(rows.map((row) => row.productId))];
+  const coverRows =
+    productIds.length > 0
+      ? await db
+          .select({
+            altText: media.altText,
+            productId: productMedia.productId,
+            relativePath: media.relativePath,
+            sortOrder: productMedia.sortOrder,
+            thumbnailRelativePath: media.thumbnailRelativePath,
+          })
+          .from(productMedia)
+          .innerJoin(media, eq(media.id, productMedia.mediaId))
+          .where(inArray(productMedia.productId, productIds))
+          .orderBy(asc(productMedia.productId), asc(productMedia.sortOrder))
+      : [];
+  const coverByProductId = new Map<string, {
+    altText: string | null;
+    url: string;
+  }>();
+
+  for (const row of coverRows) {
+    if (coverByProductId.has(row.productId)) {
+      continue;
+    }
+
+    coverByProductId.set(row.productId, {
+      altText: row.altText,
+      url: getMediaPublicUrl(row.thumbnailRelativePath ?? row.relativePath),
+    });
+  }
 
   const productsById = new Map<string, SellerProductRow>();
 
   for (const row of rows) {
-    const product =
+    const product: SellerProductRow =
       productsById.get(row.productId) ??
       {
         activeVariantCount: 0,
         createdAt: row.productCreatedAt,
         fulfillmentMode: row.productFulfillmentMode,
         id: row.productId,
+        primaryImage: coverByProductId.get(row.productId) ?? null,
         readyVariantCount: 0,
         shippingReady: false,
         slug: row.productSlug,
@@ -182,8 +229,9 @@ export async function getSellerProductsPageData(
 
   return {
     metrics: {
-      activeProducts: sellerProducts.filter((product) => product.status === "active")
-        .length,
+      activeProducts: sellerProducts.filter((product) =>
+        ["active", "live"].includes(product.status),
+      ).length,
       archivedProducts: sellerProducts.filter(
         (product) => product.status === "archived",
       ).length,
@@ -205,6 +253,7 @@ export async function getSellerProductsPageData(
     seller: {
       displayName: seller.displayName,
       id: seller.id,
+      isPiessangFulfillmentEnabled: seller.isPiessangFulfillmentEnabled,
     },
   };
 }

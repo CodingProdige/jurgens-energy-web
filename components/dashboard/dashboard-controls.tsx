@@ -1,7 +1,8 @@
 import type { ComponentProps, ReactNode } from "react";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -92,6 +93,29 @@ export function DashboardButton({
       )}
       {...props}
     />
+  );
+}
+
+export function DashboardBackButton({
+  className,
+  href,
+  label,
+}: {
+  className?: string;
+  href: string;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={buttonVariants({
+        className: cn("mb-2 h-8 w-fit gap-2 rounded-lg px-3 text-sm", className),
+        variant: "outline",
+      })}
+    >
+      <ArrowLeftIcon className="size-3.5" />
+      {label}
+    </Link>
   );
 }
 

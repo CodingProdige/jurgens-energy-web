@@ -5,7 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
+  AlertTriangleIcon,
   BoldIcon,
+  CheckCircleIcon,
   CircleHelpIcon,
   Heading2Icon,
   Heading3Icon,
@@ -14,27 +16,52 @@ import {
   LinkIcon,
   ListIcon,
   ListOrderedIcon,
+  Loader2Icon,
   PackageCheckIcon,
+  PencilIcon,
+  PlayIcon,
   PlusIcon,
   PilcrowIcon,
   QuoteIcon,
   RefreshCwIcon,
   SaveIcon,
+  SearchIcon,
   SparklesIcon,
   Trash2Icon,
   VideoIcon,
   XIcon,
+  XCircleIcon,
 } from "lucide-react";
 
 import {
+  DashboardBackButton,
   DashboardButton,
   DashboardPageHeader,
+  dashboardTableActionCellClass,
+  dashboardTableActionHeadClass,
+  dashboardTableCellClass,
+  dashboardTableClass,
+  dashboardTableContainerClass,
+  dashboardTableHeadClass,
+  dashboardTableHeaderRowClass,
+  dashboardTablePrimaryTextClass,
+  dashboardTableRowClass,
   dashboardPanelClass,
 } from "@/components/dashboard/dashboard-controls";
+import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
 import { MediaManagerDialog } from "@/components/media/media-manager-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { RequiredIndicator } from "@/components/ui/label";
 import {
@@ -44,12 +71,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { generateProductDescription } from "@/app/(seller)/seller/(dashboard)/products/new/actions";
+import {
+  createSellerParcelPreset,
+  generateProductDescription,
+  importProductLinkMedia,
+  saveProductDraft,
+  submitProductForReview,
+} from "@/app/(seller)/seller/(dashboard)/products/new/actions";
+import { updateSellerProductOperationalFields } from "@/app/(seller)/seller/(dashboard)/products/actions";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import type {
   SellerCreateProductData,
+  SellerEditableProductData,
   SellerProductCategory,
 } from "@/src/modules/sellers/product-create";
 
@@ -58,14 +101,28 @@ type VariantOption = {
   name: string;
   values: string[];
 };
+type VariantStatus = "active" | "draft" | "sold_out" | "unavailable";
 type GeneratedVariant = {
+  barcode: string;
+  compareAtPrice: string;
+  continueSellingOutOfStock: boolean;
+  heightMm: string;
   id: string;
   imageId: string | null;
+  isFragile?: boolean;
+  lengthMm: string;
+  lowStockAlert: string;
+  notes: string;
   optionValues: string[];
+  parcelPresetId: string | null;
+  persistedVariantId?: string;
   price: string;
+  shipsAlone?: boolean;
   sku: string;
+  status: VariantStatus;
   stock: string;
   weightGrams: string;
+  widthMm: string;
 };
 type SkuStatus = "available" | "checking" | "duplicate" | "idle";
 type BrandSuggestion = {
@@ -78,6 +135,54 @@ type AiFeedback = {
   message: string;
   tone: "error" | "success";
 } | null;
+type DraftSaveFeedback = {
+  message: string;
+  tone: "error" | "success";
+} | null;
+type ImportedProductImage = {
+  alt: string;
+  url: string;
+};
+type ImportedProductScan = {
+  barcode: string;
+  brandName: string;
+  compareAtPrice: string;
+  description: string;
+  images: ImportedProductImage[];
+  longDescription: string;
+  price: string;
+  productName: string;
+  sku: string;
+  sourceUrl: string;
+};
+type ImportLinkStep = {
+  message: string;
+  step: string;
+  tone: "error" | "success" | "working";
+};
+type MediaSelectionTarget =
+  | { type: "bulkVariants" }
+  | { type: "product" }
+  | { type: "variant"; variantId: string };
+type BulkValueField = "compareAtPrice" | "price" | "stock";
+type BulkValueDialogState = {
+  field: BulkValueField;
+  label: string;
+  placeholder: string;
+  value: string;
+} | null;
+type ParcelPresetDialogTarget = { type: "product" } | { type: "variant"; variantId: string };
+type ParcelPresetSaveDialogState = {
+  isDefault: boolean;
+  name: string;
+  notes: string;
+  target: ParcelPresetDialogTarget;
+} | null;
+type ListingChecklistItem = {
+  complete: boolean;
+  detail: string;
+  title: string;
+};
 type EditorCommand =
   | "bold"
   | "createLink"
@@ -96,6 +201,31 @@ const selectContentClass =
   "border border-slate-200 bg-white p-1 text-zinc-950 shadow-xl dark:border-white/10 dark:bg-[#151719] dark:text-white";
 const selectItemClass =
   "cursor-pointer px-2 py-2 text-zinc-800 focus:bg-slate-100 focus:text-zinc-950 dark:text-zinc-200 dark:focus:bg-white/10 dark:focus:text-white";
+const variantStatusConfig: Record<
+  VariantStatus,
+  { badgeClassName: string; label: string }
+> = {
+  active: {
+    badgeClassName:
+      "border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-500/15 dark:text-emerald-200",
+    label: "Active",
+  },
+  draft: {
+    badgeClassName:
+      "border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-zinc-300",
+    label: "Draft",
+  },
+  sold_out: {
+    badgeClassName:
+      "border-red-200 bg-red-100 text-red-700 dark:border-red-400/20 dark:bg-red-500/15 dark:text-red-200",
+    label: "Sold out",
+  },
+  unavailable: {
+    badgeClassName:
+      "border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-400/20 dark:bg-amber-500/15 dark:text-amber-200",
+    label: "Unavailable",
+  },
+};
 function formatFee(commissionRateBps: number | null) {
   if (!commissionRateBps) {
     return "No fee set";
@@ -150,6 +280,12 @@ function toTitleCase(value: string) {
   });
 }
 
+function toTitleCaseInput(value: string) {
+  return value.replace(/(^|[\s,-])(\S)/g, (_match, prefix: string, letter: string) =>
+    `${prefix}${letter.toUpperCase()}`,
+  );
+}
+
 function normalizeSkuPart(value: string) {
   return value
     .normalize("NFKD")
@@ -159,10 +295,157 @@ function normalizeSkuPart(value: string) {
     .toUpperCase();
 }
 
+function getVariantKey(optionValues: string[]) {
+  return optionValues.map((value) => normalizeLookupValue(value)).join("|");
+}
+
+function generateVariantSku(baseSku: string, productName: string, optionValues: string[]) {
+  const base = normalizeSkuPart(baseSku || productName || "PRODUCT") || "PRODUCT";
+  const suffix = optionValues
+    .map((value) => normalizeSkuPart(value).slice(0, 4))
+    .filter(Boolean)
+    .join("-");
+
+  return suffix ? `${base}-${suffix}` : base;
+}
+
+function getSkuStatusClass(status: SkuStatus) {
+  if (status === "available") {
+    return "border-emerald-500 pr-8 focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20";
+  }
+
+  if (status === "duplicate") {
+    return "border-red-500 pr-8 focus-visible:border-red-500 focus-visible:ring-red-500/20";
+  }
+
+  if (status === "checking") {
+    return "border-amber-500 pr-8 focus-visible:border-amber-500 focus-visible:ring-amber-500/20";
+  }
+
+  return "pr-8";
+}
+
+function getVariantStatusSelectClass(status: VariantStatus) {
+  return cn(
+    "h-8 w-32 text-xs",
+    variantStatusConfig[status].badgeClassName,
+  );
+}
+
+function getDiscountPercent(price: string, compareAtPrice: string) {
+  const priceNumber = Number(price);
+  const compareAtNumber = Number(compareAtPrice);
+
+  if (
+    !Number.isFinite(priceNumber) ||
+    !Number.isFinite(compareAtNumber) ||
+    priceNumber <= 0 ||
+    compareAtNumber <= priceNumber
+  ) {
+    return null;
+  }
+
+  return Math.round(((compareAtNumber - priceNumber) / compareAtNumber) * 100);
+}
+
+function formatRand(value: number) {
+  return `R ${value.toFixed(2)}`;
+}
+
+function getPricingBreakdown(price: string, compareAtPrice: string) {
+  const hasPrice = price.trim().length > 0;
+  const hasCompareAtPrice = compareAtPrice.trim().length > 0;
+  const priceNumber = Number(price);
+  const compareAtNumber = Number(compareAtPrice);
+
+  if (!hasPrice && !hasCompareAtPrice) {
+    return {
+      message:
+        "Enter the final customer-facing selling price including VAT. Piessang should not need to add VAT on top at checkout.",
+      title: "VAT-inclusive pricing",
+      tone: "neutral" as const,
+    };
+  }
+
+  if (!hasPrice || !Number.isFinite(priceNumber) || priceNumber <= 0) {
+    return {
+      message:
+        "Add a valid VAT-inclusive selling price before we can calculate discounts.",
+      title: "Price needed",
+      tone: "warning" as const,
+    };
+  }
+
+  if (!hasCompareAtPrice) {
+    return {
+      message:
+        "Optional: add a higher VAT-inclusive compare-at price to show a markdown.",
+      title: "No discount configured",
+      tone: "neutral" as const,
+    };
+  }
+
+  if (!Number.isFinite(compareAtNumber) || compareAtNumber <= 0) {
+    return {
+      message: "Compare-at price must be a valid VAT-inclusive amount.",
+      title: "Invalid compare-at price",
+      tone: "warning" as const,
+    };
+  }
+
+  if (compareAtNumber <= priceNumber) {
+    return {
+      message:
+        "Compare-at price must be higher than the selling price. Otherwise no discount should show.",
+      title: "No discount will show",
+      tone: "warning" as const,
+    };
+  }
+
+  const saving = compareAtNumber - priceNumber;
+  const discountPercent = Math.round((saving / compareAtNumber) * 100);
+
+  return {
+    message: `${formatRand(compareAtNumber)} compare-at - ${formatRand(priceNumber)} selling price = ${formatRand(saving)} customer saving.`,
+    title: `${discountPercent}% off`,
+    tone: "success" as const,
+  };
+}
+
 function parsePositiveNumber(value: string) {
   const number = Number(value);
 
   return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function sanitizeWholeNumberInput(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function sanitizeDecimalNumberInput(value: string) {
+  const normalizedValue = value.replace(/,/g, ".");
+  const [whole = "", ...decimalParts] = normalizedValue.split(".");
+  const decimal = decimalParts.join("");
+  const sanitizedWhole = whole.replace(/\D/g, "");
+  const sanitizedDecimal = decimal.replace(/\D/g, "");
+
+  if (normalizedValue.includes(".")) {
+    return `${sanitizedWhole}.${sanitizedDecimal}`;
+  }
+
+  return sanitizedWhole;
+}
+
+function sanitizeShippingMetricInput(value: string) {
+  return sanitizeDecimalNumberInput(value);
+}
+
+function formatMetricValue(value: number) {
+  return Number.isInteger(value) ? String(value) : String(value).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function sanitizeStockInput(value: string) {
+  return sanitizeWholeNumberInput(value);
 }
 
 function getPackagePreview(lengthMm: string, widthMm: string, heightMm: string) {
@@ -357,11 +640,28 @@ function FieldLabel({
   );
 }
 
+function ColumnInfoTitle({
+  children,
+  info,
+}: {
+  children: string;
+  info: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {children}
+      <InfoHint label={children} text={info} />
+    </span>
+  );
+}
+
 function AiGenerateButton({
+  disabled = false,
   feedback,
   isPending,
   onClick,
 }: {
+  disabled?: boolean;
   feedback: AiFeedback;
   isPending: boolean;
   onClick: () => void;
@@ -370,7 +670,7 @@ function AiGenerateButton({
     <span className="relative inline-flex max-w-full shrink-0">
       <DashboardButton
         className="max-w-full px-2 text-xs sm:px-3 sm:text-[14px]"
-        disabled={isPending}
+        disabled={disabled || isPending}
         onClick={onClick}
         type="button"
       >
@@ -394,17 +694,21 @@ function AiGenerateButton({
 }
 
 function ProductRichTextEditor({
+  disabled = false,
   maxLength,
   onChange,
   placeholder,
   value,
 }: {
+  disabled?: boolean;
   maxLength: number;
   onChange: (value: string) => void;
   placeholder: string;
   value: string;
 }) {
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [linkHref, setLinkHref] = useState("");
   const textLength = getEditorTextLength(value);
 
   useEffect(() => {
@@ -418,12 +722,20 @@ function ProductRichTextEditor({
   }, [value]);
 
   function runCommand(command: EditorCommand, commandValue?: string) {
+    if (disabled) {
+      return;
+    }
+
     editorRef.current?.focus();
     document.execCommand(command, false, commandValue);
     onChange(editorRef.current?.innerHTML ?? "");
   }
 
   function handleInput() {
+    if (disabled) {
+      return;
+    }
+
     const editor = editorRef.current;
 
     if (!editor) {
@@ -442,13 +754,22 @@ function ProductRichTextEditor({
   }
 
   function addLink() {
-    const href = window.prompt("Enter link URL");
-
-    if (!href || !URL.canParse(href)) {
+    if (disabled) {
       return;
     }
 
-    runCommand("createLink", href);
+    setLinkHref("");
+    setIsLinkDialogOpen(true);
+  }
+
+  function applyLink() {
+    if (!linkHref || !URL.canParse(linkHref)) {
+      return;
+    }
+
+    runCommand("createLink", linkHref);
+    setIsLinkDialogOpen(false);
+    setLinkHref("");
   }
 
   const tools = [
@@ -489,44 +810,94 @@ function ProductRichTextEditor({
   ];
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 dark:border-white/18 dark:bg-[#151719]">
-      <div className="flex flex-wrap gap-1 border-b border-slate-200 bg-slate-50/70 p-2 dark:border-white/10 dark:bg-white/[0.04]">
-        {tools.map((tool) => {
-          const Icon = tool.icon;
+    <>
+      <div className="min-w-0 overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-500/10 dark:border-white/18 dark:bg-[#151719]">
+        <div className="flex flex-wrap gap-1 border-b border-slate-200 bg-slate-50/70 p-2 dark:border-white/10 dark:bg-white/[0.04]">
+          {tools.map((tool) => {
+            const Icon = tool.icon;
 
-          return (
+            return (
+              <Button
+                key={tool.label}
+                aria-label={tool.label}
+                className="size-8 rounded-md border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-zinc-950 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+                disabled={disabled}
+                onClick={tool.command}
+                size="icon-sm"
+                title={tool.label}
+                type="button"
+                variant="outline"
+              >
+                <Icon className="size-4" />
+              </Button>
+            );
+          })}
+        </div>
+        <div
+          ref={editorRef}
+          aria-label="Full description editor"
+          className={cn(
+            "rich-text-editor min-h-52 px-3 py-3 text-sm leading-6 text-zinc-950 outline-none dark:text-white",
+            !value && "text-slate-400 dark:text-zinc-500",
+          )}
+          contentEditable={!disabled}
+          data-placeholder={placeholder}
+          onInput={handleInput}
+          role="textbox"
+          suppressContentEditableWarning
+        />
+        <div className="flex items-center justify-end border-t border-slate-200 px-3 py-2 text-xs text-slate-400 dark:border-white/10">
+          {textLength}/{maxLength}
+        </div>
+      </div>
+      <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add link</DialogTitle>
+            <DialogDescription>
+              Add a valid URL to the selected description text.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <label className="grid gap-1.5">
+              <FieldLabel info="Use a full URL including https://.">
+                URL
+              </FieldLabel>
+              <Input
+                autoFocus
+                className={fieldClass}
+                onChange={(event) => setLinkHref(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    applyLink();
+                  }
+                }}
+                placeholder="https://example.com"
+                value={linkHref}
+              />
+            </label>
+          </DialogBody>
+          <DialogFooter>
             <Button
-              key={tool.label}
-              aria-label={tool.label}
-              className="size-8 rounded-md border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-zinc-950 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
-              onClick={tool.command}
-              size="icon-sm"
-              title={tool.label}
+              className="h-8 rounded-md border-emerald-700 bg-emerald-700 px-3 text-[14px] font-normal text-white hover:bg-emerald-800"
+              onClick={applyLink}
+              type="button"
+            >
+              Add link
+            </Button>
+            <Button
+              className="h-8 rounded-md px-3 text-[14px] font-normal"
+              onClick={() => setIsLinkDialogOpen(false)}
               type="button"
               variant="outline"
             >
-              <Icon className="size-4" />
+              Close
             </Button>
-          );
-        })}
-      </div>
-      <div
-        ref={editorRef}
-        aria-label="Full description editor"
-        className={cn(
-          "rich-text-editor min-h-52 px-3 py-3 text-sm leading-6 text-zinc-950 outline-none dark:text-white",
-          !value && "text-slate-400 dark:text-zinc-500",
-        )}
-        contentEditable
-        data-placeholder={placeholder}
-        onInput={handleInput}
-        role="textbox"
-        suppressContentEditableWarning
-      />
-      <div className="flex items-center justify-end border-t border-slate-200 px-3 py-2 text-xs text-slate-400 dark:border-white/10">
-        {textLength}/{maxLength}
-      </div>
-    </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -595,6 +966,142 @@ function PackageSizePreview({
   );
 }
 
+function SkuStatusIcon({ status }: { status: SkuStatus }) {
+  if (status === "available") {
+    return <CheckCircleIcon className="size-4 text-emerald-600" />;
+  }
+
+  if (status === "duplicate") {
+    return <XCircleIcon className="size-4 text-red-600" />;
+  }
+
+  if (status === "checking") {
+    return <Loader2Icon className="size-4 animate-spin text-amber-600" />;
+  }
+
+  return null;
+}
+
+function ListingReadinessDrawer({
+  completedCount,
+  isOpen,
+  items,
+  onOpenChange,
+}: {
+  completedCount: number;
+  isOpen: boolean;
+  items: ListingChecklistItem[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  const totalCount = items.length;
+  const progressPercent = Math.round((completedCount / totalCount) * 100);
+
+  return (
+    <>
+      <button
+        aria-expanded={isOpen}
+        aria-label="Open listing readiness checklist"
+        className="fixed right-0 top-1/2 z-40 flex h-20 w-12 -translate-y-1/2 flex-col items-center justify-center rounded-l-full border border-r-0 border-emerald-200 bg-white/90 text-emerald-800 shadow-lg backdrop-blur transition hover:w-14 hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-[#101214]/90 dark:text-emerald-200 dark:hover:bg-emerald-500/10"
+        onClick={() => onOpenChange(true)}
+        type="button"
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">
+          List
+        </span>
+        <span className="mt-1 text-sm font-bold">
+          {completedCount}/{totalCount}
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div className="fixed inset-0 z-50">
+          <button
+            aria-label="Close listing readiness checklist"
+            className="absolute inset-0 cursor-default bg-zinc-950/15 backdrop-blur-[1px] dark:bg-black/35"
+            onClick={() => onOpenChange(false)}
+            type="button"
+          />
+          <aside className="absolute bottom-3 right-3 top-3 flex w-[min(24rem,calc(100vw-1.5rem))] min-w-0 flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/88 text-zinc-950 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#101214]/88 dark:text-white">
+            <div className="border-b border-slate-200 px-4 py-4 dark:border-white/10">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-base font-bold">Listing readiness</h2>
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                    Complete the required listing details before publishing.
+                  </p>
+                </div>
+                <Button
+                  aria-label="Close checklist"
+                  className="size-8 shrink-0 rounded-full"
+                  onClick={() => onOpenChange(false)}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <XIcon className="size-4" />
+                </Button>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
+                  <span>{completedCount} completed</span>
+                  <span>{progressPercent}%</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-emerald-600 transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              <div className="grid gap-2">
+                {items.map((item) => (
+                  <div
+                    key={item.title}
+                    className={cn(
+                      "rounded-xl border p-3 transition",
+                      item.complete
+                        ? "border-emerald-200 bg-emerald-50/80 dark:border-emerald-400/20 dark:bg-emerald-500/10"
+                        : "border-slate-200 bg-white/78 dark:border-white/10 dark:bg-white/[0.04]",
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={cn(
+                          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border",
+                          item.complete
+                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            : "border-slate-300 bg-white text-slate-400 dark:border-white/15 dark:bg-[#151719] dark:text-zinc-500",
+                        )}
+                      >
+                        {item.complete ? (
+                          <CheckCircleIcon className="size-3.5" />
+                        ) : (
+                          <span className="size-1.5 rounded-full bg-current" />
+                        )}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">
+                          {item.title}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                          {item.detail}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function createCombinations(options: VariantOption[]) {
   const usableOptions = options.filter(
     (option) => option.name.trim() && option.values.length > 0,
@@ -644,25 +1151,80 @@ function Panel({
 
 function MediaTile({
   asset,
+  index,
   isCover,
+  isDragging,
+  onDragOver,
+  onDragStart,
+  onDrop,
+  onPlay,
   onRemove,
 }: {
   asset: AdminMediaAsset;
+  index: number;
   isCover: boolean;
+  isDragging: boolean;
+  onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDragStart: () => void;
+  onDrop: () => void;
+  onPlay: () => void;
   onRemove: () => void;
 }) {
   const isVideo = asset.mimeType.startsWith("video/");
-  const src = asset.thumbnailUrl ?? asset.publicUrl;
+  const previewSrc = isVideo ? asset.thumbnailUrl : asset.publicUrl;
 
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/[0.04]">
-      {isVideo ? (
+    <div
+      className={cn(
+        "group relative aspect-square cursor-grab overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition active:cursor-grabbing dark:border-white/10 dark:bg-white/[0.04]",
+        isDragging &&
+          "scale-[0.98] border-emerald-500 opacity-70 ring-4 ring-emerald-500/10",
+      )}
+      draggable
+      onDragOver={onDragOver}
+      onDragStart={onDragStart}
+      onDrop={onDrop}
+    >
+      {previewSrc ? (
+        <Image
+          src={previewSrc}
+          alt={asset.altText ?? asset.originalFileName ?? "Product media"}
+          fill
+          quality={90}
+          sizes="(max-width: 640px) 45vw, 160px"
+          className="object-cover"
+        />
+      ) : isVideo ? (
+        <video
+          aria-label={asset.altText ?? asset.originalFileName ?? "Product video"}
+          className="size-full object-cover"
+          muted
+          preload="metadata"
+          src={asset.publicUrl}
+        >
+          <track kind="captions" />
+        </video>
+      ) : (
         <div className="grid size-full place-items-center text-emerald-700 dark:text-emerald-300">
           <VideoIcon className="size-8" />
         </div>
-      ) : (
-        <Image src={src} alt="" fill sizes="96px" className="object-cover" />
       )}
+      <span className="absolute left-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-white/95 text-[11px] font-bold text-zinc-950 shadow-sm dark:bg-[#101214]/95 dark:text-white">
+        {index + 1}
+      </span>
+      {isVideo ? (
+        <button
+          aria-label="Preview video"
+          className="absolute left-1/2 top-1/2 grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-emerald-700/95 text-white shadow-lg transition hover:bg-emerald-800"
+          onClick={(event) => {
+            event.stopPropagation();
+            onPlay();
+          }}
+          type="button"
+        >
+          <PlayIcon className="ml-0.5 size-5 fill-current" />
+        </button>
+      ) : null}
       {isCover ? (
         <Badge className="absolute bottom-1 left-1 bg-emerald-700 text-white">
           Cover
@@ -671,7 +1233,10 @@ function MediaTile({
       <button
         aria-label="Remove media"
         className="absolute right-1 top-1 grid size-7 place-items-center rounded-full bg-white/90 text-slate-700 opacity-0 shadow-sm transition group-hover:opacity-100 dark:bg-[#101214]/90 dark:text-zinc-200"
-        onClick={onRemove}
+        onClick={(event) => {
+          event.stopPropagation();
+          onRemove();
+        }}
         type="button"
       >
         <Trash2Icon className="size-3.5" />
@@ -682,39 +1247,130 @@ function MediaTile({
 
 export function ProductCreateWizard({
   data,
+  initialProduct,
 }: {
   data: SellerCreateProductData;
+  initialProduct?: SellerEditableProductData | null;
 }) {
-  const [productName, setProductName] = useState("");
-  const [sku, setSku] = useState("");
+  const initialVariantOptions =
+    initialProduct?.optionSchema.length
+      ? initialProduct.optionSchema.map((option, index) => ({
+          id: makeId(`option-${index}`),
+          name: option.name,
+          values: option.values,
+        }))
+      : [
+          {
+            id: makeId("option"),
+            name: "Size",
+            values: ["Small", "Medium", "Large"],
+          },
+        ];
+  const [productName, setProductName] = useState(initialProduct?.productName ?? "");
+  const [sku, setSku] = useState(initialProduct?.sku ?? "");
   const [skuStatus, setSkuStatus] = useState<SkuStatus>("idle");
-  const [description, setDescription] = useState("");
-  const [longDescription, setLongDescription] = useState("");
+  const [barcode, setBarcode] = useState(initialProduct?.barcode ?? "");
+  const [description, setDescription] = useState(initialProduct?.description ?? "");
+  const [longDescription, setLongDescription] = useState(
+    initialProduct?.longDescription ?? "",
+  );
   const [aiFeedback, setAiFeedback] = useState<AiFeedback>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [brandName, setBrandName] = useState("");
+  const [draftSaveFeedback, setDraftSaveFeedback] =
+    useState<DraftSaveFeedback>(null);
+  const [draftProductId, setDraftProductId] = useState<string | null>(
+    initialProduct?.id ?? null,
+  );
+  const [isImportLinkOpen, setIsImportLinkOpen] = useState(false);
+  const [importLinkUrl, setImportLinkUrl] = useState("");
+  const [importLinkSteps, setImportLinkSteps] = useState<ImportLinkStep[]>([]);
+  const [importedProduct, setImportedProduct] =
+    useState<ImportedProductScan | null>(null);
+  const [selectedImportedImageUrls, setSelectedImportedImageUrls] = useState<
+    string[]
+  >([]);
+  const [isScanningImportLink, setIsScanningImportLink] = useState(false);
+  const [isApplyingImport, startApplyImportTransition] = useTransition();
+  const canSubmitForReview = Boolean(draftProductId);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    initialProduct?.categoryId ?? null,
+  );
+  const [brandName, setBrandName] = useState(initialProduct?.brandName ?? "");
   const [isBrandPickerOpen, setIsBrandPickerOpen] = useState(false);
-  const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
+  const [mediaLibraryAssets, setMediaLibraryAssets] = useState(
+    data.mediaLibrary.assets,
+  );
+  const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>(
+    initialProduct?.mediaIds ?? [],
+  );
+  const [isReadinessOpen, setIsReadinessOpen] = useState(false);
   const [isMediaOpen, setIsMediaOpen] = useState(false);
-  const [price, setPrice] = useState("");
-  const [compareAtPrice, setCompareAtPrice] = useState("");
-  const [stock, setStock] = useState("0");
+  const [draggingMediaId, setDraggingMediaId] = useState<string | null>(null);
+  const [previewVideoAsset, setPreviewVideoAsset] =
+    useState<AdminMediaAsset | null>(null);
+  const [mediaSelectionTarget, setMediaSelectionTarget] =
+    useState<MediaSelectionTarget>({ type: "product" });
+  const [price, setPrice] = useState(initialProduct?.price ?? "");
+  const [compareAtPrice, setCompareAtPrice] = useState(
+    initialProduct?.compareAtPrice ?? "",
+  );
+  const [stock, setStock] = useState(initialProduct?.stock ?? "0");
   const [continueSellingOutOfStock, setContinueSellingOutOfStock] =
-    useState(false);
-  const [hasVariants, setHasVariants] = useState(false);
-  const [variantOptions, setVariantOptions] = useState<VariantOption[]>([
-    { id: makeId("option"), name: "Size", values: ["Small", "Medium", "Large"] },
-  ]);
-  const [generatedVariants, setGeneratedVariants] = useState<GeneratedVariant[]>([]);
-  const [weightGrams, setWeightGrams] = useState("");
-  const [lengthMm, setLengthMm] = useState("");
-  const [widthMm, setWidthMm] = useState("");
-  const [heightMm, setHeightMm] = useState("");
+    useState(initialProduct?.continueSellingOutOfStock ?? false);
+  const [hasVariants, setHasVariants] = useState(initialProduct?.hasVariants ?? false);
+  const [variantOptions, setVariantOptions] =
+    useState<VariantOption[]>(initialVariantOptions);
+  const [optionValueInputs, setOptionValueInputs] = useState<Record<string, string>>({});
+  const [generatedVariants, setGeneratedVariants] = useState<GeneratedVariant[]>(
+    initialProduct?.variants.map((variant) => ({
+      ...variant,
+      id: makeId("variant"),
+      persistedVariantId: variant.id,
+    })) ?? [],
+  );
+  const [variantSkuStatuses, setVariantSkuStatuses] = useState<Record<string, SkuStatus>>(
+    {},
+  );
+  const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+  const [expandedVariantId, setExpandedVariantId] = useState<string | null>(null);
+  const [bulkValueDialog, setBulkValueDialog] =
+    useState<BulkValueDialogState>(null);
+  const [parcelPresets, setParcelPresets] = useState(data.parcelPresets);
+  const [parcelPresetId, setParcelPresetId] = useState<string | null>(
+    initialProduct?.parcelPresetId ??
+      data.parcelPresets.find((preset) => preset.isDefault)?.id ??
+      null,
+  );
+  const [parcelPresetSaveDialog, setParcelPresetSaveDialog] =
+    useState<ParcelPresetSaveDialogState>(null);
+  const [parcelPresetFeedback, setParcelPresetFeedback] =
+    useState<DraftSaveFeedback>(null);
+  const [isSavingParcelPreset, startSaveParcelPresetTransition] = useTransition();
+  const [pendingVariantCombinations, setPendingVariantCombinations] = useState<
+    string[][] | null
+  >(null);
+  const [weightGrams, setWeightGrams] = useState(initialProduct?.weightGrams ?? "");
+  const [lengthMm, setLengthMm] = useState(initialProduct?.lengthMm ?? "");
+  const [widthMm, setWidthMm] = useState(initialProduct?.widthMm ?? "");
+  const [heightMm, setHeightMm] = useState(initialProduct?.heightMm ?? "");
   const [fulfillmentMode, setFulfillmentMode] = useState<
     "seller_fulfilled" | "piessang_fulfilled"
-  >("seller_fulfilled");
+  >(initialProduct?.fulfillmentMode ?? "seller_fulfilled");
   const [isGeneratingDescription, startDescriptionTransition] =
     useTransition();
+  const [isSavingDraft, startSaveDraftTransition] = useTransition();
+  const [isSubmittingReview, startSubmitReviewTransition] = useTransition();
+  const productStatus = initialProduct?.status ?? "draft";
+  const canFullyEditProduct =
+    productStatus === "draft" || productStatus === "changes_requested";
+  const canSaveOperationalFields =
+    Boolean(initialProduct?.id) &&
+    ["approved", "active", "live", "paused"].includes(productStatus);
+  const fullListingControlsDisabled = !canFullyEditProduct;
+  const productIsLocked = Boolean(
+    initialProduct && !canFullyEditProduct && !canSaveOperationalFields,
+  );
+  const saveDisabled =
+    productIsLocked || isSavingDraft || isSubmittingReview;
 
   const categoriesById = useMemo(
     () => new Map(data.categories.map((category) => [category.id, category])),
@@ -806,9 +1462,286 @@ export function ProductCreateWizard({
         .slice(0, 8)
     : brandSuggestions.slice(0, 8);
   const selectedMedia = selectedMediaIds
-    .map((id) => data.mediaLibrary.assets.find((asset) => asset.id === id))
+    .map((id) => mediaLibraryAssets.find((asset) => asset.id === id))
     .filter((asset): asset is AdminMediaAsset => Boolean(asset));
-  const mediaById = new Map(data.mediaLibrary.assets.map((asset) => [asset.id, asset]));
+  const mediaById = new Map(mediaLibraryAssets.map((asset) => [asset.id, asset]));
+  const mediaDialogSelectedAssetId =
+    mediaSelectionTarget.type === "product"
+      ? (selectedMediaIds[0] ?? null)
+      : mediaSelectionTarget.type === "variant"
+        ? (generatedVariants.find(
+            (variant) => variant.id === mediaSelectionTarget.variantId,
+          )?.imageId ?? null)
+        : null;
+  const usableVariantOptions = variantOptions.filter(
+    (option) => option.name.trim() && option.values.length > 0,
+  );
+  const variantCombinationCount = usableVariantOptions.reduce(
+    (total, option) => total * option.values.length,
+    usableVariantOptions.length > 0 ? 1 : 0,
+  );
+  const variantCombinationTone =
+    variantCombinationCount > 150
+      ? "danger"
+      : variantCombinationCount > 50
+        ? "warning"
+        : "normal";
+  const allGeneratedVariantsSelected =
+    generatedVariants.length > 0 &&
+    selectedVariantIds.length === generatedVariants.length;
+  const selectedVariantCount = selectedVariantIds.length;
+  const activeExpandedVariant =
+    generatedVariants.find((variant) => variant.id === expandedVariantId) ?? null;
+  const selectedParcelPreset = parcelPresetId
+    ? parcelPresets.find((preset) => preset.id === parcelPresetId) ?? null
+    : null;
+  const isParcelPresetModified = selectedParcelPreset
+    ? weightGrams !== formatMetricValue(selectedParcelPreset.weightGrams) ||
+      lengthMm !== formatMetricValue(selectedParcelPreset.lengthMm) ||
+      widthMm !== formatMetricValue(selectedParcelPreset.widthMm) ||
+      heightMm !== formatMetricValue(selectedParcelPreset.heightMm)
+    : false;
+  const activeExpandedVariantParcelPreset = activeExpandedVariant?.parcelPresetId
+    ? parcelPresets.find(
+        (preset) => preset.id === activeExpandedVariant.parcelPresetId,
+      ) ?? null
+    : null;
+  const isActiveExpandedVariantParcelPresetModified =
+    activeExpandedVariant && activeExpandedVariantParcelPreset
+      ? activeExpandedVariant.weightGrams !==
+          formatMetricValue(activeExpandedVariantParcelPreset.weightGrams) ||
+        activeExpandedVariant.lengthMm !==
+          formatMetricValue(activeExpandedVariantParcelPreset.lengthMm) ||
+        activeExpandedVariant.widthMm !==
+          formatMetricValue(activeExpandedVariantParcelPreset.widthMm) ||
+        activeExpandedVariant.heightMm !==
+          formatMetricValue(activeExpandedVariantParcelPreset.heightMm)
+      : false;
+  const activeExpandedVariantImage = activeExpandedVariant?.imageId
+    ? mediaById.get(activeExpandedVariant.imageId)
+    : null;
+  const activeExpandedPricingBreakdown = activeExpandedVariant
+    ? getPricingBreakdown(
+        activeExpandedVariant.price,
+        activeExpandedVariant.compareAtPrice,
+      )
+    : null;
+  const variantSkuSignature = generatedVariants
+    .map((variant) => `${variant.id}:${variant.sku}`)
+    .join("|");
+  const pricingBreakdown = getPricingBreakdown(price, compareAtPrice);
+  const isPiessangFulfillmentEnabled = Boolean(
+    data.seller?.isPiessangFulfillmentEnabled,
+  );
+  const isPiessangFulfilled = fulfillmentMode === "piessang_fulfilled";
+  const isInventoryLockedByPiessang = isPiessangFulfilled;
+  const isBaseBarcodeReady = barcode.trim().length > 0;
+  const areVariantBarcodesReady =
+    !hasVariants ||
+    (generatedVariants.length > 0 &&
+      generatedVariants.every((variant) => variant.barcode.trim().length > 0));
+  const listingChecklistItems = useMemo<ListingChecklistItem[]>(() => {
+    const priceNumber = parsePositiveNumber(price);
+    const compareAtNumber = parsePositiveNumber(compareAtPrice);
+    const basePricingReady =
+      Boolean(priceNumber) &&
+      (!compareAtPrice.trim() ||
+        (Boolean(compareAtNumber) && compareAtNumber! > priceNumber!));
+    const variantsReady =
+      !hasVariants ||
+      (generatedVariants.length > 0 &&
+        generatedVariants.every((variant) => {
+          const status = variantSkuStatuses[variant.id] ?? "idle";
+
+          return variant.sku.trim() && status === "available";
+        }));
+    const variantPricingReady =
+      !hasVariants ||
+      (generatedVariants.length > 0 &&
+        generatedVariants.every((variant) => {
+          const variantPrice = parsePositiveNumber(variant.price);
+          const variantCompareAt = parsePositiveNumber(variant.compareAtPrice);
+
+          return (
+            Boolean(variantPrice) &&
+            (!variant.compareAtPrice.trim() ||
+              (Boolean(variantCompareAt) && variantCompareAt! > variantPrice!))
+          );
+        }));
+    const inventoryReady = isPiessangFulfilled
+      ? true
+      : hasVariants
+        ? generatedVariants.length > 0 &&
+          generatedVariants.every(
+            (variant) =>
+              variant.continueSellingOutOfStock ||
+              (variant.stock.trim() && variant.lowStockAlert.trim()),
+          )
+        : continueSellingOutOfStock || stock.trim();
+    const shippingReady = [weightGrams, lengthMm, widthMm, heightMm].every(
+      (value) => Boolean(parsePositiveNumber(value)),
+    );
+
+    return [
+      {
+        complete: productName.trim().length > 0,
+        detail: "Add a clear product name customers can recognize.",
+        title: "Product name",
+      },
+      {
+        complete: sku.trim().length > 0 && skuStatus === "available",
+        detail: "Use a globally unique base SKU for this listing.",
+        title: "Base SKU",
+      },
+      {
+        complete: Boolean(selectedCategory),
+        detail: "Choose the main category, and optional subcategories for discoverability.",
+        title: "Category",
+      },
+      {
+        complete: brandName.trim().length > 0,
+        detail: "Select an approved brand or enter a brand request name.",
+        title: "Brand",
+      },
+      {
+        complete: description.trim().length > 0,
+        detail: "Add the short marketplace summary shown near the product title.",
+        title: "Short description",
+      },
+      {
+        complete: getEditorTextLength(longDescription) > 0,
+        detail: "Add the richer product details customers need before buying.",
+        title: "Full description",
+      },
+      {
+        complete: selectedMediaIds.length > 0,
+        detail: "Select at least one image or video from the media manager.",
+        title: "Product media",
+      },
+      {
+        complete: hasVariants ? variantPricingReady : basePricingReady,
+        detail: "Enter VAT-inclusive selling prices. Compare-at prices must be higher.",
+        title: "Pricing",
+      },
+      {
+        complete: Boolean(inventoryReady),
+        detail: isPiessangFulfilled
+          ? "Piessang controls stock after inbound inventory is received and processed."
+          : "Set stock controls, or allow overselling when stock reaches zero.",
+        title: "Inventory",
+      },
+      ...(isPiessangFulfilled
+        ? [
+            {
+              complete: isBaseBarcodeReady,
+              detail:
+                "FBP products require a product barcode before inbound stock can be booked to Piessang.",
+              title: "Product barcode",
+            },
+            {
+              complete: areVariantBarcodesReady,
+              detail: hasVariants
+                ? "Every FBP variant requires a barcode before inbound stock can be booked."
+                : "No variant barcodes are required for a single-variant product.",
+              title: "Variant barcodes",
+            },
+          ]
+        : []),
+      {
+        complete: shippingReady,
+        detail: "Provide packed weight and dimensions for accurate shipping rates.",
+        title: "Parcel data",
+      },
+      {
+        complete: fulfillmentMode === "seller_fulfilled" || isPiessangFulfillmentEnabled,
+        detail:
+          fulfillmentMode === "piessang_fulfilled"
+            ? "Fulfilled by Piessang is enabled for this seller."
+            : "Seller fulfillment is selected for this listing.",
+        title: "Fulfillment",
+      },
+      {
+        complete: variantsReady,
+        detail: hasVariants
+          ? "Generate the combinations you sell and keep every variant SKU unique."
+          : "No variant combinations are required for this listing.",
+        title: "Variants",
+      },
+    ];
+  }, [
+    areVariantBarcodesReady,
+    brandName,
+    compareAtPrice,
+    continueSellingOutOfStock,
+    description,
+    fulfillmentMode,
+    generatedVariants,
+    hasVariants,
+    heightMm,
+    isBaseBarcodeReady,
+    isPiessangFulfillmentEnabled,
+    isPiessangFulfilled,
+    lengthMm,
+    longDescription,
+    price,
+    productName,
+    selectedCategory,
+    selectedMediaIds.length,
+    sku,
+    skuStatus,
+    stock,
+    variantSkuStatuses,
+    weightGrams,
+    widthMm,
+  ]);
+  const completedChecklistCount = listingChecklistItems.filter(
+    (item) => item.complete,
+  ).length;
+  const displayedImportLinkSteps = useMemo(
+    () =>
+      importLinkSteps.map((step, index) => {
+        if (step.tone !== "working" || index === importLinkSteps.length - 1) {
+          return step;
+        }
+
+        return { ...step, tone: "success" as const };
+      }),
+    [importLinkSteps],
+  );
+
+  useEffect(() => {
+    const defaultPreset = parcelPresetId
+      ? parcelPresets.find((preset) => preset.id === parcelPresetId)
+      : null;
+
+    if (
+      defaultPreset &&
+      !weightGrams &&
+      !lengthMm &&
+      !widthMm &&
+      !heightMm
+    ) {
+      setWeightGrams(formatMetricValue(defaultPreset.weightGrams));
+      setLengthMm(formatMetricValue(defaultPreset.lengthMm));
+      setWidthMm(formatMetricValue(defaultPreset.widthMm));
+      setHeightMm(formatMetricValue(defaultPreset.heightMm));
+    }
+  }, [heightMm, lengthMm, parcelPresetId, parcelPresets, weightGrams, widthMm]);
+
+  useEffect(() => {
+    if (!isPiessangFulfilled) {
+      return;
+    }
+
+    setContinueSellingOutOfStock(false);
+    setGeneratedVariants((current) =>
+      current.map((variant) =>
+        variant.continueSellingOutOfStock
+          ? { ...variant, continueSellingOutOfStock: false }
+          : variant,
+      ),
+    );
+  }, [isPiessangFulfilled]);
 
   useEffect(() => {
     const normalizedSku = sku.trim();
@@ -823,7 +1756,9 @@ export function ProductCreateWizard({
     const timeout = window.setTimeout(async () => {
       try {
         const response = await fetch(
-          `/products/new/check-sku?sku=${encodeURIComponent(normalizedSku)}`,
+          `/products/new/check-sku?sku=${encodeURIComponent(normalizedSku)}${
+            draftProductId ? `&productId=${encodeURIComponent(draftProductId)}` : ""
+          }`,
           { signal: controller.signal },
         );
         const result = (await response.json()) as {
@@ -843,7 +1778,105 @@ export function ProductCreateWizard({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [sku]);
+  }, [draftProductId, sku]);
+
+  useEffect(() => {
+    const skuEntries = variantSkuSignature
+      ? variantSkuSignature.split("|").map((entry) => {
+          const [id = "", ...skuParts] = entry.split(":");
+
+          return {
+            id,
+            sku: skuParts.join(":"),
+          };
+        })
+      : [];
+
+    if (skuEntries.length === 0) {
+      setVariantSkuStatuses({});
+      return;
+    }
+
+    const normalizedCounts = new Map<string, number>();
+
+    for (const variant of skuEntries) {
+      const normalizedSku = normalizeLookupValue(variant.sku);
+
+      if (normalizedSku) {
+        normalizedCounts.set(
+          normalizedSku,
+          (normalizedCounts.get(normalizedSku) ?? 0) + 1,
+        );
+      }
+    }
+
+    const initialStatuses: Record<string, SkuStatus> = Object.fromEntries(
+      skuEntries.map((variant) => {
+        const normalizedSku = normalizeLookupValue(variant.sku);
+
+        if (!normalizedSku) {
+          return [variant.id, "idle" satisfies SkuStatus];
+        }
+
+        if ((normalizedCounts.get(normalizedSku) ?? 0) > 1) {
+          return [variant.id, "duplicate" satisfies SkuStatus];
+        }
+
+        return [variant.id, "checking" satisfies SkuStatus];
+      }),
+    );
+
+    setVariantSkuStatuses(initialStatuses);
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      const uniqueVariants = skuEntries.filter((variant) => {
+        const normalizedSku = normalizeLookupValue(variant.sku);
+
+        return normalizedSku && (normalizedCounts.get(normalizedSku) ?? 0) === 1;
+      });
+
+      const results = await Promise.allSettled(
+        uniqueVariants.map(async (variant) => {
+          const response = await fetch(
+            `/products/new/check-sku?sku=${encodeURIComponent(variant.sku.trim())}${
+              draftProductId ? `&productId=${encodeURIComponent(draftProductId)}` : ""
+            }`,
+            { signal: controller.signal },
+          );
+          const result = (await response.json()) as {
+            available?: boolean;
+            ok?: boolean;
+          };
+
+          return {
+            id: variant.id,
+            status:
+              result.ok && result.available
+                ? ("available" as SkuStatus)
+                : ("duplicate" as SkuStatus),
+          };
+        }),
+      );
+
+      setVariantSkuStatuses((current) => {
+        const next = { ...current };
+
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            next[result.value.id] = result.value.status;
+          }
+        }
+
+        return next;
+      });
+    }, 350);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [draftProductId, variantSkuSignature]);
 
   useEffect(() => {
     if (!aiFeedback) {
@@ -865,12 +1898,111 @@ export function ProductCreateWizard({
     setSelectedCategoryId(fallbackCategory?.id ?? null);
   }
 
+  function mergeMediaAssets(assets: AdminMediaAsset[]) {
+    setMediaLibraryAssets((current) => {
+      const nextById = new Map(current.map((asset) => [asset.id, asset]));
+
+      for (const asset of assets) {
+        nextById.set(asset.id, asset);
+      }
+
+      return Array.from(nextById.values());
+    });
+  }
+
   function addMedia(asset: AdminMediaAsset) {
+    mergeMediaAssets([asset]);
     setSelectedMediaIds((current) =>
       current.includes(asset.id) || current.length >= 10
         ? current
         : [...current, asset.id],
     );
+  }
+
+  function openProductMediaManager() {
+    if (fullListingControlsDisabled) {
+      return;
+    }
+
+    setMediaSelectionTarget({ type: "product" });
+    setIsMediaOpen(true);
+  }
+
+  function openVariantMediaManager(variantId: string) {
+    if (fullListingControlsDisabled) {
+      return;
+    }
+
+    setMediaSelectionTarget({ type: "variant", variantId });
+    setIsMediaOpen(true);
+  }
+
+  function openBulkVariantMediaManager() {
+    setMediaSelectionTarget({ type: "bulkVariants" });
+    setIsMediaOpen(true);
+  }
+
+  function handleMediaSelect(asset: AdminMediaAsset) {
+    if (mediaSelectionTarget.type === "product") {
+      addMedia(asset);
+      return;
+    }
+
+    if (mediaSelectionTarget.type === "variant") {
+      updateGeneratedVariant(mediaSelectionTarget.variantId, {
+        imageId: asset.id,
+      });
+      return;
+    }
+
+    updateBulkVariants({ imageId: asset.id });
+  }
+
+  function handleMediaSelectMany(assets: AdminMediaAsset[]) {
+    mergeMediaAssets(assets);
+
+    if (mediaSelectionTarget.type !== "product") {
+      const [asset] = assets;
+
+      if (asset) {
+        handleMediaSelect(asset);
+      }
+
+      return;
+    }
+
+    setSelectedMediaIds((current) => {
+      const next = [...current];
+
+      for (const asset of assets) {
+        if (!next.includes(asset.id) && next.length < 10) {
+          next.push(asset.id);
+        }
+      }
+
+      return next;
+    });
+  }
+
+  function moveSelectedMedia(fromId: string, toId: string) {
+    if (fromId === toId) {
+      return;
+    }
+
+    setSelectedMediaIds((current) => {
+      const fromIndex = current.indexOf(fromId);
+      const toIndex = current.indexOf(toId);
+
+      if (fromIndex === -1 || toIndex === -1) {
+        return current;
+      }
+
+      const next = [...current];
+      const [movedId] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, movedId);
+
+      return next;
+    });
   }
 
   function updateVariantOption(optionId: string, patch: Partial<VariantOption>) {
@@ -881,20 +2013,332 @@ export function ProductCreateWizard({
     );
   }
 
+  function addVariantOptionValue(optionId: string, value?: string) {
+    const rawValue = (value ?? optionValueInputs[optionId] ?? "").trim();
+
+    if (!rawValue) {
+      return;
+    }
+
+    const nextValue = toTitleCase(rawValue);
+
+    setVariantOptions((current) =>
+      current.map((option) => {
+        if (option.id !== optionId) {
+          return option;
+        }
+
+        const valueExists = option.values.some(
+          (value) => normalizeLookupValue(value) === normalizeLookupValue(nextValue),
+        );
+
+        return valueExists
+          ? option
+          : { ...option, values: [...option.values, nextValue] };
+      }),
+    );
+    setOptionValueInputs((current) => ({ ...current, [optionId]: "" }));
+  }
+
+  function addVariantOptionValues(optionId: string, value: string) {
+    const values = value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    for (const nextValue of values) {
+      addVariantOptionValue(optionId, nextValue);
+    }
+  }
+
+  function removeVariantOptionValue(optionId: string, valueToRemove: string) {
+    setVariantOptions((current) =>
+      current.map((option) =>
+        option.id === optionId
+          ? {
+              ...option,
+              values: option.values.filter((value) => value !== valueToRemove),
+            }
+          : option,
+      ),
+    );
+  }
+
+  function updateGeneratedVariant(
+    variantId: string,
+    patch: Partial<GeneratedVariant>,
+  ) {
+    setGeneratedVariants((current) =>
+      current.map((variant) =>
+        variant.id === variantId ? { ...variant, ...patch } : variant,
+      ),
+    );
+  }
+
+  function removeGeneratedVariant(variantId: string) {
+    setGeneratedVariants((current) =>
+      current.filter((variant) => variant.id !== variantId),
+    );
+    setSelectedVariantIds((current) => current.filter((id) => id !== variantId));
+    setVariantSkuStatuses((current) => {
+      const next = { ...current };
+      delete next[variantId];
+      return next;
+    });
+    setExpandedVariantId((current) => (current === variantId ? null : current));
+  }
+
+  function removeGeneratedVariants(variantIds: string[]) {
+    const idsToRemove = new Set(variantIds);
+
+    setGeneratedVariants((current) =>
+      current.filter((variant) => !idsToRemove.has(variant.id)),
+    );
+    setSelectedVariantIds((current) =>
+      current.filter((id) => !idsToRemove.has(id)),
+    );
+    setVariantSkuStatuses((current) => {
+      const next = { ...current };
+
+      for (const variantId of idsToRemove) {
+        delete next[variantId];
+      }
+
+      return next;
+    });
+    setExpandedVariantId((current) =>
+      current && idsToRemove.has(current) ? null : current,
+    );
+  }
+
+  function toggleVariantSelection(variantId: string) {
+    setSelectedVariantIds((current) =>
+      current.includes(variantId)
+        ? current.filter((id) => id !== variantId)
+        : [...current, variantId],
+    );
+  }
+
+  function getBulkVariantIds() {
+    return selectedVariantIds.length > 0
+      ? selectedVariantIds
+      : generatedVariants.map((variant) => variant.id);
+  }
+
+  function updateBulkVariants(patch: Partial<GeneratedVariant>) {
+    const targetIds = new Set(getBulkVariantIds());
+
+    setGeneratedVariants((current) =>
+      current.map((variant) =>
+        targetIds.has(variant.id) ? { ...variant, ...patch } : variant,
+      ),
+    );
+  }
+
+  function applyParcelPresetToProduct(presetId: string | null) {
+    setParcelPresetId(presetId);
+
+    if (!presetId) {
+      return;
+    }
+
+    const preset = parcelPresets.find((item) => item.id === presetId);
+
+    if (!preset) {
+      return;
+    }
+
+    setWeightGrams(formatMetricValue(preset.weightGrams));
+    setLengthMm(formatMetricValue(preset.lengthMm));
+    setWidthMm(formatMetricValue(preset.widthMm));
+    setHeightMm(formatMetricValue(preset.heightMm));
+  }
+
+  function applyParcelPresetToVariant(variantId: string, presetId: string | null) {
+    const preset = presetId
+      ? parcelPresets.find((item) => item.id === presetId)
+      : null;
+
+    updateGeneratedVariant(variantId, {
+      heightMm: preset ? formatMetricValue(preset.heightMm) : "",
+      lengthMm: preset ? formatMetricValue(preset.lengthMm) : "",
+      parcelPresetId: presetId,
+      weightGrams: preset ? formatMetricValue(preset.weightGrams) : "",
+      widthMm: preset ? formatMetricValue(preset.widthMm) : "",
+    });
+  }
+
+  function applyParcelPresetToSelectedVariants(presetId: string) {
+    const preset = parcelPresets.find((item) => item.id === presetId);
+
+    if (!preset) {
+      return;
+    }
+
+    updateBulkVariants({
+      heightMm: formatMetricValue(preset.heightMm),
+      lengthMm: formatMetricValue(preset.lengthMm),
+      parcelPresetId: preset.id,
+      weightGrams: formatMetricValue(preset.weightGrams),
+      widthMm: formatMetricValue(preset.widthMm),
+    });
+  }
+
+  function openParcelPresetSaveDialog(target: ParcelPresetDialogTarget) {
+    setParcelPresetFeedback(null);
+    setParcelPresetSaveDialog({
+      isDefault: false,
+      name: "",
+      notes: "",
+      target,
+    });
+  }
+
+  function saveParcelPresetFromDialog() {
+    if (!parcelPresetSaveDialog) {
+      return;
+    }
+
+    const target = parcelPresetSaveDialog.target;
+    const source =
+      target.type === "variant"
+        ? generatedVariants.find((variant) => variant.id === target.variantId)
+        : null;
+    const presetInput = {
+      heightMm:
+        target.type === "variant"
+          ? (source?.heightMm ?? "")
+          : heightMm,
+      isDefault: parcelPresetSaveDialog.isDefault,
+      lengthMm:
+        target.type === "variant"
+          ? (source?.lengthMm ?? "")
+          : lengthMm,
+      name: parcelPresetSaveDialog.name,
+      notes: parcelPresetSaveDialog.notes,
+      weightGrams:
+        target.type === "variant"
+          ? (source?.weightGrams ?? "")
+          : weightGrams,
+      widthMm:
+        target.type === "variant"
+          ? (source?.widthMm ?? "")
+          : widthMm,
+    };
+
+    setParcelPresetFeedback(null);
+    startSaveParcelPresetTransition(() => {
+      void createSellerParcelPreset(presetInput).then((result) => {
+        if (!result.ok || !result.preset) {
+          setParcelPresetFeedback({
+            message: result.message ?? "Could not save this parcel preset.",
+            tone: "error",
+          });
+          return;
+        }
+
+        setParcelPresets((current) => {
+          const next = result.preset?.isDefault
+            ? current.map((preset) => ({ ...preset, isDefault: false }))
+            : current;
+
+          return [...next, result.preset!].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          );
+        });
+
+        if (target.type === "variant") {
+          applyParcelPresetToVariant(
+            target.variantId,
+            result.preset.id,
+          );
+        } else {
+          applyParcelPresetToProduct(result.preset.id);
+        }
+
+        setParcelPresetFeedback({
+          message: result.message ?? "Parcel preset saved.",
+          tone: "success",
+        });
+        setParcelPresetSaveDialog(null);
+      });
+    });
+  }
+
+  function openBulkValueDialog(
+    field: BulkValueField,
+    label: string,
+    placeholder: string,
+  ) {
+    setBulkValueDialog({
+      field,
+      label,
+      placeholder,
+      value: "",
+    });
+  }
+
+  function applyBulkValueDialog() {
+    if (!bulkValueDialog) {
+      return;
+    }
+
+    updateBulkVariants({
+      [bulkValueDialog.field]: bulkValueDialog.value,
+    } as Partial<GeneratedVariant>);
+    setBulkValueDialog(null);
+  }
+
+  function applyGeneratedVariants(combinations: string[][]) {
+    const existingByKey = new Map(
+      generatedVariants.map((variant) => [
+        getVariantKey(variant.optionValues),
+        variant,
+      ]),
+    );
+
+    const nextVariants = combinations.map((optionValues) => {
+      const existingVariant = existingByKey.get(getVariantKey(optionValues));
+
+      return {
+        barcode: "",
+        compareAtPrice,
+        continueSellingOutOfStock: isPiessangFulfilled
+          ? false
+          : continueSellingOutOfStock,
+        heightMm,
+        id: makeId("variant"),
+        imageId: selectedMediaIds[0] ?? null,
+        lengthMm,
+        lowStockAlert: "5",
+        notes: "",
+        optionValues,
+        parcelPresetId,
+        price,
+        sku: generateVariantSku(sku, productName, optionValues),
+        status: "active" as VariantStatus,
+        stock,
+        weightGrams,
+        widthMm,
+        ...existingVariant,
+      };
+    });
+
+    setGeneratedVariants(nextVariants);
+    setSelectedVariantIds([]);
+    setExpandedVariantId(null);
+    setPendingVariantCombinations(null);
+  }
+
   function generateVariants() {
     const combinations = createCombinations(variantOptions);
 
-    setGeneratedVariants(
-      combinations.map((optionValues, index) => ({
-        id: makeId("variant"),
-        imageId: selectedMediaIds[0] ?? null,
-        optionValues,
-        price,
-        sku: sku ? `${sku}-${index + 1}` : "",
-        stock,
-        weightGrams,
-      })),
-    );
+    if (combinations.length > 150) {
+      setPendingVariantCombinations(combinations);
+      return;
+    }
+
+    applyGeneratedVariants(combinations);
   }
 
   function handleGenerateDescription(kind: "long" | "short") {
@@ -937,27 +2381,494 @@ export function ProductCreateWizard({
     });
   }
 
+  function getProductDraftInput() {
+    return {
+        barcode,
+        brandName,
+        categoryId: selectedCategoryId,
+        compareAtPrice,
+        continueSellingOutOfStock,
+        description,
+        fulfillmentMode,
+        hasVariants,
+        heightMm,
+        lengthMm,
+        longDescription,
+        mediaIds: selectedMediaIds,
+        optionSchema: hasVariants
+          ? usableVariantOptions.map((option) => ({
+              name: option.name,
+              values: option.values,
+            }))
+          : [],
+        parcelPresetId,
+        price,
+        productId: draftProductId,
+        productName,
+        sku,
+        stock,
+        variants: hasVariants
+          ? generatedVariants.map((variant) => ({
+              barcode: variant.barcode,
+              compareAtPrice: variant.compareAtPrice,
+              continueSellingOutOfStock: variant.continueSellingOutOfStock,
+              heightMm: variant.heightMm,
+              imageId: variant.imageId,
+              lengthMm: variant.lengthMm,
+              lowStockAlert: variant.lowStockAlert,
+              notes: variant.notes,
+              optionValues: variant.optionValues,
+              parcelPresetId: variant.parcelPresetId,
+              price: variant.price,
+              sku: variant.sku,
+              status: variant.status,
+              stock: variant.stock,
+              weightGrams: variant.weightGrams,
+              widthMm: variant.widthMm,
+            }))
+          : [],
+        weightGrams,
+        widthMm,
+      };
+  }
+
+  function getOperationalUpdateInput() {
+    const baseVariant = initialProduct?.variants[0];
+    const baseVariantId = baseVariant?.id;
+
+    return {
+      productId: draftProductId,
+      variants: hasVariants
+        ? generatedVariants
+            .filter((variant) => variant.persistedVariantId)
+            .map((variant) => ({
+              compareAtPrice: variant.compareAtPrice,
+              continueSellingOutOfStock: variant.continueSellingOutOfStock,
+              heightMm: variant.heightMm,
+              id: variant.persistedVariantId,
+              isFragile: Boolean(variant.isFragile),
+              lengthMm: variant.lengthMm,
+              lowStockAlert: variant.lowStockAlert,
+              price: variant.price,
+              shipsAlone: Boolean(variant.shipsAlone),
+              status: variant.status,
+              stock: variant.stock,
+              weightGrams: variant.weightGrams,
+              widthMm: variant.widthMm,
+            }))
+        : baseVariantId
+          ? [
+              {
+                compareAtPrice,
+                continueSellingOutOfStock,
+                heightMm,
+                id: baseVariantId,
+                isFragile: Boolean(baseVariant?.isFragile),
+                lengthMm,
+                lowStockAlert: "5",
+                price,
+                shipsAlone: Boolean(baseVariant?.shipsAlone),
+                status: "active" as VariantStatus,
+                stock,
+                weightGrams,
+                widthMm,
+              },
+            ]
+          : [],
+    };
+  }
+
+  function handleSaveDraft() {
+    if (canSaveOperationalFields) {
+      setDraftSaveFeedback(null);
+      startSaveDraftTransition(() => {
+        void updateSellerProductOperationalFields(getOperationalUpdateInput()).then(
+          (result) => {
+            setDraftSaveFeedback({
+              message: result.message,
+              tone: result.ok ? "success" : "error",
+            });
+          },
+        );
+      });
+      return;
+    }
+
+    if (!canFullyEditProduct) {
+      setDraftSaveFeedback({
+        message: "This product status is locked from full editing.",
+        tone: "error",
+      });
+      return;
+    }
+
+    setDraftSaveFeedback(null);
+    startSaveDraftTransition(() => {
+      void saveProductDraft(getProductDraftInput()).then((result) => {
+        if (result.ok) {
+          setDraftProductId(result.productId ?? draftProductId);
+          setDraftSaveFeedback({
+            message: result.message ?? "Product saved.",
+            tone: "success",
+          });
+          return;
+        }
+
+        setDraftSaveFeedback({
+          message: result.message ?? "Could not save this product.",
+          tone: "error",
+        });
+      });
+    });
+  }
+
+  function handleSubmitForReview() {
+    if (!canFullyEditProduct) {
+      setDraftSaveFeedback({
+        message: "Only draft products or products with requested changes can be submitted for review.",
+        tone: "error",
+      });
+      return;
+    }
+
+    setDraftSaveFeedback(null);
+    startSubmitReviewTransition(() => {
+      void submitProductForReview(getProductDraftInput()).then((result) => {
+        if (result.ok) {
+          setDraftProductId(result.productId ?? draftProductId);
+          setDraftSaveFeedback({
+            message: result.message ?? "Product submitted for review.",
+            tone: "success",
+          });
+          return;
+        }
+
+        setDraftSaveFeedback({
+          message: result.message ?? "Could not submit this product for review.",
+          tone: "error",
+        });
+      });
+    });
+  }
+
+  async function handleScanImportLink() {
+    const url = importLinkUrl.trim();
+
+    if (!url) {
+      setImportLinkSteps([
+        {
+          message: "Paste a product page link first.",
+          step: "url",
+          tone: "error",
+        },
+      ]);
+      return;
+    }
+
+    setIsScanningImportLink(true);
+    setImportedProduct(null);
+    setSelectedImportedImageUrls([]);
+    setImportLinkSteps([
+      {
+        message: "Starting product import scan...",
+        step: "start",
+        tone: "working",
+      },
+    ]);
+
+    try {
+      const response = await fetch("/products/new/import-link", {
+        body: JSON.stringify({ url }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+
+      if (!response.body) {
+        throw new Error("The importer did not return a readable response.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.trim()) {
+            continue;
+          }
+
+          const event = JSON.parse(line) as
+            | {
+                message: string;
+                step: string;
+                type: "error" | "status";
+              }
+            | {
+                message: string;
+                product: ImportedProductScan;
+                step: string;
+                type: "result";
+              };
+
+          setImportLinkSteps((current) => [
+            ...current,
+            {
+              message: event.message,
+              step: event.step,
+              tone:
+                event.type === "error"
+                  ? "error"
+                  : event.type === "result"
+                    ? "success"
+                    : "working",
+            },
+          ]);
+
+          if (event.type === "result") {
+            setImportedProduct(event.product);
+            setSelectedImportedImageUrls(
+              event.product.images.slice(0, 10).map((image) => image.url),
+            );
+          }
+        }
+      }
+    } catch (error) {
+      setImportLinkSteps((current) => [
+        ...current,
+        {
+          message:
+            error instanceof Error
+              ? error.message
+              : "The product could not be scanned.",
+          step: "error",
+          tone: "error",
+        },
+      ]);
+    } finally {
+      setIsScanningImportLink(false);
+    }
+  }
+
+  function toggleImportedImage(url: string) {
+    setSelectedImportedImageUrls((current) =>
+      current.includes(url)
+        ? current.filter((item) => item !== url)
+        : current.length >= 10
+          ? current
+          : [...current, url],
+    );
+  }
+
+  function applyImportedProduct() {
+    if (!importedProduct) {
+      return;
+    }
+
+    setImportLinkSteps((current) => [
+      ...current,
+      {
+        message: "Applying the imported details to your draft...",
+        step: "apply-details",
+        tone: "working",
+      },
+    ]);
+
+    if (importedProduct.productName) {
+      setProductName(toTitleCase(importedProduct.productName).slice(0, 240));
+    }
+
+    if (importedProduct.sku) {
+      setSku(normalizeSkuPart(importedProduct.sku));
+    } else if (importedProduct.productName && !sku.trim()) {
+      setSku(generateSkuFromName(importedProduct.productName));
+    }
+
+    if (importedProduct.barcode) {
+      setBarcode(importedProduct.barcode);
+    }
+
+    if (importedProduct.brandName) {
+      setBrandName(toTitleCaseInput(importedProduct.brandName).slice(0, 120));
+    }
+
+    if (importedProduct.description) {
+      setDescription(importedProduct.description.slice(0, 400));
+    }
+
+    if (importedProduct.longDescription) {
+      setLongDescription(importedProduct.longDescription);
+    }
+
+    if (importedProduct.price) {
+      setPrice(sanitizeDecimalNumberInput(importedProduct.price));
+    }
+
+    if (importedProduct.compareAtPrice) {
+      setCompareAtPrice(sanitizeDecimalNumberInput(importedProduct.compareAtPrice));
+    }
+
+    const selectedImages = importedProduct.images.filter((image) =>
+      selectedImportedImageUrls.includes(image.url),
+    );
+
+    if (selectedImages.length === 0) {
+      setImportLinkSteps((current) => [
+        ...current,
+        {
+          message: "Product details were added. No images were selected.",
+          step: "complete",
+          tone: "success",
+        },
+      ]);
+      setIsImportLinkOpen(false);
+      return;
+    }
+
+    startApplyImportTransition(() => {
+      void importProductLinkMedia({ images: selectedImages }).then((result) => {
+        if (result.ok && result.assets) {
+          mergeMediaAssets(result.assets);
+          setSelectedMediaIds((current) => {
+            const next = [...current];
+
+            for (const asset of result.assets ?? []) {
+              if (!next.includes(asset.id) && next.length < 10) {
+                next.push(asset.id);
+              }
+            }
+
+            return next;
+          });
+          setImportLinkSteps((current) => [
+            ...current,
+            {
+              message: result.message ?? "Imported images were added.",
+              step: "import-media",
+              tone: "success",
+            },
+          ]);
+          setIsImportLinkOpen(false);
+          return;
+        }
+
+        setImportLinkSteps((current) => [
+          ...current,
+          {
+            message:
+              result.message ??
+              "Product details were added, but images could not be imported.",
+            step: "import-media",
+            tone: "error",
+          },
+        ]);
+      });
+    });
+  }
+
   return (
     <div className="grid gap-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <DashboardPageHeader
-          breadcrumbs={["Seller", "Products", "New product"]}
-          className="mb-0"
-          title="Create new product"
-        />
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+      <ListingReadinessDrawer
+        completedCount={completedChecklistCount}
+        isOpen={isReadinessOpen}
+        items={listingChecklistItems}
+        onOpenChange={setIsReadinessOpen}
+      />
+
+      <DashboardPageHeader
+        breadcrumbs={[
+          "Seller",
+          "Products",
+          initialProduct ? "Edit product" : "New product",
+        ]}
+        className="mb-0"
+        title={initialProduct ? "Edit product" : "Create new product"}
+      />
+
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+        <DashboardBackButton href="/products" label="Back to products" />
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <DashboardButton nativeButton={false} render={<Link href="/products" />}>
             Cancel
           </DashboardButton>
           <DashboardButton
-            className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+            disabled={fullListingControlsDisabled || isSavingDraft || isSubmittingReview}
+            onClick={() => {
+              setIsImportLinkOpen(true);
+              setImportedProduct(null);
+              setImportLinkSteps([]);
+            }}
             type="button"
           >
-            <SaveIcon className="size-3.5" />
-            Save draft
+            <LinkIcon className="size-3.5" />
+            Import from product link
           </DashboardButton>
+          <DashboardButton
+            className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+            disabled={saveDisabled}
+            onClick={handleSaveDraft}
+            type="button"
+          >
+            {isSavingDraft ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <SaveIcon className="size-3.5" />
+            )}
+            {isSavingDraft ? "Saving..." : "Save product"}
+          </DashboardButton>
+          {canSubmitForReview && canFullyEditProduct ? (
+            <DashboardButton
+              className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+              disabled={saveDisabled}
+              onClick={handleSubmitForReview}
+              type="button"
+            >
+              {isSubmittingReview ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <PackageCheckIcon className="size-3.5" />
+              )}
+              {isSubmittingReview ? "Submitting..." : "Submit for review"}
+            </DashboardButton>
+          ) : null}
         </div>
       </div>
+      {productIsLocked || canSaveOperationalFields ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
+          {canSaveOperationalFields
+            ? `This product is currently ${productStatus.replaceAll("_", " ")}. Core listing fields are locked, but operational fields such as price, stock, variant availability, and parcel data can be updated.`
+            : `This product is currently ${productStatus.replaceAll("_", " ")}. Full listing edits are locked here; use the products table actions to cancel review, pause, activate, archive, or delete where allowed.`}
+        </div>
+      ) : null}
+      {initialProduct?.status === "changes_requested" && initialProduct.reviewNote ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100">
+          <span className="block font-semibold">Requested changes</span>
+          <span className="mt-1 block whitespace-pre-wrap leading-5">
+            {initialProduct.reviewNote}
+          </span>
+        </div>
+      ) : null}
+      {draftSaveFeedback ? (
+        <div
+          className={cn(
+            "rounded-lg border px-3 py-2 text-sm",
+            draftSaveFeedback.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+              : "border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100",
+          )}
+        >
+          {draftSaveFeedback.message}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="grid gap-4">
@@ -970,6 +2881,7 @@ export function ProductCreateWizard({
                 <div className="relative">
                   <Input
                     className={cn(fieldClass, "pr-16")}
+                    disabled={fullListingControlsDisabled}
                     maxLength={240}
                     onChange={(event) => setProductName(event.target.value)}
                     onBlur={() => setProductName((current) => toTitleCase(current))}
@@ -989,6 +2901,7 @@ export function ProductCreateWizard({
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                   <Input
                     className={fieldClass}
+                    disabled={fullListingControlsDisabled}
                     onChange={(event) =>
                       setSku(normalizeSkuPart(event.target.value))
                     }
@@ -997,6 +2910,7 @@ export function ProductCreateWizard({
                   />
                   <DashboardButton
                     className="h-10"
+                    disabled={fullListingControlsDisabled}
                     onClick={() => setSku(generateSkuFromName(productName))}
                     type="button"
                   >
@@ -1024,6 +2938,25 @@ export function ProductCreateWizard({
                 ) : null}
               </label>
 
+              <label className="grid gap-1.5">
+                <FieldLabel
+                  info={
+                    isPiessangFulfilled
+                      ? "Required for Fulfilled by Piessang. This barcode is needed before inbound stock can be booked and processed."
+                      : "Optional barcode or supplier identifier for this main listing. Variants can still have their own barcode later."
+                  }
+                >
+                  {isPiessangFulfilled ? "Barcode *" : "Barcode"}
+                </FieldLabel>
+                <Input
+                  className={fieldClass}
+                  disabled={fullListingControlsDisabled}
+                  onChange={(event) => setBarcode(event.target.value)}
+                  placeholder="Enter barcode"
+                  value={barcode}
+                />
+              </label>
+
               <div className="grid gap-1.5">
                 <FieldLabel info="Select a parent category first, then optionally choose more specific subcategories.">
                   Category *
@@ -1041,6 +2974,7 @@ export function ProductCreateWizard({
                         {canClearLevel ? (
                           <button
                             className="text-xs font-medium text-slate-500 transition hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white"
+                            disabled={fullListingControlsDisabled}
                             onClick={() => clearCategoryLevel(index)}
                             type="button"
                           >
@@ -1049,6 +2983,7 @@ export function ProductCreateWizard({
                         ) : null}
                       </div>
                       <Select
+                        disabled={fullListingControlsDisabled}
                         value={level.value}
                         onValueChange={(value) => {
                           if (!value) {
@@ -1151,6 +3086,7 @@ export function ProductCreateWizard({
                 <div className="relative">
                   <Input
                     className={cn(fieldClass, "pr-16")}
+                    disabled={fullListingControlsDisabled}
                     maxLength={120}
                     required
                     onBlur={() =>
@@ -1224,6 +3160,7 @@ export function ProductCreateWizard({
                     </FieldLabel>
                   </div>
                   <AiGenerateButton
+                    disabled={fullListingControlsDisabled}
                     feedback={aiFeedback?.kind === "short" ? aiFeedback : null}
                     isPending={isGeneratingDescription}
                     onClick={() => handleGenerateDescription("short")}
@@ -1232,6 +3169,7 @@ export function ProductCreateWizard({
                 <div className="relative">
                   <Textarea
                     className={cn(textareaClass, "pb-8")}
+                    disabled={fullListingControlsDisabled}
                     maxLength={400}
                     onChange={(event) => setDescription(event.target.value)}
                     placeholder="Briefly describe your product"
@@ -1251,12 +3189,14 @@ export function ProductCreateWizard({
                     </FieldLabel>
                   </div>
                   <AiGenerateButton
+                    disabled={fullListingControlsDisabled}
                     feedback={aiFeedback?.kind === "long" ? aiFeedback : null}
                     isPending={isGeneratingDescription}
                     onClick={() => handleGenerateDescription("long")}
                   />
                 </div>
                 <ProductRichTextEditor
+                  disabled={fullListingControlsDisabled}
                   maxLength={2000}
                   onChange={setLongDescription}
                   placeholder="Describe the product in detail"
@@ -1267,25 +3207,41 @@ export function ProductCreateWizard({
           </Panel>
 
           <Panel title="Inventory">
+            {isInventoryLockedByPiessang ? (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-5 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                Piessang controls sellable stock for fulfilled products. Stock
+                becomes visible here only after inbound inventory is received
+                and processed by Piessang.
+              </div>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-2">
               <label
                 className={cn(
                   "grid gap-1.5 transition-opacity",
-                  continueSellingOutOfStock && "opacity-45",
+                  (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
+                    "opacity-45",
                 )}
               >
-                <FieldLabel info="The available stock quantity for this product.">
+                <FieldLabel
+                  info={
+                    isInventoryLockedByPiessang
+                      ? "Fulfilled by Piessang stock is managed by Piessang after inbound stock is received and processed."
+                      : "The available stock quantity for this product."
+                  }
+                >
                   Quantity *
                 </FieldLabel>
                 <Input
                   className={cn(
                     fieldClass,
-                    continueSellingOutOfStock &&
+                    (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
                       "cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-zinc-500",
                   )}
-                  disabled={continueSellingOutOfStock}
+                  disabled={continueSellingOutOfStock || isInventoryLockedByPiessang}
+                  inputMode="numeric"
                   min={0}
-                  onChange={(event) => setStock(event.target.value)}
+                  onChange={(event) => setStock(sanitizeStockInput(event.target.value))}
+                  pattern="[0-9]*"
                   type="number"
                   value={stock}
                 />
@@ -1293,28 +3249,42 @@ export function ProductCreateWizard({
               <label
                 className={cn(
                   "grid gap-1.5 transition-opacity",
-                  continueSellingOutOfStock && "opacity-45",
+                  (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
+                    "opacity-45",
                 )}
               >
-                <FieldLabel info="The stock level at which Piessang should flag this product as low stock.">
+                <FieldLabel
+                  info={
+                    isInventoryLockedByPiessang
+                      ? "Low stock alerts are managed from Piessang inventory once fulfilled stock is received."
+                      : "The stock level at which Piessang should flag this product as low stock."
+                  }
+                >
                   Low stock alert
                 </FieldLabel>
                 <Input
                   className={cn(
                     fieldClass,
-                    continueSellingOutOfStock &&
+                    (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
                       "cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-zinc-500",
                   )}
                   defaultValue={5}
-                  disabled={continueSellingOutOfStock}
+                  disabled={continueSellingOutOfStock || isInventoryLockedByPiessang}
                   min={0}
                   type="number"
                 />
               </label>
             </div>
-            <label className="mt-4 flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10">
+            <label
+              className={cn(
+                "mt-4 flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10",
+                isInventoryLockedByPiessang &&
+                  "cursor-not-allowed bg-slate-50 text-slate-500 dark:bg-white/[0.03] dark:text-zinc-500",
+              )}
+            >
               <Checkbox
                 checked={continueSellingOutOfStock}
+                disabled={isInventoryLockedByPiessang}
                 onCheckedChange={(checked) =>
                   setContinueSellingOutOfStock(Boolean(checked))
                 }
@@ -1324,7 +3294,11 @@ export function ProductCreateWizard({
                 Continue selling when out of stock
                 <InfoHint
                   label="Continue selling"
-                  text="Allow customers to place orders even when stock reaches zero."
+                  text={
+                    isInventoryLockedByPiessang
+                      ? "Unavailable for Fulfilled by Piessang because Piessang controls sellable stock."
+                      : "Allow customers to place orders even when stock reaches zero."
+                  }
                 />
               </span>
             </label>
@@ -1335,6 +3309,70 @@ export function ProductCreateWizard({
             description="Parcel data is required before checkout can quote accurate rates. Inaccurate weight or dimensions may cause courier adjustment fees, and those extra costs may be charged back to the seller."
           >
             <div className="grid min-w-0 gap-4">
+              <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <label className="grid gap-1.5">
+                  <FieldLabel info="Choose a saved parcel preset to fill weight and dimensions. The copied values can still be edited for this product.">
+                    Parcel preset
+                  </FieldLabel>
+                  <Select
+                    onValueChange={(value) =>
+                      applyParcelPresetToProduct(value === "__none" ? null : value)
+                    }
+                    value={parcelPresetId ?? "__none"}
+                  >
+                    <SelectTrigger className={fieldClass}>
+                      <SelectValue placeholder="Select a saved parcel preset" />
+                    </SelectTrigger>
+                    <SelectContent className={selectContentClass}>
+                      <SelectItem className={selectItemClass} value="__none">
+                        No preset selected
+                      </SelectItem>
+                      {parcelPresets.map((preset) => (
+                        <SelectItem
+                          key={preset.id}
+                          className={selectItemClass}
+                          value={preset.id}
+                        >
+                          {preset.name}
+                          {preset.isDefault ? " · Default" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+                <DashboardButton
+                  className="h-10"
+                  onClick={() => openParcelPresetSaveDialog({ type: "product" })}
+                  type="button"
+                >
+                  <SaveIcon className="size-3.5" />
+                  Save as preset
+                </DashboardButton>
+              </div>
+              {selectedParcelPreset ? (
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  {isParcelPresetModified
+                    ? `Modified from ${selectedParcelPreset.name}.`
+                    : `Using ${selectedParcelPreset.name}.`}
+                </p>
+              ) : parcelPresets.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                  Save commonly used package sizes once, then reuse them across
+                  products and variants.
+                </p>
+              ) : null}
+              {parcelPresetFeedback ? (
+                <p
+                  className={cn(
+                    "text-xs",
+                    parcelPresetFeedback.tone === "success"
+                      ? "text-emerald-700 dark:text-emerald-300"
+                      : "text-red-600 dark:text-red-300",
+                  )}
+                >
+                  {parcelPresetFeedback.message}
+                </p>
+              ) : null}
               <div className="grid min-w-0 gap-4">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <label className="grid gap-1.5">
@@ -1343,8 +3381,13 @@ export function ProductCreateWizard({
                     </FieldLabel>
                     <Input
                       className={fieldClass}
+                      inputMode="decimal"
                       min={1}
-                      onChange={(event) => setWeightGrams(event.target.value)}
+                      onChange={(event) =>
+                        setWeightGrams(sanitizeShippingMetricInput(event.target.value))
+                      }
+                      pattern="[0-9]*[.]?[0-9]*"
+                      step="any"
                       type="number"
                       value={weightGrams}
                     />
@@ -1355,8 +3398,13 @@ export function ProductCreateWizard({
                     </FieldLabel>
                     <Input
                       className={fieldClass}
+                      inputMode="decimal"
                       min={1}
-                      onChange={(event) => setLengthMm(event.target.value)}
+                      onChange={(event) =>
+                        setLengthMm(sanitizeShippingMetricInput(event.target.value))
+                      }
+                      pattern="[0-9]*[.]?[0-9]*"
+                      step="any"
                       type="number"
                       value={lengthMm}
                     />
@@ -1367,8 +3415,13 @@ export function ProductCreateWizard({
                     </FieldLabel>
                     <Input
                       className={fieldClass}
+                      inputMode="decimal"
                       min={1}
-                      onChange={(event) => setWidthMm(event.target.value)}
+                      onChange={(event) =>
+                        setWidthMm(sanitizeShippingMetricInput(event.target.value))
+                      }
+                      pattern="[0-9]*[.]?[0-9]*"
+                      step="any"
                       type="number"
                       value={widthMm}
                     />
@@ -1379,8 +3432,13 @@ export function ProductCreateWizard({
                     </FieldLabel>
                     <Input
                       className={fieldClass}
+                      inputMode="decimal"
                       min={1}
-                      onChange={(event) => setHeightMm(event.target.value)}
+                      onChange={(event) =>
+                        setHeightMm(sanitizeShippingMetricInput(event.target.value))
+                      }
+                      pattern="[0-9]*[.]?[0-9]*"
+                      step="any"
                       type="number"
                       value={heightMm}
                     />
@@ -1403,7 +3461,8 @@ export function ProductCreateWizard({
           >
             <button
               className="grid min-h-40 w-full place-items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center transition hover:border-emerald-500 hover:bg-emerald-50/70 dark:border-white/15 dark:bg-white/[0.03] dark:hover:border-emerald-500 dark:hover:bg-emerald-500/10"
-              onClick={() => setIsMediaOpen(true)}
+              disabled={fullListingControlsDisabled}
+              onClick={openProductMediaManager}
               type="button"
             >
               <span>
@@ -1417,57 +3476,100 @@ export function ProductCreateWizard({
               </span>
             </button>
 
-            <div className="mt-4 grid grid-cols-5 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {selectedMedia.map((asset, index) => (
                 <MediaTile
                   key={asset.id}
                   asset={asset}
+                  index={index}
                   isCover={index === 0}
-                  onRemove={() =>
-                    setSelectedMediaIds((current) =>
-                      current.filter((id) => id !== asset.id),
-                    )
-                  }
+                  isDragging={draggingMediaId === asset.id}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragStart={() => setDraggingMediaId(asset.id)}
+                  onDrop={() => {
+                    if (draggingMediaId) {
+                      moveSelectedMedia(draggingMediaId, asset.id);
+                    }
+                    setDraggingMediaId(null);
+                  }}
+                  onPlay={() => setPreviewVideoAsset(asset)}
+                  onRemove={() => {
+                    if (!fullListingControlsDisabled) {
+                      setSelectedMediaIds((current) =>
+                        current.filter((id) => id !== asset.id),
+                      );
+                    }
+                  }}
                 />
               ))}
-              <button
-                className="grid aspect-square place-items-center rounded-lg border border-dashed border-slate-300 text-slate-500 hover:border-emerald-500 hover:text-emerald-700 dark:border-white/15 dark:text-zinc-400 dark:hover:border-emerald-500 dark:hover:text-emerald-300"
-                onClick={() => setIsMediaOpen(true)}
-                type="button"
-              >
-                <PlusIcon className="size-5" />
-              </button>
+              {!fullListingControlsDisabled ? (
+                <button
+                  className="grid aspect-square place-items-center rounded-lg border border-dashed border-slate-300 text-slate-500 hover:border-emerald-500 hover:text-emerald-700 dark:border-white/15 dark:text-zinc-400 dark:hover:border-emerald-500 dark:hover:text-emerald-300"
+                  onClick={openProductMediaManager}
+                  type="button"
+                >
+                  <PlusIcon className="size-5" />
+                </button>
+              ) : null}
             </div>
           </Panel>
 
           <Panel title="Pricing">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1.5">
-                <FieldLabel info="The customer-facing selling price.">
-                  Price *
+                <FieldLabel info="The final customer-facing selling price, including VAT. Do not enter an ex-VAT amount.">
+                  Price (VAT incl.) *
                 </FieldLabel>
                 <Input
                   className={fieldClass}
+                  inputMode="decimal"
                   min={0}
-                  onChange={(event) => setPrice(event.target.value)}
+                  onChange={(event) =>
+                    setPrice(sanitizeDecimalNumberInput(event.target.value))
+                  }
+                  pattern="[0-9]*[.]?[0-9]*"
                   placeholder="0.00"
+                  step="0.01"
                   type="number"
                   value={price}
                 />
               </label>
               <label className="grid gap-1.5">
-                <FieldLabel info="Optional original price used to show a markdown or discount.">
-                  Compare-at price
+                <FieldLabel info="Optional original VAT-inclusive price used to show a markdown or discount. This must be higher than the selling price.">
+                  Compare-at price (VAT incl.)
                 </FieldLabel>
                 <Input
                   className={fieldClass}
+                  inputMode="decimal"
                   min={0}
-                  onChange={(event) => setCompareAtPrice(event.target.value)}
+                  onChange={(event) =>
+                    setCompareAtPrice(
+                      sanitizeDecimalNumberInput(event.target.value),
+                    )
+                  }
+                  pattern="[0-9]*[.]?[0-9]*"
                   placeholder="0.00"
+                  step="0.01"
                   type="number"
                   value={compareAtPrice}
                 />
               </label>
+            </div>
+            <div
+              className={cn(
+                "mt-4 rounded-lg border px-3 py-2 text-xs leading-5",
+                pricingBreakdown.tone === "success" &&
+                  "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100",
+                pricingBreakdown.tone === "warning" &&
+                  "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100",
+                pricingBreakdown.tone === "neutral" &&
+                  "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300",
+              )}
+            >
+              <div className="font-semibold text-zinc-950 dark:text-white">
+                {pricingBreakdown.title}
+              </div>
+              <div>{pricingBreakdown.message}</div>
             </div>
           </Panel>
 
@@ -1484,27 +3586,54 @@ export function ProductCreateWizard({
                     : "border-slate-200 bg-white dark:border-white/10 dark:bg-[#151719]",
                 )}
                 onClick={() => setFulfillmentMode("seller_fulfilled")}
+                disabled={fullListingControlsDisabled}
                 type="button"
               >
                 <span className="font-semibold">Seller ships this product</span>
                 <span className="mt-1 block text-sm text-slate-600 dark:text-zinc-300">
-                  You pack the order and print the Piessang waybill.
+                  You keep the stock, pack the order, print the Piessang
+                  waybill, and hand it to the booked courier for collection.
                 </span>
               </button>
               <button
+                aria-disabled={!isPiessangFulfillmentEnabled}
                 className={cn(
                   "rounded-lg border p-4 text-left transition",
-                  fulfillmentMode === "piessang_fulfilled"
+                  !isPiessangFulfillmentEnabled &&
+                    "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 opacity-80 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-500",
+                  fulfillmentMode === "piessang_fulfilled" &&
+                    isPiessangFulfillmentEnabled
                     ? "border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-500/10 dark:text-emerald-100"
-                    : "border-slate-200 bg-white dark:border-white/10 dark:bg-[#151719]",
+                    : isPiessangFulfillmentEnabled
+                      ? "border-slate-200 bg-white dark:border-white/10 dark:bg-[#151719]"
+                      : "",
                 )}
-                onClick={() => setFulfillmentMode("piessang_fulfilled")}
+                disabled={!isPiessangFulfillmentEnabled || fullListingControlsDisabled}
+                onClick={() => {
+                  if (isPiessangFulfillmentEnabled && !fullListingControlsDisabled) {
+                    setFulfillmentMode("piessang_fulfilled");
+                  }
+                }}
                 type="button"
               >
                 <span className="font-semibold">Fulfilled by Piessang</span>
                 <span className="mt-1 block text-sm text-slate-600 dark:text-zinc-300">
-                  Available only for approved products and local stock.
+                  Piessang stores approved stock, picks and packs the order, and
+                  delivers through our local fulfillment routes.
                 </span>
+                {isPiessangFulfillmentEnabled ? (
+                  <span className="mt-3 block rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-400/20 dark:bg-[#151719] dark:text-emerald-200">
+                    Requires product and variant barcodes before inbound stock
+                    can be booked. Sellers cannot edit sellable stock for FBP;
+                    stock appears after Piessang receives and processes it.
+                  </span>
+                ) : null}
+                {!isPiessangFulfillmentEnabled ? (
+                  <span className="mt-3 block rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 dark:border-white/10 dark:bg-[#151719] dark:text-zinc-300">
+                    Not available yet. Fulfilled by Piessang is invitation-only
+                    for selected sellers and local stock programs.
+                  </span>
+                ) : null}
               </button>
             </div>
           </Panel>
@@ -1518,146 +3647,873 @@ export function ProductCreateWizard({
         <label className="mb-4 flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10">
           <Checkbox
             checked={hasVariants}
-            onCheckedChange={(checked) => setHasVariants(Boolean(checked))}
+            disabled={fullListingControlsDisabled}
+            onCheckedChange={(checked) => {
+              setHasVariants(Boolean(checked));
+              setExpandedVariantId(null);
+            }}
             className="size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
           />
           This product has multiple options
         </label>
 
         {hasVariants ? (
-          <div className="grid gap-4">
-            {variantOptions.map((option) => (
-              <div
-                key={option.id}
-                className="grid gap-2 rounded-lg border border-slate-200 p-3 dark:border-white/10"
-              >
-                <div className="grid gap-2 md:grid-cols-[220px_1fr_auto]">
-                  <label className="grid gap-1.5">
-                    <FieldLabel info="The option type, for example size, color, material, or style.">
-                      Option name
-                    </FieldLabel>
-                    <Input
-                      className={fieldClass}
-                      onChange={(event) =>
-                        updateVariantOption(option.id, {
-                          name: event.target.value,
-                        })
-                      }
-                      placeholder="Option name"
-                      value={option.name}
+          <div className="grid min-w-0 gap-5">
+            <div className="rounded-lg border border-slate-200 dark:border-white/10">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 p-3 dark:border-white/10">
+                <div>
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-950 dark:text-white">
+                    1. Build your options
+                    <InfoHint
+                      label="Build your options"
+                      text="Add option types like color, size, or material. Values become purchasable variant combinations."
                     />
-                  </label>
-                  <label className="grid gap-1.5">
-                    <FieldLabel info="Comma-separated values for this option. These become variant combinations.">
-                      Option values
-                    </FieldLabel>
-                    <Input
-                      className={fieldClass}
-                      onChange={(event) =>
-                        updateVariantOption(option.id, {
-                          values: event.target.value
-                            .split(",")
-                            .map((value) => value.trim())
-                            .filter(Boolean),
-                        })
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                    Add every option that affects the purchasable item. We will
+                    generate every possible combination, then you can remove
+                    combinations you do not sell.
+                  </p>
+                </div>
+                <DashboardButton
+                  disabled={fullListingControlsDisabled}
+                  onClick={() =>
+                    setVariantOptions((current) => [
+                      ...current,
+                      { id: makeId("option"), name: "", values: [] },
+                    ])
+                  }
+                  type="button"
+                >
+                  <PlusIcon className="size-3.5" />
+                  Add option
+                </DashboardButton>
+              </div>
+              <div className="grid gap-2 p-3">
+                {variantOptions.map((option) => (
+                  <div
+                    key={option.id}
+                    className="grid min-w-0 gap-3 rounded-lg border border-slate-200 p-3 dark:border-white/10 lg:grid-cols-[220px_minmax(0,1fr)_auto]"
+                  >
+                    <label className="grid min-w-0 gap-1.5">
+                      <FieldLabel info="The option type, for example size, color, material, or style.">
+                        Option name
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        disabled={fullListingControlsDisabled}
+                        onBlur={(event) =>
+                          updateVariantOption(option.id, {
+                            name: toTitleCase(event.target.value.trim()),
+                          })
+                        }
+                        onChange={(event) =>
+                          updateVariantOption(option.id, {
+                            name: toTitleCaseInput(event.target.value),
+                          })
+                        }
+                        placeholder="Color"
+                        value={option.name}
+                      />
+                    </label>
+                    <div className="grid min-w-0 gap-1.5">
+                      <FieldLabel info="Add option values as chips. Each value combines with the other option values.">
+                        Option values
+                      </FieldLabel>
+                      <div className="flex min-h-10 min-w-0 flex-wrap items-center gap-2 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-white/18 dark:bg-[#151719]">
+                        {option.values.map((value) => (
+                          <span
+                            key={value}
+                            className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-zinc-200"
+                          >
+                            <span className="truncate">{value}</span>
+                            <button
+                              aria-label={`Remove ${value}`}
+                              className="grid size-4 shrink-0 place-items-center rounded-full text-slate-500 hover:bg-white hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+                              disabled={fullListingControlsDisabled}
+                              onClick={() => removeVariantOptionValue(option.id, value)}
+                              type="button"
+                            >
+                              <XIcon className="size-3" />
+                            </button>
+                          </span>
+                        ))}
+                        <Input
+                          aria-label={`${option.name || "Option"} value`}
+                          className="h-7 min-w-28 flex-1 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
+                          disabled={fullListingControlsDisabled}
+                          onChange={(event) =>
+                            setOptionValueInputs((current) => ({
+                              ...current,
+                              [option.id]: toTitleCaseInput(event.target.value),
+                            }))
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === ",") {
+                              event.preventDefault();
+                              addVariantOptionValues(
+                                option.id,
+                                optionValueInputs[option.id] ?? "",
+                              );
+                            }
+
+                            if (
+                              event.key === "Backspace" &&
+                              !(optionValueInputs[option.id] ?? "") &&
+                              option.values.length > 0
+                            ) {
+                              event.preventDefault();
+                              removeVariantOptionValue(
+                                option.id,
+                                option.values[option.values.length - 1],
+                              );
+                            }
+                          }}
+                          placeholder="Add value"
+                          value={optionValueInputs[option.id] ?? ""}
+                        />
+                        <Button
+                          className="h-7 shrink-0 rounded-md px-2 text-xs"
+                          disabled={fullListingControlsDisabled}
+                          onClick={() =>
+                            addVariantOptionValues(
+                              option.id,
+                              optionValueInputs[option.id] ?? "",
+                            )
+                          }
+                          type="button"
+                          variant="outline"
+                        >
+                          <PlusIcon className="size-3" />
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      aria-label={`Remove ${option.name || "option"}`}
+                      className="self-end text-slate-600 hover:text-red-600 dark:text-zinc-300 dark:hover:text-red-300"
+                      disabled={variantOptions.length === 1 || fullListingControlsDisabled}
+                      onClick={() =>
+                        setVariantOptions((current) =>
+                          current.filter(
+                            (currentOption) => currentOption.id !== option.id,
+                          ),
+                        )
                       }
-                      placeholder="Small, Medium, Large"
-                      value={option.values.join(", ")}
-                    />
-                  </label>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() =>
-                      setVariantOptions((current) =>
-                        current.filter((currentOption) => currentOption.id !== option.id),
-                      )
-                    }
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Trash2Icon className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+                <div
+                  className={cn(
+                    "flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm",
+                    variantCombinationTone === "danger"
+                      ? "border-red-200 bg-red-50 text-red-800 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-200"
+                      : variantCombinationTone === "warning"
+                        ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100"
+                        : "border-emerald-200 bg-emerald-50/70 text-emerald-950 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100",
+                  )}
+                >
+                  <span className="flex min-w-0 items-start gap-2">
+                    {variantCombinationTone !== "normal" ? (
+                      <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
+                    ) : null}
+                    <span>
+                      {usableVariantOptions.length} option
+                      {usableVariantOptions.length === 1 ? "" : "s"} with{" "}
+                      {usableVariantOptions.reduce(
+                        (total, option) => total + option.values.length,
+                        0,
+                      )}{" "}
+                      value
+                      {usableVariantOptions.reduce(
+                        (total, option) => total + option.values.length,
+                        0,
+                      ) === 1
+                        ? ""
+                        : "s"}{" "}
+                      will generate {variantCombinationCount} variant
+                      {variantCombinationCount === 1 ? "" : "s"}. Remove
+                      combinations you do not sell after generating.
+                    </span>
+                  </span>
+                  <DashboardButton
+                    className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+                    disabled={variantCombinationCount === 0 || fullListingControlsDisabled}
+                    onClick={generateVariants}
                     type="button"
                   >
-                    <Trash2Icon className="size-4" />
-                  </Button>
+                    <SparklesIcon className="size-3.5" />
+                    Generate variants
+                  </DashboardButton>
                 </div>
               </div>
-            ))}
-            <div className="flex flex-wrap gap-2">
-              <DashboardButton
-                onClick={() =>
-                  setVariantOptions((current) => [
-                    ...current,
-                    { id: makeId("option"), name: "", values: [] },
-                  ])
-                }
-                type="button"
-              >
-                <PlusIcon className="size-3.5" />
-                Add option
-              </DashboardButton>
-              <DashboardButton
-                className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
-                onClick={generateVariants}
-                type="button"
-              >
-                <SparklesIcon className="size-3.5" />
-                Generate variants
-              </DashboardButton>
             </div>
 
             {generatedVariants.length > 0 ? (
               <div className="grid gap-3">
-                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-950 dark:text-white">
-                  Generated variants ({generatedVariants.length})
-                  <InfoHint
-                    label="Generated variants"
-                    text="The generated purchasable combinations based on the selected product options."
-                  />
-                </h3>
-                <div className="grid gap-2">
-                  {generatedVariants.slice(0, 8).map((variant) => {
-                    const image = variant.imageId ? mediaById.get(variant.imageId) : null;
-
-                    return (
-                      <div
-                        key={variant.id}
-                        className="grid gap-3 rounded-lg border border-slate-200 p-3 dark:border-white/10 md:grid-cols-[1fr_140px_110px_120px]"
+                <div>
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-950 dark:text-white">
+                    2. Manage variants
+                    <InfoHint
+                      label="Manage variants"
+                      text="Each generated row is a real purchasable variant with its own stock, price, shipping data, and status."
+                    />
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                    Edit each variant or use bulk actions to update multiple.
+                    For dependent options like RAM and storage, generate all
+                    combinations first, then remove the rows you do not sell.
+                  </p>
+                </div>
+                <div className={cn(dashboardPanelClass, "overflow-hidden")}>
+                  {selectedVariantCount > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                      <span className="mr-1 text-xs font-semibold text-slate-600 dark:text-zinc-300">
+                        {selectedVariantCount} selected
+                      </span>
+                      <DashboardRowActionMenu
+                        ariaLabel="Bulk variant actions"
+                        className="w-72"
+                        triggerClassName={cn(
+                          "ml-auto h-8 w-auto rounded-md border border-slate-300 bg-white px-3 text-[14px] font-normal leading-none text-zinc-950 shadow-none hover:bg-slate-50 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10",
+                        )}
+                        trigger={
+                          <span className="inline-flex items-center gap-1.5">
+                            Bulk actions
+                          </span>
+                        }
                       >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div className="relative size-12 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-white/10">
-                            {image?.thumbnailUrl || image?.publicUrl ? (
-                              <Image
-                                src={image.thumbnailUrl ?? image.publicUrl}
-                                alt=""
-                                fill
-                                sizes="48px"
-                                className="object-cover"
-                              />
-                            ) : null}
+                        <button
+                          className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                          onClick={() =>
+                            updateBulkVariants({ status: "unavailable" })
+                          }
+                          type="button"
+                        >
+                          Mark unavailable
+                        </button>
+                        <button
+                          className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                          onClick={() =>
+                            openBulkValueDialog(
+                              "price",
+                              "Set VAT-inclusive price",
+                              "Price incl. VAT",
+                            )
+                          }
+                          type="button"
+                        >
+                          Set price
+                        </button>
+                        <button
+                          className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                          onClick={() =>
+                            openBulkValueDialog(
+                              "compareAtPrice",
+                              "Set VAT-inclusive compare-at price",
+                              "Compare-at price incl. VAT",
+                            )
+                          }
+                          type="button"
+                        >
+                          Set compare-at price
+                        </button>
+                        <button
+                          className={cn(
+                            "flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10",
+                            isInventoryLockedByPiessang &&
+                              "cursor-not-allowed text-slate-400 hover:bg-transparent dark:text-zinc-500 dark:hover:bg-transparent",
+                          )}
+                          disabled={isInventoryLockedByPiessang}
+                          onClick={() =>
+                            openBulkValueDialog(
+                              "stock",
+                              "Set stock",
+                              "Stock",
+                            )
+                          }
+                          type="button"
+                        >
+                          Set stock
+                        </button>
+                        <button
+                          className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                          onClick={openBulkVariantMediaManager}
+                          type="button"
+                        >
+                          Set image
+                        </button>
+                        {parcelPresets.length > 0 ? (
+                          <div className="border-t border-slate-200 py-1 dark:border-white/10">
+                            {parcelPresets.map((preset) => (
+                              <button
+                                key={preset.id}
+                                className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                                onClick={() =>
+                                  applyParcelPresetToSelectedVariants(preset.id)
+                                }
+                                type="button"
+                              >
+                                Set parcel preset: {preset.name}
+                              </button>
+                            ))}
                           </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">
-                              {variant.optionValues.join(" / ")}
-                            </p>
-                            <p className="truncate text-xs text-slate-500">
-                              {variant.sku || "SKU pending"}
-                            </p>
-                          </div>
+                        ) : null}
+                        <div className="border-t border-slate-200 py-1 dark:border-white/10">
+                          {Object.entries(variantStatusConfig).map(
+                            ([status, config]) => (
+                              <button
+                                key={status}
+                                className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                                onClick={() =>
+                                  updateBulkVariants({
+                                    status: status as VariantStatus,
+                                  })
+                                }
+                                type="button"
+                              >
+                                Set status: {config.label}
+                              </button>
+                            ),
+                          )}
                         </div>
-                        <Input className={fieldClass} defaultValue={variant.price} placeholder="Price" />
-                        <Input
-                          aria-label="Variant stock"
-                          className={fieldClass}
-                          defaultValue={variant.stock}
-                          placeholder="Stock"
-                        />
-                        <Input
-                          aria-label="Variant weight grams"
-                          className={fieldClass}
-                          defaultValue={variant.weightGrams}
-                          placeholder="Weight g"
-                        />
-                      </div>
-                    );
-                  })}
+                        <button
+                          className="flex w-full items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                          onClick={() => removeGeneratedVariants(selectedVariantIds)}
+                          type="button"
+                        >
+                          Remove selected combinations
+                        </button>
+                      </DashboardRowActionMenu>
+                    </div>
+                  ) : null}
+
+                  <div className={dashboardTableContainerClass}>
+                    <Table className={dashboardTableClass}>
+                      <TableHeader>
+                        <TableRow className={dashboardTableHeaderRowClass}>
+                          <TableHead className="hidden w-10 px-4 md:table-cell">
+                            <Checkbox
+                              checked={allGeneratedVariantsSelected}
+                              onCheckedChange={(checked) =>
+                                setSelectedVariantIds(
+                                  checked
+                                    ? generatedVariants.map((variant) => variant.id)
+                                    : [],
+                                )
+                              }
+                              className="size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
+                            />
+                          </TableHead>
+                          <TableHead className={dashboardTableHeadClass}>
+                            <ColumnInfoTitle info="The generated option combination customers can buy.">
+                              Variant
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="A globally unique stock keeping unit for this variant.">
+                              SKU
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="The final customer-facing selling price for this variant, including VAT.">
+                              Price (VAT incl.)
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="Optional original VAT-inclusive price used to show a markdown discount. It must be higher than the selling price.">
+                              Compare at (VAT incl.)
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle
+                              info={
+                                isInventoryLockedByPiessang
+                                  ? "Piessang controls FBP variant stock after inbound inventory is received and processed."
+                                  : "The available stock quantity for this variant."
+                              }
+                            >
+                              Stock
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle
+                              info={
+                                isInventoryLockedByPiessang
+                                  ? "Low stock alerts are not seller-managed for FBP variants."
+                                  : "The stock level where Piessang should flag this variant as low stock."
+                              }
+                            >
+                              Low stock
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="Optional packed weight override in grams for this variant. Decimals are allowed.">
+                              Weight (g)
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="Optional packed length override in millimetres. Decimals are allowed.">
+                              Length (mm)
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="Optional packed width override in millimetres. Decimals are allowed.">
+                              Width (mm)
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="Optional packed height override in millimetres. Decimals are allowed.">
+                              Height (mm)
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle
+                              info={
+                                isPiessangFulfilled
+                                  ? "Required for Fulfilled by Piessang variants before inbound stock can be booked."
+                                  : "Optional barcode or supplier identifier."
+                              }
+                            >
+                              {isPiessangFulfilled ? "Barcode *" : "Barcode"}
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="Internal notes for this specific variant.">
+                              Notes
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle
+                              info={
+                                isInventoryLockedByPiessang
+                                  ? "Unavailable for FBP because Piessang controls sellable stock."
+                                  : "Whether this variant can keep selling when stock reaches zero."
+                              }
+                            >
+                              Oversell
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="Controls whether this variant is available, draft, sold out, or unavailable.">
+                              Status
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                            <ColumnInfoTitle info="The image shown for this exact variant combination.">
+                              Image
+                            </ColumnInfoTitle>
+                          </TableHead>
+                          <TableHead className={dashboardTableActionHeadClass}>
+                            <ColumnInfoTitle info="Row actions for editing or removing this variant.">
+                              Actions
+                            </ColumnInfoTitle>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {generatedVariants.map((variant) => {
+                          const image = variant.imageId
+                            ? mediaById.get(variant.imageId)
+                            : null;
+                          const variantSkuStatus =
+                            variantSkuStatuses[variant.id] ?? "idle";
+
+                          return (
+                            <TableRow
+                              key={variant.id}
+                              className={dashboardTableRowClass}
+                            >
+                              <TableCell className="hidden w-10 px-4 md:table-cell">
+                                <Checkbox
+                                  checked={selectedVariantIds.includes(variant.id)}
+                                  onCheckedChange={() => toggleVariantSelection(variant.id)}
+                                  className="size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
+                                />
+                              </TableCell>
+                              <TableCell className={dashboardTableCellClass}>
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="size-2 rounded-full bg-emerald-500" />
+                                  <span className={dashboardTablePrimaryTextClass}>
+                                    {variant.optionValues.join(" / ")}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <div className="relative w-32">
+                                  <Input
+                                    aria-label="Variant SKU"
+                                    className={cn(
+                                      "h-8 w-full border-slate-300 text-xs",
+                                      getSkuStatusClass(variantSkuStatus),
+                                    )}
+                                    onChange={(event) =>
+                                      updateGeneratedVariant(variant.id, {
+                                        sku: event.target.value,
+                                      })
+                                    }
+                                    title={
+                                      variantSkuStatus === "available"
+                                        ? "SKU is available"
+                                        : variantSkuStatus === "duplicate"
+                                          ? "SKU is already used or duplicated in this product"
+                                          : variantSkuStatus === "checking"
+                                            ? "Checking SKU availability"
+                                            : "Enter a unique SKU"
+                                    }
+                                    value={variant.sku}
+                                  />
+                                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+                                    <SkuStatusIcon status={variantSkuStatus} />
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant VAT-inclusive price"
+                                  className="h-8 w-24 border-slate-300 text-xs"
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      price: sanitizeDecimalNumberInput(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                  inputMode="decimal"
+                                  min={0}
+                                  pattern="[0-9]*[.]?[0-9]*"
+                                  step="0.01"
+                                  type="number"
+                                  value={variant.price}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    aria-label="Variant VAT-inclusive compare-at price"
+                                    className="h-8 w-24 border-slate-300 text-xs"
+                                    onChange={(event) =>
+                                      updateGeneratedVariant(variant.id, {
+                                        compareAtPrice:
+                                          sanitizeDecimalNumberInput(
+                                            event.target.value,
+                                          ),
+                                      })
+                                    }
+                                    inputMode="decimal"
+                                    min={0}
+                                    pattern="[0-9]*[.]?[0-9]*"
+                                    step="0.01"
+                                    type="number"
+                                    value={variant.compareAtPrice}
+                                  />
+                                  {getDiscountPercent(
+                                    variant.price,
+                                    variant.compareAtPrice,
+                                  ) ? (
+                                    <span className="text-xs font-semibold text-red-600 dark:text-red-300">
+                                      -
+                                      {getDiscountPercent(
+                                        variant.price,
+                                        variant.compareAtPrice,
+                                      )}
+                                      %
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant stock"
+                                  className={cn(
+                                    "h-8 w-20 border-slate-300 text-xs",
+                                    (variant.continueSellingOutOfStock ||
+                                      isInventoryLockedByPiessang) &&
+                                      "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
+                                  )}
+                                  disabled={
+                                    variant.continueSellingOutOfStock ||
+                                    isInventoryLockedByPiessang
+                                  }
+                                  inputMode="numeric"
+                                  min={0}
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      stock: sanitizeStockInput(event.target.value),
+                                    })
+                                  }
+                                  pattern="[0-9]*"
+                                  type="number"
+                                  value={variant.stock}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant low stock alert"
+                                  className={cn(
+                                    "h-8 w-24 border-slate-300 text-xs",
+                                    (variant.continueSellingOutOfStock ||
+                                      isInventoryLockedByPiessang) &&
+                                      "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
+                                  )}
+                                  disabled={
+                                    variant.continueSellingOutOfStock ||
+                                    isInventoryLockedByPiessang
+                                  }
+                                  inputMode="numeric"
+                                  min={0}
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      lowStockAlert: sanitizeStockInput(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                  pattern="[0-9]*"
+                                  type="number"
+                                  value={variant.lowStockAlert}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant weight override"
+                                  className="h-8 w-24 border-slate-300 text-xs"
+                                  inputMode="decimal"
+                                  min={1}
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      weightGrams: sanitizeShippingMetricInput(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                  pattern="[0-9]*[.]?[0-9]*"
+                                  placeholder="g"
+                                  step="any"
+                                  type="number"
+                                  value={variant.weightGrams}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant length override"
+                                  className="h-8 w-24 border-slate-300 text-xs"
+                                  inputMode="decimal"
+                                  min={1}
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      lengthMm: sanitizeShippingMetricInput(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                  pattern="[0-9]*[.]?[0-9]*"
+                                  placeholder="mm"
+                                  step="any"
+                                  type="number"
+                                  value={variant.lengthMm}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant width override"
+                                  className="h-8 w-24 border-slate-300 text-xs"
+                                  inputMode="decimal"
+                                  min={1}
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      widthMm: sanitizeShippingMetricInput(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                  pattern="[0-9]*[.]?[0-9]*"
+                                  placeholder="mm"
+                                  step="any"
+                                  type="number"
+                                  value={variant.widthMm}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant height override"
+                                  className="h-8 w-24 border-slate-300 text-xs"
+                                  inputMode="decimal"
+                                  min={1}
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      heightMm: sanitizeShippingMetricInput(
+                                        event.target.value,
+                                      ),
+                                    })
+                                  }
+                                  pattern="[0-9]*[.]?[0-9]*"
+                                  placeholder="mm"
+                                  step="any"
+                                  type="number"
+                                  value={variant.heightMm}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant barcode"
+                                  className="h-8 w-32 border-slate-300 text-xs"
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      barcode: event.target.value,
+                                    })
+                                  }
+                                  value={variant.barcode}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Input
+                                  aria-label="Variant notes"
+                                  className="h-8 w-40 border-slate-300 text-xs"
+                                  onChange={(event) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      notes: event.target.value,
+                                    })
+                                  }
+                                  value={variant.notes}
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Checkbox
+                                  aria-label="Continue selling this variant when out of stock"
+                                  checked={variant.continueSellingOutOfStock}
+                                  disabled={isInventoryLockedByPiessang}
+                                  onCheckedChange={(checked) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      continueSellingOutOfStock: Boolean(checked),
+                                    })
+                                  }
+                                  className="size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
+                                />
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <Select
+                                  onValueChange={(value) =>
+                                    updateGeneratedVariant(variant.id, {
+                                      status: value as VariantStatus,
+                                    })
+                                  }
+                                  value={variant.status}
+                                >
+                                  <SelectTrigger
+                                    className={getVariantStatusSelectClass(variant.status)}
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className={selectContentClass}>
+                                    {Object.entries(variantStatusConfig).map(
+                                      ([status, config]) => (
+                                        <SelectItem
+                                          key={status}
+                                          className={selectItemClass}
+                                          value={status}
+                                        >
+                                          {config.label}
+                                        </SelectItem>
+                                      ),
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                <button
+                                  aria-label="Select variant image"
+                                  className="relative size-8 overflow-hidden rounded-md border border-slate-200 bg-slate-50 transition hover:border-emerald-500 hover:text-emerald-700 dark:border-white/10 dark:hover:border-emerald-500 dark:hover:text-emerald-300"
+                                  onClick={() => openVariantMediaManager(variant.id)}
+                                  type="button"
+                                >
+                                  {image?.thumbnailUrl || image?.publicUrl ? (
+                                    <Image
+                                      src={image.thumbnailUrl ?? image.publicUrl}
+                                      alt=""
+                                      fill
+                                      sizes="32px"
+                                      className="object-cover"
+                                    />
+                                  ) : (
+                                    <ImagePlusIcon className="m-2 size-4 text-slate-400" />
+                                  )}
+                                </button>
+                              </TableCell>
+                              <TableCell className={dashboardTableActionCellClass}>
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    aria-label="Edit variant details"
+                                    className="text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
+                                    onClick={() => setExpandedVariantId(variant.id)}
+                                    size="icon-sm"
+                                    type="button"
+                                    variant="ghost"
+                                  >
+                                    <PencilIcon
+                                      className="size-4"
+                                    />
+                                  </Button>
+                                  <DashboardRowActionMenu ariaLabel="Variant actions">
+                                    <button
+                                      className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                                      onClick={() => setExpandedVariantId(variant.id)}
+                                      type="button"
+                                    >
+                                      Edit details
+                                    </button>
+                                    <button
+                                      className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                                      onClick={() =>
+                                        updateGeneratedVariant(variant.id, {
+                                          sku: generateVariantSku(
+                                            sku,
+                                            productName,
+                                            variant.optionValues,
+                                          ),
+                                        })
+                                      }
+                                      type="button"
+                                    >
+                                      Generate SKU
+                                    </button>
+                                    <button
+                                      className="flex w-full items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                                      onClick={() =>
+                                        updateGeneratedVariant(variant.id, {
+                                          status: "unavailable",
+                                        })
+                                      }
+                                      type="button"
+                                    >
+                                      Mark unavailable
+                                    </button>
+                                    <button
+                                      className="flex w-full items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                                      onClick={() => removeGeneratedVariant(variant.id)}
+                                      type="button"
+                                    >
+                                      Remove combination
+                                    </button>
+                                  </DashboardRowActionMenu>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-white/10 dark:text-zinc-400">
+                    Showing {generatedVariants.length} variant
+                    {generatedVariants.length === 1 ? "" : "s"}
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -1675,21 +4531,1080 @@ export function ProductCreateWizard({
         </DashboardButton>
         <DashboardButton
           className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+          disabled={saveDisabled}
+          onClick={handleSaveDraft}
           type="button"
         >
-          <PackageCheckIcon className="size-3.5" />
-          Save draft
+          {isSavingDraft ? (
+            <Loader2Icon className="size-3.5 animate-spin" />
+          ) : (
+            <SaveIcon className="size-3.5" />
+          )}
+          {isSavingDraft ? "Saving..." : "Save product"}
         </DashboardButton>
+        {canSubmitForReview && canFullyEditProduct ? (
+          <DashboardButton
+            className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+            disabled={saveDisabled}
+            onClick={handleSubmitForReview}
+            type="button"
+          >
+            {isSubmittingReview ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <PackageCheckIcon className="size-3.5" />
+            )}
+            {isSubmittingReview ? "Submitting..." : "Submit for review"}
+          </DashboardButton>
+        ) : null}
       </div>
+
+      <Dialog
+        open={Boolean(activeExpandedVariant)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setExpandedVariantId(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {activeExpandedVariant?.optionValues.join(" / ") ?? "Edit variant"}
+            </DialogTitle>
+            <DialogDescription>
+              Edit the sellable details for this specific variant combination.
+            </DialogDescription>
+          </DialogHeader>
+          {activeExpandedVariant ? (
+            <DialogBody>
+              <div className="grid gap-5">
+                <section className="grid gap-3">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-zinc-950 dark:text-white">
+                    Variant image
+                    <InfoHint
+                      label="Variant image"
+                      text="The image shown for this exact variant combination."
+                    />
+                  </h3>
+                  <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-slate-200 p-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <button
+                        aria-label="Select variant image"
+                        className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-slate-400 transition hover:border-emerald-500 hover:text-emerald-700 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-emerald-500 dark:hover:text-emerald-300"
+                        onClick={() =>
+                          openVariantMediaManager(activeExpandedVariant.id)
+                        }
+                        type="button"
+                      >
+                        {activeExpandedVariantImage?.thumbnailUrl ||
+                        activeExpandedVariantImage?.publicUrl ? (
+                          <Image
+                            src={
+                              activeExpandedVariantImage.thumbnailUrl ??
+                              activeExpandedVariantImage.publicUrl
+                            }
+                            alt=""
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <ImagePlusIcon className="size-5" />
+                        )}
+                      </button>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-zinc-950 dark:text-white">
+                          {activeExpandedVariantImage
+                            ? activeExpandedVariantImage.originalFileName ??
+                              "Selected media asset"
+                            : "No variant image selected"}
+                        </p>
+                        <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                          Select a saved image from the media library for this
+                          variant.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <DashboardButton
+                        onClick={() =>
+                          openVariantMediaManager(activeExpandedVariant.id)
+                        }
+                        type="button"
+                      >
+                        <PencilIcon className="size-3.5" />
+                        {activeExpandedVariantImage ? "Change" : "Select"}
+                      </DashboardButton>
+                      <DashboardButton
+                        className="text-red-600 hover:text-red-700 disabled:text-slate-400 dark:text-red-300"
+                        disabled={!activeExpandedVariantImage}
+                        onClick={() =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            imageId: null,
+                          })
+                        }
+                        type="button"
+                      >
+                        <Trash2Icon className="size-3.5" />
+                        Remove
+                      </DashboardButton>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="grid gap-3">
+                  <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                    Identity
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Globally unique SKU for this variant.">
+                        SKU
+                      </FieldLabel>
+                      <Input
+                        className={cn(
+                          fieldClass,
+                          getSkuStatusClass(
+                            variantSkuStatuses[activeExpandedVariant.id] ?? "idle",
+                          ),
+                        )}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            sku: event.target.value,
+                          })
+                        }
+                        value={activeExpandedVariant.sku}
+                      />
+                    </label>
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Controls whether this variant can be sold.">
+                        Status
+                      </FieldLabel>
+                      <Select
+                        onValueChange={(value) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            status: value as VariantStatus,
+                          })
+                        }
+                        value={activeExpandedVariant.status}
+                      >
+                        <SelectTrigger
+                          className={getVariantStatusSelectClass(
+                            activeExpandedVariant.status,
+                          )}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className={selectContentClass}>
+                          {Object.entries(variantStatusConfig).map(
+                            ([status, config]) => (
+                              <SelectItem
+                                key={status}
+                                className={selectItemClass}
+                                value={status}
+                              >
+                                {config.label}
+                              </SelectItem>
+                            ),
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                  </div>
+                </section>
+
+                <section className="grid gap-3">
+                  <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                    Pricing and stock
+                  </h3>
+                  {isInventoryLockedByPiessang ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                      Piessang controls this variant&apos;s sellable stock for FBP.
+                      Stock and low-stock settings become read-only after
+                      inbound inventory is received and processed.
+                    </div>
+                  ) : null}
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Final customer-facing variant price, including VAT. Do not enter an ex-VAT amount.">
+                        Price (VAT incl.)
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        inputMode="decimal"
+                        min={0}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            price: sanitizeDecimalNumberInput(event.target.value),
+                          })
+                        }
+                        pattern="[0-9]*[.]?[0-9]*"
+                        step="0.01"
+                        type="number"
+                        value={activeExpandedVariant.price}
+                      />
+                    </label>
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Optional original VAT-inclusive price for markdown display. It must be higher than the selling price.">
+                        Compare-at price (VAT incl.)
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        inputMode="decimal"
+                        min={0}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            compareAtPrice: sanitizeDecimalNumberInput(
+                              event.target.value,
+                            ),
+                          })
+                        }
+                        pattern="[0-9]*[.]?[0-9]*"
+                        step="0.01"
+                        type="number"
+                        value={activeExpandedVariant.compareAtPrice}
+                      />
+                    </label>
+                    <label className="grid gap-1.5">
+                      <FieldLabel
+                        info={
+                          isInventoryLockedByPiessang
+                            ? "Piessang controls FBP variant stock after inbound inventory is received and processed."
+                            : "Available stock for this variant."
+                        }
+                      >
+                        Stock
+                      </FieldLabel>
+                      <Input
+                        className={cn(
+                          fieldClass,
+                          (activeExpandedVariant.continueSellingOutOfStock ||
+                            isInventoryLockedByPiessang) &&
+                            "border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
+                        )}
+                        disabled={
+                          activeExpandedVariant.continueSellingOutOfStock ||
+                          isInventoryLockedByPiessang
+                        }
+                        inputMode="numeric"
+                        min={0}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            stock: sanitizeStockInput(event.target.value),
+                          })
+                        }
+                        pattern="[0-9]*"
+                        type="number"
+                        value={activeExpandedVariant.stock}
+                      />
+                    </label>
+                    <label className="grid gap-1.5">
+                      <FieldLabel
+                        info={
+                          isInventoryLockedByPiessang
+                            ? "Low stock alerts are not seller-managed for FBP variants."
+                            : "The stock level at which Piessang should flag this variant as low stock."
+                        }
+                      >
+                        Low stock alert
+                      </FieldLabel>
+                      <Input
+                        className={cn(
+                          fieldClass,
+                          (activeExpandedVariant.continueSellingOutOfStock ||
+                            isInventoryLockedByPiessang) &&
+                            "border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
+                        )}
+                        disabled={
+                          activeExpandedVariant.continueSellingOutOfStock ||
+                          isInventoryLockedByPiessang
+                        }
+                        inputMode="numeric"
+                        min={0}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            lowStockAlert: sanitizeStockInput(event.target.value),
+                          })
+                        }
+                        pattern="[0-9]*"
+                        type="number"
+                        value={activeExpandedVariant.lowStockAlert}
+                      />
+                    </label>
+                  </div>
+                  {activeExpandedPricingBreakdown ? (
+                    <div
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-xs leading-5",
+                        activeExpandedPricingBreakdown.tone === "success" &&
+                          "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100",
+                        activeExpandedPricingBreakdown.tone === "warning" &&
+                          "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100",
+                        activeExpandedPricingBreakdown.tone === "neutral" &&
+                          "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300",
+                      )}
+                    >
+                      <div className="font-semibold text-zinc-950 dark:text-white">
+                        {activeExpandedPricingBreakdown.title}
+                      </div>
+                      <div>{activeExpandedPricingBreakdown.message}</div>
+                    </div>
+                  ) : null}
+                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10">
+                    <Checkbox
+                      checked={activeExpandedVariant.continueSellingOutOfStock}
+                      disabled={isInventoryLockedByPiessang}
+                      onCheckedChange={(checked) =>
+                        updateGeneratedVariant(activeExpandedVariant.id, {
+                          continueSellingOutOfStock: Boolean(checked),
+                        })
+                      }
+                      className="size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
+                    />
+                    <span className="flex items-center gap-1.5">
+                      Continue selling this variant when out of stock
+                      <InfoHint
+                        label="Continue selling this variant"
+                        text={
+                          isInventoryLockedByPiessang
+                            ? "Unavailable for Fulfilled by Piessang because Piessang controls sellable stock."
+                            : "Allow this variant to keep accepting orders when stock reaches zero."
+                        }
+                      />
+                    </span>
+                  </label>
+                </section>
+
+                <section className="grid gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                      Shipping overrides
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                      Use grams for weight and millimetres for dimensions.
+                      Decimal values are allowed.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Choose a saved parcel preset to fill this variant's weight and dimensions.">
+                        Parcel preset
+                      </FieldLabel>
+                      <Select
+                        onValueChange={(value) =>
+                          applyParcelPresetToVariant(
+                            activeExpandedVariant.id,
+                            value === "__none" ? null : value,
+                          )
+                        }
+                        value={activeExpandedVariant.parcelPresetId ?? "__none"}
+                      >
+                        <SelectTrigger className={fieldClass}>
+                          <SelectValue placeholder="Select a saved parcel preset" />
+                        </SelectTrigger>
+                        <SelectContent className={selectContentClass}>
+                          <SelectItem className={selectItemClass} value="__none">
+                            No preset selected
+                          </SelectItem>
+                          {parcelPresets.map((preset) => (
+                            <SelectItem
+                              key={preset.id}
+                              className={selectItemClass}
+                              value={preset.id}
+                            >
+                              {preset.name}
+                              {preset.isDefault ? " · Default" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <DashboardButton
+                      className="h-10"
+                      onClick={() =>
+                        openParcelPresetSaveDialog({
+                          type: "variant",
+                          variantId: activeExpandedVariant.id,
+                        })
+                      }
+                      type="button"
+                    >
+                      <SaveIcon className="size-3.5" />
+                      Save as preset
+                    </DashboardButton>
+                  </div>
+                  {activeExpandedVariantParcelPreset ? (
+                    <p className="text-xs text-slate-500 dark:text-zinc-400">
+                      {isActiveExpandedVariantParcelPresetModified
+                        ? `Modified from ${activeExpandedVariantParcelPreset.name}.`
+                        : `Using ${activeExpandedVariantParcelPreset.name}.`}
+                    </p>
+                  ) : null}
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Optional variant-specific packed weight in grams. Decimals are allowed.">
+                        Weight override (g)
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        inputMode="decimal"
+                        min={1}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            weightGrams: sanitizeShippingMetricInput(
+                              event.target.value,
+                            ),
+                          })
+                        }
+                        pattern="[0-9]*[.]?[0-9]*"
+                        placeholder="g"
+                        step="any"
+                        type="number"
+                        value={activeExpandedVariant.weightGrams}
+                      />
+                    </label>
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Optional variant-specific packed length in millimetres. Decimals are allowed.">
+                        Length override (mm)
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        inputMode="decimal"
+                        min={1}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            lengthMm: sanitizeShippingMetricInput(
+                              event.target.value,
+                            ),
+                          })
+                        }
+                        pattern="[0-9]*[.]?[0-9]*"
+                        placeholder="mm"
+                        step="any"
+                        type="number"
+                        value={activeExpandedVariant.lengthMm}
+                      />
+                    </label>
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Optional variant-specific packed width in millimetres. Decimals are allowed.">
+                        Width override (mm)
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        inputMode="decimal"
+                        min={1}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            widthMm: sanitizeShippingMetricInput(
+                              event.target.value,
+                            ),
+                          })
+                        }
+                        pattern="[0-9]*[.]?[0-9]*"
+                        placeholder="mm"
+                        step="any"
+                        type="number"
+                        value={activeExpandedVariant.widthMm}
+                      />
+                    </label>
+                    <label className="grid gap-1.5">
+                      <FieldLabel info="Optional variant-specific packed height in millimetres. Decimals are allowed.">
+                        Height override (mm)
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        inputMode="decimal"
+                        min={1}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            heightMm: sanitizeShippingMetricInput(
+                              event.target.value,
+                            ),
+                          })
+                        }
+                        pattern="[0-9]*[.]?[0-9]*"
+                        placeholder="mm"
+                        step="any"
+                        type="number"
+                        value={activeExpandedVariant.heightMm}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="grid gap-3">
+                  <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                    Operations
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <label className="grid gap-1.5">
+                      <FieldLabel
+                        info={
+                          isPiessangFulfilled
+                            ? "Required for Fulfilled by Piessang variants before inbound stock can be booked."
+                            : "Optional barcode or supplier identifier for this variant."
+                        }
+                      >
+                        {isPiessangFulfilled ? "Barcode *" : "Barcode"}
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            barcode: event.target.value,
+                          })
+                        }
+                        value={activeExpandedVariant.barcode}
+                      />
+                    </label>
+                    <label className="grid gap-1.5 md:col-span-3">
+                      <FieldLabel info="Internal notes for this specific variant.">
+                        Notes
+                      </FieldLabel>
+                      <Input
+                        className={fieldClass}
+                        onChange={(event) =>
+                          updateGeneratedVariant(activeExpandedVariant.id, {
+                            notes: event.target.value,
+                          })
+                        }
+                        value={activeExpandedVariant.notes}
+                      />
+                    </label>
+                  </div>
+                </section>
+              </div>
+            </DialogBody>
+          ) : null}
+          <DialogFooter>
+            <Button
+              className="h-8 rounded-md px-3 text-[14px] font-normal"
+              onClick={() => setExpandedVariantId(null)}
+              type="button"
+              variant="outline"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(bulkValueDialog)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkValueDialog(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{bulkValueDialog?.label ?? "Bulk update"}</DialogTitle>
+            <DialogDescription>
+              Apply this value to {selectedVariantCount} selected variant
+              {selectedVariantCount === 1 ? "" : "s"}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <label className="grid gap-1.5">
+              <FieldLabel info="This value will be applied to every selected variant.">
+                Value
+              </FieldLabel>
+              <Input
+                autoFocus
+                className={fieldClass}
+                onChange={(event) =>
+                  setBulkValueDialog((current) =>
+                    current
+                      ? {
+                          ...current,
+                          value:
+                            current.field === "stock"
+                              ? sanitizeStockInput(event.target.value)
+                              : sanitizeDecimalNumberInput(event.target.value),
+                        }
+                      : current,
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    applyBulkValueDialog();
+                  }
+                }}
+                inputMode={bulkValueDialog?.field === "stock" ? "numeric" : "decimal"}
+                pattern={
+                  bulkValueDialog?.field === "stock"
+                    ? "[0-9]*"
+                    : "[0-9]*[.]?[0-9]*"
+                }
+                placeholder={bulkValueDialog?.placeholder}
+                step={bulkValueDialog?.field === "stock" ? "1" : "0.01"}
+                value={bulkValueDialog?.value ?? ""}
+              />
+            </label>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              className="h-8 rounded-md border-emerald-700 bg-emerald-700 px-3 text-[14px] font-normal text-white hover:bg-emerald-800"
+              onClick={applyBulkValueDialog}
+              type="button"
+            >
+              Apply
+            </Button>
+            <Button
+              className="h-8 rounded-md px-3 text-[14px] font-normal"
+              onClick={() => setBulkValueDialog(null)}
+              type="button"
+              variant="outline"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(parcelPresetSaveDialog)}
+        onOpenChange={(open) => {
+          if (!open && !isSavingParcelPreset) {
+            setParcelPresetSaveDialog(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save parcel preset</DialogTitle>
+            <DialogDescription>
+              Reuse these parcel metrics across products and variants.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="grid gap-4">
+            <label className="grid gap-1.5">
+              <FieldLabel info="A short reusable package name, such as Small parcel or Paper bag.">
+                Preset name *
+              </FieldLabel>
+              <Input
+                autoFocus
+                className={fieldClass}
+                maxLength={120}
+                onChange={(event) =>
+                  setParcelPresetSaveDialog((current) =>
+                    current
+                      ? { ...current, name: toTitleCaseInput(event.target.value) }
+                      : current,
+                  )
+                }
+                placeholder="Small parcel"
+                value={parcelPresetSaveDialog?.name ?? ""}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <FieldLabel info="Optional internal reminder for when this preset should be used.">
+                Notes
+              </FieldLabel>
+              <Textarea
+                className={cn(fieldClass, "min-h-20")}
+                maxLength={500}
+                onChange={(event) =>
+                  setParcelPresetSaveDialog((current) =>
+                    current ? { ...current, notes: event.target.value } : current,
+                  )
+                }
+                placeholder="Example: Fits one folded hoodie or a small boxed item."
+                value={parcelPresetSaveDialog?.notes ?? ""}
+              />
+            </label>
+            <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10">
+              <Checkbox
+                checked={parcelPresetSaveDialog?.isDefault ?? false}
+                onCheckedChange={(checked) =>
+                  setParcelPresetSaveDialog((current) =>
+                    current
+                      ? { ...current, isDefault: Boolean(checked) }
+                      : current,
+                  )
+                }
+                className="size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
+              />
+              <span>Use as my default parcel preset</span>
+            </label>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400">
+              Preset values are copied into the product. Future changes to the
+              preset will not silently change existing product shipping metrics.
+            </div>
+            {parcelPresetFeedback ? (
+              <p
+                className={cn(
+                  "text-xs",
+                  parcelPresetFeedback.tone === "success"
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : "text-red-600 dark:text-red-300",
+                )}
+              >
+                {parcelPresetFeedback.message}
+              </p>
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              className="h-8 rounded-md border-emerald-700 bg-emerald-700 px-3 text-[14px] font-normal text-white hover:bg-emerald-800"
+              disabled={isSavingParcelPreset}
+              onClick={saveParcelPresetFromDialog}
+              type="button"
+            >
+              {isSavingParcelPreset ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <SaveIcon className="size-3.5" />
+              )}
+              Save preset
+            </Button>
+            <Button
+              className="h-8 rounded-md px-3 text-[14px] font-normal"
+              disabled={isSavingParcelPreset}
+              onClick={() => setParcelPresetSaveDialog(null)}
+              type="button"
+              variant="outline"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(pendingVariantCombinations)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingVariantCombinations(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate many variants?</DialogTitle>
+            <DialogDescription>
+              This will generate {pendingVariantCombinations?.length ?? 0} variant
+              combinations. You can remove combinations you do not sell after
+              generating.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
+              Large variant sets can take sellers longer to review. Continue
+              only if each option value is needed for this product.
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              className="h-8 rounded-md border-emerald-700 bg-emerald-700 px-3 text-[14px] font-normal text-white hover:bg-emerald-800"
+              onClick={() => {
+                if (pendingVariantCombinations) {
+                  applyGeneratedVariants(pendingVariantCombinations);
+                }
+              }}
+              type="button"
+            >
+              Generate
+            </Button>
+            <Button
+              className="h-8 rounded-md px-3 text-[14px] font-normal"
+              onClick={() => setPendingVariantCombinations(null)}
+              type="button"
+              variant="outline"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(previewVideoAsset)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewVideoAsset(null);
+          }
+        }}
+      >
+        {previewVideoAsset ? (
+          <DialogContent className="w-[min(48rem,calc(100vw-2rem))] max-w-none border border-slate-200 bg-white text-zinc-950 shadow-2xl dark:border-white/10 dark:bg-[#101214] dark:text-white">
+            <DialogHeader>
+              <DialogTitle>Video preview</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="p-0">
+              <video
+                className="aspect-video w-full bg-black"
+                controls
+                src={previewVideoAsset.publicUrl}
+              >
+                <track kind="captions" />
+              </video>
+            </DialogBody>
+            <DialogFooter showCloseButton />
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={isImportLinkOpen}
+        onOpenChange={(open) => {
+          if (!open && !isScanningImportLink && !isApplyingImport) {
+            setIsImportLinkOpen(false);
+          }
+        }}
+      >
+        <DialogContent className="w-[min(52rem,calc(100vw-2rem))] max-w-none border border-slate-200 bg-white text-zinc-950 shadow-2xl dark:border-white/10 dark:bg-[#101214] dark:text-white">
+          <DialogHeader>
+            <div className="mx-auto mb-2 grid size-14 place-items-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+              <LinkIcon className="size-7" />
+            </div>
+            <DialogTitle className="text-center">Import product from link</DialogTitle>
+            <DialogDescription className="text-center">
+              Paste a product page link. Piessang will scan it, show what was
+              found, and only apply the details after you confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="grid gap-4">
+            <div className="grid gap-3">
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <div className="relative min-w-0">
+                  <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    className={cn(fieldClass, "pl-9 pr-9")}
+                    disabled={isScanningImportLink || isApplyingImport}
+                    onChange={(event) => setImportLinkUrl(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void handleScanImportLink();
+                      }
+                    }}
+                    placeholder="Paste product link here"
+                    type="url"
+                    value={importLinkUrl}
+                  />
+                  {importLinkUrl ? (
+                    <button
+                      aria-label="Clear product link"
+                      className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                      disabled={isScanningImportLink || isApplyingImport}
+                      onClick={() => setImportLinkUrl("")}
+                      type="button"
+                    >
+                      <XIcon className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+                <DashboardButton
+                  className="h-10 border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+                  disabled={isScanningImportLink || isApplyingImport}
+                  onClick={() => void handleScanImportLink()}
+                  type="button"
+                >
+                  {isScanningImportLink ? (
+                    <Loader2Icon className="size-3.5 animate-spin" />
+                  ) : (
+                    <SearchIcon className="size-3.5" />
+                  )}
+                  {isScanningImportLink ? "Scanning" : "Scan"}
+                </DashboardButton>
+              </div>
+
+              {!importedProduct && displayedImportLinkSteps.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-emerald-50/40 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-emerald-500/5 dark:text-zinc-400">
+                  <p className="font-semibold text-zinc-950 dark:text-white">
+                    Piessang will scan for:
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    <li>Product media you can choose before importing.</li>
+                    <li>Title, brand, SKU, descriptions, and VAT-inclusive pricing.</li>
+                    <li>A preview you can review before anything is applied.</li>
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+
+            {displayedImportLinkSteps.length > 0 ? (
+              <section className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-400">
+                  Import progress
+                </p>
+                <div className="grid gap-2">
+                  {displayedImportLinkSteps.map((step, index) => (
+                    <div
+                      key={`${step.step}-${index}`}
+                      className="flex min-w-0 items-start gap-2 text-sm"
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full",
+                          step.tone === "success" &&
+                            "bg-emerald-100 text-emerald-700",
+                          step.tone === "error" && "bg-red-100 text-red-700",
+                          step.tone === "working" &&
+                            "bg-amber-100 text-amber-700",
+                        )}
+                      >
+                        {step.tone === "working" ? (
+                          <Loader2Icon className="size-3 animate-spin" />
+                        ) : step.tone === "success" ? (
+                          <CheckCircleIcon className="size-3" />
+                        ) : (
+                          <XCircleIcon className="size-3" />
+                        )}
+                      </span>
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1",
+                          step.tone === "error"
+                            ? "text-red-700 dark:text-red-300"
+                            : "text-slate-700 dark:text-zinc-300",
+                        )}
+                      >
+                        {step.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {importedProduct ? (
+              <section className="grid gap-4 rounded-lg border border-slate-200 p-3 dark:border-white/10">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Product name
+                    </p>
+                    <p className="truncate text-sm font-semibold">
+                      {importedProduct.productName || "Not found"}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Brand
+                    </p>
+                    <p className="truncate text-sm font-semibold">
+                      {importedProduct.brandName || "Not found"}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      SKU
+                    </p>
+                    <p className="truncate text-sm font-semibold">
+                      {importedProduct.sku || "Will be generated if missing"}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      VAT-inclusive price
+                    </p>
+                    <p className="truncate text-sm font-semibold">
+                      {importedProduct.price || "Not found"}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Description
+                  </p>
+                  <p className="mt-1 line-clamp-3 text-sm text-slate-600 dark:text-zinc-400">
+                    {importedProduct.description || "No description was found."}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Images to import
+                  </p>
+                  {importedProduct.images.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                      {importedProduct.images.map((image, index) => {
+                        const isSelected = selectedImportedImageUrls.includes(
+                          image.url,
+                        );
+
+                        return (
+                          <button
+                            key={image.url}
+                            className={cn(
+                              "relative aspect-square overflow-hidden rounded-lg border bg-slate-50 text-left transition dark:bg-white/[0.04]",
+                              isSelected
+                                ? "border-emerald-500 ring-2 ring-emerald-500/20"
+                                : "border-slate-200 dark:border-white/10",
+                            )}
+                            onClick={() => toggleImportedImage(image.url)}
+                            type="button"
+                          >
+                            <span
+                              aria-hidden
+                              className="absolute inset-0 bg-cover bg-center"
+                              style={{ backgroundImage: `url("${image.url}")` }}
+                            />
+                            <span className="absolute left-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-white/95 text-[11px] font-bold text-zinc-950 shadow-sm">
+                              {index + 1}
+                            </span>
+                            {isSelected ? (
+                              <span className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-emerald-700 text-white shadow-sm">
+                                <CheckCircleIcon className="size-3.5" />
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      No importable images were found. You can still apply the
+                      text details and add media manually.
+                    </p>
+                  )}
+                </div>
+              </section>
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              className="h-8 rounded-md px-3 text-[14px] font-normal"
+              disabled={isScanningImportLink || isApplyingImport}
+              onClick={() => setIsImportLinkOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              Close
+            </Button>
+            {importedProduct ? (
+              <Button
+                className="h-8 rounded-md border-emerald-700 bg-emerald-700 px-3 text-[14px] font-normal text-white hover:bg-emerald-800"
+                disabled={isScanningImportLink || isApplyingImport}
+                onClick={applyImportedProduct}
+                type="button"
+              >
+                {isApplyingImport ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <CheckCircleIcon className="size-3.5" />
+                )}
+                {isApplyingImport ? "Importing..." : "Import now"}
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <MediaManagerDialog
         acceptedMediaTypes={["image", "video"]}
-        assets={data.mediaLibrary.assets}
+        allowMultipleSelection={mediaSelectionTarget.type === "product"}
+        assets={mediaLibraryAssets}
         folders={data.mediaLibrary.folders}
         onOpenChange={setIsMediaOpen}
-        onSelect={addMedia}
+        onSelect={handleMediaSelect}
+        onSelectMany={handleMediaSelectMany}
         open={isMediaOpen}
-        selectedAssetId={selectedMediaIds[0] ?? null}
+        selectedAssetId={mediaDialogSelectedAssetId}
         storage={data.mediaLibrary.storage}
         surface="seller"
         title="Product media"

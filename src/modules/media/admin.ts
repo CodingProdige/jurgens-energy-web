@@ -1,12 +1,11 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { and, desc, eq, inArray, like, ne, sql } from "drizzle-orm";
-import ffmpegPath from "ffmpeg-static";
 import sharp from "sharp";
 
 import { env } from "@/src/config/env";
@@ -433,7 +432,9 @@ export async function processAndStoreVideoUpload(input: {
   const settings = await getMediaStorageSettings();
   const maxUploadBytes = settings.maxVideoUploadFileMb * 1024 * 1024;
 
-  if (!ffmpegPath) {
+  const resolvedFfmpegPath = await resolveFfmpegPath();
+
+  if (!resolvedFfmpegPath) {
     throw new Error("FFmpeg is not available for video processing.");
   }
 
@@ -872,11 +873,11 @@ async function runFfmpeg(
   args: string[],
   options: { allowFailure?: boolean } = {},
 ) {
-  if (!ffmpegPath) {
+  const executablePath = await resolveFfmpegPath();
+
+  if (!executablePath) {
     throw new Error("FFmpeg is not available.");
   }
-
-  const executablePath = ffmpegPath;
 
   return new Promise<{ stderr: string; stdout: string }>((resolve, reject) => {
     const child = spawn(executablePath, args, {
@@ -902,6 +903,35 @@ async function runFfmpeg(
       reject(new Error("Video processing failed."));
     });
   });
+}
+
+async function resolveFfmpegPath() {
+  const candidatePaths = [
+    process.env.FFMPEG_BIN,
+    path.join(
+      /*turbopackIgnore: true*/ process.cwd(),
+      "node_modules",
+      "ffmpeg-static",
+      "ffmpeg",
+    ),
+    path.join(
+      /*turbopackIgnore: true*/ process.cwd(),
+      "node_modules",
+      "ffmpeg-static",
+      "ffmpeg.exe",
+    ),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidatePath of candidatePaths) {
+    try {
+      await access(candidatePath);
+      return candidatePath;
+    } catch {
+      // Try the next known install location.
+    }
+  }
+
+  return null;
 }
 
 async function writeMediaFile(relativePath: string, buffer: Buffer) {

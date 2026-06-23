@@ -197,6 +197,62 @@
       "when": 1780405200000,
       "tag": "0027_shipping_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1780491600000,
+      "tag": "0028_decimal_shipping_metrics",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1780578000000,
+      "tag": "0029_seller_fbp_eligibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1780664400000,
+      "tag": "0030_product_draft_persistence",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1780750800000,
+      "tag": "0031_product_review_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1780837200000,
+      "tag": "0032_seller_parcel_presets",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1780923600000,
+      "tag": "0033_bobgo_mode_credentials",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1781010000000,
+      "tag": "0034_bobgo_webhook_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1781096400000,
+      "tag": "0035_dashboard_notification_events",
+      "breakpoints": true
     }
   ]
 }

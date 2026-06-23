@@ -35,6 +35,7 @@ import type { InAppNotificationSurface } from "@/src/db/schema";
 
 type NotificationBellProps = {
   accent?: "amber" | "green" | "marketplace";
+  centerHref?: string;
   className?: string;
   initialState: NotificationCenterState;
   surface: InAppNotificationSurface;
@@ -73,6 +74,7 @@ function isExternalUrl(url: string) {
 
 export function NotificationBell({
   accent = "amber",
+  centerHref,
   className,
   initialState,
   surface,
@@ -85,6 +87,24 @@ export function NotificationBell({
   const [, startTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const styles = accentStyles[accent];
+
+  const refreshNotificationState = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/notifications/in-app?surface=${encodeURIComponent(surface)}&limit=12`,
+        { cache: "no-store" },
+      );
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = (await response.json()) as NotificationCenterState;
+      setState(data);
+    } catch (error) {
+      console.error("Failed to refresh notifications", error);
+    }
+  }, [surface]);
 
   const refreshPushStatus = useCallback(async () => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -119,6 +139,40 @@ export function NotificationBell({
   useEffect(() => {
     setState(initialState);
   }, [initialState]);
+
+  useEffect(() => {
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshNotificationState();
+      }
+    }, 12000);
+
+    return () => window.clearInterval(interval);
+  }, [refreshNotificationState]);
+
+  useEffect(() => {
+    function onFocus() {
+      void refreshNotificationState();
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void refreshNotificationState();
+      }
+    }
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [refreshNotificationState]);
 
   useEffect(() => {
     let isMounted = true;
@@ -485,6 +539,21 @@ export function NotificationBell({
               </div>
             ) : null}
           </div>
+          {centerHref ? (
+            <div className="border-t border-slate-200 p-2 dark:border-white/10">
+              <Link
+                className={cn(
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition hover:bg-slate-100 dark:hover:bg-white/[0.06]",
+                  styles.action,
+                )}
+                href={centerHref}
+                onClick={() => setIsOpen(false)}
+              >
+                View all notifications
+                <ChevronRightIcon className="size-4" />
+              </Link>
+            </div>
+          ) : null}
           </section>
         ) : null}
       </div>

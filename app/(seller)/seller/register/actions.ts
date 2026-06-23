@@ -17,6 +17,7 @@ import {
 } from "@/src/modules/sellers/applications";
 import { getAdminNotificationRecipientIds } from "@/src/modules/notifications/in-app";
 import { notify } from "@/src/modules/notifications/templates";
+import { normalizePhoneNumber } from "@/src/modules/phone";
 
 export type SellerApplicationStatus = "pending" | "approved" | "rejected";
 
@@ -62,7 +63,20 @@ const sellerApplicationSchema = z.object({
   phone: z
     .string()
     .trim()
-    .regex(/^\+[1-9]\d{6,14}$/, "Enter a valid mobile number."),
+    .transform((value, context) => {
+      const normalized = normalizePhoneNumber(value, { defaultCountryCode: "ZA" });
+
+      if (!normalized) {
+        context.addIssue({
+          code: "custom",
+          message: "Enter a valid mobile number.",
+        });
+
+        return z.NEVER;
+      }
+
+      return normalized;
+    }),
   postalCode: z.string().trim().min(2).max(40),
   ssoHandoffToken: z.string().optional(),
   stateProvince: z.string().trim().min(2).max(120),

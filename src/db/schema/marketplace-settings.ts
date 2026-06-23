@@ -46,7 +46,44 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   shippingBufferBps: integer("shipping_buffer_bps").notNull().default(0),
   bobgoEnabled: boolean("bobgo_enabled").notNull().default(false),
   bobgoMode: varchar("bobgo_mode", { length: 16 }).notNull().default("sandbox"),
+  bobgoBookingMode: varchar("bobgo_booking_mode", { length: 32 })
+    .notNull()
+    .default("disabled"),
   bobgoApiKeyEncrypted: text("bobgo_api_key_encrypted"),
   bobgoWebhookSecretEncrypted: text("bobgo_webhook_secret_encrypted"),
+  bobgoLiveApiKeyEncrypted: text("bobgo_live_api_key_encrypted"),
+  bobgoLiveWebhookSecretEncrypted: text(
+    "bobgo_live_webhook_secret_encrypted",
+  ),
+  bobgoSandboxApiKeyEncrypted: text("bobgo_sandbox_api_key_encrypted"),
+  bobgoSandboxWebhookSecretEncrypted: text(
+    "bobgo_sandbox_webhook_secret_encrypted",
+  ),
+  bobgoWebhookTrackingUpdated: boolean("bobgo_webhook_tracking_updated")
+    .notNull()
+    .default(true),
+  bobgoWebhookFulfillmentCreated: boolean("bobgo_webhook_fulfillment_created")
+    .notNull()
+    .default(true),
+  bobgoWebhookShipmentSubmissionStatusUpdated: boolean(
+    "bobgo_webhook_shipment_submission_status_updated",
+  )
+    .notNull()
+    .default(true),
+  bobgoWebhookShipmentChargedAmountChanged: boolean(
+    "bobgo_webhook_shipment_charged_amount_changed",
+  )
+    .notNull()
+    .default(true),
+  bobgoWebhookShipmentChargedWeightChanged: boolean(
+    "bobgo_webhook_shipment_charged_weight_changed",
+  )
+    .notNull()
+    .default(true),
+  bobgoWebhookShipmentHealthStatusUpdated: boolean(
+    "bobgo_webhook_shipment_health_status_updated",
+  )
+    .notNull()
+    .default(true),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

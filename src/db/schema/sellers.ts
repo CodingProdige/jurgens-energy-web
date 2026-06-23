@@ -1,4 +1,5 @@
 import {
+  boolean,
   pgEnum,
   pgTable,
   timestamp,
@@ -30,6 +31,9 @@ export const sellers = pgTable("sellers", {
   displayName: varchar("display_name", { length: 160 }).notNull(),
   slug: varchar("slug", { length: 160 }).notNull().unique(),
   status: sellerStatus("status").notNull().default("pending"),
+  isPiessangFulfillmentEnabled: boolean("is_piessang_fulfillment_enabled")
+    .notNull()
+    .default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

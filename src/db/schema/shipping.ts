@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  index,
   jsonb,
   numeric,
   pgEnum,
@@ -75,6 +76,50 @@ export const sellerFulfillmentProfiles = pgTable(
   }),
 );
 
+export const sellerParcelPresets = pgTable(
+  "seller_parcel_presets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sellerId: uuid("seller_id")
+      .notNull()
+      .references(() => sellers.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    normalizedName: varchar("normalized_name", { length: 140 }).notNull(),
+    weightGrams: numeric("weight_grams", {
+      mode: "number",
+      precision: 12,
+      scale: 3,
+    }).notNull(),
+    lengthMm: numeric("length_mm", {
+      mode: "number",
+      precision: 12,
+      scale: 3,
+    }).notNull(),
+    widthMm: numeric("width_mm", {
+      mode: "number",
+      precision: 12,
+      scale: 3,
+    }).notNull(),
+    heightMm: numeric("height_mm", {
+      mode: "number",
+      precision: 12,
+      scale: 3,
+    }).notNull(),
+    notes: text("notes"),
+    isDefault: boolean("is_default").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (preset) => ({
+    sellerIdx: index("seller_parcel_presets_seller_id_idx").on(preset.sellerId),
+    sellerNameUnique: unique("seller_parcel_presets_seller_name_unique").on(
+      preset.sellerId,
+      preset.normalizedName,
+    ),
+  }),
+);
+
 export const shippingRateQuotes = pgTable("shipping_rate_quotes", {
   id: uuid("id").defaultRandom().primaryKey(),
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
@@ -136,10 +181,26 @@ export const shipmentParcels = pgTable("shipment_parcels", {
   shipmentId: uuid("shipment_id")
     .notNull()
     .references(() => shipments.id, { onDelete: "cascade" }),
-  weightGrams: integer("weight_grams").notNull(),
-  lengthMm: integer("length_mm").notNull(),
-  widthMm: integer("width_mm").notNull(),
-  heightMm: integer("height_mm").notNull(),
+  weightGrams: numeric("weight_grams", {
+    mode: "number",
+    precision: 12,
+    scale: 3,
+  }).notNull(),
+  lengthMm: numeric("length_mm", {
+    mode: "number",
+    precision: 12,
+    scale: 3,
+  }).notNull(),
+  widthMm: numeric("width_mm", {
+    mode: "number",
+    precision: 12,
+    scale: 3,
+  }).notNull(),
+  heightMm: numeric("height_mm", {
+    mode: "number",
+    precision: 12,
+    scale: 3,
+  }).notNull(),
   declaredValue: numeric("declared_value", { precision: 12, scale: 2 }),
   reference: varchar("reference", { length: 160 }),
 });
@@ -158,3 +219,26 @@ export const shipmentEvents = pgTable("shipment_events", {
   payload: jsonb("payload"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+export const bobgoWebhookEvents = pgTable(
+  "bobgo_webhook_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    topic: varchar("topic", { length: 160 }).notNull(),
+    providerEventId: text("provider_event_id").notNull(),
+    providerShipmentId: text("provider_shipment_id"),
+    status: varchar("status", { length: 32 }).notNull().default("received"),
+    payload: jsonb("payload").notNull(),
+    receivedAt: timestamp("received_at", { mode: "date" }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { mode: "date" }),
+  },
+  (event) => ({
+    providerEventUnique: unique("bobgo_webhook_events_provider_event_unique").on(
+      event.providerEventId,
+    ),
+    shipmentIdx: index("bobgo_webhook_events_provider_shipment_id_idx").on(
+      event.providerShipmentId,
+    ),
+    topicIdx: index("bobgo_webhook_events_topic_idx").on(event.topic),
+  }),
+);

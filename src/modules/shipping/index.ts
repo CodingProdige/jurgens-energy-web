@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { normalizePhoneNumber } from "@/src/modules/phone";
+
 export type ProductFulfillmentMode = z.infer<typeof fulfillmentModeSchema>;
 
 export type ShippingParcel = z.infer<typeof shippingParcelSchema>;
@@ -7,21 +9,21 @@ export type ShippingParcel = z.infer<typeof shippingParcelSchema>;
 export const shippingParcelSchema = z.object({
   heightMm: z.coerce
     .number()
-    .int("Height must be a whole number of millimetres.")
+    .finite("Height must be a valid number of millimetres.")
     .positive("Height is required for shipping rates."),
   isFragile: z.coerce.boolean().default(false),
   lengthMm: z.coerce
     .number()
-    .int("Length must be a whole number of millimetres.")
+    .finite("Length must be a valid number of millimetres.")
     .positive("Length is required for shipping rates."),
   shipsAlone: z.coerce.boolean().default(false),
   weightGrams: z.coerce
     .number()
-    .int("Weight must be a whole number of grams.")
+    .finite("Weight must be a valid number of grams.")
     .positive("Weight is required for shipping rates."),
   widthMm: z.coerce
     .number()
-    .int("Width must be a whole number of millimetres.")
+    .finite("Width must be a valid number of millimetres.")
     .positive("Width is required for shipping rates."),
 });
 
@@ -51,7 +53,24 @@ export const fulfillmentProfileSchema = z.object({
   collectionInstructions: z.string().trim().optional(),
   contactEmail: z.string().trim().email("A valid collection email is required."),
   contactName: z.string().trim().min(1, "Collection contact name is required."),
-  contactPhone: z.string().trim().min(1, "Collection phone number is required."),
+  contactPhone: z
+    .string()
+    .trim()
+    .min(1, "Collection phone number is required.")
+    .transform((value, context) => {
+      const normalized = normalizePhoneNumber(value, { defaultCountryCode: "ZA" });
+
+      if (!normalized) {
+        context.addIssue({
+          code: "custom",
+          message: "Enter a valid South African collection phone number.",
+        });
+
+        return z.NEVER;
+      }
+
+      return normalized;
+    }),
   countryCode: z
     .string()
     .trim()
@@ -70,19 +89,19 @@ export function getMissingParcelFields(
     "heightMm" | "lengthMm" | "weightGrams" | "widthMm"
   >> = [];
 
-  if (!Number.isInteger(parcel.weightGrams) || Number(parcel.weightGrams) <= 0) {
+  if (!Number.isFinite(parcel.weightGrams) || Number(parcel.weightGrams) <= 0) {
     missingFields.push("weightGrams");
   }
 
-  if (!Number.isInteger(parcel.lengthMm) || Number(parcel.lengthMm) <= 0) {
+  if (!Number.isFinite(parcel.lengthMm) || Number(parcel.lengthMm) <= 0) {
     missingFields.push("lengthMm");
   }
 
-  if (!Number.isInteger(parcel.widthMm) || Number(parcel.widthMm) <= 0) {
+  if (!Number.isFinite(parcel.widthMm) || Number(parcel.widthMm) <= 0) {
     missingFields.push("widthMm");
   }
 
-  if (!Number.isInteger(parcel.heightMm) || Number(parcel.heightMm) <= 0) {
+  if (!Number.isFinite(parcel.heightMm) || Number(parcel.heightMm) <= 0) {
     missingFields.push("heightMm");
   }
 

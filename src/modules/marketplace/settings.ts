@@ -6,11 +6,12 @@ import { db } from "@/src/db";
 import { marketplaceSettings } from "@/src/db/schema";
 import { env } from "@/src/config/env";
 import { hashPassword, verifyPassword } from "@/src/modules/auth/service";
-import { encryptSecret } from "@/src/modules/security/secrets";
+import { decryptSecret, encryptSecret } from "@/src/modules/security/secrets";
 
 export const marketplaceComingSoonCookieName = "piessang_marketplace_preview";
 
 type MarketplaceSettings = {
+  bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
   comingSoonEnabled: boolean;
   comingSoonPasswordHash: string | null;
   facebookUrl: string | null;
@@ -26,6 +27,16 @@ type MarketplaceSettings = {
   bobgoMode: "live" | "sandbox";
   hasBobgoApiKey: boolean;
   hasBobgoWebhookSecret: boolean;
+  hasBobgoLiveApiKey: boolean;
+  hasBobgoLiveWebhookSecret: boolean;
+  hasBobgoSandboxApiKey: boolean;
+  hasBobgoSandboxWebhookSecret: boolean;
+  bobgoWebhookFulfillmentCreated: boolean;
+  bobgoWebhookShipmentChargedAmountChanged: boolean;
+  bobgoWebhookShipmentChargedWeightChanged: boolean;
+  bobgoWebhookShipmentHealthStatusUpdated: boolean;
+  bobgoWebhookShipmentSubmissionStatusUpdated: boolean;
+  bobgoWebhookTrackingUpdated: boolean;
   shippingBufferBps: number;
   shippingEnabled: boolean;
   shippingMarginBps: number;
@@ -40,7 +51,19 @@ type MarketplaceSettings = {
   videoCompressionCrf: number;
 };
 
+export type MarketplaceAdminSecrets = {
+  bobgoLiveApiKey: string | null;
+  bobgoLiveWebhookSecret: string | null;
+  bobgoSandboxApiKey: string | null;
+  bobgoSandboxWebhookSecret: string | null;
+  stripeLiveSecretKey: string | null;
+  stripeLiveWebhookSecret: string | null;
+  stripeSandboxSecretKey: string | null;
+  stripeSandboxWebhookSecret: string | null;
+};
+
 const defaultSettings: MarketplaceSettings = {
+  bobgoBookingMode: "disabled",
   comingSoonEnabled: false,
   comingSoonPasswordHash: null,
   facebookUrl: null,
@@ -56,6 +79,16 @@ const defaultSettings: MarketplaceSettings = {
   bobgoMode: "sandbox",
   hasBobgoApiKey: false,
   hasBobgoWebhookSecret: false,
+  hasBobgoLiveApiKey: false,
+  hasBobgoLiveWebhookSecret: false,
+  hasBobgoSandboxApiKey: false,
+  hasBobgoSandboxWebhookSecret: false,
+  bobgoWebhookFulfillmentCreated: true,
+  bobgoWebhookShipmentChargedAmountChanged: true,
+  bobgoWebhookShipmentChargedWeightChanged: true,
+  bobgoWebhookShipmentHealthStatusUpdated: true,
+  bobgoWebhookShipmentSubmissionStatusUpdated: true,
+  bobgoWebhookTrackingUpdated: true,
   shippingBufferBps: 0,
   shippingEnabled: false,
   shippingMarginBps: 0,
@@ -85,10 +118,30 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       maxVideoWidth: marketplaceSettings.maxVideoWidth,
       premiumStorageQuotaMb: marketplaceSettings.premiumStorageQuotaMb,
       bobgoApiKeyEncrypted: marketplaceSettings.bobgoApiKeyEncrypted,
+      bobgoBookingMode: marketplaceSettings.bobgoBookingMode,
       bobgoEnabled: marketplaceSettings.bobgoEnabled,
+      bobgoLiveApiKeyEncrypted: marketplaceSettings.bobgoLiveApiKeyEncrypted,
+      bobgoLiveWebhookSecretEncrypted:
+        marketplaceSettings.bobgoLiveWebhookSecretEncrypted,
       bobgoMode: marketplaceSettings.bobgoMode,
+      bobgoSandboxApiKeyEncrypted:
+        marketplaceSettings.bobgoSandboxApiKeyEncrypted,
+      bobgoSandboxWebhookSecretEncrypted:
+        marketplaceSettings.bobgoSandboxWebhookSecretEncrypted,
       bobgoWebhookSecretEncrypted:
         marketplaceSettings.bobgoWebhookSecretEncrypted,
+      bobgoWebhookFulfillmentCreated:
+        marketplaceSettings.bobgoWebhookFulfillmentCreated,
+      bobgoWebhookShipmentChargedAmountChanged:
+        marketplaceSettings.bobgoWebhookShipmentChargedAmountChanged,
+      bobgoWebhookShipmentChargedWeightChanged:
+        marketplaceSettings.bobgoWebhookShipmentChargedWeightChanged,
+      bobgoWebhookShipmentHealthStatusUpdated:
+        marketplaceSettings.bobgoWebhookShipmentHealthStatusUpdated,
+      bobgoWebhookShipmentSubmissionStatusUpdated:
+        marketplaceSettings.bobgoWebhookShipmentSubmissionStatusUpdated,
+      bobgoWebhookTrackingUpdated:
+        marketplaceSettings.bobgoWebhookTrackingUpdated,
       shippingBufferBps: marketplaceSettings.shippingBufferBps,
       shippingEnabled: marketplaceSettings.shippingEnabled,
       shippingMarginBps: marketplaceSettings.shippingMarginBps,
@@ -117,9 +170,26 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
 
   return {
     ...settings,
+    bobgoBookingMode: normalizeBobgoBookingMode(settings.bobgoBookingMode),
     bobgoMode: settings.bobgoMode === "live" ? "live" : "sandbox",
-    hasBobgoApiKey: Boolean(settings.bobgoApiKeyEncrypted),
-    hasBobgoWebhookSecret: Boolean(settings.bobgoWebhookSecretEncrypted),
+    hasBobgoApiKey: Boolean(
+      settings.bobgoApiKeyEncrypted ?? settings.bobgoSandboxApiKeyEncrypted,
+    ),
+    hasBobgoWebhookSecret: Boolean(
+      settings.bobgoWebhookSecretEncrypted ??
+        settings.bobgoSandboxWebhookSecretEncrypted,
+    ),
+    hasBobgoLiveApiKey: Boolean(settings.bobgoLiveApiKeyEncrypted),
+    hasBobgoLiveWebhookSecret: Boolean(
+      settings.bobgoLiveWebhookSecretEncrypted,
+    ),
+    hasBobgoSandboxApiKey: Boolean(
+      settings.bobgoSandboxApiKeyEncrypted ?? settings.bobgoApiKeyEncrypted,
+    ),
+    hasBobgoSandboxWebhookSecret: Boolean(
+      settings.bobgoSandboxWebhookSecretEncrypted ??
+        settings.bobgoWebhookSecretEncrypted,
+    ),
     stripeMode: settings.stripeMode === "live" ? "live" : "sandbox",
     hasStripeLiveSecretKey: Boolean(settings.stripeLiveSecretKeyEncrypted),
     hasStripeLiveWebhookSecret: Boolean(
@@ -252,17 +322,39 @@ export async function updateMarketplaceStripeSettings({
 
 export async function updateMarketplaceShippingSettings({
   bobgoApiKey,
+  bobgoBookingMode,
   bobgoEnabled,
+  bobgoLiveApiKey,
+  bobgoLiveWebhookSecret,
   bobgoMode,
+  bobgoSandboxApiKey,
+  bobgoSandboxWebhookSecret,
+  bobgoWebhookFulfillmentCreated,
   bobgoWebhookSecret,
+  bobgoWebhookShipmentChargedAmountChanged,
+  bobgoWebhookShipmentChargedWeightChanged,
+  bobgoWebhookShipmentHealthStatusUpdated,
+  bobgoWebhookShipmentSubmissionStatusUpdated,
+  bobgoWebhookTrackingUpdated,
   shippingBufferBps,
   shippingEnabled,
   shippingMarginBps,
 }: {
   bobgoApiKey?: string;
+  bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
   bobgoEnabled: boolean;
+  bobgoLiveApiKey?: string;
+  bobgoLiveWebhookSecret?: string;
   bobgoMode: "live" | "sandbox";
+  bobgoSandboxApiKey?: string;
+  bobgoSandboxWebhookSecret?: string;
+  bobgoWebhookFulfillmentCreated: boolean;
   bobgoWebhookSecret?: string;
+  bobgoWebhookShipmentChargedAmountChanged: boolean;
+  bobgoWebhookShipmentChargedWeightChanged: boolean;
+  bobgoWebhookShipmentHealthStatusUpdated: boolean;
+  bobgoWebhookShipmentSubmissionStatusUpdated: boolean;
+  bobgoWebhookTrackingUpdated: boolean;
   shippingBufferBps: number;
   shippingEnabled: boolean;
   shippingMarginBps: number;
@@ -285,20 +377,52 @@ export async function updateMarketplaceShippingSettings({
   const nextBobgoApiKey =
     bobgoApiKey && bobgoApiKey.length > 0
       ? encryptSecret(bobgoApiKey)
-      : existing?.bobgoApiKeyEncrypted;
+      : (existing?.bobgoApiKeyEncrypted ??
+        existing?.bobgoSandboxApiKeyEncrypted);
   const nextBobgoWebhookSecret =
     bobgoWebhookSecret && bobgoWebhookSecret.length > 0
       ? encryptSecret(bobgoWebhookSecret)
-      : existing?.bobgoWebhookSecretEncrypted;
+      : (existing?.bobgoWebhookSecretEncrypted ??
+        existing?.bobgoSandboxWebhookSecretEncrypted);
+  const nextBobgoLiveApiKey =
+    bobgoLiveApiKey && bobgoLiveApiKey.length > 0
+      ? encryptSecret(bobgoLiveApiKey)
+      : existing?.bobgoLiveApiKeyEncrypted;
+  const nextBobgoLiveWebhookSecret =
+    bobgoLiveWebhookSecret && bobgoLiveWebhookSecret.length > 0
+      ? encryptSecret(bobgoLiveWebhookSecret)
+      : existing?.bobgoLiveWebhookSecretEncrypted;
+  const nextBobgoSandboxApiKey =
+    bobgoSandboxApiKey && bobgoSandboxApiKey.length > 0
+      ? encryptSecret(bobgoSandboxApiKey)
+      : (existing?.bobgoSandboxApiKeyEncrypted ??
+        existing?.bobgoApiKeyEncrypted);
+  const nextBobgoSandboxWebhookSecret =
+    bobgoSandboxWebhookSecret && bobgoSandboxWebhookSecret.length > 0
+      ? encryptSecret(bobgoSandboxWebhookSecret)
+      : (existing?.bobgoSandboxWebhookSecretEncrypted ??
+        existing?.bobgoWebhookSecretEncrypted);
 
   await db
     .insert(marketplaceSettings)
     .values({
       id: 1,
       bobgoApiKeyEncrypted: nextBobgoApiKey ?? null,
+      bobgoBookingMode,
       bobgoEnabled,
+      bobgoLiveApiKeyEncrypted: nextBobgoLiveApiKey ?? null,
+      bobgoLiveWebhookSecretEncrypted: nextBobgoLiveWebhookSecret ?? null,
       bobgoMode,
       bobgoWebhookSecretEncrypted: nextBobgoWebhookSecret ?? null,
+      bobgoWebhookFulfillmentCreated,
+      bobgoWebhookShipmentChargedAmountChanged,
+      bobgoWebhookShipmentChargedWeightChanged,
+      bobgoWebhookShipmentHealthStatusUpdated,
+      bobgoWebhookShipmentSubmissionStatusUpdated,
+      bobgoWebhookTrackingUpdated,
+      bobgoSandboxApiKeyEncrypted: nextBobgoSandboxApiKey ?? null,
+      bobgoSandboxWebhookSecretEncrypted:
+        nextBobgoSandboxWebhookSecret ?? null,
       shippingBufferBps,
       shippingEnabled,
       shippingMarginBps,
@@ -308,9 +432,21 @@ export async function updateMarketplaceShippingSettings({
       target: marketplaceSettings.id,
       set: {
         bobgoApiKeyEncrypted: nextBobgoApiKey ?? null,
+        bobgoBookingMode,
         bobgoEnabled,
+        bobgoLiveApiKeyEncrypted: nextBobgoLiveApiKey ?? null,
+        bobgoLiveWebhookSecretEncrypted: nextBobgoLiveWebhookSecret ?? null,
         bobgoMode,
         bobgoWebhookSecretEncrypted: nextBobgoWebhookSecret ?? null,
+        bobgoWebhookFulfillmentCreated,
+        bobgoWebhookShipmentChargedAmountChanged,
+        bobgoWebhookShipmentChargedWeightChanged,
+        bobgoWebhookShipmentHealthStatusUpdated,
+        bobgoWebhookShipmentSubmissionStatusUpdated,
+        bobgoWebhookTrackingUpdated,
+        bobgoSandboxApiKeyEncrypted: nextBobgoSandboxApiKey ?? null,
+        bobgoSandboxWebhookSecretEncrypted:
+          nextBobgoSandboxWebhookSecret ?? null,
         shippingBufferBps,
         shippingEnabled,
         shippingMarginBps,
@@ -321,10 +457,89 @@ export async function updateMarketplaceShippingSettings({
   return { ok: true, message: "Shipping settings saved." };
 }
 
+export async function getBobGoWebhookSecret() {
+  const [settings, rawSettings] = await Promise.all([
+    getMarketplaceSettings(),
+    getRawMarketplaceSettings(),
+  ]);
+  const encryptedSecret =
+    settings.bobgoMode === "live"
+      ? (rawSettings?.bobgoLiveWebhookSecretEncrypted ??
+        rawSettings?.bobgoWebhookSecretEncrypted)
+      : (rawSettings?.bobgoSandboxWebhookSecretEncrypted ??
+        rawSettings?.bobgoWebhookSecretEncrypted);
+
+  return encryptedSecret ? decryptSecret(encryptedSecret) : null;
+}
+
+export async function getBobGoIntegrationConfig() {
+  const rawSettings = await getRawMarketplaceSettings();
+  const settings = await getMarketplaceSettings();
+  const encryptedApiKey =
+    settings.bobgoMode === "live"
+      ? (rawSettings?.bobgoLiveApiKeyEncrypted ??
+        rawSettings?.bobgoApiKeyEncrypted)
+      : (rawSettings?.bobgoSandboxApiKeyEncrypted ??
+        rawSettings?.bobgoApiKeyEncrypted);
+  const apiKey = encryptedApiKey ? decryptSecret(encryptedApiKey) : null;
+
+  return {
+    apiBaseUrl:
+      settings.bobgoMode === "sandbox"
+        ? "https://api.sandbox.bobgo.co.za"
+        : "https://api.bobgo.co.za",
+    apiKey,
+    bookingMode: settings.bobgoBookingMode,
+    bobgoEnabled: settings.bobgoEnabled,
+    mode: settings.bobgoMode,
+    shippingBufferBps: settings.shippingBufferBps,
+    shippingEnabled: settings.shippingEnabled,
+    shippingMarginBps: settings.shippingMarginBps,
+  };
+}
+
+export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecrets> {
+  const rawSettings = await getRawMarketplaceSettings();
+
+  return {
+    bobgoLiveApiKey: decryptOptionalSecret(rawSettings?.bobgoLiveApiKeyEncrypted),
+    bobgoLiveWebhookSecret: decryptOptionalSecret(
+      rawSettings?.bobgoLiveWebhookSecretEncrypted,
+    ),
+    bobgoSandboxApiKey: decryptOptionalSecret(
+      rawSettings?.bobgoSandboxApiKeyEncrypted ??
+        rawSettings?.bobgoApiKeyEncrypted,
+    ),
+    bobgoSandboxWebhookSecret: decryptOptionalSecret(
+      rawSettings?.bobgoSandboxWebhookSecretEncrypted ??
+        rawSettings?.bobgoWebhookSecretEncrypted,
+    ),
+    stripeLiveSecretKey: decryptOptionalSecret(
+      rawSettings?.stripeLiveSecretKeyEncrypted,
+    ),
+    stripeLiveWebhookSecret: decryptOptionalSecret(
+      rawSettings?.stripeLiveWebhookSecretEncrypted,
+    ),
+    stripeSandboxSecretKey: decryptOptionalSecret(
+      rawSettings?.stripeSandboxSecretKeyEncrypted,
+    ),
+    stripeSandboxWebhookSecret: decryptOptionalSecret(
+      rawSettings?.stripeSandboxWebhookSecretEncrypted,
+    ),
+  };
+}
+
 async function getRawMarketplaceSettings() {
   const [settings] = await db
     .select({
       bobgoApiKeyEncrypted: marketplaceSettings.bobgoApiKeyEncrypted,
+      bobgoLiveApiKeyEncrypted: marketplaceSettings.bobgoLiveApiKeyEncrypted,
+      bobgoLiveWebhookSecretEncrypted:
+        marketplaceSettings.bobgoLiveWebhookSecretEncrypted,
+      bobgoSandboxApiKeyEncrypted:
+        marketplaceSettings.bobgoSandboxApiKeyEncrypted,
+      bobgoSandboxWebhookSecretEncrypted:
+        marketplaceSettings.bobgoSandboxWebhookSecretEncrypted,
       bobgoWebhookSecretEncrypted:
         marketplaceSettings.bobgoWebhookSecretEncrypted,
       stripeLiveSecretKeyEncrypted:
@@ -341,6 +556,28 @@ async function getRawMarketplaceSettings() {
     .limit(1);
 
   return settings;
+}
+
+function decryptOptionalSecret(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return decryptSecret(value);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeBobgoBookingMode(
+  value: string | null,
+): "disabled" | "quote_only" | "quote_and_book" {
+  if (value === "quote_only" || value === "quote_and_book") {
+    return value;
+  }
+
+  return "disabled";
 }
 
 export async function updateMarketplaceComingSoonSettings({

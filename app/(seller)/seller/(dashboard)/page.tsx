@@ -1,12 +1,15 @@
 import {
   BadgeCheckIcon,
   BoxesIcon,
+  CheckCircle2Icon,
+  CircleIcon,
   ClipboardListIcon,
   PackageCheckIcon,
   ShieldCheckIcon,
   TruckIcon,
   WalletCardsIcon,
 } from "lucide-react";
+import Link from "next/link";
 import type { Metadata } from "next";
 
 import { DashboardCompactMetrics } from "@/components/dashboard/dashboard-compact-metrics";
@@ -97,6 +100,56 @@ export default async function SellerDashboardPage() {
         metrics={counts}
         storageKey={`seller:${overview.seller.id}:overview-counts`}
       />
+
+      {!overview.setup.complete ? (
+        <DashboardPanel
+          accent="green"
+          title="Seller setup guide"
+          description="Complete these steps to make your seller dashboard ready for orders, shipping quotes, and collection bookings."
+        >
+          <ol className="grid gap-3">
+            {overview.setup.steps.map((step, index) => (
+              <li
+                key={step.id}
+                className="flex min-w-0 items-start gap-3 rounded-lg border border-zinc-200/80 bg-zinc-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-sm font-bold text-zinc-700 ring-1 ring-zinc-200 dark:bg-white/10 dark:text-white dark:ring-white/10">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex min-w-0 items-center gap-2">
+                    {step.complete ? (
+                      <CheckCircle2Icon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+                    ) : (
+                      <CircleIcon className="size-4 shrink-0 text-amber-500" />
+                    )}
+                    <span className="font-semibold text-zinc-950 dark:text-white">
+                      {step.title}
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-300">
+                    {step.description}
+                  </span>
+                </span>
+                {!step.complete ? (
+                  step.href && step.actionLabel ? (
+                    <Link
+                      className="shrink-0 rounded-md border border-emerald-700/20 bg-emerald-600/10 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-600/15 dark:border-emerald-300/20 dark:text-emerald-200"
+                      href={step.href}
+                    >
+                      {step.actionLabel}
+                    </Link>
+                  ) : (
+                    <span className="shrink-0 rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-sm font-semibold text-amber-700 dark:text-amber-200">
+                      Waiting
+                    </span>
+                  )
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        </DashboardPanel>
+      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
         <DashboardPanel
