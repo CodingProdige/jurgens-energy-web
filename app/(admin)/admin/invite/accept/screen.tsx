@@ -46,8 +46,8 @@ export function AdminInviteAcceptScreen({
 
       <form action={formAction} className="w-full max-w-[410px]">
         <Image
-          src="/brand/logo/Piessang Logo Full - Clipped.png"
-          alt="Piessang"
+          src="/brand/logo/jurgens-icon.png"
+          alt="Jurgens Energy"
           width={164}
           height={30}
           priority

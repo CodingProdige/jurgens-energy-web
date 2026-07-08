@@ -31,7 +31,7 @@ export async function MarketplaceFooter() {
                 alt=""
                 className="h-9 w-[164px] max-w-none object-left"
                 height={36}
-                src="/brand/logo/Piessang Logo Full - Clipped.png"
+                src="/brand/logo/jurgens-icon.png"
                 width={164}
               />
             </span>

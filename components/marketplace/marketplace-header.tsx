@@ -74,7 +74,7 @@ export async function MarketplaceHeader() {
               className="h-9 w-[164px] max-w-none object-left"
               height={36}
               priority
-              src="/brand/logo/Piessang Logo Full - Clipped.png"
+              src="/brand/logo/jurgens-icon.png"
               width={164}
             />
           </span>
@@ -187,10 +187,10 @@ export async function MarketplaceHeader() {
           </button>
           <Link href="/" aria-label="Piessang home">
             <Image
-              alt="Piessang"
+              alt="Jurgens Energy"
               height={30}
               priority
-              src="/brand/logo/Piessang Logo Full - Clipped.png"
+              src="/brand/logo/jurgens-icon.png"
               width={132}
             />
           </Link>

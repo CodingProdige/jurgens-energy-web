@@ -2,7 +2,7 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
-const logoSrc = "/brand/logo/Piessang Logo Full - Clipped.png";
+const logoSrc = "/brand/logo/jurgens-icon.png";
 
 type PiessangLogoProps = {
   className?: string;
@@ -19,7 +19,7 @@ export function PiessangLogo({
     <div className={cn("relative h-9 w-48", className)}>
       <Image
         src={logoSrc}
-        alt="Piessang"
+        alt="Jurgens Energy"
         fill
         priority={priority}
         sizes="192px"

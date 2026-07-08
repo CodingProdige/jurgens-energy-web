@@ -85,8 +85,8 @@ const registerFeatures = [
 function BrandMark({ className }: { className?: string }) {
   return (
     <Image
-      src="/brand/logo/Piessang Logo Full - Clipped.png"
-      alt="Piessang"
+      src="/brand/logo/jurgens-icon.png"
+      alt="Jurgens Energy"
       width={164}
       height={30}
       priority

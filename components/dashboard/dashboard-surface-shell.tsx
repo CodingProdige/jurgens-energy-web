@@ -106,7 +106,7 @@ function SurfaceBrand({
     <Link href="/" className="flex min-w-0 items-center gap-3" aria-label={ariaLabel}>
       <span className="relative block h-8 w-8 shrink-0 overflow-hidden">
         <Image
-          src="/brand/logo/Piessang Logo Full - Clipped.png"
+          src="/brand/logo/jurgens-icon.png"
           alt=""
           width={146}
           height={32}
