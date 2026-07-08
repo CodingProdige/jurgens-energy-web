@@ -81,7 +81,7 @@ Shipping rates must be based on explicit product parcel data. Do not use fallbac
 
 All shipping metric fields must make their unit of measurement visible in the label or directly attached control. Use grams for weight and millimetres for dimensions unless the underlying shipping model is intentionally changed. Sanitize shipping metric inputs through a shared decimal numeric path so sellers cannot submit unit text or arbitrary strings, while still allowing decimal values such as `2.3`. Stock and count fields remain whole-number inputs unless a specific product rule says otherwise.
 
-Follow `docs/brand.md` for Piessang colors and brand asset locations. Prefer brand semantic tokens over ad hoc colors.
+Follow `docs/brand.md` for Jurgens Energy colors and brand asset locations. Prefer brand semantic tokens over ad hoc colors.
 
 Preferred flow:
 
@@ -110,7 +110,7 @@ Use the root title template from `app/layout.tsx` and page-level metadata:
 ```ts
 export const metadata = {
   title: "Products",
-  description: "Browse products on Piessang.",
+  description: "Browse products on Jurgens Energy.",
 };
 ```
 

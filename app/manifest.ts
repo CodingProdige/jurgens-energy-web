@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Jurgens Energy online store.",
     start_url: "/",
     display: "standalone",
-    background_color: "#FCFCF8",
-    theme_color: "#CCA137",
+    background_color: "#F7F7F2",
+    theme_color: "#FF5A1F",
     icons: [
       {
         src: "/brand/favicon-for-app/web-app-manifest-192x192.png",
