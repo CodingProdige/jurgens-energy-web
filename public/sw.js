@@ -6,12 +6,12 @@ self.addEventListener("push", (event) => {
   const payload = event.data.json();
   const title = payload.title || "Jurgens Energy";
   const options = {
-    badge: "/brand/favicon-for-public/web-app-manifest-192x192.png",
+    badge: "/brand/favicon-for-app/web-app-manifest-192x192.png",
     body: payload.body || "",
     data: {
       url: payload.url || "/",
     },
-    icon: payload.icon || "/brand/favicon-for-public/web-app-manifest-192x192.png",
+    icon: payload.icon || "/brand/favicon-for-app/web-app-manifest-192x192.png",
     tag: payload.tag || "jurgens-energy-notification",
   };
 

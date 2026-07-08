@@ -362,9 +362,9 @@ export function NotificationBell({
       });
 
       await registration.showNotification("Piessang notifications enabled", {
-        badge: "/brand/favicon-for-public/web-app-manifest-192x192.png",
+        badge: "/brand/favicon-for-app/web-app-manifest-192x192.png",
         body: "You will receive important updates from Piessang here.",
-        icon: "/brand/favicon-for-public/web-app-manifest-192x192.png",
+        icon: "/brand/favicon-for-app/web-app-manifest-192x192.png",
         tag: "piessang-push-enabled",
       });
 

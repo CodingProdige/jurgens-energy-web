@@ -11,14 +11,16 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#CCA137",
     icons: [
       {
-        src: "/brand/favicon-for-public/web-app-manifest-192x192.png",
+        src: "/brand/favicon-for-app/web-app-manifest-192x192.png",
         sizes: "192x192",
         type: "image/png",
+        purpose: "maskable",
       },
       {
-        src: "/brand/favicon-for-public/web-app-manifest-512x512.png",
+        src: "/brand/favicon-for-app/web-app-manifest-512x512.png",
         sizes: "512x512",
         type: "image/png",
+        purpose: "maskable",
       },
     ],
   };

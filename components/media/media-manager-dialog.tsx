@@ -3191,7 +3191,7 @@ function PiessangPremiumBrand() {
       <img
         alt=""
         className="size-9 object-contain"
-        src="/brand/favicon-for-public/web-app-manifest-192x192.png"
+        src="/brand/favicon-for-app/web-app-manifest-192x192.png"
       />
       <span className="text-sm font-black tracking-[0.18em]">PIESSANG</span>
     </div>
@@ -3245,7 +3245,7 @@ function PremiumIntro({
             <img
               alt=""
               className="size-24 object-contain drop-shadow-2xl"
-              src="/brand/favicon-for-public/web-app-manifest-192x192.png"
+              src="/brand/favicon-for-app/web-app-manifest-192x192.png"
             />
           </div>
         </div>

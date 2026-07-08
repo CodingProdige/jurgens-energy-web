@@ -580,7 +580,7 @@ export async function createInAppNotificationTemplateTest({
     ? await sendPushNotificationToUser({
         payload: {
           body: renderTemplate(bodyTemplate, renderData),
-          icon: "/brand/favicon-for-public/web-app-manifest-192x192.png",
+          icon: "/brand/favicon-for-app/web-app-manifest-192x192.png",
           tag: `test:${templateKey}`,
           title: `[Test] ${renderTemplate(titleTemplate, renderData)}`,
           url: actionUrlTemplate
@@ -1404,7 +1404,7 @@ async function renderPushPayload({
 
   return {
     body: renderTemplate(template.bodyTemplate, renderData),
-    icon: "/brand/favicon-for-public/web-app-manifest-192x192.png",
+    icon: "/brand/favicon-for-app/web-app-manifest-192x192.png",
     tag: event,
     title: renderTemplate(template.titleTemplate, renderData),
     url: template.actionUrlTemplate
