@@ -57,8 +57,55 @@ Repository
 
 Run the commands GitHub gives you inside Ubuntu/WSL on the Windows server.
 
-For the first pass, starting the runner with `./run.sh` is enough. Later, run
-it as a service so deploys continue after reboot.
+Use a dedicated repository runner for this app so it does not clash with other
+self-hosted runners on the same server:
+
+```text
+Runner name:  jurgens-energy-web-prod-01
+Runner label: jurgens-energy-web-prod
+Runner dir:   ~/actions-runner-jurgens-energy-web
+Work dir:     _work-jurgens-energy-web
+```
+
+The workflow targets:
+
+```yaml
+runs-on: [self-hosted, linux, x64, jurgens-energy-web-prod]
+```
+
+That means the deploy job will only run on a Linux x64 self-hosted runner with
+the `jurgens-energy-web-prod` label. Generic self-hosted runners for other
+projects should not pick up this deployment.
+
+If there are old queued deploy runs from before this label was added, cancel
+those runs in GitHub before starting the runner. Those old runs targeted the
+broad `self-hosted` label and may be picked up by any available self-hosted
+runner.
+
+Example isolated setup:
+
+```bash
+mkdir -p ~/actions-runner-jurgens-energy-web
+cd ~/actions-runner-jurgens-energy-web
+
+# Run the download/extract commands shown by GitHub, then configure with:
+./config.sh \
+  --url https://github.com/CodingProdige/jurgens-energy-web \
+  --token <token-from-github> \
+  --name jurgens-energy-web-prod-01 \
+  --labels jurgens-energy-web-prod \
+  --work _work-jurgens-energy-web \
+  --unattended
+```
+
+For the first pass, starting the runner with `./run.sh` is enough. Once a
+deploy succeeds, install it as a service from the same runner directory:
+
+```bash
+sudo ./svc.sh install
+sudo ./svc.sh start
+sudo ./svc.sh status
+```
 
 ## Manual Deploy
 

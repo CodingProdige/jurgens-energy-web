@@ -15,7 +15,7 @@ env:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64, jurgens-energy-web-prod]
     timeout-minutes: 30
 
     steps:
