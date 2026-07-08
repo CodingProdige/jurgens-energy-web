@@ -4,7 +4,7 @@ self.addEventListener("push", (event) => {
   }
 
   const payload = event.data.json();
-  const title = payload.title || "Piessang";
+  const title = payload.title || "Jurgens Energy";
   const options = {
     badge: "/brand/favicon-for-public/web-app-manifest-192x192.png",
     body: payload.body || "",
@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
       url: payload.url || "/",
     },
     icon: payload.icon || "/brand/favicon-for-public/web-app-manifest-192x192.png",
-    tag: payload.tag || "piessang-notification",
+    tag: payload.tag || "jurgens-energy-notification",
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

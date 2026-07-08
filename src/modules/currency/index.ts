@@ -1,7 +1,7 @@
 import { isoCountryCodes } from "@/src/modules/currency/country-codes";
 
-export const currencyPreferenceCookieName = "piessang_currency";
-export const countryPreferenceCookieName = "piessang_country";
+export const currencyPreferenceCookieName = "jurgens_energy_currency";
+export const countryPreferenceCookieName = "jurgens_energy_country";
 export const baseCurrency = "ZAR";
 
 export type SupportedCurrencyCode = string;

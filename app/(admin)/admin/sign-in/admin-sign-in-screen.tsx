@@ -105,7 +105,7 @@ function AdminSignInForm({
               autoComplete="email"
               required
               defaultValue={rememberedEmail}
-              placeholder="admin@piessang.com"
+              placeholder="admin@jurgensenergy.com"
               className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
             />
           </span>

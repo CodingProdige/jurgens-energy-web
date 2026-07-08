@@ -17,13 +17,13 @@ CLOUDFLARE_TUNNEL_TOKEN=your-token
 6. Configure the tunnel public hostname in Cloudflare:
 
 ```text
-Hostname: piessang.com
+Hostname: jurgensenergy.com
 Service:  http://caddy:80
 
-Hostname: admin.piessang.com
+Hostname: admin.jurgensenergy.com
 Service:  http://caddy:80
 
-Hostname: seller.piessang.com
+Hostname: seller.jurgensenergy.com
 Service:  http://caddy:80
 ```
 
@@ -56,7 +56,7 @@ npm run selfhost:start
 Then open:
 
 ```text
-http://localhost
+http://localhost:3010
 ```
 
 After the local Docker stack works, switch to:

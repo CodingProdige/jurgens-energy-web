@@ -1534,7 +1534,7 @@ function sampleVariableValue(variable: string) {
   }
 
   if (normalized.includes("url") || normalized.includes("link")) {
-    return "https://piessang.com";
+    return "https://jurgensenergy.com";
   }
 
   return `Example ${variable}`;

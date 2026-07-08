@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const composeProject = "piessang_selfhost";
+const composeProject = "jurgens_energy_selfhost";
 const composeBaseArgs = ["compose", "-p", composeProject];
 
 function run(command, args) {

@@ -373,7 +373,7 @@ async function fetchProductPage(url: URL) {
       headers: {
         Accept: "text/html,application/xhtml+xml",
         "User-Agent":
-          "PiessangProductImporter/1.0 (+https://piessang.com; seller product import)",
+          "JurgensEnergyProductImporter/1.0 (+https://jurgensenergy.com; seller product import)",
       },
       redirect: "follow",
       signal: controller.signal,

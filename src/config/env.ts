@@ -8,18 +8,18 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .min(1)
-    .default("postgres://marketplace:marketplace@localhost:5432/marketplace"),
-  REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
-  MEDIA_ROOT: z.string().min(1).default("./storage/media"),
+    .default("postgres://jurgens_energy:jurgens_energy@localhost:5433/jurgens_energy"),
+  REDIS_URL: z.string().min(1).default("redis://localhost:6380"),
+  MEDIA_ROOT: z.string().min(1).default("./storage/jurgens-energy/media"),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().min(1).default("gpt-5.4-mini"),
   SENDGRID_API_KEY: z.string().min(1).optional(),
   SENDGRID_FROM_EMAIL: z.email().optional(),
-  SENDGRID_FROM_NAME: z.string().min(1).default("Piessang"),
+  SENDGRID_FROM_NAME: z.string().min(1).default("Jurgens Energy"),
   SENDGRID_WEBHOOK_PUBLIC_KEY: z.string().min(1).optional(),
   WEB_PUSH_PRIVATE_KEY: z.string().min(1).optional(),
   WEB_PUSH_PUBLIC_KEY: z.string().min(1).optional(),
-  WEB_PUSH_SUBJECT: z.string().min(1).default("mailto:no-reply@piessang.com"),
+  WEB_PUSH_SUBJECT: z.string().min(1).default("mailto:no-reply@jurgensenergy.com"),
 });
 
 export const env = envSchema.parse({

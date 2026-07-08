@@ -1,6 +1,6 @@
-# Piessang Marketplace
+# Jurgens Energy Web
 
-Self-hosted multi-vendor marketplace foundation built as a modular monolith.
+Self-hosted Jurgens Energy online store built as a modular monolith.
 
 Project engineering rules live in `docs/engineering-principles.md`. Agents and humans should read those before making architectural changes.
 
@@ -90,7 +90,7 @@ npm run local:start
 
 This starts Postgres and Redis in Docker, runs migrations, seeds the admin user, and starts the Next.js dev server at `http://localhost:3000`.
 
-Local development Docker data uses the Compose project `piessang_dev`.
+Local development Docker data uses the Compose project `jurgens_energy_dev`.
 
 Stop the local development stack:
 
@@ -143,7 +143,7 @@ ADMIN_EMAIL
 ADMIN_PASSWORD
 ```
 
-For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5432`. The Docker `web` service automatically receives the internal container database URL.
+For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5433`. The Docker `web` service automatically receives the internal container database URL.
 
 3. Bootstrap the database:
 
@@ -160,7 +160,7 @@ npm run selfhost:start
 Open:
 
 ```text
-http://localhost
+http://localhost:3010
 ```
 
 5. Stop the self-hosted stack:
@@ -200,14 +200,14 @@ See `infra/cloudflare/README.md` for the Cloudflare-specific notes.
 The intended public hostname split is:
 
 ```text
-https://piessang.com        -> marketplace
-https://admin.piessang.com  -> admin dashboard
-https://seller.piessang.com -> seller dashboard
+https://jurgensenergy.com        -> store
+https://admin.jurgensenergy.com  -> admin dashboard
+https://seller.jurgensenergy.com -> legacy seller dashboard during the single-vendor transition
 ```
 
 Both hostnames still route to the same Docker stack and the same Next.js project.
 
-Self-hosted Docker data uses the Compose project `piessang_selfhost`, which keeps it separate from local development containers and volumes on the same machine.
+Self-hosted Docker data uses the Compose project `jurgens_energy_selfhost`, which keeps it separate from local development containers and volumes on the same machine.
 
 ## Docker Compose
 
@@ -224,7 +224,7 @@ Services:
 - `redis`: cache, rate-limit, and future queue layer
 - `caddy`: reverse proxy plus `/media/*` static file serving
 
-Caddy serves files from `./storage/media` at `/media/*` with long-lived cache headers so Cloudflare can cache static media.
+Caddy serves files from `./storage/jurgens-energy/media` at `/media/*` with long-lived cache headers so Cloudflare can cache static media.
 
 ## Database
 

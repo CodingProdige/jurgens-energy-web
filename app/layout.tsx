@@ -16,13 +16,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Piessang Marketplace",
-    template: "%s | Piessang",
+    default: "Jurgens Energy",
+    template: "%s | Jurgens Energy",
   },
-  description: "Self-hosted multi-vendor marketplace foundation.",
+  description: "Jurgens Energy online store.",
   appleWebApp: {
     capable: true,
-    title: "Piessang",
+    title: "Jurgens Energy",
   },
 };
 

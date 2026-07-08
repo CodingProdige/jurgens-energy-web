@@ -1,6 +1,6 @@
 # Deployment
 
-Piessang deploys to the self-hosted Windows server through a GitHub Actions
+Jurgens Energy deploys to the self-hosted Windows server through a GitHub Actions
 self-hosted runner running inside Ubuntu/WSL.
 
 ## Flow
@@ -16,30 +16,30 @@ Push to main
 ```
 
 Uploaded media and generated files stay outside the repo under
-`/mnt/c/Piessang/storage/...`. PostgreSQL, Redis, Caddy, and Cloudflare Tunnel
+`/mnt/c/JurgensEnergy/storage/...`. PostgreSQL, Redis, Caddy, and Cloudflare Tunnel
 state stay in Docker named volumes. A deploy should not delete live data.
 
 ## Server Environment File
 
 The GitHub runner checks out the repo into its own work directory, so do not
-depend on the `.env` inside `~/Dev/piessang-marketplace`.
+depend on the `.env` inside `~/Dev/jurgens-energy-web`.
 
 Store the production server environment at:
 
 ```text
-/mnt/c/Piessang/config/piessang-marketplace.env
+/mnt/c/JurgensEnergy/config/jurgens-energy-web.env
 ```
 
 Create it from Ubuntu/WSL:
 
 ```bash
-mkdir -p /mnt/c/Piessang/config
-cp ~/Dev/piessang-marketplace/.env /mnt/c/Piessang/config/piessang-marketplace.env
-chmod 600 /mnt/c/Piessang/config/piessang-marketplace.env
+mkdir -p /mnt/c/JurgensEnergy/config
+cp ~/Dev/jurgens-energy-web/.env /mnt/c/JurgensEnergy/config/jurgens-energy-web.env
+chmod 600 /mnt/c/JurgensEnergy/config/jurgens-energy-web.env
 ```
 
 The workflow copies that file to `.env` during deployment. To use a different
-path, set `PIESSANG_ENV_FILE` in the runner environment.
+path, set `JURGENS_ENERGY_ENV_FILE` in the runner environment.
 
 ## GitHub Runner
 
@@ -65,7 +65,7 @@ it as a service so deploys continue after reboot.
 From the server checkout:
 
 ```bash
-cd ~/Dev/piessang-marketplace
+cd ~/Dev/jurgens-energy-web
 git pull
 npm ci
 npm run lint

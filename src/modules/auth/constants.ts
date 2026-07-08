@@ -1,6 +1,6 @@
-export const rememberedEmailCookieName = "piessang_remembered_email";
-export const adminSurfaceAccessCookieName = "piessang_admin_access";
-export const sellerSurfaceAccessCookieName = "piessang_seller_access";
+export const rememberedEmailCookieName = "jurgens_energy_remembered_email";
+export const adminSurfaceAccessCookieName = "jurgens_energy_admin_access";
+export const sellerSurfaceAccessCookieName = "jurgens_energy_seller_access";
 export const surfaceAccessRememberSeconds = 60 * 60 * 24 * 30;
 
 function getConfiguredRootDomain() {

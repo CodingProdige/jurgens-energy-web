@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: piessang-selfhost-production
+  group: jurgens-energy-selfhost-production
   cancel-in-progress: false
 
 env:
@@ -34,7 +34,7 @@ jobs:
       - name: Load server environment
         shell: bash
         run: |
-          ENV_FILE="${PIESSANG_ENV_FILE:-/mnt/c/Piessang/config/piessang-marketplace.env}"
+          ENV_FILE="${JURGENS_ENERGY_ENV_FILE:-/mnt/c/JurgensEnergy/config/jurgens-energy-web.env}"
 
           if [ ! -f "$ENV_FILE" ]; then
             echo "Missing production env file at $ENV_FILE"

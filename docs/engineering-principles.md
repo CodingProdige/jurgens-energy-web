@@ -459,8 +459,8 @@ Local development and self-hosted stacks must remain separate.
 Current Compose project names:
 
 ```text
-local dev: piessang_dev
-self-host: piessang_selfhost
+local dev: jurgens_energy_dev
+self-host: jurgens_energy_selfhost
 ```
 
 Do not point local development commands at production data.

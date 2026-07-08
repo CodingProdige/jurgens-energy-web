@@ -2141,7 +2141,7 @@ function NotificationGlobalVariableForm({
               name="value"
               defaultValue={variable?.value ?? ""}
               maxLength={5000}
-              placeholder="support@piessang.com"
+              placeholder="support@jurgensenergy.com"
               required
             />
           </div>
@@ -3754,19 +3754,19 @@ function getTemplateVariableSample(
   const normalized = variable.toLowerCase();
 
   if (normalized.includes("sellerdashboard")) {
-    return "https://seller.piessang.com";
+    return "https://seller.jurgensenergy.com";
   }
 
   if (normalized.includes("admindashboard")) {
-    return "https://admin.piessang.com";
+    return "https://admin.jurgensenergy.com";
   }
 
   if (normalized.includes("email")) {
-    return "admin@piessang.com";
+    return "admin@jurgensenergy.com";
   }
 
   if (normalized.includes("url")) {
-    return "https://piessang.com";
+    return "https://jurgensenergy.com";
   }
 
   if (normalized.includes("store")) {

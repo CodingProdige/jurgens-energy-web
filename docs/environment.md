@@ -21,30 +21,30 @@ AUTH_GOOGLE_SECRET=replace-with-google-client-secret
 ADMIN_HOSTNAME=admin.localhost
 SELLER_HOSTNAME=seller.localhost
 
-POSTGRES_DB=marketplace
-POSTGRES_USER=marketplace
+POSTGRES_DB=jurgens_energy
+POSTGRES_USER=jurgens_energy
 POSTGRES_PASSWORD=replace-with-your-local-database-password
-DATABASE_URL=postgres://marketplace:replace-with-your-local-database-password@localhost:5432/marketplace
+DATABASE_URL=postgres://jurgens_energy:replace-with-your-local-database-password@localhost:5433/jurgens_energy
 
-REDIS_URL=redis://localhost:6379
-MEDIA_ROOT=./storage/media
-MEDIA_STORAGE_PATH=./storage/media
-INVOICE_STORAGE_PATH=./storage/invoices
-EXPORT_STORAGE_PATH=./storage/exports
-BACKUP_STORAGE_PATH=./storage/backups
+REDIS_URL=redis://localhost:6380
+MEDIA_ROOT=./storage/jurgens-energy/media
+MEDIA_STORAGE_PATH=./storage/jurgens-energy/media
+INVOICE_STORAGE_PATH=./storage/jurgens-energy/invoices
+EXPORT_STORAGE_PATH=./storage/jurgens-energy/exports
+BACKUP_STORAGE_PATH=./storage/jurgens-energy/backups
 
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change-me-now
-ADMIN_NAME=Marketplace Admin
+ADMIN_NAME=Jurgens Energy Admin
 
 SENDGRID_API_KEY=replace-with-sendgrid-api-key
-SENDGRID_FROM_EMAIL=no-reply@piessang.com
-SENDGRID_FROM_NAME=Piessang
+SENDGRID_FROM_EMAIL=no-reply@jurgensenergy.com
+SENDGRID_FROM_NAME=Jurgens Energy
 SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
 
 WEB_PUSH_PUBLIC_KEY=replace-with-vapid-public-key
 WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
-WEB_PUSH_SUBJECT=mailto:no-reply@piessang.com
+WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
 ```
 
 ## Self-Hosted Values
@@ -52,50 +52,52 @@ WEB_PUSH_SUBJECT=mailto:no-reply@piessang.com
 For self-hosting, update the same `.env` file with production-style values:
 
 ```env
-APP_URL=https://piessang.com
-AUTH_URL=https://piessang.com
+APP_URL=https://jurgensenergy.com
+AUTH_URL=https://jurgensenergy.com
 AUTH_SECRET=replace-with-a-long-random-production-secret
 AUTH_GOOGLE_ID=replace-with-google-client-id
 AUTH_GOOGLE_SECRET=replace-with-google-client-secret
 
-DOMAIN=piessang.com
-ADMIN_HOSTNAME=admin.piessang.com
-SELLER_HOSTNAME=seller.piessang.com
+DOMAIN=jurgensenergy.com
+ADMIN_HOSTNAME=admin.jurgensenergy.com
+SELLER_HOSTNAME=seller.jurgensenergy.com
 CADDY_EMAIL=admin@example.com
 
-POSTGRES_DB=marketplace
-POSTGRES_USER=marketplace
+POSTGRES_DB=jurgens_energy
+POSTGRES_USER=jurgens_energy
 POSTGRES_PASSWORD=replace-with-a-strong-database-password
-DATABASE_URL=postgres://marketplace:replace-with-a-strong-database-password@localhost:5432/marketplace
+DATABASE_URL=postgres://jurgens_energy:replace-with-a-strong-database-password@localhost:5433/jurgens_energy
 
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://localhost:6380
 MEDIA_ROOT=/data/media
-MEDIA_STORAGE_PATH=/Users/dillonjurgens/Piessang/storage/media
-INVOICE_STORAGE_PATH=/Users/dillonjurgens/Piessang/storage/invoices
-EXPORT_STORAGE_PATH=/Users/dillonjurgens/Piessang/storage/exports
-BACKUP_STORAGE_PATH=/Users/dillonjurgens/Piessang/storage/backups
+MEDIA_STORAGE_PATH=/Users/dillonjurgens/JurgensEnergy/storage/media
+INVOICE_STORAGE_PATH=/Users/dillonjurgens/JurgensEnergy/storage/invoices
+EXPORT_STORAGE_PATH=/Users/dillonjurgens/JurgensEnergy/storage/exports
+BACKUP_STORAGE_PATH=/Users/dillonjurgens/JurgensEnergy/storage/backups
 
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=replace-with-a-strong-admin-password
-ADMIN_NAME=Marketplace Admin
+ADMIN_NAME=Jurgens Energy Admin
 
 SENDGRID_API_KEY=replace-with-sendgrid-api-key
-SENDGRID_FROM_EMAIL=no-reply@piessang.com
-SENDGRID_FROM_NAME=Piessang
+SENDGRID_FROM_EMAIL=no-reply@jurgensenergy.com
+SENDGRID_FROM_NAME=Jurgens Energy
 SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
 
 WEB_PUSH_PUBLIC_KEY=replace-with-vapid-public-key
 WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
-WEB_PUSH_SUBJECT=mailto:no-reply@piessang.com
+WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
 
 CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 ```
 
-For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5432`. Docker Compose gives the `web` container its internal database URL automatically.
+For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5433`. Docker Compose gives the `web` container its internal database URL automatically.
+
+The Docker Compose defaults intentionally avoid common ports used by the copied project: PostgreSQL publishes on `5433`, Redis on `6380`, Caddy HTTP on `3010`, and Caddy HTTPS on `3443`. Override `POSTGRES_PORT`, `REDIS_PORT`, `CADDY_HTTP_PORT`, or `CADDY_HTTPS_PORT` in the single root `.env` only if the server needs different bindings.
 
 `SENDGRID_FROM_EMAIL` must be a sender identity verified in SendGrid. If either SendGrid value is missing in local development, password reset requests keep showing the dev reset link instead of sending email.
 
-`SENDGRID_WEBHOOK_PUBLIC_KEY` is the Verification key shown by SendGrid when Signed Event Webhook is enabled. Use the endpoint `https://piessang.com/api/webhooks/sendgrid/events` in SendGrid.
+`SENDGRID_WEBHOOK_PUBLIC_KEY` is the Verification key shown by SendGrid when Signed Event Webhook is enabled. Use the endpoint `https://jurgensenergy.com/api/webhooks/sendgrid/events` in SendGrid.
 
 `WEB_PUSH_PUBLIC_KEY` and `WEB_PUSH_PRIVATE_KEY` are the VAPID keys used for browser push notifications. Generate them with:
 
@@ -113,9 +115,9 @@ Create one Google OAuth web client and add redirect URIs for every public auth s
 http://localhost:3000/api/auth/callback/google
 http://admin.localhost:3000/api/auth/callback/google
 http://seller.localhost:3000/api/auth/callback/google
-https://piessang.com/api/auth/callback/google
-https://admin.piessang.com/api/auth/callback/google
-https://seller.piessang.com/api/auth/callback/google
+https://jurgensenergy.com/api/auth/callback/google
+https://admin.jurgensenergy.com/api/auth/callback/google
+https://seller.jurgensenergy.com/api/auth/callback/google
 ```
 
 Use the OAuth client ID as `AUTH_GOOGLE_ID` and the client secret as `AUTH_GOOGLE_SECRET`.

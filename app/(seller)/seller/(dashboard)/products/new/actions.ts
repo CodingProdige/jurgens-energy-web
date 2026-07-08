@@ -980,7 +980,7 @@ async function fetchRemoteImage(url: string) {
         Accept:
           "image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.8,*/*;q=0.5",
         "User-Agent":
-          "PiessangProductImporter/1.0 (+https://piessang.com; seller product import)",
+          "JurgensEnergyProductImporter/1.0 (+https://jurgensenergy.com; seller product import)",
       },
       signal: controller.signal,
     });

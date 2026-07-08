@@ -71,7 +71,7 @@ node -e "console.log(require('web-push').generateVAPIDKeys())"
 Use a subject you control, for example:
 
 ```txt
-WEB_PUSH_SUBJECT=mailto:no-reply@piessang.com
+WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
 ```
 
 Still planned:

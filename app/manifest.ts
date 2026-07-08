@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Piessang Marketplace",
-    short_name: "Piessang",
-    description: "Self-hosted multi-vendor marketplace.",
+    name: "Jurgens Energy",
+    short_name: "Jurgens Energy",
+    description: "Jurgens Energy online store.",
     start_url: "/",
     display: "standalone",
     background_color: "#FCFCF8",
