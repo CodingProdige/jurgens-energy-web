@@ -22,7 +22,6 @@ type MarketplaceSettings = {
   maxUploadFileMb: number;
   maxVideoUploadFileMb: number;
   maxVideoWidth: number;
-  premiumStorageQuotaMb: number;
   bobgoEnabled: boolean;
   bobgoMode: "live" | "sandbox";
   hasBobgoApiKey: boolean;
@@ -31,6 +30,7 @@ type MarketplaceSettings = {
   hasBobgoLiveWebhookSecret: boolean;
   hasBobgoSandboxApiKey: boolean;
   hasBobgoSandboxWebhookSecret: boolean;
+  jurgensDeliveryCutoffTime: string;
   bobgoWebhookFulfillmentCreated: boolean;
   bobgoWebhookShipmentChargedAmountChanged: boolean;
   bobgoWebhookShipmentChargedWeightChanged: boolean;
@@ -40,6 +40,15 @@ type MarketplaceSettings = {
   shippingBufferBps: number;
   shippingEnabled: boolean;
   shippingMarginBps: number;
+  payfastLiveMerchantId: string | null;
+  payfastMode: "live" | "sandbox";
+  payfastOnsiteEnabled: boolean;
+  payfastSandboxMerchantId: string | null;
+  payfastTokenizationEnabled: boolean;
+  hasPayfastLiveMerchantKey: boolean;
+  hasPayfastLivePassphrase: boolean;
+  hasPayfastSandboxMerchantKey: boolean;
+  hasPayfastSandboxPassphrase: boolean;
   stripeLivePublishableKey: string | null;
   stripeMode: "live" | "sandbox";
   stripeSandboxPublishableKey: string | null;
@@ -56,6 +65,10 @@ export type MarketplaceAdminSecrets = {
   bobgoLiveWebhookSecret: string | null;
   bobgoSandboxApiKey: string | null;
   bobgoSandboxWebhookSecret: string | null;
+  payfastLiveMerchantKey: string | null;
+  payfastLivePassphrase: string | null;
+  payfastSandboxMerchantKey: string | null;
+  payfastSandboxPassphrase: string | null;
   stripeLiveSecretKey: string | null;
   stripeLiveWebhookSecret: string | null;
   stripeSandboxSecretKey: string | null;
@@ -74,7 +87,6 @@ const defaultSettings: MarketplaceSettings = {
   maxUploadFileMb: 10,
   maxVideoUploadFileMb: 100,
   maxVideoWidth: 1280,
-  premiumStorageQuotaMb: 5120,
   bobgoEnabled: false,
   bobgoMode: "sandbox",
   hasBobgoApiKey: false,
@@ -83,6 +95,7 @@ const defaultSettings: MarketplaceSettings = {
   hasBobgoLiveWebhookSecret: false,
   hasBobgoSandboxApiKey: false,
   hasBobgoSandboxWebhookSecret: false,
+  jurgensDeliveryCutoffTime: "14:00",
   bobgoWebhookFulfillmentCreated: true,
   bobgoWebhookShipmentChargedAmountChanged: true,
   bobgoWebhookShipmentChargedWeightChanged: true,
@@ -92,6 +105,15 @@ const defaultSettings: MarketplaceSettings = {
   shippingBufferBps: 0,
   shippingEnabled: false,
   shippingMarginBps: 0,
+  payfastLiveMerchantId: null,
+  payfastMode: "sandbox",
+  payfastOnsiteEnabled: false,
+  payfastSandboxMerchantId: null,
+  payfastTokenizationEnabled: false,
+  hasPayfastLiveMerchantKey: false,
+  hasPayfastLivePassphrase: false,
+  hasPayfastSandboxMerchantKey: false,
+  hasPayfastSandboxPassphrase: false,
   stripeLivePublishableKey: null,
   stripeMode: "sandbox",
   stripeSandboxPublishableKey: null,
@@ -116,7 +138,6 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       maxUploadFileMb: marketplaceSettings.maxUploadFileMb,
       maxVideoUploadFileMb: marketplaceSettings.maxVideoUploadFileMb,
       maxVideoWidth: marketplaceSettings.maxVideoWidth,
-      premiumStorageQuotaMb: marketplaceSettings.premiumStorageQuotaMb,
       bobgoApiKeyEncrypted: marketplaceSettings.bobgoApiKeyEncrypted,
       bobgoBookingMode: marketplaceSettings.bobgoBookingMode,
       bobgoEnabled: marketplaceSettings.bobgoEnabled,
@@ -145,6 +166,21 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       shippingBufferBps: marketplaceSettings.shippingBufferBps,
       shippingEnabled: marketplaceSettings.shippingEnabled,
       shippingMarginBps: marketplaceSettings.shippingMarginBps,
+      jurgensDeliveryCutoffTime: marketplaceSettings.jurgensDeliveryCutoffTime,
+      payfastLiveMerchantId: marketplaceSettings.payfastLiveMerchantId,
+      payfastLiveMerchantKeyEncrypted:
+        marketplaceSettings.payfastLiveMerchantKeyEncrypted,
+      payfastLivePassphraseEncrypted:
+        marketplaceSettings.payfastLivePassphraseEncrypted,
+      payfastMode: marketplaceSettings.payfastMode,
+      payfastOnsiteEnabled: marketplaceSettings.payfastOnsiteEnabled,
+      payfastSandboxMerchantId: marketplaceSettings.payfastSandboxMerchantId,
+      payfastSandboxMerchantKeyEncrypted:
+        marketplaceSettings.payfastSandboxMerchantKeyEncrypted,
+      payfastSandboxPassphraseEncrypted:
+        marketplaceSettings.payfastSandboxPassphraseEncrypted,
+      payfastTokenizationEnabled:
+        marketplaceSettings.payfastTokenizationEnabled,
       stripeLivePublishableKey: marketplaceSettings.stripeLivePublishableKey,
       stripeLiveSecretKeyEncrypted:
         marketplaceSettings.stripeLiveSecretKeyEncrypted,
@@ -190,6 +226,17 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       settings.bobgoSandboxWebhookSecretEncrypted ??
         settings.bobgoWebhookSecretEncrypted,
     ),
+    payfastMode: settings.payfastMode === "live" ? "live" : "sandbox",
+    hasPayfastLiveMerchantKey: Boolean(
+      settings.payfastLiveMerchantKeyEncrypted,
+    ),
+    hasPayfastLivePassphrase: Boolean(settings.payfastLivePassphraseEncrypted),
+    hasPayfastSandboxMerchantKey: Boolean(
+      settings.payfastSandboxMerchantKeyEncrypted,
+    ),
+    hasPayfastSandboxPassphrase: Boolean(
+      settings.payfastSandboxPassphraseEncrypted,
+    ),
     stripeMode: settings.stripeMode === "live" ? "live" : "sandbox",
     hasStripeLiveSecretKey: Boolean(settings.stripeLiveSecretKeyEncrypted),
     hasStripeLiveWebhookSecret: Boolean(
@@ -211,7 +258,6 @@ export async function updateMarketplaceMediaSettings({
   maxUploadFileMb,
   maxVideoUploadFileMb,
   maxVideoWidth,
-  premiumStorageQuotaMb,
   videoCompressionCrf,
 }: {
   freeStorageQuotaMb: number;
@@ -220,7 +266,6 @@ export async function updateMarketplaceMediaSettings({
   maxUploadFileMb: number;
   maxVideoUploadFileMb: number;
   maxVideoWidth: number;
-  premiumStorageQuotaMb: number;
   videoCompressionCrf: number;
 }) {
   await db
@@ -233,7 +278,6 @@ export async function updateMarketplaceMediaSettings({
       maxUploadFileMb,
       maxVideoUploadFileMb,
       maxVideoWidth,
-      premiumStorageQuotaMb,
       videoCompressionCrf,
       updatedAt: new Date(),
     })
@@ -246,78 +290,85 @@ export async function updateMarketplaceMediaSettings({
         maxUploadFileMb,
         maxVideoUploadFileMb,
         maxVideoWidth,
-        premiumStorageQuotaMb,
         videoCompressionCrf,
         updatedAt: new Date(),
       },
     });
 
-  return { ok: true, message: "Media and premium storage settings saved." };
+  return { ok: true, message: "Media storage settings saved." };
 }
 
-export async function updateMarketplaceStripeSettings({
-  livePublishableKey,
-  liveSecretKey,
-  liveWebhookSecret,
+export async function updateMarketplacePayFastSettings({
+  liveMerchantId,
+  liveMerchantKey,
+  livePassphrase,
   mode,
-  sandboxPublishableKey,
-  sandboxSecretKey,
-  sandboxWebhookSecret,
+  onsiteEnabled,
+  sandboxMerchantId,
+  sandboxMerchantKey,
+  sandboxPassphrase,
+  tokenizationEnabled,
 }: {
-  livePublishableKey?: string;
-  liveSecretKey?: string;
-  liveWebhookSecret?: string;
+  liveMerchantId?: string;
+  liveMerchantKey?: string;
+  livePassphrase?: string;
   mode: "live" | "sandbox";
-  sandboxPublishableKey?: string;
-  sandboxSecretKey?: string;
-  sandboxWebhookSecret?: string;
+  onsiteEnabled: boolean;
+  sandboxMerchantId?: string;
+  sandboxMerchantKey?: string;
+  sandboxPassphrase?: string;
+  tokenizationEnabled: boolean;
 }) {
   const existing = await getRawMarketplaceSettings();
-  const nextLiveSecret =
-    liveSecretKey && liveSecretKey.length > 0
-      ? encryptSecret(liveSecretKey)
-      : existing?.stripeLiveSecretKeyEncrypted;
-  const nextLiveWebhookSecret =
-    liveWebhookSecret && liveWebhookSecret.length > 0
-      ? encryptSecret(liveWebhookSecret)
-      : existing?.stripeLiveWebhookSecretEncrypted;
-  const nextSandboxSecret =
-    sandboxSecretKey && sandboxSecretKey.length > 0
-      ? encryptSecret(sandboxSecretKey)
-      : existing?.stripeSandboxSecretKeyEncrypted;
-  const nextSandboxWebhookSecret =
-    sandboxWebhookSecret && sandboxWebhookSecret.length > 0
-      ? encryptSecret(sandboxWebhookSecret)
-      : existing?.stripeSandboxWebhookSecretEncrypted;
+  const nextLiveMerchantKey =
+    liveMerchantKey && liveMerchantKey.length > 0
+      ? encryptSecret(liveMerchantKey)
+      : existing?.payfastLiveMerchantKeyEncrypted;
+  const nextLivePassphrase =
+    livePassphrase && livePassphrase.length > 0
+      ? encryptSecret(livePassphrase)
+      : existing?.payfastLivePassphraseEncrypted;
+  const nextSandboxMerchantKey =
+    sandboxMerchantKey && sandboxMerchantKey.length > 0
+      ? encryptSecret(sandboxMerchantKey)
+      : existing?.payfastSandboxMerchantKeyEncrypted;
+  const nextSandboxPassphrase =
+    sandboxPassphrase && sandboxPassphrase.length > 0
+      ? encryptSecret(sandboxPassphrase)
+      : existing?.payfastSandboxPassphraseEncrypted;
 
   await db
     .insert(marketplaceSettings)
     .values({
       id: 1,
-      stripeLivePublishableKey: livePublishableKey || null,
-      stripeLiveSecretKeyEncrypted: nextLiveSecret ?? null,
-      stripeLiveWebhookSecretEncrypted: nextLiveWebhookSecret ?? null,
-      stripeMode: mode,
-      stripeSandboxPublishableKey: sandboxPublishableKey || null,
-      stripeSandboxSecretKeyEncrypted: nextSandboxSecret ?? null,
-      stripeSandboxWebhookSecretEncrypted: nextSandboxWebhookSecret ?? null,
+      payfastLiveMerchantId: liveMerchantId || null,
+      payfastLiveMerchantKeyEncrypted: nextLiveMerchantKey ?? null,
+      payfastLivePassphraseEncrypted: nextLivePassphrase ?? null,
+      payfastMode: mode,
+      payfastOnsiteEnabled: onsiteEnabled,
+      payfastSandboxMerchantId: sandboxMerchantId || null,
+      payfastSandboxMerchantKeyEncrypted: nextSandboxMerchantKey ?? null,
+      payfastSandboxPassphraseEncrypted: nextSandboxPassphrase ?? null,
+      payfastTokenizationEnabled: tokenizationEnabled,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: marketplaceSettings.id,
       set: {
-        stripeLivePublishableKey: livePublishableKey || null,
-        stripeLiveSecretKeyEncrypted: nextLiveSecret ?? null,
-        stripeLiveWebhookSecretEncrypted: nextLiveWebhookSecret ?? null,
-        stripeMode: mode,
-        stripeSandboxPublishableKey: sandboxPublishableKey || null,
-        stripeSandboxSecretKeyEncrypted: nextSandboxSecret ?? null,
-        stripeSandboxWebhookSecretEncrypted: nextSandboxWebhookSecret ?? null,
+        payfastLiveMerchantId: liveMerchantId || null,
+        payfastLiveMerchantKeyEncrypted: nextLiveMerchantKey ?? null,
+        payfastLivePassphraseEncrypted: nextLivePassphrase ?? null,
+        payfastMode: mode,
+        payfastOnsiteEnabled: onsiteEnabled,
+        payfastSandboxMerchantId: sandboxMerchantId || null,
+        payfastSandboxMerchantKeyEncrypted: nextSandboxMerchantKey ?? null,
+        payfastSandboxPassphraseEncrypted: nextSandboxPassphrase ?? null,
+        payfastTokenizationEnabled: tokenizationEnabled,
         updatedAt: new Date(),
       },
     });
 
-  return { ok: true, message: "Stripe payment settings saved." };
+  return { ok: true, message: "PayFast payment settings saved." };
 }
 
 export async function updateMarketplaceShippingSettings({
@@ -336,6 +387,7 @@ export async function updateMarketplaceShippingSettings({
   bobgoWebhookShipmentHealthStatusUpdated,
   bobgoWebhookShipmentSubmissionStatusUpdated,
   bobgoWebhookTrackingUpdated,
+  jurgensDeliveryCutoffTime,
   shippingBufferBps,
   shippingEnabled,
   shippingMarginBps,
@@ -355,6 +407,7 @@ export async function updateMarketplaceShippingSettings({
   bobgoWebhookShipmentHealthStatusUpdated: boolean;
   bobgoWebhookShipmentSubmissionStatusUpdated: boolean;
   bobgoWebhookTrackingUpdated: boolean;
+  jurgensDeliveryCutoffTime: string;
   shippingBufferBps: number;
   shippingEnabled: boolean;
   shippingMarginBps: number;
@@ -423,6 +476,7 @@ export async function updateMarketplaceShippingSettings({
       bobgoSandboxApiKeyEncrypted: nextBobgoSandboxApiKey ?? null,
       bobgoSandboxWebhookSecretEncrypted:
         nextBobgoSandboxWebhookSecret ?? null,
+      jurgensDeliveryCutoffTime,
       shippingBufferBps,
       shippingEnabled,
       shippingMarginBps,
@@ -447,6 +501,7 @@ export async function updateMarketplaceShippingSettings({
         bobgoSandboxApiKeyEncrypted: nextBobgoSandboxApiKey ?? null,
         bobgoSandboxWebhookSecretEncrypted:
           nextBobgoSandboxWebhookSecret ?? null,
+        jurgensDeliveryCutoffTime,
         shippingBufferBps,
         shippingEnabled,
         shippingMarginBps,
@@ -498,6 +553,49 @@ export async function getBobGoIntegrationConfig() {
   };
 }
 
+export async function getPayFastIntegrationConfig() {
+  const [rawSettings, settings] = await Promise.all([
+    getRawMarketplaceSettings(),
+    getMarketplaceSettings(),
+  ]);
+  const encryptedMerchantKey =
+    settings.payfastMode === "live"
+      ? rawSettings?.payfastLiveMerchantKeyEncrypted
+      : rawSettings?.payfastSandboxMerchantKeyEncrypted;
+  const encryptedPassphrase =
+    settings.payfastMode === "live"
+      ? rawSettings?.payfastLivePassphraseEncrypted
+      : rawSettings?.payfastSandboxPassphraseEncrypted;
+  const merchantId =
+    settings.payfastMode === "live"
+      ? settings.payfastLiveMerchantId
+      : settings.payfastSandboxMerchantId;
+  const merchantKey = encryptedMerchantKey
+    ? decryptSecret(encryptedMerchantKey)
+    : null;
+  const passphrase = encryptedPassphrase
+    ? decryptSecret(encryptedPassphrase)
+    : null;
+
+  return {
+    isConfigured: Boolean(merchantId && merchantKey),
+    merchantId,
+    merchantKey,
+    mode: settings.payfastMode,
+    onsiteEnabled: settings.payfastOnsiteEnabled,
+    passphrase,
+    processUrl:
+      settings.payfastMode === "live"
+        ? "https://www.payfast.co.za/eng/process"
+        : "https://sandbox.payfast.co.za/eng/process",
+    tokenizationEnabled: settings.payfastTokenizationEnabled,
+    validationUrl:
+      settings.payfastMode === "live"
+        ? "https://www.payfast.co.za/eng/query/validate"
+        : "https://sandbox.payfast.co.za/eng/query/validate",
+  };
+}
+
 export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecrets> {
   const rawSettings = await getRawMarketplaceSettings();
 
@@ -513,6 +611,18 @@ export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecr
     bobgoSandboxWebhookSecret: decryptOptionalSecret(
       rawSettings?.bobgoSandboxWebhookSecretEncrypted ??
         rawSettings?.bobgoWebhookSecretEncrypted,
+    ),
+    payfastLiveMerchantKey: decryptOptionalSecret(
+      rawSettings?.payfastLiveMerchantKeyEncrypted,
+    ),
+    payfastLivePassphrase: decryptOptionalSecret(
+      rawSettings?.payfastLivePassphraseEncrypted,
+    ),
+    payfastSandboxMerchantKey: decryptOptionalSecret(
+      rawSettings?.payfastSandboxMerchantKeyEncrypted,
+    ),
+    payfastSandboxPassphrase: decryptOptionalSecret(
+      rawSettings?.payfastSandboxPassphraseEncrypted,
     ),
     stripeLiveSecretKey: decryptOptionalSecret(
       rawSettings?.stripeLiveSecretKeyEncrypted,
@@ -542,6 +652,14 @@ async function getRawMarketplaceSettings() {
         marketplaceSettings.bobgoSandboxWebhookSecretEncrypted,
       bobgoWebhookSecretEncrypted:
         marketplaceSettings.bobgoWebhookSecretEncrypted,
+      payfastLiveMerchantKeyEncrypted:
+        marketplaceSettings.payfastLiveMerchantKeyEncrypted,
+      payfastLivePassphraseEncrypted:
+        marketplaceSettings.payfastLivePassphraseEncrypted,
+      payfastSandboxMerchantKeyEncrypted:
+        marketplaceSettings.payfastSandboxMerchantKeyEncrypted,
+      payfastSandboxPassphraseEncrypted:
+        marketplaceSettings.payfastSandboxPassphraseEncrypted,
       stripeLiveSecretKeyEncrypted:
         marketplaceSettings.stripeLiveSecretKeyEncrypted,
       stripeLiveWebhookSecretEncrypted:

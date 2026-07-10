@@ -18,518 +18,136 @@ function slugify(value) {
     .slice(0, 160);
 }
 
-function category(name, commissionRateBps, children) {
-  return { children, commissionRateBps, name };
+function category(name, children) {
+  return { children, name };
 }
 
-function branch(name, children) {
+function branch(name, children = []) {
   return { children, name };
 }
 
 const categories = [
-  category("Fashion & Apparel", 1200, [
-    branch("Clothing", [
-      "T-Shirts",
-      "Shirts",
-      "Hoodies & Sweaters",
-      "Jackets & Coats",
-      "Dresses",
-      "Pants",
-      "Jeans",
-      "Activewear",
-      "Sleepwear",
-      "Underwear",
+  category("Gas Cylinders", [
+    branch("Full LPG Cylinders", [
+      "3 kg LPG Cylinders",
+      "5 kg LPG Cylinders",
+      "9 kg LPG Cylinders",
+      "14 kg LPG Cylinders",
+      "19 kg LPG Cylinders",
+      "48 kg LPG Cylinders",
     ]),
-    branch("Shoes", [
-      "Sneakers",
-      "Formal Shoes",
-      "Boots",
-      "Sandals",
-      "Heels",
-      "Loafers",
-      "Sports Shoes",
+    branch("Cylinder Exchange", [
+      "9 kg Cylinder Exchange",
+      "14 kg Cylinder Exchange",
+      "19 kg Cylinder Exchange",
+      "48 kg Cylinder Exchange",
     ]),
-    branch("Bags & Accessories", [
-      "Handbags",
-      "Backpacks",
-      "Wallets",
-      "Belts",
-      "Hats & Caps",
-      "Scarves",
-      "Sunglasses",
+    branch("Empty Cylinders", [
+      "Empty LPG Cylinders",
+      "Cylinder Deposits",
+      "Cylinder Recertification",
     ]),
-    branch("Jewelry & Watches", [
-      "Fine Jewelry",
-      "Fashion Jewelry",
-      "Watches",
-      "Rings",
-      "Necklaces",
-      "Earrings",
+    branch("Cylinder Accessories", [
+      "Cylinder Caps",
+      "Cylinder Seals",
+      "Cylinder Trolleys",
+      "Cylinder Cages",
     ]),
   ]),
-  category("Electronics", 800, [
-    branch("Phones & Accessories", [
-      "Smartphones",
-      "Feature Phones",
-      "Phone Cases",
-      "Chargers & Cables",
-      "Screen Protectors",
-      "Power Banks",
-    ]),
-    branch("Computers", [
-      "Laptops",
-      "Desktop Computers",
-      "Monitors",
-      "Keyboards & Mice",
-      "Computer Storage",
-      "Printers & Scanners",
-    ]),
-    branch("Audio", [
-      "Headphones",
-      "Earbuds",
-      "Speakers",
-      "Microphones",
-      "Home Audio",
-      "DJ Equipment",
-    ]),
-    branch("Cameras & Imaging", [
-      "Digital Cameras",
-      "Camera Lenses",
-      "Action Cameras",
-      "Drones",
-      "Lighting & Studio",
-      "Camera Accessories",
-    ]),
-    branch("Gaming", [
-      "Consoles",
-      "Video Games",
-      "Controllers",
-      "Gaming Headsets",
-      "Gaming Chairs",
-      "PC Gaming Parts",
-    ]),
+  category("Gas Geysers", [
+    branch("Indoor Gas Geysers"),
+    branch("Outdoor Gas Geysers"),
+    branch("Constant Temperature Geysers"),
+    branch("Low Pressure Geysers"),
+    branch("Geyser Flues & Kits"),
+    branch("Geyser Spares"),
   ]),
-  category("Home & Living", 1000, [
-    branch("Furniture", [
-      "Sofas",
-      "Tables",
-      "Chairs",
-      "Beds & Mattresses",
-      "Storage Furniture",
-      "Office Furniture",
-    ]),
-    branch("Home Decor", [
-      "Wall Art",
-      "Mirrors",
-      "Candles",
-      "Vases",
-      "Clocks",
-      "Decorative Accessories",
-    ]),
-    branch("Kitchen & Dining", [
-      "Cookware",
-      "Dinnerware",
-      "Drinkware",
-      "Kitchen Tools",
-      "Small Appliances",
-      "Food Storage",
-    ]),
-    branch("Bedding & Bath", [
-      "Bedding Sets",
-      "Pillows",
-      "Blankets",
-      "Towels",
-      "Bath Accessories",
-      "Laundry",
-    ]),
-    branch("Lighting", [
-      "Ceiling Lights",
-      "Table Lamps",
-      "Floor Lamps",
-      "Outdoor Lighting",
-      "Smart Lighting",
-    ]),
+  category("Gas Appliances", [
+    branch("Gas Stoves"),
+    branch("Gas Cooker Tops"),
+    branch("Single Burners"),
+    branch("Double Burners"),
+    branch("Camping Stoves"),
+    branch("Gas Heaters"),
   ]),
-  category("Beauty & Personal Care", 1400, [
-    branch("Makeup", [
-      "Face Makeup",
-      "Eye Makeup",
-      "Lip Makeup",
-      "Makeup Brushes",
-      "Makeup Palettes",
-    ]),
-    branch("Skincare", [
-      "Cleansers",
-      "Moisturizers",
-      "Serums",
-      "Sunscreen",
-      "Face Masks",
-      "Treatments",
-    ]),
-    branch("Hair Care", [
-      "Shampoo",
-      "Conditioner",
-      "Hair Styling",
-      "Hair Treatments",
-      "Hair Tools",
-    ]),
-    branch("Fragrance", [
-      "Perfume",
-      "Cologne",
-      "Body Mist",
-      "Fragrance Sets",
-    ]),
-    branch("Personal Care", [
-      "Bath & Body",
-      "Oral Care",
-      "Shaving & Grooming",
-      "Deodorants",
-      "Personal Care Tools",
-    ]),
+  category("Burners & Cooker Equipment", [
+    branch("Cast Iron Burners"),
+    branch("Boiling Rings"),
+    branch("Potjie Burners"),
+    branch("Wok Burners"),
+    branch("Burner Stands"),
+    branch("Cooker Spares"),
   ]),
-  category("Food & Beverage", 1200, [
-    branch("Pantry", [
-      "Snacks",
-      "Breakfast Foods",
-      "Pasta & Grains",
-      "Sauces & Condiments",
-      "Baking",
-      "Canned Goods",
-    ]),
-    branch("Drinks", [
-      "Coffee",
-      "Tea",
-      "Juice",
-      "Soft Drinks",
-      "Energy Drinks",
-      "Water",
-    ]),
-    branch("Specialty Food", [
-      "Organic",
-      "Vegan",
-      "Gluten Free",
-      "International Foods",
-      "Gourmet Gifts",
-    ]),
-    branch("Fresh & Frozen", [
-      "Fresh Produce",
-      "Meat & Seafood",
-      "Dairy",
-      "Frozen Meals",
-      "Bakery",
-    ]),
+  category("Regulators & Valves", [
+    branch("LPG Regulators"),
+    branch("Low Pressure Regulators"),
+    branch("High Pressure Regulators"),
+    branch("Changeover Valves"),
+    branch("Safety Valves"),
+    branch("Gauges"),
   ]),
-  category("Health & Wellness", 1000, [
-    branch("Vitamins & Supplements", [
-      "Multivitamins",
-      "Protein",
-      "Minerals",
-      "Herbal Supplements",
-      "Sports Nutrition",
+  category("Hoses & Fittings", [
+    branch("Gas Hoses", [
+      "1.2 m Gas Hoses",
+      "2 m Gas Hoses",
+      "3 m Gas Hoses",
+      "Bulk Gas Hose",
     ]),
-    branch("Medical Supplies", [
-      "First Aid",
-      "Mobility Aids",
-      "Monitoring Devices",
-      "Masks & Sanitizers",
-    ]),
-    branch("Wellness", [
-      "Massage",
-      "Aromatherapy",
-      "Sleep Support",
-      "Fitness Recovery",
-      "Sexual Wellness",
-    ]),
+    branch("Hose Clamps"),
+    branch("Brass Fittings"),
+    branch("Nozzles & Jets"),
+    branch("Quick Couplers"),
+    branch("Adapters"),
   ]),
-  category("Sports & Outdoors", 1000, [
-    branch("Fitness", [
-      "Weights",
-      "Cardio Equipment",
-      "Yoga & Pilates",
-      "Fitness Accessories",
-      "Wearable Fitness",
-    ]),
-    branch("Team Sports", [
-      "Soccer",
-      "Basketball",
-      "Rugby",
-      "Cricket",
-      "Tennis",
-      "Golf",
-    ]),
-    branch("Outdoor Recreation", [
-      "Camping",
-      "Hiking",
-      "Cycling",
-      "Fishing",
-      "Water Sports",
-      "Travel Gear",
-    ]),
-    branch("Sportswear", [
-      "Training Tops",
-      "Training Bottoms",
-      "Sports Bras",
-      "Performance Shoes",
-    ]),
+  category("Installation & Safety", [
+    branch("Installation Kits"),
+    branch("Leak Detection"),
+    branch("Gas Cages"),
+    branch("Mounting Brackets"),
+    branch("Fire Safety"),
+    branch("Compliance Accessories"),
   ]),
-  category("Toys, Kids & Baby", 1000, [
-    branch("Toys", [
-      "Action Figures",
-      "Dolls",
-      "Building Toys",
-      "Educational Toys",
-      "Outdoor Toys",
-      "Board Games",
-    ]),
-    branch("Baby", [
-      "Diapers",
-      "Feeding",
-      "Strollers",
-      "Car Seats",
-      "Nursery",
-      "Baby Clothing",
-    ]),
-    branch("Kids", [
-      "Kids Clothing",
-      "Kids Shoes",
-      "School Supplies",
-      "Kids Room",
-    ]),
-  ]),
-  category("Books, Media & Stationery", 800, [
-    branch("Books", [
-      "Fiction",
-      "Non-Fiction",
-      "Children's Books",
-      "Textbooks",
-      "Comics & Graphic Novels",
-    ]),
-    branch("Music & Movies", [
-      "Vinyl",
-      "CDs",
-      "DVDs & Blu-ray",
-      "Collectibles",
-    ]),
-    branch("Stationery", [
-      "Notebooks",
-      "Pens & Pencils",
-      "Art Supplies",
-      "Office Supplies",
-      "Calendars & Planners",
-    ]),
-  ]),
-  category("Art, Handmade & Collectibles", 1200, [
-    branch("Art", [
-      "Paintings",
-      "Prints",
-      "Photography",
-      "Sculpture",
-      "Digital Art",
-    ]),
-    branch("Handmade", [
-      "Handmade Jewelry",
-      "Handmade Decor",
-      "Handmade Clothing",
-      "Craft Supplies",
-    ]),
-    branch("Collectibles", [
-      "Trading Cards",
-      "Coins",
-      "Stamps",
-      "Memorabilia",
-      "Antiques",
-    ]),
-  ]),
-  category("Automotive", 900, [
-    branch("Parts", [
-      "Engine Parts",
-      "Brake Parts",
-      "Suspension",
-      "Electrical",
-      "Filters",
-    ]),
-    branch("Accessories", [
-      "Interior Accessories",
-      "Exterior Accessories",
-      "Car Covers",
-      "Phone Mounts",
-      "Dash Cameras",
-    ]),
-    branch("Tools & Maintenance", [
-      "Car Care",
-      "Oils & Fluids",
-      "Tyres & Wheels",
-      "Workshop Tools",
-    ]),
-  ]),
-  category("Pet Supplies", 1000, [
-    branch("Dogs", [
-      "Dog Food",
-      "Dog Treats",
-      "Dog Toys",
-      "Dog Beds",
-      "Leashes & Collars",
-    ]),
-    branch("Cats", [
-      "Cat Food",
-      "Cat Treats",
-      "Cat Toys",
-      "Cat Litter",
-      "Cat Trees",
-    ]),
-    branch("Other Pets", [
-      "Bird Supplies",
-      "Fish Supplies",
-      "Small Animal Supplies",
-      "Reptile Supplies",
-    ]),
-  ]),
-  category("Garden & DIY", 1000, [
-    branch("Garden", [
-      "Plants",
-      "Seeds",
-      "Planters",
-      "Garden Tools",
-      "Outdoor Furniture",
-      "Irrigation",
-    ]),
-    branch("DIY & Tools", [
-      "Power Tools",
-      "Hand Tools",
-      "Hardware",
-      "Paint",
-      "Electrical",
-      "Plumbing",
-    ]),
-  ]),
-  category("Digital Products", 1500, [
-    branch("Software", [
-      "Productivity Software",
-      "Design Software",
-      "Security Software",
-      "Developer Tools",
-    ]),
-    branch("Digital Media", [
-      "Templates",
-      "E-books",
-      "Stock Assets",
-      "Music & Audio",
-      "Courses",
-    ]),
-  ]),
-  category("Services", 1500, [
-    branch("Creative Services", [
-      "Graphic Design",
-      "Photography",
-      "Video Editing",
-      "Writing & Translation",
-    ]),
-    branch("Professional Services", [
-      "Consulting",
-      "Accounting",
-      "Legal Services",
-      "Business Support",
-    ]),
-    branch("Home Services", [
-      "Cleaning",
-      "Repairs",
-      "Installation",
-      "Moving Services",
-    ]),
-  ]),
-  category("Business & Industrial", 900, [
-    branch("Business Supplies", [
-      "Packaging",
-      "Labels",
-      "Office Furniture",
-      "Cleaning Supplies",
-      "Safety Supplies",
-    ]),
-    branch("Industrial", [
-      "Machinery",
-      "Raw Materials",
-      "Lab Equipment",
-      "Material Handling",
-    ]),
+  category("Spares & Maintenance", [
+    branch("Geyser Spares"),
+    branch("Stove Spares"),
+    branch("Burner Spares"),
+    branch("Ignition Parts"),
+    branch("Service Kits"),
+    branch("Cleaning & Maintenance"),
   ]),
 ];
 
 const brands = [
+  "Jurgens Energy",
   "Generic / Unbranded",
-  "Apple",
-  "Samsung",
-  "Sony",
-  "LG",
-  "Microsoft",
-  "Dell",
-  "HP",
-  "Lenovo",
-  "Asus",
-  "Acer",
-  "Canon",
-  "Nikon",
-  "GoPro",
-  "DJI",
-  "Bose",
-  "JBL",
-  "Sennheiser",
-  "Logitech",
-  "Nike",
-  "Adidas",
-  "Puma",
-  "New Balance",
-  "Under Armour",
-  "Reebok",
-  "Converse",
-  "Vans",
-  "Levi's",
-  "Zara",
-  "H&M",
-  "Gucci",
-  "Prada",
-  "Louis Vuitton",
-  "Rolex",
-  "Casio",
-  "Fossil",
-  "L'Oreal",
-  "Maybelline",
-  "Revlon",
-  "Nivea",
-  "Dove",
-  "The Ordinary",
-  "CeraVe",
-  "Philips",
-  "Braun",
-  "Dyson",
-  "KitchenAid",
-  "Nespresso",
+  "Cadac",
+  "Alva",
+  "Totai",
+  "Dewhot",
+  "Rinnai",
+  "Paloma",
   "Bosch",
-  "Makita",
-  "DeWalt",
-  "Black+Decker",
-  "Toyota",
-  "BMW",
-  "Mercedes-Benz",
-  "Volkswagen",
-  "Ford",
-  "Purina",
-  "Royal Canin",
-  "Lego",
-  "Mattel",
-  "Hasbro",
-  "Penguin Books",
-  "Oxford",
-  "Moleskine",
-  "Faber-Castell",
-  "Adobe",
-  "Canva",
-  "Notion",
-  "Shopify",
+  "Kwikot",
+  "Megamaster",
+  "Safire",
+  "LeisureQuip",
+  "LK's",
+  "Bull",
+  "Oryx Energies",
+  "Afrox",
+  "Easigas",
+  "Handigas",
+  "Typhoon",
 ];
+
+const activeCategoryPaths = new Set();
+const activeBrandSlugs = new Set();
 
 async function upsertCategory(node, parent, depth, sortOrder) {
   const slug = slugify(node.name);
   const path = parent ? `${parent.path}/${slug}` : slug;
+  activeCategoryPaths.add(path);
+
   const [row] = await sql`
     insert into categories (
       parent_id,
@@ -548,7 +166,7 @@ async function upsertCategory(node, parent, depth, sortOrder) {
       ${slug},
       ${path},
       ${depth},
-      ${node.commissionRateBps ?? null},
+      null,
       'active',
       ${sortOrder},
       now()
@@ -559,8 +177,8 @@ async function upsertCategory(node, parent, depth, sortOrder) {
       name = excluded.name,
       slug = excluded.slug,
       depth = excluded.depth,
-      commission_rate_bps = excluded.commission_rate_bps,
-      status = excluded.status,
+      commission_rate_bps = null,
+      status = 'active',
       sort_order = excluded.sort_order,
       updated_at = now()
     returning id, path
@@ -570,11 +188,70 @@ async function upsertCategory(node, parent, depth, sortOrder) {
 
   for (const [index, child] of children.entries()) {
     await upsertCategory(
-      typeof child === "string" ? branch(child, []) : child,
+      typeof child === "string" ? branch(child) : child,
       row,
       depth + 1,
       index,
     );
+  }
+}
+
+async function cleanupStaleCategories() {
+  const rows = await sql`
+    select id, path
+    from categories
+    order by depth desc, path desc
+  `;
+
+  for (const row of rows) {
+    if (activeCategoryPaths.has(row.path)) {
+      continue;
+    }
+
+    await sql`
+      delete from categories
+      where id = ${row.id}
+        and not exists (
+          select 1 from products where products.category_id = categories.id
+        )
+        and not exists (
+          select 1 from categories children where children.parent_id = categories.id
+        )
+    `;
+
+    await sql`
+      update categories
+      set status = 'archived', updated_at = now()
+      where id = ${row.id}
+    `;
+  }
+}
+
+async function cleanupStaleBrands() {
+  const rows = await sql`
+    select id, slug
+    from brands
+    order by name
+  `;
+
+  for (const row of rows) {
+    if (activeBrandSlugs.has(row.slug)) {
+      continue;
+    }
+
+    await sql`
+      delete from brands
+      where id = ${row.id}
+        and not exists (
+          select 1 from products where products.brand_id = brands.id
+        )
+    `;
+
+    await sql`
+      update brands
+      set status = 'archived', updated_at = now()
+      where id = ${row.id}
+    `;
   }
 }
 
@@ -584,6 +261,7 @@ for (const [index, item] of categories.entries()) {
 
 for (const name of brands) {
   const slug = slugify(name);
+  activeBrandSlugs.add(slug);
 
   await sql`
     insert into brands (name, slug, status, updated_at)
@@ -591,13 +269,15 @@ for (const name of brands) {
     on conflict (slug)
     do update set
       name = excluded.name,
-      status = excluded.status,
+      status = 'active',
       updated_at = now()
   `;
 }
 
+await cleanupStaleCategories();
+await cleanupStaleBrands();
 await sql.end();
 
 console.log(
-  `Seeded catalog taxonomy: ${categories.length} root categories and ${brands.length} brands.`,
+  `Seeded gas catalog taxonomy: ${categories.length} root categories and ${brands.length} preset brands.`,
 );

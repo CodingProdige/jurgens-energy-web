@@ -1,11 +1,14 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   DownloadIcon,
   EyeIcon,
   FilterIcon,
+  PencilIcon,
+  PlusIcon,
   SearchIcon,
   XIcon,
 } from "lucide-react";
@@ -151,7 +154,7 @@ function FulfillmentBadge({
           : "bg-slate-100 text-slate-700",
       )}
     >
-      {mode === "piessang_fulfilled" ? "FBP" : "Seller fulfilled"}
+      {mode === "piessang_fulfilled" ? "Jurgens delivery" : "Bob Go courier"}
     </Badge>
   );
 }
@@ -183,7 +186,7 @@ function ProductFilterPanel({
         <div>
           <p className="text-sm font-semibold">Filter products</p>
           <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-            Narrow products by status, category, and fulfillment.
+            Narrow products by status, category, and delivery method.
           </p>
         </div>
         <button
@@ -214,12 +217,6 @@ function ProductFilterPanel({
               </SelectItem>
               <SelectItem value="draft" className={selectItemClass}>
                 Draft
-              </SelectItem>
-              <SelectItem value="pending_review" className={selectItemClass}>
-                Pending review
-              </SelectItem>
-              <SelectItem value="changes_requested" className={selectItemClass}>
-                Changes requested
               </SelectItem>
               <SelectItem value="approved" className={selectItemClass}>
                 Approved
@@ -272,7 +269,7 @@ function ProductFilterPanel({
 
         <label className="grid gap-1.5">
           <span className="text-xs font-semibold text-slate-600 dark:text-zinc-300">
-            Fulfillment mode
+            Delivery method
           </span>
           <Select
             value={fulfillmentFilter}
@@ -285,13 +282,13 @@ function ProductFilterPanel({
             </SelectTrigger>
             <SelectContent className={selectContentClass}>
               <SelectItem value="all" className={selectItemClass}>
-                All fulfillment
+                All delivery methods
               </SelectItem>
               <SelectItem value="seller_fulfilled" className={selectItemClass}>
-                Seller fulfilled
+                Bob Go courier
               </SelectItem>
               <SelectItem value="piessang_fulfilled" className={selectItemClass}>
-                Fulfilled by Piessang
+                Jurgens delivery
               </SelectItem>
             </SelectContent>
           </Select>
@@ -344,10 +341,10 @@ function ProductDetails({ product }: { product: AdminProductReviewRow }) {
           <div className="grid gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10 sm:grid-cols-2">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Seller
+                Catalog
               </p>
-              <p className="truncate font-medium">{product.sellerName}</p>
-              <p className="truncate text-xs text-slate-500">{product.sellerSlug}</p>
+              <p className="truncate font-medium">Jurgens Energy</p>
+              <p className="truncate text-xs text-slate-500">Single marketplace</p>
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -365,7 +362,7 @@ function ProductDetails({ product }: { product: AdminProductReviewRow }) {
                 {product.brandName ?? "No brand"}
               </p>
               {product.needsBrandReview ? (
-                <p className="text-xs text-amber-700">Brand request pending.</p>
+                <p className="text-xs text-amber-700">Brand needs confirmation.</p>
               ) : null}
             </div>
             <div className="min-w-0">
@@ -486,7 +483,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
     () => [
       {
         color: "#3b82f6",
-        description: "Every product record across all seller accounts.",
+        description: "Every product record in the Jurgens Energy catalog.",
         id: "products",
         label: "Products",
         value: metrics.products,
@@ -499,32 +496,25 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
         value: metrics.live,
       },
       {
-        color: "#f59e0b",
-        description: "Products waiting for admin review.",
-        id: "pending",
-        label: "Pending review",
-        value: metrics.pending,
-      },
-      {
         color: "#64748b",
-        description: "Seller drafts that have not been submitted yet.",
+        description: "Products saved internally but not ready to sell.",
         id: "draft",
         label: "Drafts",
         value: metrics.draft,
       },
       {
         color: "#8b5cf6",
-        description: "Products configured for Fulfilled by Piessang.",
-        id: "fbp",
-        label: "FBP",
-        value: metrics.fbp,
+        description: "Products delivered through Bob Go courier bookings.",
+        id: "in-house-fulfillment",
+        label: "Bob Go",
+        value: metrics.inHouseFulfilled,
       },
       {
-        color: "#ef4444",
-        description: "Products returned to sellers with required changes.",
-        id: "changes-requested",
-        label: "Changes requested",
-        value: metrics.changesRequested,
+        color: "#f59e0b",
+        description: "Products delivered by Jurgens Energy local delivery.",
+        id: "warehouse-fulfillment",
+        label: "Jurgens delivery",
+        value: metrics.warehouseFulfilled,
       },
       {
         color: "#f97316",
@@ -570,8 +560,6 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
         !normalizedSearch ||
         [
           product.title,
-          product.sellerName,
-          product.sellerSlug,
           product.brandName,
           product.categoryPath,
         ]
@@ -605,7 +593,6 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
   function exportProductsCsv() {
     const headers = [
       "Product",
-      "Seller",
       "Status",
       "Fulfillment",
       "Brand",
@@ -616,7 +603,6 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
     ];
     const rows = filteredProducts.map((product) => [
       product.title,
-      product.sellerName,
       product.status,
       product.fulfillmentMode,
       product.brandName,
@@ -632,7 +618,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `piessang-products-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `jurgens-energy-products-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -647,7 +633,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
       <div className="grid gap-4">
         <DashboardCompactMetrics
           metrics={productMetrics}
-          storageKey="piessang:admin:all-product-metrics"
+          storageKey="jurgens:admin:all-product-metrics"
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -664,6 +650,10 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
             />
           </div>
           <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
+            <DashboardButton nativeButton={false} render={<Link href="/products/new" />}>
+              <PlusIcon className="size-3.5" />
+              New product
+            </DashboardButton>
             <div className="relative min-w-0">
               <DashboardButton
                 onClick={() => setFilterOpen((isOpen) => !isOpen)}
@@ -727,11 +717,6 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
               <TableRow className={dashboardTableHeaderRowClass}>
                 <TableHead className={dashboardTableHeadClass}>Product</TableHead>
                 <TableHead
-                  className={cn(dashboardTableHeadClass, "hidden md:table-cell")}
-                >
-                  Seller
-                </TableHead>
-                <TableHead
                   className={cn(dashboardTableHeadClass, "hidden lg:table-cell")}
                 >
                   Status
@@ -784,19 +769,6 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell
-                      className={cn(
-                        "hidden max-w-[220px] md:table-cell",
-                        dashboardTableCellClass,
-                      )}
-                    >
-                      <p className={cn("truncate", dashboardTableMutedTextClass)}>
-                        {product.sellerName}
-                      </p>
-                      <p className={cn("truncate", dashboardTableSecondaryTextClass)}>
-                        {product.sellerSlug}
-                      </p>
-                    </TableCell>
                     <TableCell className={cn("hidden lg:table-cell", dashboardTableCellClass)}>
                       <StatusBadge status={product.status} />
                     </TableCell>
@@ -820,6 +792,13 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                             <EyeIcon className="size-4" />
                             View product
                           </button>
+                          <Link
+                            className="flex w-full items-center gap-3 px-4 py-3 text-sm text-zinc-800 transition hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-white/10"
+                            href={`/products/${product.id}/edit`}
+                          >
+                            <PencilIcon className="size-4" />
+                            Edit product
+                          </Link>
                         </DashboardRowActionMenu>
                       </div>
                     </TableCell>
@@ -827,7 +806,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                 ))
               ) : (
                 <TableRow className="border-slate-200 dark:border-white/10">
-                  <TableCell colSpan={6} className="px-5 py-12 text-center">
+                  <TableCell colSpan={5} className="px-5 py-12 text-center">
                     <div className="mx-auto grid max-w-sm gap-1">
                       <p className="text-sm font-semibold text-zinc-950 dark:text-white">
                         No products found
@@ -835,7 +814,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                       <p className="text-sm text-slate-500 dark:text-zinc-400">
                         {searchTerm || activeFilterCount > 0
                           ? "Try changing the search or filters."
-                          : "Products will appear here once sellers create listings."}
+                          : "Products will appear here once catalog items are created."}
                       </p>
                     </div>
                   </TableCell>
@@ -866,7 +845,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           <DialogHeader>
             <DialogTitle>Product details</DialogTitle>
             <DialogDescription>
-              Inspect seller, lifecycle, fulfillment, media, and variant data.
+              Inspect lifecycle, delivery method, media, and variant data.
             </DialogDescription>
           </DialogHeader>
           {viewProduct ? <ProductDetails product={viewProduct} /> : null}

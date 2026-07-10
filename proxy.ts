@@ -106,6 +106,17 @@ function redirectToSurfaceHost(
   );
 }
 
+function redirectToStrippedSurfacePath(
+  request: NextRequest,
+  surfacePath: string,
+) {
+  const url = request.nextUrl.clone();
+
+  url.pathname = stripSurfacePath(url.pathname, surfacePath);
+
+  return NextResponse.redirect(url);
+}
+
 function rewriteSurface(request: NextRequest, surfacePath: string) {
   const url = request.nextUrl.clone();
 
@@ -140,6 +151,8 @@ function rewriteSurface(request: NextRequest, surfacePath: string) {
 export function proxy(request: NextRequest) {
   const hostname = getHostname(request);
   const pathname = request.nextUrl.pathname;
+  const isNavigationMethod =
+    request.method === "GET" || request.method === "HEAD";
 
   if (
     !isAdminHost(hostname) &&
@@ -155,16 +168,20 @@ export function proxy(request: NextRequest) {
     return redirectToSurfaceHost(request, getCanonicalSellerHost(), "/seller");
   }
 
-  if (isAdminHost(hostname) && startsWithSurfacePath(pathname, "/admin")) {
-    return NextResponse.redirect(
-      new URL(stripSurfacePath(pathname, "/admin"), request.url),
-    );
+  if (
+    isNavigationMethod &&
+    isAdminHost(hostname) &&
+    startsWithSurfacePath(pathname, "/admin")
+  ) {
+    return redirectToStrippedSurfacePath(request, "/admin");
   }
 
-  if (isSellerHost(hostname) && startsWithSurfacePath(pathname, "/seller")) {
-    return NextResponse.redirect(
-      new URL(stripSurfacePath(pathname, "/seller"), request.url),
-    );
+  if (
+    isNavigationMethod &&
+    isSellerHost(hostname) &&
+    startsWithSurfacePath(pathname, "/seller")
+  ) {
+    return redirectToStrippedSurfacePath(request, "/seller");
   }
 
   if (isAdminHost(hostname)) {

@@ -38,9 +38,9 @@ export const productFulfillmentMode = pgEnum("product_fulfillment_mode", [
 
 export const products = pgTable("products", {
   id: uuid("id").defaultRandom().primaryKey(),
-  sellerId: uuid("seller_id")
-    .notNull()
-    .references(() => sellers.id),
+  sellerId: uuid("seller_id").references(() => sellers.id, {
+    onDelete: "set null",
+  }),
   categoryId: uuid("category_id").references(() => categories.id),
   brandId: uuid("brand_id").references(() => brands.id),
   brandRequestId: uuid("brand_request_id").references(() => brandRequests.id, {
@@ -115,6 +115,17 @@ export const productVariants = pgTable(
     }),
     shipsAlone: boolean("ships_alone").notNull().default(false),
     isFragile: boolean("is_fragile").notNull().default(false),
+    requiresExchangeEmpty: boolean("requires_exchange_empty")
+      .notNull()
+      .default(false),
+    exchangeEmptyCylinderSize: varchar("exchange_empty_cylinder_size", {
+      length: 80,
+    }),
+    exchangeAcceptedReturnBrands: jsonb("exchange_accepted_return_brands")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    exchangeConfirmationText: text("exchange_confirmation_text"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },

@@ -80,7 +80,7 @@ import type {
 } from "@/src/modules/media/admin";
 import type { AdminUser, AdminUsersData } from "@/src/modules/users/admin";
 
-type UserPageKind = "admins" | "all" | "customers" | "sellers";
+type UserPageKind = "admins" | "all" | "customers";
 type UserManagerProps = AdminUsersData & {
   canManage: boolean;
   mediaLibrary: {
@@ -92,7 +92,8 @@ type UserManagerProps = AdminUsersData & {
   page: UserPageKind;
 };
 
-type RoleFilter = "all" | PlatformRole | "admins" | "sellers" | "no-role";
+type ManagedPlatformRole = Exclude<PlatformRole, "seller_owner" | "seller_staff">;
+type RoleFilter = "all" | ManagedPlatformRole | "admins" | "no-role";
 type StatusFilter = "all" | "active" | "inactive";
 
 const roleLabels: Record<PlatformRole, string> = {
@@ -103,18 +104,18 @@ const roleLabels: Record<PlatformRole, string> = {
   superadmin: "Superadmin",
 };
 const roleFilterLabels: Record<RoleFilter, string> = {
-  ...roleLabels,
+  admin: roleLabels.admin,
   admins: "Admin access",
   all: "All roles",
+  customer: roleLabels.customer,
   "no-role": "No role",
-  sellers: "Seller access",
+  superadmin: roleLabels.superadmin,
 };
 
 const userPageLabels: Record<UserPageKind, string> = {
   admins: "Admins",
   all: "All users",
   customers: "Customers",
-  sellers: "Sellers",
 };
 
 const roleBadgeClass: Record<PlatformRole, string> = {
@@ -413,20 +414,11 @@ function UserFilterPanel({
               <SelectItem value="admins" className={modalSelectItemClass}>
                 {roleFilterLabels.admins}
               </SelectItem>
-              <SelectItem value="sellers" className={modalSelectItemClass}>
-                {roleFilterLabels.sellers}
-              </SelectItem>
               <SelectItem value="superadmin" className={modalSelectItemClass}>
                 Superadmin
               </SelectItem>
               <SelectItem value="admin" className={modalSelectItemClass}>
                 Admin
-              </SelectItem>
-              <SelectItem value="seller_owner" className={modalSelectItemClass}>
-                Seller owner
-              </SelectItem>
-              <SelectItem value="seller_staff" className={modalSelectItemClass}>
-                Seller staff
               </SelectItem>
               <SelectItem value="customer" className={modalSelectItemClass}>
                 Customer
@@ -493,8 +485,6 @@ function exportUsers(users: AdminUser[]) {
     "Roles",
     "Status",
     "Auth providers",
-    "Seller access count",
-    "Seller owner count",
     "Joined",
     "Updated",
   ];
@@ -506,8 +496,6 @@ function exportUsers(users: AdminUser[]) {
     user.accountProviders.length > 0
       ? user.accountProviders.join(", ")
       : user.hasPassword ? "Password" : "None",
-    user.sellerAccessCount,
-    user.sellerOwnerCount,
     formatDate(user.createdAt),
     formatDate(user.updatedAt),
   ]);
@@ -519,7 +507,7 @@ function exportUsers(users: AdminUser[]) {
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = "piessang-users.csv";
+  link.download = "jurgens-energy-users.csv";
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -537,9 +525,7 @@ function matchesUserPage(user: AdminUser, page: UserPageKind) {
     return user.roles.some((role) => role === "admin" || role === "superadmin");
   }
 
-  return user.roles.some(
-    (role) => role === "seller_owner" || role === "seller_staff",
-  );
+  return true;
 }
 
 function getUserPageMetricLabel(page: UserPageKind) {
@@ -549,10 +535,6 @@ function getUserPageMetricLabel(page: UserPageKind) {
 
   if (page === "admins") {
     return "Total admins";
-  }
-
-  if (page === "sellers") {
-    return "Total sellers";
   }
 
   return "Total users";
@@ -739,16 +721,6 @@ function UserProfileForm({
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
-                Seller access
-              </p>
-              <p className="mt-1 text-slate-700 dark:text-zinc-300">
-                {user.sellerAccessCount > 0 || user.sellerOwnerCount > 0
-                  ? `${user.sellerAccessCount} staff / ${user.sellerOwnerCount} owner`
-                : "None"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-500">
                 Status
               </p>
               <div className="mt-1">
@@ -908,15 +880,6 @@ export function UserManager({
   const pageCustomerUserCount = pageUsers.filter((user) =>
     user.roles.includes("customer"),
   ).length;
-  const pageSellerUserCount = pageUsers.filter((user) =>
-    user.roles.some((role) => role === "seller_owner" || role === "seller_staff"),
-  ).length;
-  const pageSellerOwnerCount = pageUsers.filter((user) =>
-    user.roles.includes("seller_owner"),
-  ).length;
-  const pageSellerStaffCount = pageUsers.filter((user) =>
-    user.roles.includes("seller_staff"),
-  ).length;
   const pageCustomerOnlyCount = pageUsers.filter(
     (user) => user.roles.length === 1 && user.roles.includes("customer"),
   ).length;
@@ -927,7 +890,7 @@ export function UserManager({
     user.accountProviders.includes("google"),
   ).length;
   const passwordProviderCount = pageUsers.filter((user) => user.hasPassword).length;
-  const userMetricStorageKey = `piessang:admin:user-metrics:${page}`;
+  const userMetricStorageKey = `jurgens:admin:user-metrics:${page}`;
   const availableMetrics = useMemo<DashboardMetricDefinition[]>(() => {
     const baseMetrics: DashboardMetricDefinition[] = [
       {
@@ -986,7 +949,7 @@ export function UserManager({
         },
         {
           color: "emerald",
-          description: "Customer users without admin or seller access roles.",
+          description: "Customer users without admin access roles.",
           id: "customer-only",
           label: "Customer only",
           value: pageCustomerOnlyCount,
@@ -1014,33 +977,6 @@ export function UserManager({
       ];
     }
 
-    if (page === "sellers") {
-      return [
-        ...baseMetrics,
-        {
-          color: "amber",
-          description: "Users on this page with seller owner or seller staff platform access.",
-          id: "seller-access",
-          label: "Seller access",
-          value: pageSellerUserCount,
-        },
-        {
-          color: "blue",
-          description: "Users on this page who own at least one seller account.",
-          id: "seller-owners",
-          label: "Seller owners",
-          value: pageSellerOwnerCount,
-        },
-        {
-          color: "violet",
-          description: "Users on this page assigned as staff on at least one seller account.",
-          id: "seller-staff",
-          label: "Seller staff",
-          value: pageSellerStaffCount,
-        },
-      ];
-    }
-
     return [
       ...baseMetrics,
       {
@@ -1049,13 +985,6 @@ export function UserManager({
         id: "admin-access",
         label: "Admin access",
         value: pageAdminUserCount,
-      },
-      {
-        color: "amber",
-        description: "Users on this page with seller owner or seller staff platform access.",
-        id: "seller-access",
-        label: "Seller access",
-        value: pageSellerUserCount,
       },
       {
         color: "blue",
@@ -1075,9 +1004,6 @@ export function UserManager({
     pageCustomerUserCount,
     pageCustomerWithOtherAccessCount,
     pageInactiveUserCount,
-    pageSellerOwnerCount,
-    pageSellerStaffCount,
-    pageSellerUserCount,
     pageUsers.length,
     passwordProviderCount,
   ]);
@@ -1097,11 +1023,7 @@ export function UserManager({
           ? user.roles.length === 0
           : roleFilter === "admins"
             ? user.roles.some((role) => role === "admin" || role === "superadmin")
-            : roleFilter === "sellers"
-              ? user.roles.some(
-                  (role) => role === "seller_owner" || role === "seller_staff",
-                )
-              : user.roles.includes(roleFilter));
+            : user.roles.includes(roleFilter));
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "active" ? user.isActive : !user.isActive);
@@ -1230,7 +1152,6 @@ export function UserManager({
               </TableHead>
               <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>Status</TableHead>
               <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>Providers</TableHead>
-              <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>Seller access</TableHead>
               <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>Joined</TableHead>
               <TableHead className={cn(dashboardTableHeadClass, dashboardTableActionHeadClass)}>
                 Actions
@@ -1265,13 +1186,6 @@ export function UserManager({
                         hasPassword={user.hasPassword}
                         providers={user.accountProviders}
                       />
-                    </TableCell>
-                    <TableCell className={cn("hidden md:table-cell", dashboardTableCellClass)}>
-                      <span className={dashboardTableMutedTextClass}>
-                        {user.sellerAccessCount > 0 || user.sellerOwnerCount > 0
-                          ? `${user.sellerAccessCount} staff / ${user.sellerOwnerCount} owner`
-                          : "None"}
-                      </span>
                     </TableCell>
                     <TableCell className={cn("hidden md:table-cell", dashboardTableCellClass)}>
                       <span className={dashboardTableMutedTextClass}>
@@ -1338,7 +1252,7 @@ export function UserManager({
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={6}
                     className="h-32 px-5 text-center text-sm text-slate-500 dark:text-zinc-400"
                   >
                     No users match the current filters.

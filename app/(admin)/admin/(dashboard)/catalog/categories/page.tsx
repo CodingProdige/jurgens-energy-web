@@ -7,8 +7,7 @@ import { getAdminCatalogTaxonomy } from "@/src/modules/catalog/admin";
 
 export const metadata: Metadata = {
   title: "Admin Categories",
-  description:
-    "Manage Piessang marketplace categories, category branches, and success fee defaults.",
+  description: "Manage Jurgens Energy catalog categories and category branches.",
   robots: {
     index: false,
     follow: false,

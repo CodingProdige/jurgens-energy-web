@@ -63,10 +63,6 @@ function getResetSurface(roles: PlatformRole[]) {
     return "admin" as const;
   }
 
-  if (roles.some((role) => role === "seller_owner" || role === "seller_staff")) {
-    return "seller" as const;
-  }
-
   return "marketplace" as const;
 }
 
@@ -119,7 +115,6 @@ function revalidateUserPages() {
   revalidatePath("/users/all");
   revalidatePath("/users/customers");
   revalidatePath("/users/admins");
-  revalidatePath("/users/sellers");
 }
 
 export async function updateAdminUserProfile(

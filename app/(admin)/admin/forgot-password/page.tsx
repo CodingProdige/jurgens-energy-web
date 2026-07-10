@@ -5,7 +5,7 @@ import { ForgotPasswordScreen } from "@/components/auth/forgot-password-screen";
 
 export const metadata: Metadata = {
   title: "Admin Password Reset",
-  description: "Request a password reset link for Piessang admin access.",
+  description: "Request a password reset link for Jurgens Energy admin access.",
   robots: {
     index: false,
     follow: false,

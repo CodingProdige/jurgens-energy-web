@@ -6,7 +6,7 @@ import { getNotificationCenter } from "@/src/modules/notifications/in-app";
 
 export const metadata: Metadata = {
   title: "Admin Notifications",
-  description: "Review Piessang admin dashboard notifications and event links.",
+  description: "Review Jurgens Energy admin dashboard notifications and event links.",
   robots: { follow: false, index: false },
 };
 
@@ -21,7 +21,7 @@ export default async function AdminNotificationsPage() {
   return (
     <NotificationCenterPage
       breadcrumbs={["Admin", "Notifications"]}
-      emptyCopy="Admin review, seller, product, shipping, and platform events will appear here when they need attention."
+      emptyCopy="Product, shipping, user, and platform events will appear here when they need attention."
       state={notificationCenter}
       title="Notifications"
     />

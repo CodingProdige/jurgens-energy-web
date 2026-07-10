@@ -1,27 +1,15 @@
 import type { Metadata } from "next";
-
-import { ProductReviewManager } from "@/app/(admin)/admin/(dashboard)/products/reviews/product-review-manager";
-import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
-import { requireAdminCapability } from "@/src/modules/auth/permissions";
-import { getAdminProductReviews } from "@/src/modules/admin/product-reviews";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Admin Product Reviews",
-  description: "Review seller product submissions before they go live.",
+  title: "Admin Products",
+  description: "Product reviews have been retired for the single Jurgens Energy catalog.",
   robots: {
     follow: false,
     index: false,
   },
 };
 
-export default async function AdminProductReviewsPage() {
-  const access = await requireAdminCapability("admin.catalog.view");
-
-  if (!access.ok) {
-    return <RestrictedAdminPage />;
-  }
-
-  const data = await getAdminProductReviews();
-
-  return <ProductReviewManager {...data} />;
+export default function AdminProductReviewsPage() {
+  redirect("/products/all");
 }

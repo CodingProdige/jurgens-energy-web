@@ -1,35 +1,15 @@
 import type { Metadata } from "next";
-
-import { resetPassword } from "@/app/forgot-password/actions";
-import { ResetPasswordScreen } from "@/components/auth/reset-password-screen";
-import { isPasswordResetTokenValid } from "@/src/modules/auth/service";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Reset Seller Password",
-  description: "Set a new password for Piessang seller access.",
+  description: "Seller access has moved into the Jurgens Energy admin dashboard.",
   robots: {
-    index: false,
     follow: false,
+    index: false,
   },
 };
 
-type ResetPasswordPageProps = {
-  searchParams: Promise<{ token?: string | string[] }>;
-};
-
-export default async function SellerResetPasswordPage({
-  searchParams,
-}: ResetPasswordPageProps) {
-  const query = await searchParams;
-  const token = Array.isArray(query.token) ? query.token[0] : query.token ?? "";
-  const isTokenValid = token ? await isPasswordResetTokenValid(token) : false;
-
-  return (
-    <ResetPasswordScreen
-      action={resetPassword}
-      token={token}
-      isTokenValid={isTokenValid}
-      accent="green"
-    />
-  );
+export default function SellerResetPasswordPage() {
+  redirect("/admin/reset-password");
 }

@@ -9,10 +9,8 @@ import {
   productReviewEvents,
   products,
   productVariants,
-  sellerParcelPresets,
 } from "@/src/db/schema";
 import { getScopedMediaLibrary } from "@/src/modules/media/admin";
-import { getPrimarySellerForUser } from "@/src/modules/sellers/dashboard";
 
 export type SellerProductCategory = {
   commissionRateBps: number | null;
@@ -52,11 +50,6 @@ export type SellerCreateProductData = {
   categories: SellerProductCategory[];
   mediaLibrary: Awaited<ReturnType<typeof getScopedMediaLibrary>>;
   parcelPresets: SellerParcelPreset[];
-  seller: {
-    displayName: string;
-    id: string;
-    isPiessangFulfillmentEnabled: boolean;
-  } | null;
 };
 
 export type SellerEditableProductData = {
@@ -66,6 +59,10 @@ export type SellerEditableProductData = {
   compareAtPrice: string;
   continueSellingOutOfStock: boolean;
   description: string;
+  exchangeAcceptedReturnBrands: string[];
+  exchangeConfirmationText: string;
+  exchangeEmptyCylinderSize: string;
+  exchangeRequiresEmpty: boolean;
   fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
   hasVariants: boolean;
   heightMm: string;
@@ -97,6 +94,10 @@ export type SellerEditableProductData = {
     barcode: string;
     compareAtPrice: string;
     continueSellingOutOfStock: boolean;
+    exchangeAcceptedReturnBrands: string[];
+    exchangeConfirmationText: string;
+    exchangeEmptyCylinderSize: string;
+    exchangeRequiresEmpty: boolean;
     heightMm: string;
     id: string;
     imageId: string | null;
@@ -121,12 +122,9 @@ export type SellerEditableProductData = {
 export async function getSellerCreateProductData(
   userId: string,
 ): Promise<SellerCreateProductData> {
-  const seller = await getPrimarySellerForUser(userId);
   const [
     categoryRows,
     brandRows,
-    brandRequestRows,
-    parcelPresetRows,
     mediaLibrary,
   ] = await Promise.all([
     db
@@ -150,66 +148,18 @@ export async function getSellerCreateProductData(
       .from(brands)
       .where(eq(brands.status, "active"))
       .orderBy(asc(brands.name)),
-    seller
-      ? db
-          .select({
-            id: brandRequests.id,
-            name: brandRequests.brandName,
-            status: brandRequests.status,
-          })
-          .from(brandRequests)
-          .where(
-            and(
-              eq(brandRequests.sellerId, seller.id),
-              eq(brandRequests.status, "pending"),
-            ),
-          )
-          .orderBy(asc(brandRequests.brandName))
-      : Promise.resolve([]),
-    seller
-      ? db
-          .select({
-            heightMm: sellerParcelPresets.heightMm,
-            id: sellerParcelPresets.id,
-            isDefault: sellerParcelPresets.isDefault,
-            lengthMm: sellerParcelPresets.lengthMm,
-            name: sellerParcelPresets.name,
-            notes: sellerParcelPresets.notes,
-            weightGrams: sellerParcelPresets.weightGrams,
-            widthMm: sellerParcelPresets.widthMm,
-          })
-          .from(sellerParcelPresets)
-          .where(
-            and(
-              eq(sellerParcelPresets.sellerId, seller.id),
-              eq(sellerParcelPresets.isActive, true),
-            ),
-          )
-          .orderBy(asc(sellerParcelPresets.name))
-      : Promise.resolve([]),
     getScopedMediaLibrary({
       ownerUserId: userId,
-      surface: "seller",
+      surface: "admin",
     }),
   ]);
 
   return {
-    brandRequests: brandRequestRows.map((request) => ({
-      id: request.id,
-      name: request.name,
-      status: "pending",
-    })),
+    brandRequests: [],
     brands: brandRows,
     categories: categoryRows,
     mediaLibrary,
-    parcelPresets: parcelPresetRows,
-    seller: seller
-      ? {
-          displayName: seller.displayName,
-          id: seller.id,
-          isPiessangFulfillmentEnabled: seller.isPiessangFulfillmentEnabled,
-        }
-      : null,
+    parcelPresets: [],
   };
 }
 
@@ -225,17 +175,10 @@ function formatEditableMetric(value: number | string | null) {
 
 export async function getSellerEditableProductData({
   productId,
-  userId,
 }: {
   productId: string;
   userId: string;
 }): Promise<SellerEditableProductData | null> {
-  const seller = await getPrimarySellerForUser(userId);
-
-  if (!seller) {
-    return null;
-  }
-
   const [product] = await db
     .select({
       barcode: products.barcode,
@@ -247,14 +190,13 @@ export async function getSellerEditableProductData({
       fullDescription: products.fullDescription,
       id: products.id,
       optionSchema: products.optionSchema,
-      sellerId: products.sellerId,
       status: products.status,
       title: products.title,
     })
     .from(products)
     .leftJoin(brands, eq(brands.id, products.brandId))
     .leftJoin(brandRequests, eq(brandRequests.id, products.brandRequestId))
-    .where(and(eq(products.id, productId), eq(products.sellerId, seller.id)))
+    .where(eq(products.id, productId))
     .limit(1);
 
   if (!product) {
@@ -267,6 +209,11 @@ export async function getSellerEditableProductData({
         barcode: productVariants.barcode,
         compareAtPrice: productVariants.compareAtPrice,
         continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
+        exchangeAcceptedReturnBrands:
+          productVariants.exchangeAcceptedReturnBrands,
+        exchangeConfirmationText: productVariants.exchangeConfirmationText,
+        exchangeEmptyCylinderSize: productVariants.exchangeEmptyCylinderSize,
+        exchangeRequiresEmpty: productVariants.requiresExchangeEmpty,
         heightMm: productVariants.heightMm,
         id: productVariants.id,
         imageId: productVariants.mediaId,
@@ -322,6 +269,11 @@ export async function getSellerEditableProductData({
     compareAtPrice: firstVariant?.compareAtPrice ?? "",
     continueSellingOutOfStock: firstVariant?.continueSellingOutOfStock ?? false,
     description: product.description ?? "",
+    exchangeAcceptedReturnBrands:
+      firstVariant?.exchangeAcceptedReturnBrands ?? [],
+    exchangeConfirmationText: firstVariant?.exchangeConfirmationText ?? "",
+    exchangeEmptyCylinderSize: firstVariant?.exchangeEmptyCylinderSize ?? "",
+    exchangeRequiresEmpty: firstVariant?.exchangeRequiresEmpty ?? false,
     fulfillmentMode: product.fulfillmentMode,
     hasVariants,
     heightMm: formatEditableMetric(firstVariant?.heightMm ?? null),
@@ -341,6 +293,10 @@ export async function getSellerEditableProductData({
       barcode: variant.barcode ?? "",
       compareAtPrice: variant.compareAtPrice ?? "",
       continueSellingOutOfStock: variant.continueSellingOutOfStock,
+      exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands ?? [],
+      exchangeConfirmationText: variant.exchangeConfirmationText ?? "",
+      exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize ?? "",
+      exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
       heightMm: formatEditableMetric(variant.heightMm),
       id: variant.id,
       imageId: variant.imageId,

@@ -1,11 +1,14 @@
 import {
+  boolean,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
   text,
   timestamp,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 
 import { brands, categories } from "@/src/db/schema/catalog";
@@ -38,9 +41,9 @@ export const orderItems = pgTable("order_items", {
   orderId: uuid("order_id")
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
-  sellerId: uuid("seller_id")
-    .notNull()
-    .references(() => sellers.id),
+  sellerId: uuid("seller_id").references(() => sellers.id, {
+    onDelete: "set null",
+  }),
   variantId: uuid("variant_id")
     .notNull()
     .references(() => productVariants.id),
@@ -49,6 +52,26 @@ export const orderItems = pgTable("order_items", {
   title: text("title").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  deliveryMethodSnapshot: varchar("delivery_method_snapshot", { length: 32 }),
+  deliveryLabelSnapshot: text("delivery_label_snapshot"),
+  purchaseType: varchar("purchase_type", { length: 32 })
+    .notNull()
+    .default("standard"),
+  exchangeEmptyConfirmed: boolean("exchange_empty_confirmed")
+    .notNull()
+    .default(false),
+  exchangeReturnBrand: varchar("exchange_return_brand", { length: 120 }),
+  exchangeRequiredEmptyCylinderSize: varchar(
+    "exchange_required_empty_cylinder_size",
+    { length: 80 },
+  ),
+  exchangeAcceptedReturnBrandsSnapshot: jsonb(
+    "exchange_accepted_return_brands_snapshot",
+  )
+    .$type<string[]>()
+    .notNull()
+    .default([]),
+  exchangeConfirmationTextSnapshot: text("exchange_confirmation_text_snapshot"),
   commissionRateBps: integer("commission_rate_bps"),
   commissionAmount: numeric("commission_amount", {
     precision: 12,

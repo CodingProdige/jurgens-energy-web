@@ -1,10 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { requireSellerDashboardAccess } from "@/src/modules/auth/permissions";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { db } from "@/src/db";
 import { productVariants, products } from "@/src/db/schema";
-import { getPrimarySellerForUser } from "@/src/modules/sellers/dashboard";
 
 const querySchema = z.object({
   productId: z.string().uuid().optional(),
@@ -12,7 +11,11 @@ const querySchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const session = await requireSellerDashboardAccess();
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  if (!access.ok) {
+    return Response.json({ available: false, ok: false }, { status: 403 });
+  }
 
   const url = new URL(request.url);
   const parsed = querySchema.safeParse({
@@ -21,12 +24,6 @@ export async function GET(request: Request) {
   });
 
   if (!parsed.success) {
-    return Response.json({ available: false, ok: false });
-  }
-
-  const seller = await getPrimarySellerForUser(session.user.id);
-
-  if (!seller) {
     return Response.json({ available: false, ok: false });
   }
 
@@ -42,7 +39,7 @@ export async function GET(request: Request) {
     ? await db
         .select({ id: products.id })
         .from(products)
-        .where(and(eq(products.id, productId), eq(products.sellerId, seller.id)))
+        .where(eq(products.id, productId))
         .limit(1)
     : [];
 

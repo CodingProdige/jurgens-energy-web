@@ -40,7 +40,7 @@ const signInFeatures = [
   {
     icon: Sparkles,
     title: "Top Products",
-    description: "Explore best-selling products from trusted vendors",
+    description: "Explore best-selling gas essentials",
   },
   {
     icon: Boxes,
@@ -72,8 +72,8 @@ const registerFeatures = [
   },
   {
     icon: ShieldCheck,
-    title: "Trusted Vendors",
-    description: "Verified sellers and quality guaranteed",
+    title: "Certified Supply",
+    description: "Quality products and trusted service",
   },
   {
     icon: RotateCcw,
@@ -135,7 +135,7 @@ function MarketplaceVisual({ mode }: { mode: "sign-in" | "register" }) {
   const [didVideoEnd, setDidVideoEnd] = useState(false);
   const videoSrc = isRegister
     ? "/brand/video/make_all_these_products_come_t_Seedance_20_70761.mp4"
-    : "/brand/video/Create_a_cinematic_premium_pro_Seedance_20_78783.mp4";
+    : "/brand/video/cinematic-jurgens-energy-sign-in.mp4";
 
   return (
     <section className="relative min-h-[430px] min-w-0 overflow-hidden bg-[#0c0d0b] px-7 py-8 text-white lg:min-h-screen lg:px-10 xl:px-12">
@@ -189,8 +189,8 @@ function MarketplaceVisual({ mode }: { mode: "sign-in" | "register" }) {
           </h1>
           <p className="mt-5 text-[14px] font-medium leading-6 text-white/86">
             {isRegister
-              ? "Start selling, buying and growing your business on a trusted marketplace."
-              : "The premium multi-vendor marketplace for everyone."}
+              ? "Create your account and shop gas essentials with confidence."
+              : "The Jurgens Energy store for cylinders, exchanges, and accessories."}
           </p>
         </div>
 

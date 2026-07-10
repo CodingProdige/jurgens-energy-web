@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 type CurrencySelectorProps = {
   className?: string;
+  compact?: boolean;
   initialPreference: CurrencyPreference;
   variant?: "dashboard" | "marketplace";
 };
@@ -40,6 +41,7 @@ function writePreferenceCookie(name: string, value: string) {
 
 export function CurrencySelector({
   className,
+  compact = false,
   initialPreference,
   variant = "marketplace",
 }: CurrencySelectorProps) {
@@ -51,9 +53,19 @@ export function CurrencySelector({
   const triggerClass = useMemo(
     () =>
       variant === "marketplace"
-        ? "h-9 rounded-md border-transparent bg-transparent px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10"
-        : "h-9 rounded-lg border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/12 dark:bg-[#151719] dark:text-zinc-300",
-    [variant],
+        ? cn(
+            "rounded-md border-transparent bg-transparent font-semibold text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-white/10",
+            compact
+              ? "h-8 gap-1 px-1.5 text-[11px] [&_svg]:size-3.5"
+              : "h-9 px-2.5 text-xs",
+          )
+        : cn(
+            "rounded-lg border-slate-200 bg-white font-semibold text-slate-700 shadow-sm dark:border-white/12 dark:bg-[#151719] dark:text-zinc-300",
+            compact
+              ? "h-8 gap-1 px-1.5 text-[11px] [&_svg]:size-3.5"
+              : "h-9 px-2.5 text-xs",
+          ),
+    [compact, variant],
   );
 
   function refresh(nextCountry: SupportedCountryCode, nextCurrency: SupportedCurrencyCode) {
@@ -63,7 +75,7 @@ export function CurrencySelector({
   }
 
   return (
-    <div className={cn("flex items-center gap-1.5", className)}>
+    <div className={cn("flex items-center", compact ? "gap-1" : "gap-1.5", className)}>
       <Select
         value={country}
         onValueChange={(value) => {
@@ -75,9 +87,9 @@ export function CurrencySelector({
           refresh(nextCountry, nextCurrency);
         }}
       >
-        <SelectTrigger className={cn(triggerClass, "w-[5.75rem]")}>
+        <SelectTrigger className={cn(triggerClass, compact ? "w-[4.35rem]" : "w-[5.75rem]")}>
           <SelectValue>
-            <span className="flex items-center gap-1.5">
+            <span className={cn("flex items-center", compact ? "gap-1" : "gap-1.5")}>
               <span aria-hidden="true">{selectedCountry?.flag ?? "🌍"}</span>
               <span>{selectedCountry?.code ?? country}</span>
             </span>
@@ -113,9 +125,9 @@ export function CurrencySelector({
           refresh(country, nextCurrency);
         }}
       >
-        <SelectTrigger className={cn(triggerClass, "w-[6.25rem]")}>
+        <SelectTrigger className={cn(triggerClass, compact ? "w-[4.75rem]" : "w-[6.25rem]")}>
           <SelectValue>
-            <span className="flex items-center gap-1.5">
+            <span className={cn("flex items-center", compact ? "gap-1" : "gap-1.5")}>
               <span aria-hidden="true">{selectedCurrency?.flag ?? "💱"}</span>
               <span>{selectedCurrency?.code ?? currency}</span>
             </span>

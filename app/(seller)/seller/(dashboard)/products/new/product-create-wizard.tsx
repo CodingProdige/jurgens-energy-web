@@ -17,7 +17,6 @@ import {
   ListIcon,
   ListOrderedIcon,
   Loader2Icon,
-  PackageCheckIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -86,9 +85,7 @@ import {
   generateProductDescription,
   importProductLinkMedia,
   saveProductDraft,
-  submitProductForReview,
 } from "@/app/(seller)/seller/(dashboard)/products/new/actions";
-import { updateSellerProductOperationalFields } from "@/app/(seller)/seller/(dashboard)/products/actions";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import type {
   SellerCreateProductData,
@@ -106,6 +103,10 @@ type GeneratedVariant = {
   barcode: string;
   compareAtPrice: string;
   continueSellingOutOfStock: boolean;
+  exchangeAcceptedReturnBrandsInput: string;
+  exchangeConfirmationText: string;
+  exchangeEmptyCylinderSize: string;
+  exchangeRequiresEmpty: boolean;
   heightMm: string;
   id: string;
   imageId: string | null;
@@ -124,7 +125,7 @@ type GeneratedVariant = {
   weightGrams: string;
   widthMm: string;
 };
-type SkuStatus = "available" | "checking" | "duplicate" | "idle";
+type SkuStatus = "available" | "checking" | "duplicate" | "error" | "idle";
 type BrandSuggestion = {
   id: string;
   name: string;
@@ -226,14 +227,6 @@ const variantStatusConfig: Record<
     label: "Unavailable",
   },
 };
-function formatFee(commissionRateBps: number | null) {
-  if (!commissionRateBps) {
-    return "No fee set";
-  }
-
-  return `${(commissionRateBps / 100).toFixed(2).replace(/\.00$/, "")}% success fee`;
-}
-
 function formatCategoryPath(
   path: string,
   categoriesByPath: Map<string, SellerProductCategory>,
@@ -251,21 +244,6 @@ function formatCategoryPath(
   }
 
   return names.length ? names.join(" > ") : path;
-}
-
-function getCategoryFeeBps(
-  category: SellerProductCategory,
-  categoriesByPath: Map<string, SellerProductCategory>,
-) {
-  if (category.commissionRateBps !== null) {
-    return category.commissionRateBps;
-  }
-
-  const topLevelSlug = category.path.split("/")[0];
-
-  return topLevelSlug
-    ? (categoriesByPath.get(topLevelSlug)?.commissionRateBps ?? null)
-    : null;
 }
 
 function makeId(prefix: string) {
@@ -322,6 +300,10 @@ function getSkuStatusClass(status: SkuStatus) {
     return "border-amber-500 pr-8 focus-visible:border-amber-500 focus-visible:ring-amber-500/20";
   }
 
+  if (status === "error") {
+    return "border-amber-500 pr-8 focus-visible:border-amber-500 focus-visible:ring-amber-500/20";
+  }
+
   return "pr-8";
 }
 
@@ -361,7 +343,7 @@ function getPricingBreakdown(price: string, compareAtPrice: string) {
   if (!hasPrice && !hasCompareAtPrice) {
     return {
       message:
-        "Enter the final customer-facing selling price including VAT. Piessang should not need to add VAT on top at checkout.",
+        "Enter the final customer-facing selling price including VAT. Checkout should not need to add VAT on top.",
       title: "VAT-inclusive pricing",
       tone: "neutral" as const,
     };
@@ -444,6 +426,10 @@ function formatMetricValue(value: number) {
   return Number.isInteger(value) ? String(value) : String(value).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+function clampPackagePreviewSize(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function sanitizeStockInput(value: string) {
   return sanitizeWholeNumberInput(value);
 }
@@ -453,21 +439,21 @@ function getPackagePreview(lengthMm: string, widthMm: string, heightMm: string) 
   const width = parsePositiveNumber(widthMm);
   const height = parsePositiveNumber(heightMm);
   const hasDimensions = Boolean(length && width && height);
-  const previewLength = length ?? 220;
-  const previewWidth = width ?? 160;
-  const previewHeight = height ?? 160;
+  const previewLength = length ?? 300;
+  const previewWidth = width ?? 260;
+  const previewHeight = height ?? 360;
   const millimetresPerHuman = 1800;
   const humanPreviewHeight = 118;
   const scale = humanPreviewHeight / millimetresPerHuman;
 
   return {
-    depthPx: Math.max(34, Math.min(110, previewWidth * scale)),
+    depthPx: clampPackagePreviewSize(previewWidth * scale, 18, 112),
     hasDimensions,
-    heightPx: Math.max(34, Math.min(128, previewHeight * scale)),
+    heightPx: clampPackagePreviewSize(previewHeight * scale, 24, 128),
     label: hasDimensions
       ? `${length} x ${width} x ${height} mm`
       : "Enter dimensions to shape the preview",
-    widthPx: Math.max(58, Math.min(156, previewLength * scale)),
+    widthPx: clampPackagePreviewSize(previewLength * scale, 18, 144),
   };
 }
 
@@ -481,6 +467,27 @@ function generateSkuFromName(value: string) {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
 
   return `${base || "PROD"}-${suffix}`;
+}
+
+function formatExchangeBrandInput(brands: string[]) {
+  return brands.join(", ");
+}
+
+function parseExchangeBrandInput(value: string) {
+  const brands = value
+    .split(/[\n,]/)
+    .map((brand) => brand.trim())
+    .filter(Boolean);
+
+  return [...new Set(brands)];
+}
+
+function getDefaultExchangeConfirmationText(size: string) {
+  const sizeText = size.trim();
+
+  return sizeText
+    ? `I confirm I have a ${sizeText} empty cylinder in acceptable condition to exchange on delivery.`
+    : "I confirm I have an empty cylinder in acceptable condition to exchange on delivery.";
 }
 
 function normalizeLookupValue(value: string) {
@@ -923,7 +930,7 @@ function PackageSizePreview({
         Package preview
         <InfoHint
           label="Package preview"
-          text="A visual guide based on length, width, and height. Courier rates still use the exact values entered."
+          text="A proportional parcel shape based on length, width, and height. Courier rates still use the exact values entered."
         />
       </div>
       <div
@@ -935,7 +942,7 @@ function PackageSizePreview({
           <span>1.8 m</span>
         </span>
         <span className="package-preview-floor-guide" aria-hidden="true">
-          <span>2 m scale</span>
+          <span>2 m reference</span>
         </span>
         <svg
           aria-hidden="true"
@@ -966,6 +973,121 @@ function PackageSizePreview({
   );
 }
 
+function ExchangeRulesFields({
+  acceptedBrandsInput,
+  confirmationText,
+  disabled,
+  emptyCylinderSize,
+  enabled,
+  onAcceptedBrandsInputChange,
+  onConfirmationTextChange,
+  onEmptyCylinderSizeChange,
+  onEnabledChange,
+}: {
+  acceptedBrandsInput: string;
+  confirmationText: string;
+  disabled: boolean;
+  emptyCylinderSize: string;
+  enabled: boolean;
+  onAcceptedBrandsInputChange: (value: string) => void;
+  onConfirmationTextChange: (value: string) => void;
+  onEmptyCylinderSizeChange: (value: string) => void;
+  onEnabledChange: (value: boolean) => void;
+}) {
+  function handleEnabledChange(value: boolean) {
+    onEnabledChange(value);
+
+    if (value && !confirmationText.trim()) {
+      onConfirmationTextChange(getDefaultExchangeConfirmationText(emptyCylinderSize));
+    }
+  }
+
+  function handleEmptyCylinderSizeChange(value: string) {
+    const previousDefaultText =
+      getDefaultExchangeConfirmationText(emptyCylinderSize);
+    const nextDefaultText = getDefaultExchangeConfirmationText(value);
+
+    onEmptyCylinderSizeChange(value);
+
+    if (!confirmationText.trim() || confirmationText === previousDefaultText) {
+      onConfirmationTextChange(nextDefaultText);
+    }
+  }
+
+  return (
+    <div className="grid gap-3">
+      <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10">
+        <Checkbox
+          checked={enabled}
+          className="mt-0.5 size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
+          disabled={disabled}
+          onCheckedChange={(checked) => handleEnabledChange(Boolean(checked))}
+        />
+        <span>
+          <span className="block font-semibold text-zinc-950 dark:text-white">
+            Require empty cylinder exchange confirmation
+          </span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Use this on exchange variants so the customer confirms they have a
+            compatible empty cylinder before checkout.
+          </span>
+        </span>
+      </label>
+
+      {enabled ? (
+        <div className="grid gap-4 rounded-lg border border-orange-200 bg-orange-50/40 p-3 dark:border-orange-400/20 dark:bg-orange-500/10">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-1.5">
+              <FieldLabel info="The empty cylinder size the customer must hand over, for example 9kg, 14kg, 19kg, or 48kg.">
+                Required empty size
+              </FieldLabel>
+              <Input
+                className={fieldClass}
+                disabled={disabled}
+                onChange={(event) =>
+                  handleEmptyCylinderSizeChange(event.target.value)
+                }
+                placeholder="9kg"
+                value={emptyCylinderSize}
+              />
+            </label>
+            <label className="grid gap-1.5">
+              <FieldLabel info="Accepted returnable cylinder brands. Separate brands with commas or new lines.">
+                Accepted return brands
+              </FieldLabel>
+              <Textarea
+                className={cn(textareaClass, "min-h-20")}
+                disabled={disabled}
+                onChange={(event) =>
+                  onAcceptedBrandsInputChange(event.target.value)
+                }
+                placeholder="Jurgens Energy, Afrox, Totalgaz"
+                value={acceptedBrandsInput}
+              />
+            </label>
+          </div>
+          <label className="grid gap-1.5">
+            <FieldLabel info="The exact checkbox text customers must accept for this exchange option.">
+              Customer confirmation text
+            </FieldLabel>
+            <Textarea
+              className={cn(textareaClass, "min-h-20")}
+              disabled={disabled}
+              onChange={(event) => onConfirmationTextChange(event.target.value)}
+              value={confirmationText}
+            />
+          </label>
+          <p className="text-xs leading-5 text-slate-600 dark:text-zinc-300">
+            Checkout will snapshot the accepted brands and confirmation text on
+            the order item so future catalog changes do not alter what the
+            customer agreed to.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function SkuStatusIcon({ status }: { status: SkuStatus }) {
   if (status === "available") {
     return <CheckCircleIcon className="size-4 text-emerald-600" />;
@@ -977,6 +1099,10 @@ function SkuStatusIcon({ status }: { status: SkuStatus }) {
 
   if (status === "checking") {
     return <Loader2Icon className="size-4 animate-spin text-amber-600" />;
+  }
+
+  if (status === "error") {
+    return <AlertTriangleIcon className="size-4 text-amber-600" />;
   }
 
   return null;
@@ -1290,7 +1416,6 @@ export function ProductCreateWizard({
   >([]);
   const [isScanningImportLink, setIsScanningImportLink] = useState(false);
   const [isApplyingImport, startApplyImportTransition] = useTransition();
-  const canSubmitForReview = Boolean(draftProductId);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     initialProduct?.categoryId ?? null,
   );
@@ -1316,6 +1441,21 @@ export function ProductCreateWizard({
   const [stock, setStock] = useState(initialProduct?.stock ?? "0");
   const [continueSellingOutOfStock, setContinueSellingOutOfStock] =
     useState(initialProduct?.continueSellingOutOfStock ?? false);
+  const [exchangeRequiresEmpty, setExchangeRequiresEmpty] = useState(
+    initialProduct?.exchangeRequiresEmpty ?? false,
+  );
+  const [exchangeEmptyCylinderSize, setExchangeEmptyCylinderSize] = useState(
+    initialProduct?.exchangeEmptyCylinderSize ?? "",
+  );
+  const [exchangeAcceptedReturnBrandsInput, setExchangeAcceptedReturnBrandsInput] =
+    useState(
+      formatExchangeBrandInput(
+        initialProduct?.exchangeAcceptedReturnBrands ?? [],
+      ),
+    );
+  const [exchangeConfirmationText, setExchangeConfirmationText] = useState(
+    initialProduct?.exchangeConfirmationText ?? "",
+  );
   const [hasVariants, setHasVariants] = useState(initialProduct?.hasVariants ?? false);
   const [variantOptions, setVariantOptions] =
     useState<VariantOption[]>(initialVariantOptions);
@@ -1323,6 +1463,9 @@ export function ProductCreateWizard({
   const [generatedVariants, setGeneratedVariants] = useState<GeneratedVariant[]>(
     initialProduct?.variants.map((variant) => ({
       ...variant,
+      exchangeAcceptedReturnBrandsInput: formatExchangeBrandInput(
+        variant.exchangeAcceptedReturnBrands,
+      ),
       id: makeId("variant"),
       persistedVariantId: variant.id,
     })) ?? [],
@@ -1358,19 +1501,15 @@ export function ProductCreateWizard({
   const [isGeneratingDescription, startDescriptionTransition] =
     useTransition();
   const [isSavingDraft, startSaveDraftTransition] = useTransition();
-  const [isSubmittingReview, startSubmitReviewTransition] = useTransition();
   const productStatus = initialProduct?.status ?? "draft";
   const canFullyEditProduct =
-    productStatus === "draft" || productStatus === "changes_requested";
-  const canSaveOperationalFields =
-    Boolean(initialProduct?.id) &&
-    ["approved", "active", "live", "paused"].includes(productStatus);
+    !["archived", "admin_suspended"].includes(productStatus);
+  const canSaveOperationalFields = false;
   const fullListingControlsDisabled = !canFullyEditProduct;
   const productIsLocked = Boolean(
     initialProduct && !canFullyEditProduct && !canSaveOperationalFields,
   );
-  const saveDisabled =
-    productIsLocked || isSavingDraft || isSubmittingReview;
+  const saveDisabled = productIsLocked || isSavingDraft;
 
   const categoriesById = useMemo(
     () => new Map(data.categories.map((category) => [category.id, category])),
@@ -1530,16 +1669,7 @@ export function ProductCreateWizard({
     .map((variant) => `${variant.id}:${variant.sku}`)
     .join("|");
   const pricingBreakdown = getPricingBreakdown(price, compareAtPrice);
-  const isPiessangFulfillmentEnabled = Boolean(
-    data.seller?.isPiessangFulfillmentEnabled,
-  );
-  const isPiessangFulfilled = fulfillmentMode === "piessang_fulfilled";
-  const isInventoryLockedByPiessang = isPiessangFulfilled;
-  const isBaseBarcodeReady = barcode.trim().length > 0;
-  const areVariantBarcodesReady =
-    !hasVariants ||
-    (generatedVariants.length > 0 &&
-      generatedVariants.every((variant) => variant.barcode.trim().length > 0));
+  const isJurgensDelivery = fulfillmentMode === "piessang_fulfilled";
   const listingChecklistItems = useMemo<ListingChecklistItem[]>(() => {
     const priceNumber = parsePositiveNumber(price);
     const compareAtNumber = parsePositiveNumber(compareAtPrice);
@@ -1568,16 +1698,14 @@ export function ProductCreateWizard({
               (Boolean(variantCompareAt) && variantCompareAt! > variantPrice!))
           );
         }));
-    const inventoryReady = isPiessangFulfilled
-      ? true
-      : hasVariants
-        ? generatedVariants.length > 0 &&
-          generatedVariants.every(
-            (variant) =>
-              variant.continueSellingOutOfStock ||
-              (variant.stock.trim() && variant.lowStockAlert.trim()),
-          )
-        : continueSellingOutOfStock || stock.trim();
+    const inventoryReady = hasVariants
+      ? generatedVariants.length > 0 &&
+        generatedVariants.every(
+          (variant) =>
+            variant.continueSellingOutOfStock ||
+            (variant.stock.trim() && variant.lowStockAlert.trim()),
+        )
+      : continueSellingOutOfStock || stock.trim();
     const shippingReady = [weightGrams, lengthMm, widthMm, heightMm].every(
       (value) => Boolean(parsePositiveNumber(value)),
     );
@@ -1599,8 +1727,8 @@ export function ProductCreateWizard({
         title: "Category",
       },
       {
-        complete: brandName.trim().length > 0,
-        detail: "Select an approved brand or enter a brand request name.",
+        complete: selectedBrandSuggestion?.status === "active",
+        detail: "Select an active preset brand from the catalog.",
         title: "Brand",
       },
       {
@@ -1620,45 +1748,28 @@ export function ProductCreateWizard({
       },
       {
         complete: hasVariants ? variantPricingReady : basePricingReady,
-        detail: "Enter VAT-inclusive selling prices. Compare-at prices must be higher.",
+        detail: hasVariants
+          ? "Enter VAT-inclusive prices on each generated variant row."
+          : "Enter a VAT-inclusive selling price. Compare-at price must be higher.",
         title: "Pricing",
       },
       {
         complete: Boolean(inventoryReady),
-        detail: isPiessangFulfilled
-          ? "Piessang controls stock after inbound inventory is received and processed."
-          : "Set stock controls, or allow overselling when stock reaches zero.",
+        detail: "Set stock controls, or allow overselling when stock reaches zero.",
         title: "Inventory",
       },
-      ...(isPiessangFulfilled
-        ? [
-            {
-              complete: isBaseBarcodeReady,
-              detail:
-                "FBP products require a product barcode before inbound stock can be booked to Piessang.",
-              title: "Product barcode",
-            },
-            {
-              complete: areVariantBarcodesReady,
-              detail: hasVariants
-                ? "Every FBP variant requires a barcode before inbound stock can be booked."
-                : "No variant barcodes are required for a single-variant product.",
-              title: "Variant barcodes",
-            },
-          ]
-        : []),
       {
         complete: shippingReady,
         detail: "Provide packed weight and dimensions for accurate shipping rates.",
         title: "Parcel data",
       },
       {
-        complete: fulfillmentMode === "seller_fulfilled" || isPiessangFulfillmentEnabled,
+        complete: true,
         detail:
           fulfillmentMode === "piessang_fulfilled"
-            ? "Fulfilled by Piessang is enabled for this seller."
-            : "Seller fulfillment is selected for this listing.",
-        title: "Fulfillment",
+            ? "Jurgens Energy delivery is selected for this listing."
+            : "Bob Go courier delivery is selected for this listing.",
+        title: "Delivery method",
       },
       {
         complete: variantsReady,
@@ -1669,8 +1780,6 @@ export function ProductCreateWizard({
       },
     ];
   }, [
-    areVariantBarcodesReady,
-    brandName,
     compareAtPrice,
     continueSellingOutOfStock,
     description,
@@ -1678,13 +1787,11 @@ export function ProductCreateWizard({
     generatedVariants,
     hasVariants,
     heightMm,
-    isBaseBarcodeReady,
-    isPiessangFulfillmentEnabled,
-    isPiessangFulfilled,
     lengthMm,
     longDescription,
     price,
     productName,
+    selectedBrandSuggestion,
     selectedCategory,
     selectedMediaIds.length,
     sku,
@@ -1729,21 +1836,6 @@ export function ProductCreateWizard({
   }, [heightMm, lengthMm, parcelPresetId, parcelPresets, weightGrams, widthMm]);
 
   useEffect(() => {
-    if (!isPiessangFulfilled) {
-      return;
-    }
-
-    setContinueSellingOutOfStock(false);
-    setGeneratedVariants((current) =>
-      current.map((variant) =>
-        variant.continueSellingOutOfStock
-          ? { ...variant, continueSellingOutOfStock: false }
-          : variant,
-      ),
-    );
-  }, [isPiessangFulfilled]);
-
-  useEffect(() => {
     const normalizedSku = sku.trim();
 
     if (!normalizedSku) {
@@ -1756,7 +1848,7 @@ export function ProductCreateWizard({
     const timeout = window.setTimeout(async () => {
       try {
         const response = await fetch(
-          `/products/new/check-sku?sku=${encodeURIComponent(normalizedSku)}${
+          `/admin/products/new/check-sku?sku=${encodeURIComponent(normalizedSku)}${
             draftProductId ? `&productId=${encodeURIComponent(draftProductId)}` : ""
           }`,
           { signal: controller.signal },
@@ -1766,10 +1858,15 @@ export function ProductCreateWizard({
           ok?: boolean;
         };
 
-        setSkuStatus(result.ok && result.available ? "available" : "duplicate");
+        if (!response.ok || !result.ok) {
+          setSkuStatus("error");
+          return;
+        }
+
+        setSkuStatus(result.available ? "available" : "duplicate");
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
-          setSkuStatus("idle");
+          setSkuStatus("error");
         }
       }
     }, 350);
@@ -1838,24 +1935,35 @@ export function ProductCreateWizard({
 
       const results = await Promise.allSettled(
         uniqueVariants.map(async (variant) => {
-          const response = await fetch(
-            `/products/new/check-sku?sku=${encodeURIComponent(variant.sku.trim())}${
-              draftProductId ? `&productId=${encodeURIComponent(draftProductId)}` : ""
-            }`,
-            { signal: controller.signal },
-          );
-          const result = (await response.json()) as {
-            available?: boolean;
-            ok?: boolean;
-          };
+          try {
+            const response = await fetch(
+              `/admin/products/new/check-sku?sku=${encodeURIComponent(variant.sku.trim())}${
+                draftProductId ? `&productId=${encodeURIComponent(draftProductId)}` : ""
+              }`,
+              { signal: controller.signal },
+            );
+            const result = (await response.json()) as {
+              available?: boolean;
+              ok?: boolean;
+            };
 
-          return {
-            id: variant.id,
-            status:
-              result.ok && result.available
+            if (!response.ok || !result.ok) {
+              return { id: variant.id, status: "error" as SkuStatus };
+            }
+
+            return {
+              id: variant.id,
+              status: result.available
                 ? ("available" as SkuStatus)
                 : ("duplicate" as SkuStatus),
-          };
+            };
+          } catch (error) {
+            if ((error as Error).name === "AbortError") {
+              throw error;
+            }
+
+            return { id: variant.id, status: "error" as SkuStatus };
+          }
         }),
       );
 
@@ -2303,9 +2411,11 @@ export function ProductCreateWizard({
       return {
         barcode: "",
         compareAtPrice,
-        continueSellingOutOfStock: isPiessangFulfilled
-          ? false
-          : continueSellingOutOfStock,
+        continueSellingOutOfStock,
+        exchangeAcceptedReturnBrandsInput: "",
+        exchangeConfirmationText: "",
+        exchangeEmptyCylinderSize: "",
+        exchangeRequiresEmpty: false,
         heightMm,
         id: makeId("variant"),
         imageId: selectedMediaIds[0] ?? null,
@@ -2389,6 +2499,12 @@ export function ProductCreateWizard({
         compareAtPrice,
         continueSellingOutOfStock,
         description,
+        exchangeAcceptedReturnBrands: parseExchangeBrandInput(
+          exchangeAcceptedReturnBrandsInput,
+        ),
+        exchangeConfirmationText,
+        exchangeEmptyCylinderSize,
+        exchangeRequiresEmpty,
         fulfillmentMode,
         hasVariants,
         heightMm,
@@ -2412,6 +2528,12 @@ export function ProductCreateWizard({
               barcode: variant.barcode,
               compareAtPrice: variant.compareAtPrice,
               continueSellingOutOfStock: variant.continueSellingOutOfStock,
+              exchangeAcceptedReturnBrands: parseExchangeBrandInput(
+                variant.exchangeAcceptedReturnBrandsInput,
+              ),
+              exchangeConfirmationText: variant.exchangeConfirmationText,
+              exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
+              exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
               heightMm: variant.heightMm,
               imageId: variant.imageId,
               lengthMm: variant.lengthMm,
@@ -2432,68 +2554,7 @@ export function ProductCreateWizard({
       };
   }
 
-  function getOperationalUpdateInput() {
-    const baseVariant = initialProduct?.variants[0];
-    const baseVariantId = baseVariant?.id;
-
-    return {
-      productId: draftProductId,
-      variants: hasVariants
-        ? generatedVariants
-            .filter((variant) => variant.persistedVariantId)
-            .map((variant) => ({
-              compareAtPrice: variant.compareAtPrice,
-              continueSellingOutOfStock: variant.continueSellingOutOfStock,
-              heightMm: variant.heightMm,
-              id: variant.persistedVariantId,
-              isFragile: Boolean(variant.isFragile),
-              lengthMm: variant.lengthMm,
-              lowStockAlert: variant.lowStockAlert,
-              price: variant.price,
-              shipsAlone: Boolean(variant.shipsAlone),
-              status: variant.status,
-              stock: variant.stock,
-              weightGrams: variant.weightGrams,
-              widthMm: variant.widthMm,
-            }))
-        : baseVariantId
-          ? [
-              {
-                compareAtPrice,
-                continueSellingOutOfStock,
-                heightMm,
-                id: baseVariantId,
-                isFragile: Boolean(baseVariant?.isFragile),
-                lengthMm,
-                lowStockAlert: "5",
-                price,
-                shipsAlone: Boolean(baseVariant?.shipsAlone),
-                status: "active" as VariantStatus,
-                stock,
-                weightGrams,
-                widthMm,
-              },
-            ]
-          : [],
-    };
-  }
-
   function handleSaveDraft() {
-    if (canSaveOperationalFields) {
-      setDraftSaveFeedback(null);
-      startSaveDraftTransition(() => {
-        void updateSellerProductOperationalFields(getOperationalUpdateInput()).then(
-          (result) => {
-            setDraftSaveFeedback({
-              message: result.message,
-              tone: result.ok ? "success" : "error",
-            });
-          },
-        );
-      });
-      return;
-    }
-
     if (!canFullyEditProduct) {
       setDraftSaveFeedback({
         message: "This product status is locked from full editing.",
@@ -2516,35 +2577,6 @@ export function ProductCreateWizard({
 
         setDraftSaveFeedback({
           message: result.message ?? "Could not save this product.",
-          tone: "error",
-        });
-      });
-    });
-  }
-
-  function handleSubmitForReview() {
-    if (!canFullyEditProduct) {
-      setDraftSaveFeedback({
-        message: "Only draft products or products with requested changes can be submitted for review.",
-        tone: "error",
-      });
-      return;
-    }
-
-    setDraftSaveFeedback(null);
-    startSubmitReviewTransition(() => {
-      void submitProductForReview(getProductDraftInput()).then((result) => {
-        if (result.ok) {
-          setDraftProductId(result.productId ?? draftProductId);
-          setDraftSaveFeedback({
-            message: result.message ?? "Product submitted for review.",
-            tone: "success",
-          });
-          return;
-        }
-
-        setDraftSaveFeedback({
-          message: result.message ?? "Could not submit this product for review.",
           tone: "error",
         });
       });
@@ -2577,7 +2609,7 @@ export function ProductCreateWizard({
     ]);
 
     try {
-      const response = await fetch("/products/new/import-link", {
+      const response = await fetch("/admin/products/new/import-link", {
         body: JSON.stringify({ url }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -2786,7 +2818,6 @@ export function ProductCreateWizard({
 
       <DashboardPageHeader
         breadcrumbs={[
-          "Seller",
           "Products",
           initialProduct ? "Edit product" : "New product",
         ]}
@@ -2801,7 +2832,7 @@ export function ProductCreateWizard({
             Cancel
           </DashboardButton>
           <DashboardButton
-            disabled={fullListingControlsDisabled || isSavingDraft || isSubmittingReview}
+            disabled={fullListingControlsDisabled || isSavingDraft}
             onClick={() => {
               setIsImportLinkOpen(true);
               setImportedProduct(null);
@@ -2825,36 +2856,13 @@ export function ProductCreateWizard({
             )}
             {isSavingDraft ? "Saving..." : "Save product"}
           </DashboardButton>
-          {canSubmitForReview && canFullyEditProduct ? (
-            <DashboardButton
-              className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
-              disabled={saveDisabled}
-              onClick={handleSubmitForReview}
-              type="button"
-            >
-              {isSubmittingReview ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : (
-                <PackageCheckIcon className="size-3.5" />
-              )}
-              {isSubmittingReview ? "Submitting..." : "Submit for review"}
-            </DashboardButton>
-          ) : null}
         </div>
       </div>
       {productIsLocked || canSaveOperationalFields ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
           {canSaveOperationalFields
             ? `This product is currently ${productStatus.replaceAll("_", " ")}. Core listing fields are locked, but operational fields such as price, stock, variant availability, and parcel data can be updated.`
-            : `This product is currently ${productStatus.replaceAll("_", " ")}. Full listing edits are locked here; use the products table actions to cancel review, pause, activate, archive, or delete where allowed.`}
-        </div>
-      ) : null}
-      {initialProduct?.status === "changes_requested" && initialProduct.reviewNote ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100">
-          <span className="block font-semibold">Requested changes</span>
-          <span className="mt-1 block whitespace-pre-wrap leading-5">
-            {initialProduct.reviewNote}
-          </span>
+            : `This product is currently ${productStatus.replaceAll("_", " ")}. Full listing edits are locked for this status.`}
         </div>
       ) : null}
       {draftSaveFeedback ? (
@@ -2895,7 +2903,7 @@ export function ProductCreateWizard({
               </label>
 
               <label className="grid gap-1.5">
-                <FieldLabel info="A unique stock keeping unit. SKUs must be unique across all sellers and products.">
+                <FieldLabel info="A unique stock keeping unit. SKUs must be unique across all products.">
                   SKU *
                 </FieldLabel>
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -2933,20 +2941,16 @@ export function ProductCreateWizard({
                       ? "Checking SKU..."
                       : skuStatus === "available"
                         ? "SKU is available."
-                        : "This SKU is already in use."}
+                        : skuStatus === "duplicate"
+                          ? "This SKU is already in use."
+                          : "Could not check SKU availability. Try again."}
                   </p>
                 ) : null}
               </label>
 
               <label className="grid gap-1.5">
-                <FieldLabel
-                  info={
-                    isPiessangFulfilled
-                      ? "Required for Fulfilled by Piessang. This barcode is needed before inbound stock can be booked and processed."
-                      : "Optional barcode or supplier identifier for this main listing. Variants can still have their own barcode later."
-                  }
-                >
-                  {isPiessangFulfilled ? "Barcode *" : "Barcode"}
+                <FieldLabel info="Optional barcode or supplier identifier for this main listing. Variants can still have their own barcode later.">
+                  Barcode
                 </FieldLabel>
                 <Input
                   className={fieldClass}
@@ -3028,36 +3032,12 @@ export function ProductCreateWizard({
                             >
                               <span className="block min-w-0">
                                 <span className="block truncate">{category.name}</span>
-                                {index === 0 ? (
-                                  <span className="block text-xs text-slate-500 dark:text-zinc-400">
-                                    {formatFee(
-                                      getCategoryFeeBps(
-                                        category,
-                                        categoriesByPath,
-                                      ),
-                                    )}
-                                  </span>
-                                ) : null}
                               </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      {index === 0 && level.value ? (
-                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-xs leading-5 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
-                          <span className="block font-semibold">
-                            {categoriesById.get(level.value)?.name}
-                          </span>
-                          <span>
-                            {formatFee(
-                              getCategoryFeeBps(
-                                categoriesById.get(level.value)!,
-                                categoriesByPath,
-                              ),
-                            )}
-                          </span>
-                        </div>
-                      ) : index === 0 ? (
+                      {index === 0 && !level.value ? (
                         <span className="text-xs text-slate-500 dark:text-zinc-400">
                           Select the main category first.
                         </span>
@@ -3080,7 +3060,7 @@ export function ProductCreateWizard({
               </div>
 
               <div className="grid gap-1.5">
-                <FieldLabel info="Start typing a brand name. Existing brands can be selected; unknown brands will be submitted as a brand request when the product is saved.">
+                <FieldLabel info="Search and select an active preset brand. Add missing brands under Catalog > Brands before creating products.">
                   Brand *
                 </FieldLabel>
                 <div className="relative">
@@ -3100,7 +3080,7 @@ export function ProductCreateWizard({
                       setIsBrandPickerOpen(true);
                     }}
                     onFocus={() => setIsBrandPickerOpen(true)}
-                    placeholder="Type or select a brand"
+                    placeholder="Search preset brands"
                     value={brandName}
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
@@ -3121,11 +3101,6 @@ export function ProductCreateWizard({
                         >
                           <span className="flex items-center justify-between gap-3">
                             <span>{brand.name}</span>
-                            {brand.status === "pending" ? (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
-                                Under review
-                              </span>
-                            ) : null}
                           </span>
                         </button>
                       ))}
@@ -3138,16 +3113,12 @@ export function ProductCreateWizard({
                       "text-xs leading-5",
                       selectedBrandSuggestion?.status === "active"
                         ? "text-emerald-700 dark:text-emerald-300"
-                        : selectedBrandSuggestion?.status === "pending"
-                          ? "text-amber-700 dark:text-amber-300"
                         : "text-amber-700 dark:text-amber-300",
                     )}
                   >
                     {selectedBrandSuggestion?.status === "active"
                       ? `Using existing brand: ${selectedBrandSuggestion.name}.`
-                      : selectedBrandSuggestion?.status === "pending"
-                        ? `${selectedBrandSuggestion.name} is already under review. You can keep using it while the brand request is pending.`
-                      : "This brand does not exist yet. Saving this product will submit a brand request for review."}
+                      : "No active preset brand matches this. Add it under Catalog > Brands first."}
                   </p>
                 ) : null}
               </div>
@@ -3207,37 +3178,23 @@ export function ProductCreateWizard({
           </Panel>
 
           <Panel title="Inventory">
-            {isInventoryLockedByPiessang ? (
-              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm leading-5 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-                Piessang controls sellable stock for fulfilled products. Stock
-                becomes visible here only after inbound inventory is received
-                and processed by Piessang.
-              </div>
-            ) : null}
             <div className="grid gap-4 md:grid-cols-2">
               <label
                 className={cn(
                   "grid gap-1.5 transition-opacity",
-                  (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
-                    "opacity-45",
+                  continueSellingOutOfStock && "opacity-45",
                 )}
               >
-                <FieldLabel
-                  info={
-                    isInventoryLockedByPiessang
-                      ? "Fulfilled by Piessang stock is managed by Piessang after inbound stock is received and processed."
-                      : "The available stock quantity for this product."
-                  }
-                >
+                <FieldLabel info="The available stock quantity for this product.">
                   Quantity *
                 </FieldLabel>
                 <Input
                   className={cn(
                     fieldClass,
-                    (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
+                    continueSellingOutOfStock &&
                       "cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-zinc-500",
                   )}
-                  disabled={continueSellingOutOfStock || isInventoryLockedByPiessang}
+                  disabled={continueSellingOutOfStock}
                   inputMode="numeric"
                   min={0}
                   onChange={(event) => setStock(sanitizeStockInput(event.target.value))}
@@ -3249,42 +3206,30 @@ export function ProductCreateWizard({
               <label
                 className={cn(
                   "grid gap-1.5 transition-opacity",
-                  (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
-                    "opacity-45",
+                  continueSellingOutOfStock && "opacity-45",
                 )}
               >
-                <FieldLabel
-                  info={
-                    isInventoryLockedByPiessang
-                      ? "Low stock alerts are managed from Piessang inventory once fulfilled stock is received."
-                      : "The stock level at which Piessang should flag this product as low stock."
-                  }
-                >
+                <FieldLabel info="The stock level at which this product should be flagged as low stock.">
                   Low stock alert
                 </FieldLabel>
                 <Input
                   className={cn(
                     fieldClass,
-                    (continueSellingOutOfStock || isInventoryLockedByPiessang) &&
+                    continueSellingOutOfStock &&
                       "cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-zinc-500",
                   )}
                   defaultValue={5}
-                  disabled={continueSellingOutOfStock || isInventoryLockedByPiessang}
+                  disabled={continueSellingOutOfStock}
                   min={0}
                   type="number"
                 />
               </label>
             </div>
             <label
-              className={cn(
-                "mt-4 flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10",
-                isInventoryLockedByPiessang &&
-                  "cursor-not-allowed bg-slate-50 text-slate-500 dark:bg-white/[0.03] dark:text-zinc-500",
-              )}
+              className="mt-4 flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10"
             >
               <Checkbox
                 checked={continueSellingOutOfStock}
-                disabled={isInventoryLockedByPiessang}
                 onCheckedChange={(checked) =>
                   setContinueSellingOutOfStock(Boolean(checked))
                 }
@@ -3294,11 +3239,7 @@ export function ProductCreateWizard({
                 Continue selling when out of stock
                 <InfoHint
                   label="Continue selling"
-                  text={
-                    isInventoryLockedByPiessang
-                      ? "Unavailable for Fulfilled by Piessang because Piessang controls sellable stock."
-                      : "Allow customers to place orders even when stock reaches zero."
-                  }
+                  text="Allow customers to place orders even when stock reaches zero."
                 />
               </span>
             </label>
@@ -3306,7 +3247,7 @@ export function ProductCreateWizard({
 
           <Panel
             title="Shipping"
-            description="Parcel data is required before checkout can quote accurate rates. Inaccurate weight or dimensions may cause courier adjustment fees, and those extra costs may be charged back to the seller."
+            description="Parcel data is required before checkout can quote accurate rates. Inaccurate weight or dimensions may cause courier adjustment fees."
           >
             <div className="grid min-w-0 gap-4">
               <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -3514,11 +3455,26 @@ export function ProductCreateWizard({
             </div>
           </Panel>
 
-          <Panel title="Pricing">
+          <Panel
+            title={hasVariants ? "Variant price defaults" : "Pricing"}
+            description={
+              hasVariants
+                ? "Optional defaults used to prefill newly generated variants. The storefront uses variant prices, starting from the lowest active variant."
+                : "Set the final customer-facing VAT-inclusive price for this product."
+            }
+          >
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1.5">
-                <FieldLabel info="The final customer-facing selling price, including VAT. Do not enter an ex-VAT amount.">
-                  Price (VAT incl.) *
+                <FieldLabel
+                  info={
+                    hasVariants
+                      ? "Optional default used to prefill generated variants. Each variant still needs its own VAT-inclusive price."
+                      : "The final customer-facing selling price, including VAT. Do not enter an ex-VAT amount."
+                  }
+                >
+                  {hasVariants
+                    ? "Default variant price (VAT incl.)"
+                    : "Price (VAT incl.) *"}
                 </FieldLabel>
                 <Input
                   className={fieldClass}
@@ -3535,8 +3491,16 @@ export function ProductCreateWizard({
                 />
               </label>
               <label className="grid gap-1.5">
-                <FieldLabel info="Optional original VAT-inclusive price used to show a markdown or discount. This must be higher than the selling price.">
-                  Compare-at price (VAT incl.)
+                <FieldLabel
+                  info={
+                    hasVariants
+                      ? "Optional default compare-at price used to prefill generated variants."
+                      : "Optional original VAT-inclusive price used to show a markdown or discount. This must be higher than the selling price."
+                  }
+                >
+                  {hasVariants
+                    ? "Default compare-at price (VAT incl.)"
+                    : "Compare-at price (VAT incl.)"}
                 </FieldLabel>
                 <Input
                   className={fieldClass}
@@ -3558,24 +3522,30 @@ export function ProductCreateWizard({
             <div
               className={cn(
                 "mt-4 rounded-lg border px-3 py-2 text-xs leading-5",
-                pricingBreakdown.tone === "success" &&
+                !hasVariants &&
+                  pricingBreakdown.tone === "success" &&
                   "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100",
-                pricingBreakdown.tone === "warning" &&
+                !hasVariants &&
+                  pricingBreakdown.tone === "warning" &&
                   "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100",
-                pricingBreakdown.tone === "neutral" &&
+                (hasVariants || pricingBreakdown.tone === "neutral") &&
                   "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300",
               )}
             >
               <div className="font-semibold text-zinc-950 dark:text-white">
-                {pricingBreakdown.title}
+                {hasVariants ? "Variant prices drive the storefront" : pricingBreakdown.title}
               </div>
-              <div>{pricingBreakdown.message}</div>
+              <div>
+                {hasVariants
+                  ? "You do not need a separate product price when variants exist. These values only prefill new variant rows; customers see and buy the selected variant price."
+                  : pricingBreakdown.message}
+              </div>
             </div>
           </Panel>
 
           <Panel
-            title="Fulfillment"
-            description="Choose who physically stores, packs, and hands off this product."
+            title="Delivery method"
+            description="Choose how this product should be delivered to customers at checkout."
           >
             <div className="grid gap-3">
               <button
@@ -3589,51 +3559,32 @@ export function ProductCreateWizard({
                 disabled={fullListingControlsDisabled}
                 type="button"
               >
-                <span className="font-semibold">Seller ships this product</span>
+                <span className="font-semibold">Bob Go courier</span>
                 <span className="mt-1 block text-sm text-slate-600 dark:text-zinc-300">
-                  You keep the stock, pack the order, print the Piessang
-                  waybill, and hand it to the booked courier for collection.
+                  Pack the order and use Bob Go to quote and book the courier.
+                  Customers see courier rates at checkout.
                 </span>
               </button>
               <button
-                aria-disabled={!isPiessangFulfillmentEnabled}
                 className={cn(
                   "rounded-lg border p-4 text-left transition",
-                  !isPiessangFulfillmentEnabled &&
-                    "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 opacity-80 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-500",
-                  fulfillmentMode === "piessang_fulfilled" &&
-                    isPiessangFulfillmentEnabled
+                  isJurgensDelivery
                     ? "border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-500/10 dark:text-emerald-100"
-                    : isPiessangFulfillmentEnabled
-                      ? "border-slate-200 bg-white dark:border-white/10 dark:bg-[#151719]"
-                      : "",
+                    : "border-slate-200 bg-white dark:border-white/10 dark:bg-[#151719]",
                 )}
-                disabled={!isPiessangFulfillmentEnabled || fullListingControlsDisabled}
+                disabled={fullListingControlsDisabled}
                 onClick={() => {
-                  if (isPiessangFulfillmentEnabled && !fullListingControlsDisabled) {
+                  if (!fullListingControlsDisabled) {
                     setFulfillmentMode("piessang_fulfilled");
                   }
                 }}
                 type="button"
               >
-                <span className="font-semibold">Fulfilled by Piessang</span>
+                <span className="font-semibold">Jurgens Energy delivery</span>
                 <span className="mt-1 block text-sm text-slate-600 dark:text-zinc-300">
-                  Piessang stores approved stock, picks and packs the order, and
-                  delivers through our local fulfillment routes.
+                  Deliver this product through Jurgens Energy&apos;s own local
+                  delivery route instead of quoting a Bob Go courier rate.
                 </span>
-                {isPiessangFulfillmentEnabled ? (
-                  <span className="mt-3 block rounded-md border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-400/20 dark:bg-[#151719] dark:text-emerald-200">
-                    Requires product and variant barcodes before inbound stock
-                    can be booked. Sellers cannot edit sellable stock for FBP;
-                    stock appears after Piessang receives and processes it.
-                  </span>
-                ) : null}
-                {!isPiessangFulfillmentEnabled ? (
-                  <span className="mt-3 block rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 dark:border-white/10 dark:bg-[#151719] dark:text-zinc-300">
-                    Not available yet. Fulfilled by Piessang is invitation-only
-                    for selected sellers and local stock programs.
-                  </span>
-                ) : null}
               </button>
             </div>
           </Panel>
@@ -3866,8 +3817,8 @@ export function ProductCreateWizard({
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
                     Edit each variant or use bulk actions to update multiple.
-                    For dependent options like RAM and storage, generate all
-                    combinations first, then remove the rows you do not sell.
+                    Open a specific variant to enable cylinder exchange rules
+                    only for that sellable option.
                   </p>
                 </div>
                 <div className={cn(dashboardPanelClass, "overflow-hidden")}>
@@ -3924,12 +3875,7 @@ export function ProductCreateWizard({
                           Set compare-at price
                         </button>
                         <button
-                          className={cn(
-                            "flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10",
-                            isInventoryLockedByPiessang &&
-                              "cursor-not-allowed text-slate-400 hover:bg-transparent dark:text-zinc-500 dark:hover:bg-transparent",
-                          )}
-                          disabled={isInventoryLockedByPiessang}
+                          className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
                           onClick={() =>
                             openBulkValueDialog(
                               "stock",
@@ -4031,24 +3977,12 @@ export function ProductCreateWizard({
                             </ColumnInfoTitle>
                           </TableHead>
                           <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
-                            <ColumnInfoTitle
-                              info={
-                                isInventoryLockedByPiessang
-                                  ? "Piessang controls FBP variant stock after inbound inventory is received and processed."
-                                  : "The available stock quantity for this variant."
-                              }
-                            >
+                            <ColumnInfoTitle info="The available stock quantity for this variant.">
                               Stock
                             </ColumnInfoTitle>
                           </TableHead>
                           <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
-                            <ColumnInfoTitle
-                              info={
-                                isInventoryLockedByPiessang
-                                  ? "Low stock alerts are not seller-managed for FBP variants."
-                                  : "The stock level where Piessang should flag this variant as low stock."
-                              }
-                            >
+                            <ColumnInfoTitle info="The stock level where this variant should be flagged as low stock.">
                               Low stock
                             </ColumnInfoTitle>
                           </TableHead>
@@ -4073,14 +4007,8 @@ export function ProductCreateWizard({
                             </ColumnInfoTitle>
                           </TableHead>
                           <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
-                            <ColumnInfoTitle
-                              info={
-                                isPiessangFulfilled
-                                  ? "Required for Fulfilled by Piessang variants before inbound stock can be booked."
-                                  : "Optional barcode or supplier identifier."
-                              }
-                            >
-                              {isPiessangFulfilled ? "Barcode *" : "Barcode"}
+                            <ColumnInfoTitle info="Optional barcode or supplier identifier.">
+                              Barcode
                             </ColumnInfoTitle>
                           </TableHead>
                           <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
@@ -4089,13 +4017,7 @@ export function ProductCreateWizard({
                             </ColumnInfoTitle>
                           </TableHead>
                           <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
-                            <ColumnInfoTitle
-                              info={
-                                isInventoryLockedByPiessang
-                                  ? "Unavailable for FBP because Piessang controls sellable stock."
-                                  : "Whether this variant can keep selling when stock reaches zero."
-                              }
-                            >
+                            <ColumnInfoTitle info="Whether this variant can keep selling when stock reaches zero.">
                               Oversell
                             </ColumnInfoTitle>
                           </TableHead>
@@ -4137,11 +4059,19 @@ export function ProductCreateWizard({
                                 />
                               </TableCell>
                               <TableCell className={dashboardTableCellClass}>
-                                <div className="flex min-w-0 items-center gap-2">
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
                                   <span className="size-2 rounded-full bg-emerald-500" />
                                   <span className={dashboardTablePrimaryTextClass}>
                                     {variant.optionValues.join(" / ")}
                                   </span>
+                                  {variant.exchangeRequiresEmpty ? (
+                                    <Badge className="rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/15 dark:text-orange-200">
+                                      Exchange
+                                      {variant.exchangeEmptyCylinderSize
+                                        ? ` ${variant.exchangeEmptyCylinderSize}`
+                                        : ""}
+                                    </Badge>
+                                  ) : null}
                                 </div>
                               </TableCell>
                               <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
@@ -4164,7 +4094,9 @@ export function ProductCreateWizard({
                                           ? "SKU is already used or duplicated in this product"
                                           : variantSkuStatus === "checking"
                                             ? "Checking SKU availability"
-                                            : "Enter a unique SKU"
+                                            : variantSkuStatus === "error"
+                                              ? "Could not check SKU availability"
+                                              : "Enter a unique SKU"
                                     }
                                     value={variant.sku}
                                   />
@@ -4232,14 +4164,10 @@ export function ProductCreateWizard({
                                   aria-label="Variant stock"
                                   className={cn(
                                     "h-8 w-20 border-slate-300 text-xs",
-                                    (variant.continueSellingOutOfStock ||
-                                      isInventoryLockedByPiessang) &&
+                                    variant.continueSellingOutOfStock &&
                                       "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
                                   )}
-                                  disabled={
-                                    variant.continueSellingOutOfStock ||
-                                    isInventoryLockedByPiessang
-                                  }
+                                  disabled={variant.continueSellingOutOfStock}
                                   inputMode="numeric"
                                   min={0}
                                   onChange={(event) =>
@@ -4257,14 +4185,10 @@ export function ProductCreateWizard({
                                   aria-label="Variant low stock alert"
                                   className={cn(
                                     "h-8 w-24 border-slate-300 text-xs",
-                                    (variant.continueSellingOutOfStock ||
-                                      isInventoryLockedByPiessang) &&
+                                    variant.continueSellingOutOfStock &&
                                       "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
                                   )}
-                                  disabled={
-                                    variant.continueSellingOutOfStock ||
-                                    isInventoryLockedByPiessang
-                                  }
+                                  disabled={variant.continueSellingOutOfStock}
                                   inputMode="numeric"
                                   min={0}
                                   onChange={(event) =>
@@ -4387,7 +4311,6 @@ export function ProductCreateWizard({
                                 <Checkbox
                                   aria-label="Continue selling this variant when out of stock"
                                   checked={variant.continueSellingOutOfStock}
-                                  disabled={isInventoryLockedByPiessang}
                                   onCheckedChange={(checked) =>
                                     updateGeneratedVariant(variant.id, {
                                       continueSellingOutOfStock: Boolean(checked),
@@ -4519,9 +4442,34 @@ export function ProductCreateWizard({
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-slate-600 dark:text-zinc-300">
-            This product will be created as a single variant. You can always add variants later.
-          </p>
+          <div className="grid gap-4">
+            <p className="text-sm text-slate-600 dark:text-zinc-300">
+              This product will be created as a single variant. Configure
+              exchange rules here only if this sellable option is an exchange.
+            </p>
+            <div className="grid gap-3 rounded-lg border border-slate-200 p-3 dark:border-white/10">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                  Single variant exchange rules
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  When enabled, checkout will require the customer to confirm
+                  they have an accepted empty cylinder for this variant.
+                </p>
+              </div>
+              <ExchangeRulesFields
+                acceptedBrandsInput={exchangeAcceptedReturnBrandsInput}
+                confirmationText={exchangeConfirmationText}
+                disabled={fullListingControlsDisabled}
+                emptyCylinderSize={exchangeEmptyCylinderSize}
+                enabled={exchangeRequiresEmpty}
+                onAcceptedBrandsInputChange={setExchangeAcceptedReturnBrandsInput}
+                onConfirmationTextChange={setExchangeConfirmationText}
+                onEmptyCylinderSizeChange={setExchangeEmptyCylinderSize}
+                onEnabledChange={setExchangeRequiresEmpty}
+              />
+            </div>
+          </div>
         )}
       </Panel>
 
@@ -4542,21 +4490,6 @@ export function ProductCreateWizard({
           )}
           {isSavingDraft ? "Saving..." : "Save product"}
         </DashboardButton>
-        {canSubmitForReview && canFullyEditProduct ? (
-          <DashboardButton
-            className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
-            disabled={saveDisabled}
-            onClick={handleSubmitForReview}
-            type="button"
-          >
-            {isSubmittingReview ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <PackageCheckIcon className="size-3.5" />
-            )}
-            {isSubmittingReview ? "Submitting..." : "Submit for review"}
-          </DashboardButton>
-        ) : null}
       </div>
 
       <Dialog
@@ -4718,13 +4651,6 @@ export function ProductCreateWizard({
                   <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
                     Pricing and stock
                   </h3>
-                  {isInventoryLockedByPiessang ? (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-                      Piessang controls this variant&apos;s sellable stock for FBP.
-                      Stock and low-stock settings become read-only after
-                      inbound inventory is received and processed.
-                    </div>
-                  ) : null}
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="grid gap-1.5">
                       <FieldLabel info="Final customer-facing variant price, including VAT. Do not enter an ex-VAT amount.">
@@ -4767,26 +4693,16 @@ export function ProductCreateWizard({
                       />
                     </label>
                     <label className="grid gap-1.5">
-                      <FieldLabel
-                        info={
-                          isInventoryLockedByPiessang
-                            ? "Piessang controls FBP variant stock after inbound inventory is received and processed."
-                            : "Available stock for this variant."
-                        }
-                      >
+                      <FieldLabel info="Available stock for this variant.">
                         Stock
                       </FieldLabel>
                       <Input
                         className={cn(
                           fieldClass,
-                          (activeExpandedVariant.continueSellingOutOfStock ||
-                            isInventoryLockedByPiessang) &&
+                          activeExpandedVariant.continueSellingOutOfStock &&
                             "border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
                         )}
-                        disabled={
-                          activeExpandedVariant.continueSellingOutOfStock ||
-                          isInventoryLockedByPiessang
-                        }
+                        disabled={activeExpandedVariant.continueSellingOutOfStock}
                         inputMode="numeric"
                         min={0}
                         onChange={(event) =>
@@ -4800,26 +4716,16 @@ export function ProductCreateWizard({
                       />
                     </label>
                     <label className="grid gap-1.5">
-                      <FieldLabel
-                        info={
-                          isInventoryLockedByPiessang
-                            ? "Low stock alerts are not seller-managed for FBP variants."
-                            : "The stock level at which Piessang should flag this variant as low stock."
-                        }
-                      >
+                      <FieldLabel info="The stock level at which this variant should be flagged as low stock.">
                         Low stock alert
                       </FieldLabel>
                       <Input
                         className={cn(
                           fieldClass,
-                          (activeExpandedVariant.continueSellingOutOfStock ||
-                            isInventoryLockedByPiessang) &&
+                          activeExpandedVariant.continueSellingOutOfStock &&
                             "border-slate-200 bg-slate-100 text-slate-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-500",
                         )}
-                        disabled={
-                          activeExpandedVariant.continueSellingOutOfStock ||
-                          isInventoryLockedByPiessang
-                        }
+                        disabled={activeExpandedVariant.continueSellingOutOfStock}
                         inputMode="numeric"
                         min={0}
                         onChange={(event) =>
@@ -4854,7 +4760,6 @@ export function ProductCreateWizard({
                   <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10">
                     <Checkbox
                       checked={activeExpandedVariant.continueSellingOutOfStock}
-                      disabled={isInventoryLockedByPiessang}
                       onCheckedChange={(checked) =>
                         updateGeneratedVariant(activeExpandedVariant.id, {
                           continueSellingOutOfStock: Boolean(checked),
@@ -4866,11 +4771,7 @@ export function ProductCreateWizard({
                       Continue selling this variant when out of stock
                       <InfoHint
                         label="Continue selling this variant"
-                        text={
-                          isInventoryLockedByPiessang
-                            ? "Unavailable for Fulfilled by Piessang because Piessang controls sellable stock."
-                            : "Allow this variant to keep accepting orders when stock reaches zero."
-                        }
+                        text="Allow this variant to keep accepting orders when stock reaches zero."
                       />
                     </span>
                   </label>
@@ -5039,14 +4940,8 @@ export function ProductCreateWizard({
                   </h3>
                   <div className="grid gap-4 md:grid-cols-3">
                     <label className="grid gap-1.5">
-                      <FieldLabel
-                        info={
-                          isPiessangFulfilled
-                            ? "Required for Fulfilled by Piessang variants before inbound stock can be booked."
-                            : "Optional barcode or supplier identifier for this variant."
-                        }
-                      >
-                        {isPiessangFulfilled ? "Barcode *" : "Barcode"}
+                      <FieldLabel info="Optional barcode or supplier identifier for this variant.">
+                        Barcode
                       </FieldLabel>
                       <Input
                         className={fieldClass}
@@ -5073,6 +4968,41 @@ export function ProductCreateWizard({
                       />
                     </label>
                   </div>
+                </section>
+
+                <section className="grid gap-3">
+                  <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                    Cylinder exchange
+                  </h3>
+                  <ExchangeRulesFields
+                    acceptedBrandsInput={
+                      activeExpandedVariant.exchangeAcceptedReturnBrandsInput
+                    }
+                    confirmationText={activeExpandedVariant.exchangeConfirmationText}
+                    disabled={fullListingControlsDisabled}
+                    emptyCylinderSize={activeExpandedVariant.exchangeEmptyCylinderSize}
+                    enabled={activeExpandedVariant.exchangeRequiresEmpty}
+                    onAcceptedBrandsInputChange={(value) =>
+                      updateGeneratedVariant(activeExpandedVariant.id, {
+                        exchangeAcceptedReturnBrandsInput: value,
+                      })
+                    }
+                    onConfirmationTextChange={(value) =>
+                      updateGeneratedVariant(activeExpandedVariant.id, {
+                        exchangeConfirmationText: value,
+                      })
+                    }
+                    onEmptyCylinderSizeChange={(value) =>
+                      updateGeneratedVariant(activeExpandedVariant.id, {
+                        exchangeEmptyCylinderSize: value,
+                      })
+                    }
+                    onEnabledChange={(value) =>
+                      updateGeneratedVariant(activeExpandedVariant.id, {
+                        exchangeRequiresEmpty: value,
+                      })
+                    }
+                  />
                 </section>
               </div>
             </DialogBody>
@@ -5293,7 +5223,7 @@ export function ProductCreateWizard({
           </DialogHeader>
           <DialogBody>
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
-              Large variant sets can take sellers longer to review. Continue
+              Large variant sets take longer to inspect. Continue
               only if each option value is needed for this product.
             </div>
           </DialogBody>
@@ -5363,7 +5293,7 @@ export function ProductCreateWizard({
             </div>
             <DialogTitle className="text-center">Import product from link</DialogTitle>
             <DialogDescription className="text-center">
-              Paste a product page link. Piessang will scan it, show what was
+              Paste a product page link. Jurgens Energy will scan it, show what was
               found, and only apply the details after you confirm.
             </DialogDescription>
           </DialogHeader>
@@ -5416,7 +5346,7 @@ export function ProductCreateWizard({
               {!importedProduct && displayedImportLinkSteps.length === 0 ? (
                 <div className="rounded-xl border border-slate-200 bg-emerald-50/40 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-emerald-500/5 dark:text-zinc-400">
                   <p className="font-semibold text-zinc-950 dark:text-white">
-                    Piessang will scan for:
+                    Jurgens Energy will scan for:
                   </p>
                   <ul className="mt-1 list-disc space-y-0.5 pl-4">
                     <li>Product media you can choose before importing.</li>
@@ -5606,7 +5536,7 @@ export function ProductCreateWizard({
         open={isMediaOpen}
         selectedAssetId={mediaDialogSelectedAssetId}
         storage={data.mediaLibrary.storage}
-        surface="seller"
+        surface="admin"
         title="Product media"
         usedStorageBytes={data.mediaLibrary.usedStorageBytes}
       />

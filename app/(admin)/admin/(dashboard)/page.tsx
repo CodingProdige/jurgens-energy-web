@@ -2,8 +2,8 @@ import {
   BadgeCheckIcon,
   BoxesIcon,
   ClipboardListIcon,
+  FolderTreeIcon,
   ShieldCheckIcon,
-  StoreIcon,
   UsersIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -17,7 +17,7 @@ import { getAdminOverview } from "@/src/modules/admin";
 export const metadata: Metadata = {
   title: "Admin Dashboard",
   description:
-    "Protected Piessang admin dashboard for marketplace operations, sellers, users, products, orders, audit logs, and analytics.",
+    "Protected Jurgens Energy admin dashboard for catalog, orders, users, audit logs, and analytics.",
   robots: {
     index: false,
     follow: false,
@@ -45,8 +45,8 @@ export default async function AdminPage() {
           Marketplace operations
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-zinc-300">
-          Review platform activity, seller readiness, user growth, and
-          operational risk from one controlled surface.
+          Review catalog activity, user growth, and operational risk from one
+          controlled surface.
         </p>
       </div>
 
@@ -55,16 +55,16 @@ export default async function AdminPage() {
         aria-label="Marketplace overview"
       >
         <DashboardStatCard
-          description="Registered customer, seller, and admin accounts."
+          description="Registered customer and admin accounts."
           icon={UsersIcon}
           label="Users"
           value={overview.users}
         />
         <DashboardStatCard
-          description="Seller profiles across pending, active, and suspended states."
-          icon={StoreIcon}
-          label="Sellers"
-          value={overview.sellers}
+          description="Category branches available for merchandising."
+          icon={FolderTreeIcon}
+          label="Categories"
+          value={overview.categories}
         />
         <DashboardStatCard
           description="Catalog records ready for moderation and merchandising."
@@ -73,7 +73,7 @@ export default async function AdminPage() {
           value={overview.products}
         />
         <DashboardStatCard
-          description="Sensitive admin and seller actions captured for review."
+          description="Sensitive admin actions captured for review."
           icon={ClipboardListIcon}
           label="Audit logs"
           value={overview.auditLogs}
@@ -83,14 +83,14 @@ export default async function AdminPage() {
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <DashboardPanel
           title="Operational priorities"
-          description="The next admin screens should focus on moderation, access, and traceability before analytics."
+          description="Keep the catalog, access, and traceability surfaces ready before analytics."
         >
           <div className="grid gap-3">
             {[
-              "Approve and suspend sellers",
-              "Review users and roles",
+              "Maintain products, brands, and categories",
+              "Review users and admin roles",
               "Capture audit logs for sensitive actions",
-              "Prepare product moderation workflows",
+              "Keep order and fulfillment workflows traceable",
             ].map((item) => (
               <div
                 key={item}

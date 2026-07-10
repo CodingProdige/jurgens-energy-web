@@ -1,43 +1,41 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
-  BadgePercentIcon,
-  MenuIcon,
-  PackageCheckIcon,
-  SearchIcon,
-  ShieldCheckIcon,
-  ShoppingBagIcon,
-  StoreIcon,
-  TruckIcon,
+  ChevronDownIcon,
   UserIcon,
 } from "lucide-react";
 
 import { auth } from "@/auth";
+import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { CurrencySelector } from "@/components/currency/currency-selector";
+import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
+import { MarketplaceCartLink } from "@/components/marketplace/marketplace-cart-link";
+import { MarketplaceHeaderShell } from "@/components/marketplace/marketplace-header-shell";
+import { MarketplaceMobileMenu } from "@/components/marketplace/marketplace-mobile-menu";
+import { marketplaceTrustItems } from "@/components/marketplace/marketplace-trust-items";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { cn } from "@/lib/utils";
 import {
   emptyNotificationCenter,
   getNotificationCenter,
 } from "@/src/modules/notifications/in-app";
 import { getCurrencyPreference } from "@/src/modules/currency/server";
-import { getMarketplaceCategories } from "@/src/modules/marketplace/catalog";
 
-function getSurfaceUrl(hostname: string) {
-  const appUrl = new URL(process.env.APP_URL ?? "http://localhost:3000");
-  appUrl.hostname = hostname;
-  appUrl.pathname = "";
-  appUrl.search = "";
-  appUrl.hash = "";
-
-  return appUrl.toString().replace(/\/$/, "");
-}
+const navItems = [
+  ["Home", "/"],
+  ["Shop", "#products"],
+  ["Cylinder Exchange", "#exchange"],
+  ["Accessories", "#accessories"],
+  ["Delivery", "#delivery"],
+  ["Blog", "/blog"],
+  ["About Us", "#about"],
+  ["Contact", "#contact"],
+] as const;
 
 export async function MarketplaceHeader() {
-  const [session, currencyPreference, categories] = await Promise.all([
+  const [session, currencyPreference] = await Promise.all([
     auth(),
     getCurrencyPreference(),
-    getMarketplaceCategories(),
   ]);
   const notificationCenter = session?.user?.id
     ? await getNotificationCenter({
@@ -45,205 +43,92 @@ export async function MarketplaceHeader() {
         userId: session.user.id,
       })
     : emptyNotificationCenter;
-  const sellerUrl = getSurfaceUrl(
-    process.env.SELLER_HOSTNAME ?? "seller.localhost",
-  );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-[#101112]/95">
-      <div className="border-b border-slate-100 dark:border-white/10">
-        <div className="flex h-9 w-full items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <p className="hidden text-xs font-semibold text-slate-500 dark:text-zinc-400 sm:block">
-            Shop trusted local sellers across South Africa.
+    <MarketplaceHeaderShell>
+      <div className="border-b border-[#ecece6] bg-[#f7f7f2]/92 dark:border-white/10 dark:bg-[#101010]/92">
+        <div className="mx-auto flex w-full items-center justify-end gap-2 overflow-hidden px-2 py-1.5 sm:w-[min(1500px,calc(100%-1rem))] sm:justify-between sm:px-6 sm:py-2 lg:px-10">
+          <p className="hidden text-[11px] font-bold uppercase tracking-[0.16em] text-[#5c5c57] dark:text-[#c8c8c0] md:block">
+            Safe LPG from a certified reseller.
           </p>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:ml-auto sm:flex-none sm:gap-2">
             <CurrencySelector
+              className="min-w-0 rounded-full border border-[#e8e8e2] bg-white/80 px-1 py-1 dark:border-white/10 dark:bg-white/[0.04]"
+              compact
               initialPreference={currencyPreference}
               variant="marketplace"
             />
-            <ThemeToggle compact />
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <ThemeToggle
+                compact
+                className="size-8 border border-[#e8e8e2] bg-white/80 text-[#1a1a1a] hover:bg-white dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f7f7f2] sm:size-9"
+              />
+              {session?.user ? (
+                <NotificationBell
+                  accent="marketplace"
+                  className="scale-[0.9] sm:scale-100"
+                  initialState={notificationCenter}
+                  surface="marketplace"
+                />
+              ) : null}
+              <Link
+                aria-label={session?.user ? "Account" : "Sign in"}
+                className="grid size-8 place-items-center rounded-full border border-[#e8e8e2] bg-white/80 text-[#080808] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f7f7f2] sm:size-9"
+                href="/sign-in"
+              >
+                <UserIcon className="size-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
+      <div className="mx-auto flex h-16 w-full items-center justify-between gap-2 overflow-hidden px-3 sm:h-[82px] sm:w-[min(1500px,calc(100%-1rem))] sm:gap-3 sm:px-6 lg:px-10">
+        <MarketplaceMobileMenu navItems={navItems} />
 
-      <div className="hidden h-20 w-full items-center gap-6 px-8 lg:flex">
-        <Link className="flex shrink-0 items-center gap-3" href="/" aria-label="Piessang home">
-          <span className="relative block h-9 w-9 overflow-hidden">
-            <Image
-              alt=""
-              className="h-9 w-[164px] max-w-none object-left"
-              height={36}
-              priority
-              src="/brand/logo/jurgens-icon.png"
-              width={164}
-            />
-          </span>
-          <span className="text-xl font-black tracking-wide text-zinc-950 dark:text-white">
-            PIESSANG
-          </span>
+        <Link
+          aria-label="Jurgens Energy home"
+          className="flex min-w-0 shrink items-center sm:shrink-0"
+          href="/"
+        >
+          <JurgensEnergyLogo className="sm:hidden" compact />
+          <JurgensEnergyLogo className="hidden sm:inline-flex" compact={false} />
         </Link>
 
-        <form className="flex h-11 min-w-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
-          <select
-            aria-label="Search category"
-            className="w-36 border-r border-slate-200 bg-white px-3 text-sm text-zinc-950 outline-none dark:border-white/10 dark:bg-[#151719] dark:text-white"
-            name="category"
-          >
-            <option value="">All Categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.slug}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="min-w-0 flex-1 bg-transparent px-4 text-sm text-zinc-950 outline-none placeholder:text-slate-400 dark:text-white"
-            name="q"
-            placeholder="Search for products, brands and more..."
-          />
-          <button
-            aria-label="Search"
-            className="grid w-14 place-items-center bg-[#ffd000] text-zinc-950 transition hover:bg-[#f4bf00]"
-            type="submit"
-          >
-            <SearchIcon className="size-5" />
-          </button>
-        </form>
-
-        <nav className="flex items-center gap-6 text-[11px] font-semibold text-zinc-950 dark:text-white">
-          <Link className="grid justify-items-center gap-1" href="/deals">
-            <ShieldCheckIcon className="size-5" />
-            Deals
-          </Link>
-          <Link className="grid justify-items-center gap-1" href="/track-order">
-            <TruckIcon className="size-5" />
-            Track Order
-          </Link>
-          <Link className="grid justify-items-center gap-1" href={sellerUrl}>
-            <StoreIcon className="size-5" />
-            Sell on Piessang
-          </Link>
-          <Link className="relative grid justify-items-center gap-1" href="/cart">
-            <ShoppingBagIcon className="size-5" />
-            <span className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full bg-[#ffd000] text-[10px] font-black">
-              0
-            </span>
-            Cart
-          </Link>
-          {session?.user ? (
-            <NotificationBell
-              accent="marketplace"
-              initialState={notificationCenter}
-              surface="marketplace"
-            />
-          ) : (
-            <Link className="grid justify-items-center gap-1" href="/sign-in">
-              <UserIcon className="size-5" />
-              Sign in
-            </Link>
-          )}
-        </nav>
-      </div>
-
-      <div className="hidden h-14 w-full items-center gap-7 border-t border-slate-100 px-8 text-sm dark:border-white/10 lg:flex">
-        <button className="flex items-center gap-3 font-semibold text-zinc-950 dark:text-white" type="button">
-          <MenuIcon className="size-5" />
-          <span className="grid text-left leading-tight">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">
-              Shop by
-            </span>
-            Categories
-          </span>
-        </button>
-        <nav className="flex min-w-0 flex-1 items-center justify-between gap-4">
-          <Link
-            className="border-b-2 border-[#ffd000] py-4 font-semibold text-[#e5ad00]"
-            href="/"
-          >
-            Home
-          </Link>
-          {categories.slice(0, 7).map((category) => (
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-7 text-[12px] font-black uppercase text-[#080808] dark:text-[#f7f7f2] xl:flex 2xl:gap-8">
+          {navItems.map(([label, href], index) => (
             <Link
-              className="py-4 font-medium text-zinc-950 transition hover:text-[#c4982d] dark:text-zinc-200"
-              href={`/categories/${category.slug}`}
-              key={category.id}
+              className="group relative inline-flex h-[82px] items-center gap-1 transition hover:text-[#ff5a1f]"
+              href={href}
+              key={label}
             >
-              {category.name}
+              <span>{label}</span>
+              {label === "Shop" ? <ChevronDownIcon className="size-3" /> : null}
+              <span
+                className={
+                  index === 0
+                    ? "absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f]"
+                    : "absolute inset-x-0 bottom-5 h-0.5 scale-x-0 rounded-full bg-[#ff5a1f] transition group-hover:scale-x-100"
+                }
+              />
             </Link>
           ))}
-          <Link
-            className="py-4 font-medium text-zinc-950 transition hover:text-[#c4982d] dark:text-zinc-200"
-            href="/"
-          >
-            More
-          </Link>
         </nav>
-      </div>
 
-      <div className="grid w-full gap-3 px-3 py-3 lg:hidden">
-        <div className="flex h-10 items-center justify-between">
-          <button aria-label="Open menu" className="grid size-9 place-items-center" type="button">
-            <MenuIcon className="size-5" />
-          </button>
-          <Link href="/" aria-label="Piessang home">
-            <Image
-              alt="Jurgens Energy"
-              height={30}
-              priority
-              src="/brand/logo/jurgens-icon.png"
-              width={132}
-            />
-          </Link>
-          <div className="flex items-center gap-2">
-            <Link className="relative grid size-9 place-items-center" href="/cart">
-              <ShoppingBagIcon className="size-5" />
-              <span className="absolute right-0 top-0 grid size-5 place-items-center rounded-full bg-[#ffd000] text-[10px] font-black">
-                0
-              </span>
-            </Link>
-            <Link className="grid size-9 place-items-center" href="/sign-in">
-              <UserIcon className="size-5" />
-            </Link>
-          </div>
-        </div>
-        <form className="flex h-11 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
-          <input
-            className="min-w-0 flex-1 bg-transparent px-4 text-xs outline-none placeholder:text-slate-400 dark:text-white"
-            name="q"
-            placeholder="Search for products, brands and more..."
-          />
-          <button
-            aria-label="Search"
-            className="grid w-14 place-items-center bg-[#ffd000] text-zinc-950"
-            type="submit"
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <MarketplaceCartLink />
+          <Link
+            className={cn(
+              "hidden min-[390px]:inline-flex sm:px-5",
+              marketplacePrimaryActionBaseClass,
+            )}
+            href="#products"
           >
-            <SearchIcon className="size-5" />
-          </button>
-        </form>
+            Order Now
+          </Link>
+        </div>
       </div>
-    </header>
+    </MarketplaceHeaderShell>
   );
 }
 
-export const marketplaceTrustItems = [
-  {
-    description: "Shop from verified sellers across the country",
-    icon: PackageCheckIcon,
-    title: "Multiple Trusted Sellers",
-  },
-  {
-    description: "Compare and get the best prices",
-    icon: BadgePercentIcon,
-    title: "Best Prices & Deals",
-  },
-  {
-    description: "100% safe payments across all banks",
-    icon: ShieldCheckIcon,
-    title: "Secure Payments",
-  },
-  {
-    description: "Quick delivery to your doorstep",
-    icon: TruckIcon,
-    title: "Fast & Reliable Delivery",
-  },
-] as const;
+export { marketplaceTrustItems };

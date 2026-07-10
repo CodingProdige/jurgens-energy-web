@@ -241,7 +241,7 @@ function exportProducts(products: SellerProductRow[]) {
   const headers = [
     "Product",
     "Status",
-    "Fulfillment mode",
+    "Delivery method",
     "Variants",
     "Ready variants",
     "Stock",
@@ -271,15 +271,15 @@ function exportProducts(products: SellerProductRow[]) {
 
 function downloadCsvTemplate() {
   const example = [
-    "La Vie De Luc Sparkling Water 1L",
-    "LVDL-SPARK-1L",
+    "19 kg LPG Cylinder",
+    "JE-LPG-19KG",
     "6000000000001",
-    "La Vie De Luc",
-    "Food & Beverage > Drinks > Water",
-    "Premium sparkling mountain water in a 1L bottle.",
-    "Crisp sparkling water for everyday refreshment.",
-    "29.99",
-    "39.99",
+    "Jurgens Energy",
+    "Gas Cylinders > LPG Cylinders > 19 kg Cylinders",
+    "Full 19 kg LPG cylinder for home and business use.",
+    "Certified LPG cylinder delivered to your door.",
+    "559.00",
+    "649.00",
     "24",
     "false",
     "1200",
@@ -397,6 +397,24 @@ function parseBoolean(value: string) {
   return ["1", "true", "yes", "y", "on"].includes(value.trim().toLowerCase());
 }
 
+function normalizeDeliveryMethod(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
+  if (
+    [
+      "jurgens",
+      "jurgens_delivery",
+      "jurgens_energy",
+      "jurgens_energy_delivery",
+      "piessang_fulfilled",
+    ].includes(normalized)
+  ) {
+    return "piessang_fulfilled" as const;
+  }
+
+  return "seller_fulfilled" as const;
+}
+
 function buildCsvImportRows(csvText: string): CsvImportRow[] {
   const rows = parseCsv(csvText);
   const headers = rows[0]?.map(normalizeHeader) ?? [];
@@ -455,11 +473,14 @@ function buildCsvImportRows(csvText: string): CsvImportRow[] {
         ]),
       ),
       decision: "import",
-      fulfillmentMode:
-        getMappedValue(row, ["fulfillment_mode", "fulfilment_mode"]) ===
-        "piessang_fulfilled"
-          ? "piessang_fulfilled"
-          : "seller_fulfilled",
+      fulfillmentMode: normalizeDeliveryMethod(
+        getMappedValue(row, [
+          "delivery_method",
+          "delivery",
+          "fulfillment_mode",
+          "fulfilment_mode",
+        ]),
+      ),
       fullDescription:
         getMappedValue(row, ["full_description", "description_html", "body", "body_html"]) ||
         undefined,
@@ -551,18 +572,18 @@ function FulfillmentBadge({
 }: {
   mode: SellerProductRow["fulfillmentMode"];
 }) {
-  const isPiessang = mode === "piessang_fulfilled";
+  const isJurgensDelivery = mode === "piessang_fulfilled";
 
   return (
     <Badge
       className={cn(
         "rounded-md px-2 py-1 text-xs font-semibold",
-        isPiessang
+        isJurgensDelivery
           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200"
           : "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-zinc-300",
       )}
     >
-      {isPiessang ? "Piessang" : "Seller"}
+      {isJurgensDelivery ? "Jurgens delivery" : "Bob Go courier"}
     </Badge>
   );
 }
@@ -586,14 +607,6 @@ function ReadinessBadge({ product }: { product: SellerProductRow }) {
 }
 
 function StockSummary({ product }: { product: SellerProductRow }) {
-  if (product.fulfillmentMode === "piessang_fulfilled") {
-    return (
-      <span className={dashboardTableMutedTextClass}>
-        Piessang managed
-      </span>
-    );
-  }
-
   const variantCount = product.variants.length;
 
   return (
@@ -630,7 +643,7 @@ function ProductFilterPanel({
         <div>
           <p className="text-sm font-semibold">Filter products</p>
           <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-            Narrow products by readiness and fulfillment.
+            Narrow products by readiness and delivery method.
           </p>
         </div>
         <button
@@ -685,16 +698,16 @@ function ProductFilterPanel({
 
         <label className="grid gap-1.5">
           <span className="text-xs font-semibold text-slate-600 dark:text-zinc-300">
-            Fulfillment mode
+            Delivery method
           </span>
           <Select value={fulfillmentFilter} onValueChange={(value) => onChangeFulfillment(value as FulfillmentFilter)}>
             <SelectTrigger className="h-9 border-slate-300 bg-white dark:border-white/18 dark:bg-[#101214]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className={selectContentClass}>
-              <SelectItem value="all" className={selectItemClass}>All fulfillment</SelectItem>
-              <SelectItem value="seller_fulfilled" className={selectItemClass}>Seller fulfilled</SelectItem>
-              <SelectItem value="piessang_fulfilled" className={selectItemClass}>Fulfilled by Piessang</SelectItem>
+              <SelectItem value="all" className={selectItemClass}>All delivery methods</SelectItem>
+              <SelectItem value="seller_fulfilled" className={selectItemClass}>Bob Go courier</SelectItem>
+              <SelectItem value="piessang_fulfilled" className={selectItemClass}>Jurgens delivery</SelectItem>
             </SelectContent>
           </Select>
         </label>
@@ -829,7 +842,7 @@ function CsvImportDialog({
         <DialogHeader>
           <DialogTitle>Import products from CSV</DialogTitle>
           <DialogDescription>
-            Upload a Piessang template or any seller CSV. Products are reviewed
+            Upload a Jurgens Energy template or any product CSV. Products are reviewed
             first, then saved as drafts.
           </DialogDescription>
         </DialogHeader>
@@ -1424,14 +1437,14 @@ export function SellerProductManager({
       color: "#64748b",
       description: "Products that the seller fulfills directly.",
       id: "seller_fulfilled",
-      label: "Seller fulfilled",
+      label: "Bob Go courier",
       value: data.metrics.sellerFulfilled,
     },
     {
       color: "#8b5cf6",
-      description: "Products marked for fulfilled by Piessang.",
+      description: "Products marked for Jurgens Energy local delivery.",
       id: "piessang_fulfilled",
-      label: "Piessang fulfilled",
+      label: "Jurgens delivery",
       value: data.metrics.piessangFulfilled,
     },
   ];

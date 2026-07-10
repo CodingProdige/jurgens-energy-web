@@ -16,7 +16,6 @@ export type CategoryMutationState = {
 const categoryStatusValues = ["active", "hidden", "archived"] as const;
 
 const createCategorySchema = z.object({
-  commissionRateBps: z.coerce.number().int().min(0).max(9999).optional(),
   description: z.string().trim().max(500).optional(),
   name: z.string().trim().min(2).max(160),
   parentId: z.string().uuid().optional(),
@@ -24,7 +23,6 @@ const createCategorySchema = z.object({
 });
 
 const updateCategorySchema = z.object({
-  commissionRateBps: z.coerce.number().int().min(0).max(9999).optional(),
   description: z.string().trim().max(500).optional(),
   id: z.string().uuid(),
   name: z.string().trim().min(2).max(160),
@@ -184,7 +182,6 @@ export async function createCategory(
   await requireCatalogManageAccess();
 
   const parsed = createCategorySchema.safeParse({
-    commissionRateBps: optionalNumber(formData.get("commissionRateBps")),
     description: optionalString(formData.get("description")),
     name: formData.get("name"),
     parentId: optionalString(formData.get("parentId")),
@@ -224,7 +221,7 @@ export async function createCategory(
 
   try {
     await db.insert(categories).values({
-      commissionRateBps: parent ? null : (parsed.data.commissionRateBps ?? 0),
+      commissionRateBps: null,
       depth: parent ? parent.depth + 1 : 0,
       description: parsed.data.description,
       name: parsed.data.name,
@@ -256,7 +253,6 @@ export async function updateCategory(
   await requireCatalogManageAccess();
 
   const parsed = updateCategorySchema.safeParse({
-    commissionRateBps: optionalNumber(formData.get("commissionRateBps")),
     description: optionalString(formData.get("description")),
     id: formData.get("id"),
     name: formData.get("name"),
@@ -324,8 +320,7 @@ export async function updateCategory(
       })
     : [];
   const updateValues = {
-    commissionRateBps:
-      existing.depth === 0 ? (parsed.data.commissionRateBps ?? 0) : null,
+    commissionRateBps: null,
     description: parsed.data.description,
     name: parsed.data.name,
     path: nextPath,

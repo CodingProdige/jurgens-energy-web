@@ -72,7 +72,6 @@ export type MediaStorageSettings = {
   maxUploadFileMb: number;
   maxVideoUploadFileMb: number;
   maxVideoWidth: number;
-  premiumStorageQuotaMb: number;
   videoCompressionCrf: number;
 };
 
@@ -96,7 +95,7 @@ export class MediaStorageQuotaError extends Error {
   details: MediaStorageQuotaDetails;
 
   constructor(details: MediaStorageQuotaDetails) {
-    super("Not enough storage. Free up space or unlock Premium to keep uploading.");
+    super("Not enough storage. Free up space or increase the media storage quota to keep uploading.");
     this.name = "MediaStorageQuotaError";
     this.details = details;
   }
@@ -111,7 +110,6 @@ export async function getMediaStorageSettings(): Promise<MediaStorageSettings> {
       maxUploadFileMb: marketplaceSettings.maxUploadFileMb,
       maxVideoUploadFileMb: marketplaceSettings.maxVideoUploadFileMb,
       maxVideoWidth: marketplaceSettings.maxVideoWidth,
-      premiumStorageQuotaMb: marketplaceSettings.premiumStorageQuotaMb,
       videoCompressionCrf: marketplaceSettings.videoCompressionCrf,
     })
     .from(marketplaceSettings)
@@ -125,7 +123,6 @@ export async function getMediaStorageSettings(): Promise<MediaStorageSettings> {
     maxUploadFileMb: settings?.maxUploadFileMb ?? 10,
     maxVideoUploadFileMb: settings?.maxVideoUploadFileMb ?? 100,
     maxVideoWidth: settings?.maxVideoWidth ?? 1280,
-    premiumStorageQuotaMb: settings?.premiumStorageQuotaMb ?? 5120,
     videoCompressionCrf: settings?.videoCompressionCrf ?? 28,
   };
 }

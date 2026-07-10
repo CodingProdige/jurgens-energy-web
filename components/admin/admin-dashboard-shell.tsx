@@ -4,11 +4,11 @@ import {
   BarChart3Icon,
   BoxesIcon,
   ClipboardListIcon,
+  FileTextIcon,
   FolderTreeIcon,
   LayoutDashboardIcon,
-  PackageCheckIcon,
   SettingsIcon,
-  ShieldCheckIcon,
+  TruckIcon,
   UserCogIcon,
   ZapIcon,
 } from "lucide-react";
@@ -37,6 +37,12 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
     capability: "admin.orders.view",
   },
   {
+    label: "Shipping",
+    href: "/shipping",
+    icon: TruckIcon,
+    capability: "admin.orders.view",
+  },
+  {
     label: "Products",
     icon: BoxesIcon,
     children: [
@@ -46,9 +52,9 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
         capability: "admin.catalog.view",
       },
       {
-        label: "Product reviews",
-        href: "/products/reviews",
-        capability: "admin.catalog.view",
+        label: "New product",
+        href: "/products/new",
+        capability: "admin.catalog.manage",
       },
     ],
   },
@@ -62,11 +68,6 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
         capability: "admin.catalog.view",
       },
       { label: "Brands", href: "/catalog/brands", capability: "admin.catalog.view" },
-      {
-        label: "Brand requests",
-        href: "/catalog/brand-requests",
-        capability: "admin.catalog.view",
-      },
     ],
   },
   {
@@ -80,36 +81,24 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
         capability: "admin.users.view",
       },
       { label: "Admins", href: "/users/admins", capability: "admin.users.view" },
-      { label: "Sellers", href: "/users/sellers", capability: "admin.users.view" },
       {
         label: "Admin staff",
         href: "/users/staff",
         capability: "admin.staff.view",
       },
-      {
-        label: "Seller applications",
-        href: "/users/applications",
-        capability: "admin.sellers.view",
-      },
     ],
   },
   {
-    label: "Marketing",
-    href: "/marketing",
+    label: "Site Builder",
+    href: "/site-builder",
     icon: ZapIcon,
     capability: "admin.marketing.view",
   },
   {
-    label: "Reviews",
-    href: "/reviews",
-    icon: ShieldCheckIcon,
-    capability: "admin.reviews.view",
-  },
-  {
-    label: "Payouts",
-    href: "/payouts",
-    icon: PackageCheckIcon,
-    capability: "admin.payouts.view",
+    label: "Blog",
+    href: "/blog",
+    icon: FileTextIcon,
+    capability: "admin.marketing.view",
   },
   {
     label: "Analytics",
@@ -141,7 +130,7 @@ export function AdminDashboardShell({
   return (
     <DashboardSurfaceShell
       accent="amber"
-      brandAriaLabel="Piessang admin dashboard"
+      brandAriaLabel="Jurgens Energy admin dashboard"
       capabilities={capabilities}
       currencyPreference={currencyPreference}
       navItems={navItems}
@@ -149,7 +138,7 @@ export function AdminDashboardShell({
       notificationCenterHref="/notifications"
       notificationSurface="admin"
       searchAriaLabel="Search admin dashboard"
-      searchPlaceholder="Search anything... (Orders, Products, Sellers, etc.)"
+      searchPlaceholder="Search anything... (Orders, Products, Customers, etc.)"
       user={user}
       userFallbackLabel="Admin user"
     >

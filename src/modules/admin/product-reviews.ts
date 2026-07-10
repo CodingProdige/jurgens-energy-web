@@ -10,7 +10,6 @@ import {
   productReviewEvents,
   productVariants,
   products,
-  sellers,
 } from "@/src/db/schema";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import { getMissingParcelFields } from "@/src/modules/shipping";
@@ -71,11 +70,11 @@ export type AdminProductReviewsData = {
   metrics: {
     approved: number;
     changesRequested: number;
-    fbp: number;
+    inHouseFulfilled: number;
     live: number;
     missingParcelData: number;
     pending: number;
-    sellerFulfilled: number;
+    warehouseFulfilled: number;
     totalSubmitted: number;
   };
   reviews: AdminProductReviewRow[];
@@ -89,12 +88,12 @@ export type AdminProductsData = {
     archived: number;
     changesRequested: number;
     draft: number;
-    fbp: number;
+    inHouseFulfilled: number;
     live: number;
     missingParcelData: number;
     pending: number;
     products: number;
-    sellerFulfilled: number;
+    warehouseFulfilled: number;
     variants: number;
   };
   products: AdminProductReviewRow[];
@@ -125,15 +124,12 @@ export async function getAdminProductReviews(): Promise<AdminProductReviewsData>
       fulfillmentMode: products.fulfillmentMode,
       id: products.id,
       optionSchema: products.optionSchema,
-      sellerName: sellers.displayName,
-      sellerSlug: sellers.slug,
       shortDescription: products.shortDescription,
       status: products.status,
       title: products.title,
       updatedAt: products.updatedAt,
     })
     .from(products)
-    .innerJoin(sellers, eq(sellers.id, products.sellerId))
     .leftJoin(categories, eq(categories.id, products.categoryId))
     .leftJoin(brands, eq(brands.id, products.brandId))
     .leftJoin(brandRequests, eq(brandRequests.id, products.brandRequestId))
@@ -146,11 +142,11 @@ export async function getAdminProductReviews(): Promise<AdminProductReviewsData>
       metrics: {
         approved: 0,
         changesRequested: 0,
-        fbp: 0,
+        inHouseFulfilled: 0,
         live: 0,
         missingParcelData: 0,
         pending: 0,
-        sellerFulfilled: 0,
+        warehouseFulfilled: 0,
         totalSubmitted: 0,
       },
       reviews: [],
@@ -287,8 +283,8 @@ export async function getAdminProductReviews(): Promise<AdminProductReviewsData>
       ).length,
       needsBrandReview: product.brandRequestStatus === "pending",
       optionCount: product.optionSchema?.length ?? 0,
-      sellerName: product.sellerName,
-      sellerSlug: product.sellerSlug,
+      sellerName: "Jurgens Energy",
+      sellerSlug: "single-store",
       shortDescription: product.shortDescription,
       status: product.status,
       submittedAt: submittedAtByProductId.get(product.id) ?? null,
@@ -308,9 +304,9 @@ export async function getAdminProductReviews(): Promise<AdminProductReviewsData>
         productRows,
         (product) => product.status === "changes_requested",
       ),
-      fbp: getMetricCount(
+      inHouseFulfilled: getMetricCount(
         productRows,
-        (product) => product.fulfillmentMode === "piessang_fulfilled",
+        (product) => product.fulfillmentMode === "seller_fulfilled",
       ),
       live: getMetricCount(
         productRows,
@@ -324,9 +320,9 @@ export async function getAdminProductReviews(): Promise<AdminProductReviewsData>
         productRows,
         (product) => product.status === "pending_review",
       ),
-      sellerFulfilled: getMetricCount(
+      warehouseFulfilled: getMetricCount(
         productRows,
-        (product) => product.fulfillmentMode === "seller_fulfilled",
+        (product) => product.fulfillmentMode === "piessang_fulfilled",
       ),
       totalSubmitted: productRows.filter((product) => product.status !== "draft")
         .length,
@@ -352,8 +348,8 @@ export async function getAdminProducts(): Promise<AdminProductsData> {
         (product) => product.status === "changes_requested",
       ).length,
       draft: products.filter((product) => product.status === "draft").length,
-      fbp: products.filter(
-        (product) => product.fulfillmentMode === "piessang_fulfilled",
+      inHouseFulfilled: products.filter(
+        (product) => product.fulfillmentMode === "seller_fulfilled",
       ).length,
       live: products.filter(
         (product) => product.status === "live" || product.status === "active",
@@ -365,8 +361,8 @@ export async function getAdminProducts(): Promise<AdminProductsData> {
       pending: products.filter((product) => product.status === "pending_review")
         .length,
       products: products.length,
-      sellerFulfilled: products.filter(
-        (product) => product.fulfillmentMode === "seller_fulfilled",
+      warehouseFulfilled: products.filter(
+        (product) => product.fulfillmentMode === "piessang_fulfilled",
       ).length,
       variants: products.reduce(
         (total, product) => total + product.variants.length,

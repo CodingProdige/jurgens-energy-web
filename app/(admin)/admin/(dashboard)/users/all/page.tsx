@@ -8,7 +8,7 @@ import { getAdminUsers } from "@/src/modules/users/admin";
 
 export const metadata: Metadata = {
   title: "Admin Users",
-  description: "Manage Piessang marketplace user accounts and access roles.",
+  description: "Manage Jurgens Energy user accounts and access roles.",
   robots: {
     index: false,
     follow: false,

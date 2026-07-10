@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 
+import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -89,9 +90,7 @@ export function DashboardShell({
                 styles.cardShadow,
               )}
             >
-              <p className="text-xl font-semibold tracking-normal text-zinc-950 dark:text-white">
-                PIESSANG
-              </p>
+              <JurgensEnergyLogo compact />
               <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                 {surfaceLabel}
               </p>
@@ -152,8 +151,7 @@ export function DashboardShell({
             <div className={cn("rounded-2xl p-4 shadow-xl", styles.promo)}>
               <p className="text-sm font-semibold">Launch-ready path</p>
               <p className={cn("mt-1 text-xs", styles.promoText)}>
-                Shared admin and seller surfaces, one controlled self-hosted
-                stack.
+                Shared admin surfaces for one controlled self-hosted storefront.
               </p>
             </div>
           </div>

@@ -3,8 +3,7 @@ import { isIP } from "node:net";
 import * as cheerio from "cheerio";
 import { z } from "zod";
 
-import { requireSellerDashboardAccess } from "@/src/modules/auth/permissions";
-import { getPrimarySellerForUser } from "@/src/modules/sellers/dashboard";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 type ImportedProductImage = {
   alt: string;
@@ -373,7 +372,7 @@ async function fetchProductPage(url: URL) {
       headers: {
         Accept: "text/html,application/xhtml+xml",
         "User-Agent":
-          "JurgensEnergyProductImporter/1.0 (+https://jurgensenergy.com; seller product import)",
+          "JurgensEnergyProductImporter/1.0 (+https://jurgensenergy.com; product import)",
       },
       redirect: "follow",
       signal: controller.signal,
@@ -400,15 +399,14 @@ export async function POST(request: Request) {
     async start(controller) {
       try {
         sendEvent(controller, {
-          message: "Confirming seller access...",
+          message: "Confirming catalog access...",
           step: "auth",
           type: "status",
         });
-        const session = await requireSellerDashboardAccess();
-        const seller = await getPrimarySellerForUser(session.user.id);
+        const access = await requireAdminCapability("admin.catalog.manage");
 
-        if (!seller) {
-          throw new Error("Seller access could not be confirmed.");
+        if (!access.ok) {
+          throw new Error("Catalog access could not be confirmed.");
         }
 
         const body = await request.json();
@@ -458,7 +456,7 @@ export async function POST(request: Request) {
       } catch (error) {
         const message =
           error instanceof Error && error.message === "NEXT_REDIRECT"
-            ? "Sign in to the seller dashboard before importing products."
+            ? "Sign in to the admin dashboard before importing products."
             : error instanceof Error
               ? error.message
               : "The product could not be imported from that link.";

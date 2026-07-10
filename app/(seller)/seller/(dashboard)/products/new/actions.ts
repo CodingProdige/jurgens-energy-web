@@ -2,29 +2,24 @@
 
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/src/config/env";
-import { requireSellerDashboardAccess } from "@/src/modules/auth/permissions";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { db } from "@/src/db";
 import {
-  brandRequests,
   brands,
   categories,
   media,
   productMedia,
-  productReviewEvents,
   products,
   productVariants,
-  sellerParcelPresets,
 } from "@/src/db/schema";
 import { processAndStoreMediaUpload } from "@/src/modules/media/admin";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
-import { notifyAdminsProductSubmitted } from "@/src/modules/notifications/events";
 import { fulfillmentModeSchema } from "@/src/modules/shipping";
-import { getPrimarySellerForUser } from "@/src/modules/sellers/dashboard";
 
 const productDescriptionGenerationSchema = z.object({
   kind: z.enum(["short", "long"]),
@@ -40,15 +35,6 @@ const importedMediaSchema = z.object({
     )
     .max(10),
 });
-const parcelPresetInputSchema = z.object({
-  heightMm: z.string().trim().max(40),
-  isDefault: z.boolean().default(false),
-  lengthMm: z.string().trim().max(40),
-  name: z.string().trim().min(2).max(120),
-  notes: z.string().trim().max(500).optional(),
-  weightGrams: z.string().trim().max(40),
-  widthMm: z.string().trim().max(40),
-});
 const variantStatusSchema = z.enum(["active", "draft", "sold_out", "unavailable"]);
 const productOptionSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -58,6 +44,13 @@ const productDraftVariantSchema = z.object({
   barcode: z.string().trim().max(120).optional(),
   compareAtPrice: z.string().trim().max(40).optional(),
   continueSellingOutOfStock: z.boolean().default(false),
+  exchangeAcceptedReturnBrands: z
+    .array(z.string().trim().min(1).max(80))
+    .max(30)
+    .default([]),
+  exchangeConfirmationText: z.string().trim().max(240).optional(),
+  exchangeEmptyCylinderSize: z.string().trim().max(80).optional(),
+  exchangeRequiresEmpty: z.boolean().default(false),
   heightMm: z.string().trim().max(40).optional(),
   imageId: z.string().uuid().nullable().optional(),
   lengthMm: z.string().trim().max(40).optional(),
@@ -79,6 +72,13 @@ const productDraftSchema = z.object({
   compareAtPrice: z.string().trim().max(40).optional(),
   continueSellingOutOfStock: z.boolean().default(false),
   description: z.string().trim().max(400).optional(),
+  exchangeAcceptedReturnBrands: z
+    .array(z.string().trim().min(1).max(80))
+    .max(30)
+    .default([]),
+  exchangeConfirmationText: z.string().trim().max(240).optional(),
+  exchangeEmptyCylinderSize: z.string().trim().max(80).optional(),
+  exchangeRequiresEmpty: z.boolean().default(false),
   fulfillmentMode: fulfillmentModeSchema,
   hasVariants: z.boolean().default(false),
   heightMm: z.string().trim().max(40).optional(),
@@ -98,17 +98,6 @@ const productDraftSchema = z.object({
 });
 
 type ProductDraftInput = z.infer<typeof productDraftSchema>;
-type ProductLifecycleStatus =
-  | "active"
-  | "admin_suspended"
-  | "approved"
-  | "archived"
-  | "changes_requested"
-  | "draft"
-  | "live"
-  | "paused"
-  | "pending_review";
-
 export type ImportedProductMediaState = {
   assets?: AdminMediaAsset[];
   message?: string;
@@ -157,44 +146,44 @@ function parseOptionalMetric(value?: string) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function normalizePresetName(value: string) {
-  return value
-    .trim()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 140);
-}
-
-function isPositiveMoney(value?: string) {
-  const parsed = Number(value?.trim());
-
-  return Number.isFinite(parsed) && parsed > 0;
-}
-
-function isCompareAtValid(price?: string, compareAtPrice?: string) {
-  const normalizedCompareAt = compareAtPrice?.trim();
-
-  if (!normalizedCompareAt) {
-    return true;
-  }
-
-  const priceNumber = Number(price?.trim());
-  const compareAtNumber = Number(normalizedCompareAt);
-
-  return (
-    Number.isFinite(priceNumber) &&
-    Number.isFinite(compareAtNumber) &&
-    compareAtNumber > priceNumber
-  );
-}
-
 function parseStock(value?: string) {
   const parsed = Number(value?.trim() || "0");
 
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
+function normalizeExchangeBrands(brandsList: string[]) {
+  const normalized = brandsList
+    .map((brand) => brand.trim())
+    .filter(Boolean);
+
+  return [...new Set(normalized)];
+}
+
+function getExchangeConfirmationText({
+  customText,
+  emptyCylinderSize,
+  requiresExchangeEmpty,
+}: {
+  customText?: string;
+  emptyCylinderSize?: string;
+  requiresExchangeEmpty: boolean;
+}) {
+  if (!requiresExchangeEmpty) {
+    return null;
+  }
+
+  const trimmedText = customText?.trim();
+
+  if (trimmedText) {
+    return trimmedText;
+  }
+
+  const sizeText = emptyCylinderSize?.trim();
+
+  return sizeText
+    ? `I confirm I have a ${sizeText} empty cylinder in acceptable condition to exchange on delivery.`
+    : "I confirm I have an empty cylinder in acceptable condition to exchange on delivery.";
 }
 
 function buildVariantRows(input: ProductDraftInput) {
@@ -202,28 +191,31 @@ function buildVariantRows(input: ProductDraftInput) {
     return input.variants.map((variant) => ({
       barcode: variant.barcode?.trim() || null,
       compareAtPrice: parseOptionalMoney(variant.compareAtPrice),
-      continueSellingOutOfStock:
-        input.fulfillmentMode === "piessang_fulfilled"
-          ? false
-          : variant.continueSellingOutOfStock,
+      continueSellingOutOfStock: variant.continueSellingOutOfStock,
+      exchangeAcceptedReturnBrands: variant.exchangeRequiresEmpty
+        ? normalizeExchangeBrands(variant.exchangeAcceptedReturnBrands)
+        : [],
+      exchangeConfirmationText: getExchangeConfirmationText({
+        customText: variant.exchangeConfirmationText,
+        emptyCylinderSize: variant.exchangeEmptyCylinderSize,
+        requiresExchangeEmpty: variant.exchangeRequiresEmpty,
+      }),
+      exchangeEmptyCylinderSize: variant.exchangeRequiresEmpty
+        ? variant.exchangeEmptyCylinderSize?.trim() || null
+        : null,
+      exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
       heightMm: parseOptionalMetric(variant.heightMm) ?? parseOptionalMetric(input.heightMm),
       imageId: variant.imageId ?? null,
       isActive: variant.status === "active",
       lengthMm: parseOptionalMetric(variant.lengthMm) ?? parseOptionalMetric(input.lengthMm),
-      lowStockAlert:
-        input.fulfillmentMode === "piessang_fulfilled"
-          ? 0
-          : parseStock(variant.lowStockAlert || "5"),
+      lowStockAlert: parseStock(variant.lowStockAlert || "5"),
       notes: variant.notes?.trim() || null,
       optionValues: variant.optionValues,
       parcelPresetId: variant.parcelPresetId ?? input.parcelPresetId ?? null,
       price: parseRequiredMoney(variant.price || input.price),
       sku: variant.sku.trim(),
       status: variant.status,
-      stockOnHand:
-        input.fulfillmentMode === "piessang_fulfilled"
-          ? 0
-          : parseStock(variant.stock),
+      stockOnHand: parseStock(variant.stock),
       title: variant.optionValues.join(" / ") || input.productName,
       weightGrams:
         parseOptionalMetric(variant.weightGrams) ?? parseOptionalMetric(input.weightGrams),
@@ -235,23 +227,31 @@ function buildVariantRows(input: ProductDraftInput) {
     {
       barcode: input.barcode?.trim() || null,
       compareAtPrice: parseOptionalMoney(input.compareAtPrice),
-      continueSellingOutOfStock:
-        input.fulfillmentMode === "piessang_fulfilled"
-          ? false
-          : input.continueSellingOutOfStock,
+      continueSellingOutOfStock: input.continueSellingOutOfStock,
+      exchangeAcceptedReturnBrands: input.exchangeRequiresEmpty
+        ? normalizeExchangeBrands(input.exchangeAcceptedReturnBrands)
+        : [],
+      exchangeConfirmationText: getExchangeConfirmationText({
+        customText: input.exchangeConfirmationText,
+        emptyCylinderSize: input.exchangeEmptyCylinderSize,
+        requiresExchangeEmpty: input.exchangeRequiresEmpty,
+      }),
+      exchangeEmptyCylinderSize: input.exchangeRequiresEmpty
+        ? input.exchangeEmptyCylinderSize?.trim() || null
+        : null,
+      exchangeRequiresEmpty: input.exchangeRequiresEmpty,
       heightMm: parseOptionalMetric(input.heightMm),
       imageId: input.mediaIds[0] ?? null,
       isActive: true,
       lengthMm: parseOptionalMetric(input.lengthMm),
-      lowStockAlert: input.fulfillmentMode === "piessang_fulfilled" ? 0 : 5,
+      lowStockAlert: 5,
       notes: null,
       optionValues: [],
       parcelPresetId: input.parcelPresetId ?? null,
       price: parseRequiredMoney(input.price),
       sku: input.sku.trim(),
       status: "active" as const,
-      stockOnHand:
-        input.fulfillmentMode === "piessang_fulfilled" ? 0 : parseStock(input.stock),
+      stockOnHand: parseStock(input.stock),
       title: input.productName,
       weightGrams: parseOptionalMetric(input.weightGrams),
       widthMm: parseOptionalMetric(input.widthMm),
@@ -276,88 +276,6 @@ async function getUniqueProductSlug(title: string, productId?: string | null) {
   }
 
   return `${base}-${crypto.randomUUID().slice(0, 8)}`;
-}
-
-function validateDraftForReview(input: ProductDraftInput, variantRows: ReturnType<typeof buildVariantRows>) {
-  if (!input.categoryId) {
-    return "Choose a category before submitting for review.";
-  }
-
-  if (!input.brandName?.trim()) {
-    return "Choose or enter a brand before submitting for review.";
-  }
-
-  if (!input.description?.trim()) {
-    return "Add a short description before submitting for review.";
-  }
-
-  if (!input.longDescription?.replace(/<[^>]*>/g, "").trim()) {
-    return "Add a full description before submitting for review.";
-  }
-
-  if (input.mediaIds.length === 0) {
-    return "Add at least one product image or video before submitting for review.";
-  }
-
-  if (input.hasVariants && input.variants.length === 0) {
-    return "Generate the variants you sell before submitting for review.";
-  }
-
-  if (input.hasVariants && input.optionSchema.length === 0) {
-    return "Add variant options before submitting for review.";
-  }
-
-  if (!input.hasVariants && !isPositiveMoney(input.price)) {
-    return "Enter a VAT-inclusive price before submitting for review.";
-  }
-
-  if (!isCompareAtValid(input.price, input.compareAtPrice)) {
-    return "Compare-at price must be higher than the selling price.";
-  }
-
-  const baseParcelValues = [
-    input.weightGrams,
-    input.lengthMm,
-    input.widthMm,
-    input.heightMm,
-  ];
-
-  if (baseParcelValues.some((value) => !parseOptionalMetric(value))) {
-    return "Complete product parcel weight and dimensions before submitting for review.";
-  }
-
-  if (input.fulfillmentMode === "piessang_fulfilled" && !input.barcode?.trim()) {
-    return "Add the product barcode before submitting an FBP product for review.";
-  }
-
-  for (const variant of variantRows) {
-    if (!variant.sku.trim()) {
-      return "Every variant must have a SKU before submitting for review.";
-    }
-
-    if (!isPositiveMoney(variant.price)) {
-      return `Enter a VAT-inclusive price for ${variant.title}.`;
-    }
-
-    if (!isCompareAtValid(variant.price, variant.compareAtPrice ?? undefined)) {
-      return `Compare-at price must be higher than the selling price for ${variant.title}.`;
-    }
-
-    if (
-      !variant.weightGrams ||
-      !variant.lengthMm ||
-      !variant.widthMm ||
-      !variant.heightMm
-    ) {
-      return `Complete parcel data for ${variant.title}.`;
-    }
-
-    if (input.fulfillmentMode === "piessang_fulfilled" && !variant.barcode) {
-      return `Add a barcode for ${variant.title} before submitting an FBP product.`;
-    }
-  }
-
-  return null;
 }
 
 function getResponseText(payload: unknown) {
@@ -409,11 +327,24 @@ function clampGeneratedText(value: string, maxLength: number) {
   return value.trim().replace(/^["']|["']$/g, "").slice(0, maxLength);
 }
 
+async function requireCatalogManageSession() {
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  return access.ok ? access.session : null;
+}
+
 export async function generateProductDescription(input: {
   kind: "long" | "short";
   productName: string;
 }) {
-  await requireSellerDashboardAccess();
+  const session = await requireCatalogManageSession();
+
+  if (!session) {
+    return {
+      ok: false,
+      message: "Catalog access could not be confirmed.",
+    };
+  }
 
   const parsed = productDescriptionGenerationSchema.safeParse(input);
 
@@ -446,7 +377,7 @@ export async function generateProductDescription(input: {
           "Keep it neutral, buyer-friendly, specific enough to be useful, and do not invent certifications, stock availability, delivery promises, discounts, warranties, dimensions, or ingredients.",
         ].join("\n"),
         instructions:
-          "You write marketplace product copy for seller-submitted listings. Return only the product description text.",
+          "You write concise marketplace product copy for catalog listings. Return only the product description text.",
         max_output_tokens: isShort ? 80 : 420,
         model: env.OPENAI_MODEL,
       }),
@@ -489,13 +420,12 @@ export async function generateProductDescription(input: {
 }
 
 export async function saveProductDraft(input: ProductDraftInput) {
-  const session = await requireSellerDashboardAccess();
-  const seller = await getPrimarySellerForUser(session.user.id);
+  const session = await requireCatalogManageSession();
 
-  if (!seller) {
+  if (!session) {
     return {
       ok: false,
-      message: "Seller access could not be confirmed.",
+      message: "Catalog access could not be confirmed.",
     };
   }
 
@@ -510,17 +440,6 @@ export async function saveProductDraft(input: ProductDraftInput) {
   }
 
   const draft = parsed.data;
-
-  if (
-    draft.fulfillmentMode === "piessang_fulfilled" &&
-    !seller.isPiessangFulfillmentEnabled
-  ) {
-    return {
-      ok: false,
-      message:
-        "Fulfilled by Piessang is not enabled for this seller account yet.",
-    };
-  }
 
   const variantRows = buildVariantRows(draft);
 
@@ -552,7 +471,6 @@ export async function saveProductDraft(input: ProductDraftInput) {
     ? await db
         .select({
           id: products.id,
-          sellerId: products.sellerId,
           status: products.status,
         })
         .from(products)
@@ -561,7 +479,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
         .then(([product]) => product ?? null)
     : null;
 
-  if (draft.productId && (!existingProduct || existingProduct.sellerId !== seller.id)) {
+  if (draft.productId && !existingProduct) {
     return {
       ok: false,
       message: "This product draft could not be confirmed.",
@@ -570,11 +488,11 @@ export async function saveProductDraft(input: ProductDraftInput) {
 
   if (
     existingProduct &&
-    !["draft", "changes_requested"].includes(existingProduct.status)
+    ["archived", "admin_suspended"].includes(existingProduct.status)
   ) {
     return {
       ok: false,
-      message: "This product cannot be edited as a draft in its current status.",
+      message: "Archived or suspended products cannot be edited here.",
     };
   }
 
@@ -636,7 +554,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
       .where(
         and(
           inArray(media.id, uniqueMediaIds),
-          or(eq(media.ownerUserId, session.user.id), eq(media.sellerId, seller.id)),
+          eq(media.ownerUserId, session.user.id),
         ),
       );
 
@@ -649,82 +567,49 @@ export async function saveProductDraft(input: ProductDraftInput) {
   }
 
   if (uniqueParcelPresetIds.length > 0) {
-    const ownedPresets = await db
-      .select({ id: sellerParcelPresets.id })
-      .from(sellerParcelPresets)
-      .where(
-        and(
-          inArray(sellerParcelPresets.id, uniqueParcelPresetIds),
-          eq(sellerParcelPresets.sellerId, seller.id),
-          eq(sellerParcelPresets.isActive, true),
-        ),
-      );
-
-    if (ownedPresets.length !== uniqueParcelPresetIds.length) {
-      return {
-        ok: false,
-        message: "One or more parcel presets could not be confirmed.",
-      };
-    }
+    return {
+      ok: false,
+      message: "Parcel presets are retired for the single-store catalog.",
+    };
   }
 
   const brandName = draft.brandName?.trim();
   const brandSlug = brandName ? slugify(brandName) : "";
   let brandId: string | null = null;
-  let brandRequestId: string | null = null;
+  const brandRequestId: string | null = null;
 
-  if (brandName && brandSlug) {
-    const [existingBrand] = await db
-      .select({ id: brands.id })
-      .from(brands)
-      .where(eq(brands.slug, brandSlug))
-      .limit(1);
-
-    if (existingBrand) {
-      brandId = existingBrand.id;
-    } else {
-      const [existingRequest] = await db
-        .select({
-          id: brandRequests.id,
-          status: brandRequests.status,
-        })
-        .from(brandRequests)
-        .where(
-          and(
-            eq(brandRequests.sellerId, seller.id),
-            eq(brandRequests.slug, brandSlug),
-          ),
-        )
-        .limit(1);
-
-      if (existingRequest && existingRequest.status !== "pending") {
-        return {
-          ok: false,
-          message: "This brand request already exists and is not pending.",
-        };
-      }
-
-      if (existingRequest) {
-        brandRequestId = existingRequest.id;
-      } else {
-        const [createdRequest] = await db
-          .insert(brandRequests)
-          .values({
-            brandName,
-            requestedByUserId: session.user.id,
-            sellerId: seller.id,
-            slug: brandSlug,
-            status: "pending",
-          })
-          .returning({ id: brandRequests.id });
-
-        brandRequestId = createdRequest?.id ?? null;
-      }
-    }
+  if (!brandName || !brandSlug) {
+    return {
+      ok: false,
+      message: "Select a preset brand before saving this product.",
+    };
   }
+
+  const [existingBrand] = await db
+    .select({ id: brands.id })
+    .from(brands)
+    .where(and(eq(brands.slug, brandSlug), eq(brands.status, "active")))
+    .limit(1);
+
+  if (!existingBrand) {
+    return {
+      ok: false,
+      message:
+        "Select an active preset brand from Catalog > Brands before saving this product.",
+    };
+  }
+
+  brandId = existingBrand.id;
 
   const now = new Date();
   const productSlug = await getUniqueProductSlug(draft.productName, draft.productId);
+  const nextProductStatus =
+    existingProduct &&
+    !["draft", "pending_review", "changes_requested", "approved"].includes(
+      existingProduct.status,
+    )
+      ? existingProduct.status
+      : "active";
 
   const productId = await db.transaction(async (tx) => {
     const savedProductId = draft.productId
@@ -740,10 +625,9 @@ export async function saveProductDraft(input: ProductDraftInput) {
             fulfillmentMode: draft.fulfillmentMode,
             fullDescription: draft.longDescription || null,
             optionSchema: draft.hasVariants ? draft.optionSchema : null,
-            sellerId: seller.id,
             shortDescription: draft.description || null,
             slug: productSlug,
-            status: "draft",
+            status: nextProductStatus,
             title: draft.productName,
             updatedAt: now,
           })
@@ -764,7 +648,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
           optionSchema: draft.hasVariants ? draft.optionSchema : null,
           shortDescription: draft.description || null,
           slug: productSlug,
-          status: "draft",
+          status: nextProductStatus,
           title: draft.productName,
           updatedAt: now,
         })
@@ -792,6 +676,10 @@ export async function saveProductDraft(input: ProductDraftInput) {
         barcode: variant.barcode,
         compareAtPrice: variant.compareAtPrice,
         continueSellingOutOfStock: variant.continueSellingOutOfStock,
+        exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands,
+        exchangeConfirmationText: variant.exchangeConfirmationText,
+        exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
+        requiresExchangeEmpty: variant.exchangeRequiresEmpty,
         heightMm: variant.heightMm,
         isActive: variant.isActive,
         lengthMm: variant.lengthMm,
@@ -814,135 +702,15 @@ export async function saveProductDraft(input: ProductDraftInput) {
     return savedProductId;
   });
 
-  revalidatePath("/seller/products");
-  revalidatePath("/seller/products/new");
+  revalidatePath("/admin/products/all");
+  revalidatePath("/admin/products/new");
+  revalidatePath("/products/all");
+  revalidatePath("/products/new");
 
   return {
     ok: true,
     message: "Product saved.",
     productId,
-  };
-}
-
-export async function submitProductForReview(input: ProductDraftInput) {
-  const session = await requireSellerDashboardAccess();
-  const seller = await getPrimarySellerForUser(session.user.id);
-
-  if (!seller) {
-    return {
-      ok: false,
-      message: "Seller access could not be confirmed.",
-    };
-  }
-
-  const parsed = productDraftSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message:
-        parsed.error.issues[0]?.message ?? "Check the product details first.",
-    };
-  }
-
-  const draft = parsed.data;
-
-  if (!draft.productId) {
-    return {
-      ok: false,
-      message: "Save this product before submitting it for review.",
-    };
-  }
-
-  const variantRows = buildVariantRows(draft);
-  const reviewError = validateDraftForReview(draft, variantRows);
-
-  if (reviewError) {
-    return {
-      ok: false,
-      message: reviewError,
-    };
-  }
-
-  if (
-    draft.fulfillmentMode === "piessang_fulfilled" &&
-    !seller.isPiessangFulfillmentEnabled
-  ) {
-    return {
-      ok: false,
-      message:
-        "Fulfilled by Piessang is not enabled for this seller account yet.",
-    };
-  }
-
-  let fromStatus: ProductLifecycleStatus | null = null;
-
-  if (draft.productId) {
-    const [existingProduct] = await db
-      .select({
-        sellerId: products.sellerId,
-        status: products.status,
-      })
-      .from(products)
-      .where(eq(products.id, draft.productId))
-      .limit(1);
-
-    if (!existingProduct || existingProduct.sellerId !== seller.id) {
-      return {
-        ok: false,
-        message: "This product draft could not be confirmed.",
-      };
-    }
-
-    if (!["draft", "changes_requested"].includes(existingProduct.status)) {
-      return {
-        ok: false,
-        message:
-          "Only draft products or products with requested changes can be submitted for review.",
-      };
-    }
-
-    fromStatus = existingProduct.status;
-  }
-
-  const saved = await saveProductDraft(draft);
-
-  if (!saved.ok || !saved.productId) {
-    return saved;
-  }
-
-  await db.transaction(async (tx) => {
-    await tx
-      .update(products)
-      .set({
-        status: "pending_review",
-        updatedAt: new Date(),
-      })
-      .where(and(eq(products.id, saved.productId), eq(products.sellerId, seller.id)));
-
-    await tx.insert(productReviewEvents).values({
-      action: "submitted_for_review",
-      actorUserId: session.user.id,
-      fromStatus: fromStatus ?? "draft",
-      note: "Seller submitted product for admin review.",
-      productId: saved.productId,
-      toStatus: "pending_review",
-    });
-  });
-
-  revalidatePath("/seller/products");
-  revalidatePath("/seller/products/new");
-
-  await notifyAdminsProductSubmitted({
-    productId: saved.productId,
-    productTitle: draft.productName,
-    sellerName: seller.displayName,
-  });
-
-  return {
-    ok: true,
-    message: "Product submitted for review.",
-    productId: saved.productId,
   };
 }
 
@@ -980,7 +748,7 @@ async function fetchRemoteImage(url: string) {
         Accept:
           "image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.8,*/*;q=0.5",
         "User-Agent":
-          "JurgensEnergyProductImporter/1.0 (+https://jurgensenergy.com; seller product import)",
+          "JurgensEnergyProductImporter/1.0 (+https://jurgensenergy.com; product import)",
       },
       signal: controller.signal,
     });
@@ -1051,11 +819,10 @@ function toImportedMediaAsset(row: {
 export async function importProductLinkMedia(
   input: unknown,
 ): Promise<ImportedProductMediaState> {
-  const session = await requireSellerDashboardAccess();
-  const seller = await getPrimarySellerForUser(session.user.id);
+  const session = await requireCatalogManageSession();
 
-  if (!seller) {
-    return { ok: false, message: "Seller access could not be confirmed." };
+  if (!session) {
+    return { ok: false, message: "Catalog access could not be confirmed." };
   }
 
   const parsed = importedMediaSchema.safeParse(input);
@@ -1117,7 +884,7 @@ export async function importProductLinkMedia(
         altText: image.alt,
         file,
         ownerUserId: session.user.id,
-        scope: "seller-media",
+        scope: "admin-media",
       });
 
       assets.push(asset);
@@ -1127,7 +894,8 @@ export async function importProductLinkMedia(
     }
   }
 
-  revalidatePath("/seller/products/new");
+  revalidatePath("/admin/products/new");
+  revalidatePath("/products/new");
 
   if (assets.length === 0) {
     return {
@@ -1164,99 +932,11 @@ export async function createSellerParcelPreset(input: unknown): Promise<{
     widthMm: number;
   };
 }> {
-  const session = await requireSellerDashboardAccess();
-  const seller = await getPrimarySellerForUser(session.user.id);
-
-  if (!seller) {
-    return { ok: false, message: "Seller access could not be confirmed." };
-  }
-
-  const parsed = parcelPresetInputSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return { ok: false, message: "Complete the parcel preset details first." };
-  }
-
-  const weightGrams = parseOptionalMetric(parsed.data.weightGrams);
-  const lengthMm = parseOptionalMetric(parsed.data.lengthMm);
-  const widthMm = parseOptionalMetric(parsed.data.widthMm);
-  const heightMm = parseOptionalMetric(parsed.data.heightMm);
-
-  if (!weightGrams || !lengthMm || !widthMm || !heightMm) {
-    return {
-      ok: false,
-      message: "Preset weight, length, width, and height are required.",
-    };
-  }
-
-  const normalizedName = normalizePresetName(parsed.data.name);
-
-  if (!normalizedName) {
-    return { ok: false, message: "Use a clearer preset name." };
-  }
-
-  const existing = await db
-    .select({ id: sellerParcelPresets.id })
-    .from(sellerParcelPresets)
-    .where(
-      and(
-        eq(sellerParcelPresets.sellerId, seller.id),
-        eq(sellerParcelPresets.normalizedName, normalizedName),
-      ),
-    )
-    .limit(1);
-
-  if (existing[0]) {
-    return {
-      ok: false,
-      message: "A parcel preset with this name already exists.",
-    };
-  }
-
-  const preset = await db.transaction(async (tx) => {
-    if (parsed.data.isDefault) {
-      await tx
-        .update(sellerParcelPresets)
-        .set({ isDefault: false, updatedAt: new Date() })
-        .where(eq(sellerParcelPresets.sellerId, seller.id));
-    }
-
-    const [createdPreset] = await tx
-      .insert(sellerParcelPresets)
-      .values({
-        heightMm,
-        isDefault: parsed.data.isDefault,
-        lengthMm,
-        name: parsed.data.name,
-        normalizedName,
-        notes: parsed.data.notes?.trim() || null,
-        sellerId: seller.id,
-        weightGrams,
-        widthMm,
-      })
-      .returning({
-        heightMm: sellerParcelPresets.heightMm,
-        id: sellerParcelPresets.id,
-        isDefault: sellerParcelPresets.isDefault,
-        lengthMm: sellerParcelPresets.lengthMm,
-        name: sellerParcelPresets.name,
-        notes: sellerParcelPresets.notes,
-        weightGrams: sellerParcelPresets.weightGrams,
-        widthMm: sellerParcelPresets.widthMm,
-      });
-
-    return createdPreset;
-  });
-
-  if (!preset) {
-    return { ok: false, message: "Could not save this parcel preset." };
-  }
-
-  revalidatePath("/seller/products/new");
+  void input;
 
   return {
-    ok: true,
-    message: "Parcel preset saved.",
-    preset,
+    ok: false,
+    message:
+      "Parcel presets are retired for the single-store catalog. Enter parcel dimensions directly on the product.",
   };
 }

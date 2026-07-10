@@ -1,4 +1,13 @@
-import { integer, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 import { productVariants } from "@/src/db/schema/products";
 import { users } from "@/src/db/schema/users";
@@ -19,4 +28,22 @@ export const cartItems = pgTable("cart_items", {
     .notNull()
     .references(() => productVariants.id),
   quantity: integer("quantity").notNull().default(1),
+  purchaseType: varchar("purchase_type", { length: 32 })
+    .notNull()
+    .default("standard"),
+  exchangeEmptyConfirmed: boolean("exchange_empty_confirmed")
+    .notNull()
+    .default(false),
+  exchangeReturnBrand: varchar("exchange_return_brand", { length: 120 }),
+  exchangeRequiredEmptyCylinderSize: varchar(
+    "exchange_required_empty_cylinder_size",
+    { length: 80 },
+  ),
+  exchangeAcceptedReturnBrandsSnapshot: jsonb(
+    "exchange_accepted_return_brands_snapshot",
+  )
+    .$type<string[]>()
+    .notNull()
+    .default([]),
+  exchangeConfirmationTextSnapshot: text("exchange_confirmation_text_snapshot"),
 });

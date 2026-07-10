@@ -23,7 +23,7 @@
   --popover: #ffffff;
   --popover-foreground: var(--brand-carbon);
   --primary: var(--brand-flame);
-  --primary-foreground: var(--brand-ink);
+  --primary-foreground: #ffffff;
   --secondary: #ecece6;
   --secondary-foreground: var(--brand-carbon);
   --muted-foreground: #5c5c57;
@@ -63,7 +63,7 @@
   --popover: #101010;
   --popover-foreground: var(--brand-porcelain);
   --primary: var(--brand-flame);
-  --primary-foreground: var(--brand-ink);
+  --primary-foreground: #ffffff;
   --secondary: var(--brand-carbon);
   --secondary-foreground: var(--brand-porcelain);
   --muted-foreground: #c8c8c0;
@@ -129,6 +129,39 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-x pan-y;
+}
+
+@supports (overflow: clip) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+}
+
+body {
+  min-width: 0;
+  position: relative;
+}
+
+body > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
 }
 
 body {
@@ -374,6 +407,81 @@ h6:not([class]) {
   text-underline-offset: 2px;
 }
 
+.blog-rich-text-editor .ProseMirror h2 {
+  margin: 1.2rem 0 0.45rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.blog-rich-text-editor .ProseMirror h3 {
+  margin: 1rem 0 0.4rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.blog-rich-text-editor .ProseMirror p {
+  margin: 0.55rem 0;
+}
+
+.blog-rich-text-editor .ProseMirror ul,
+.blog-rich-text-editor .ProseMirror ol {
+  margin: 0.7rem 0;
+  padding-left: 1.5rem;
+}
+
+.blog-rich-text-editor .ProseMirror ul {
+  list-style: disc;
+}
+
+.blog-rich-text-editor .ProseMirror ol {
+  list-style: decimal;
+}
+
+.blog-rich-text-editor .ProseMirror li::marker {
+  color: #ff5a1f;
+}
+
+.blog-rich-text-editor .ProseMirror blockquote {
+  margin: 1rem 0;
+  border-left: 3px solid #ff5a1f;
+  padding: 0.5rem 0 0.5rem 1rem;
+  color: #475569;
+}
+
+.dark .blog-rich-text-editor .ProseMirror blockquote {
+  color: #d4d4d4;
+}
+
+.blog-rich-text-editor .ProseMirror a {
+  color: #e84c15;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgb(255 90 31 / 40%);
+  text-underline-offset: 3px;
+}
+
+.blog-rich-text-editor .ProseMirror code {
+  border-radius: 0.2rem;
+  background: #f1f1ec;
+  padding: 0.1rem 0.3rem;
+  font-family: monospace;
+}
+
+.dark .blog-rich-text-editor .ProseMirror code {
+  background: rgb(255 255 255 / 10%);
+}
+
+.blog-rich-text-editor .ProseMirror hr {
+  margin: 1.25rem 0;
+  border-color: #deded7;
+}
+
+.blog-rich-text-editor .ProseMirror ::selection {
+  background: rgb(255 90 31 / 20%);
+}
+
 .package-preview-scene {
   position: relative;
   display: flex;
@@ -479,10 +587,12 @@ h6:not([class]) {
   --package-width: 128px;
   position: relative;
   z-index: 2;
+  margin-right: clamp(18px, 7vw, 70px);
   width: var(--package-width);
   height: var(--package-height);
   transform-style: preserve-3d;
-  animation: package-preview-spin 10s linear infinite;
+  transform: rotateX(-18deg) rotateY(-34deg);
+  transition: height 160ms ease, width 160ms ease;
 }
 
 .package-preview-person {
@@ -509,6 +619,10 @@ h6:not([class]) {
   );
   box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.34);
   backface-visibility: visible;
+  transition:
+    height 160ms ease,
+    transform 160ms ease,
+    width 160ms ease;
 }
 
 .package-preview-face-front,
@@ -568,20 +682,10 @@ h6:not([class]) {
     translateZ(calc(var(--package-height) * 0.5));
 }
 
-@keyframes package-preview-spin {
-  from {
-    transform: rotateX(-18deg) rotateY(0deg);
-  }
-
-  to {
-    transform: rotateX(-18deg) rotateY(360deg);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
+  .package-preview-face,
   .package-preview-box {
-    animation: none;
-    transform: rotateX(-18deg) rotateY(-32deg);
+    transition: none;
   }
 }
 

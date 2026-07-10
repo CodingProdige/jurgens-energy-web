@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   ChevronRightIcon,
   CreditCardIcon,
-  CrownIcon,
   FolderUpIcon,
   GlobeIcon,
   GlobeLockIcon,
@@ -21,23 +20,22 @@ import {
   getMarketplaceAdminSecrets,
   getMarketplaceSettings,
 } from "@/src/modules/marketplace/settings";
+import { getJurgensDeliveryZones } from "@/src/modules/shipping/jurgens-delivery";
 import {
   SettingsForm,
   MediaStorageSettingsForm,
   NotificationSettingsForm,
-  PremiumPlansSettingsForm,
+  PayFastSettingsForm,
   SocialLinksForm,
   ShippingSettingsForm,
-  StripeSettingsForm,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/settings-form";
-import { getAdminPremiumPlans } from "@/src/modules/billing/premium-plans";
 import { getAdminMediaLibrary } from "@/src/modules/media/admin";
 import { getAdminNotificationSettings } from "@/src/modules/notifications/templates";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 export const metadata: Metadata = {
   title: "Admin Settings",
-  description: "Manage protected Piessang platform settings.",
+  description: "Manage protected Jurgens Energy platform settings.",
   robots: {
     index: false,
     follow: false,
@@ -46,24 +44,17 @@ export const metadata: Metadata = {
 
 const settingSections = [
   {
-    key: "premium-plans",
-    title: "Premium subscription plans",
+    key: "payfast-payments",
+    title: "PayFast payments",
     description:
-      "Create customer and seller premium packages without manually copying Stripe product or price IDs.",
-    icon: CrownIcon,
-  },
-  {
-    key: "stripe-payments",
-    title: "Stripe payments",
-    description:
-      "Switch payment mode and manage live or sandbox Stripe credentials.",
+      "Manage live or sandbox PayFast onsite payment credentials.",
     icon: CreditCardIcon,
   },
   {
     key: "shipping",
     title: "Shipping",
     description:
-      "Manage Piessang shipping margins and encrypted Bob Go provider credentials.",
+      "Manage Jurgens Energy shipping margins and encrypted Bob Go provider credentials.",
     icon: TruckIcon,
   },
   {
@@ -84,14 +75,14 @@ const settingSections = [
     key: "social-links",
     title: "Marketplace social links",
     description:
-      "Set the public Piessang links shown across marketplace surfaces.",
+      "Set the public Jurgens Energy links shown across marketplace surfaces.",
     icon: Share2Icon,
   },
   {
     key: "media-storage",
-    title: "Media and premium storage",
+    title: "Media storage",
     description:
-      "Control upload limits, compression defaults, and storage allocations.",
+      "Control upload limits, compression defaults, and media storage allocation.",
     icon: FolderUpIcon,
   },
   {
@@ -146,11 +137,9 @@ export default async function AdminSettingsPage({
   const selectedConfig = getSectionConfig(selectedSection);
   const settings = await getMarketplaceSettings();
   const secrets =
-    selectedSection === "stripe-payments" || selectedSection === "shipping"
+    selectedSection === "payfast-payments" || selectedSection === "shipping"
       ? await getMarketplaceAdminSecrets()
       : null;
-  const premiumPlans =
-    selectedSection === "premium-plans" ? await getAdminPremiumPlans() : [];
   const notificationSettings =
     selectedSection === "notifications"
       ? await getAdminNotificationSettings()
@@ -159,6 +148,8 @@ export default async function AdminSettingsPage({
     selectedSection === "notifications"
       ? await getAdminMediaLibrary(session.user.id)
       : null;
+  const jurgensDeliveryZones =
+    selectedSection === "shipping" ? await getJurgensDeliveryZones() : [];
 
   return (
     <>
@@ -190,9 +181,9 @@ export default async function AdminSettingsPage({
         <section className="w-full">
           <SettingsSection
             notificationMediaLibrary={notificationMediaLibrary}
+            jurgensDeliveryZones={jurgensDeliveryZones}
             selectedNotificationItem={selectedNotificationItem ?? null}
             notificationSettings={notificationSettings}
-            premiumPlans={premiumPlans}
             section={selectedSection}
             secrets={secrets}
             settings={settings}
@@ -238,53 +229,41 @@ function SettingsMenu() {
 
 function SettingsSection({
   notificationMediaLibrary,
+  jurgensDeliveryZones,
   notificationSettings,
-  premiumPlans,
   selectedNotificationItem,
   section,
   secrets,
   settings,
 }: {
   notificationMediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
+  jurgensDeliveryZones: Awaited<ReturnType<typeof getJurgensDeliveryZones>>;
   notificationSettings: Awaited<ReturnType<typeof getAdminNotificationSettings>>;
-  premiumPlans: Awaited<ReturnType<typeof getAdminPremiumPlans>>;
   selectedNotificationItem: string | null;
   section: SettingSectionKey;
   secrets: Awaited<ReturnType<typeof getMarketplaceAdminSecrets>> | null;
   settings: Awaited<ReturnType<typeof getMarketplaceSettings>>;
 }) {
-  if (section === "premium-plans") {
+  if (section === "payfast-payments") {
     return (
       <DashboardPanel
-        title="Premium subscription plans"
-        description="Create customer and seller premium packages without manually copying Stripe product or price IDs."
+        title="PayFast payments"
+        description="Switch the onsite PayFast payment credentials between live and sandbox mode. Merchant keys and passphrases are encrypted before storage."
       >
-        <PremiumPlansSettingsForm
-          plans={premiumPlans}
-          stripeMode={settings.stripeMode}
-        />
-      </DashboardPanel>
-    );
-  }
-
-  if (section === "stripe-payments") {
-    return (
-      <DashboardPanel
-        title="Stripe payments"
-        description="Switch the integrated payment credentials between live and sandbox mode. Secret keys are encrypted before storage."
-      >
-        <StripeSettingsForm
-          hasStripeLiveSecretKey={settings.hasStripeLiveSecretKey}
-          hasStripeLiveWebhookSecret={settings.hasStripeLiveWebhookSecret}
-          hasStripeSandboxSecretKey={settings.hasStripeSandboxSecretKey}
-          hasStripeSandboxWebhookSecret={settings.hasStripeSandboxWebhookSecret}
-          stripeLiveSecretKey={secrets?.stripeLiveSecretKey ?? null}
-          stripeLiveWebhookSecret={secrets?.stripeLiveWebhookSecret ?? null}
-          stripeLivePublishableKey={settings.stripeLivePublishableKey}
-          stripeMode={settings.stripeMode}
-          stripeSandboxSecretKey={secrets?.stripeSandboxSecretKey ?? null}
-          stripeSandboxWebhookSecret={secrets?.stripeSandboxWebhookSecret ?? null}
-          stripeSandboxPublishableKey={settings.stripeSandboxPublishableKey}
+        <PayFastSettingsForm
+          hasPayfastLiveMerchantKey={settings.hasPayfastLiveMerchantKey}
+          hasPayfastLivePassphrase={settings.hasPayfastLivePassphrase}
+          hasPayfastSandboxMerchantKey={settings.hasPayfastSandboxMerchantKey}
+          hasPayfastSandboxPassphrase={settings.hasPayfastSandboxPassphrase}
+          payfastLiveMerchantId={settings.payfastLiveMerchantId}
+          payfastLiveMerchantKey={secrets?.payfastLiveMerchantKey ?? null}
+          payfastLivePassphrase={secrets?.payfastLivePassphrase ?? null}
+          payfastMode={settings.payfastMode}
+          payfastOnsiteEnabled={settings.payfastOnsiteEnabled}
+          payfastSandboxMerchantId={settings.payfastSandboxMerchantId}
+          payfastSandboxMerchantKey={secrets?.payfastSandboxMerchantKey ?? null}
+          payfastSandboxPassphrase={secrets?.payfastSandboxPassphrase ?? null}
+          payfastTokenizationEnabled={settings.payfastTokenizationEnabled}
         />
       </DashboardPanel>
     );
@@ -294,7 +273,7 @@ function SettingsSection({
     return (
       <DashboardPanel
         title="Shipping"
-        description="Manage Piessang shipping controls and encrypted Bob Go credentials."
+        description="Manage Jurgens Energy shipping controls and encrypted Bob Go credentials."
       >
         <ShippingSettingsForm
           bobgoBookingMode={settings.bobgoBookingMode}
@@ -324,6 +303,8 @@ function SettingsSection({
           bobgoLiveWebhookSecret={secrets?.bobgoLiveWebhookSecret ?? null}
           bobgoSandboxApiKey={secrets?.bobgoSandboxApiKey ?? null}
           bobgoSandboxWebhookSecret={secrets?.bobgoSandboxWebhookSecret ?? null}
+          jurgensDeliveryCutoffTime={settings.jurgensDeliveryCutoffTime}
+          jurgensDeliveryZones={jurgensDeliveryZones}
           shippingBufferBps={settings.shippingBufferBps}
           shippingEnabled={settings.shippingEnabled}
           shippingMarginBps={settings.shippingMarginBps}
@@ -368,7 +349,7 @@ function SettingsSection({
     return (
       <DashboardPanel
         title="Marketplace social links"
-        description="Set the public Piessang links shown on marketplace surfaces like the coming soon page."
+        description="Set the public Jurgens Energy links shown on marketplace surfaces like the coming soon page."
       >
         <SocialLinksForm
           facebookUrl={settings.facebookUrl}
@@ -382,8 +363,8 @@ function SettingsSection({
   if (section === "media-storage") {
     return (
       <DashboardPanel
-        title="Media and premium storage"
-        description="Control upload limits, compression defaults, and the storage allocation shown in premium prompts."
+        title="Media storage"
+        description="Control upload limits, compression defaults, and the storage allocation for media uploads."
       >
         <MediaStorageSettingsForm
           freeStorageQuotaMb={settings.freeStorageQuotaMb}
@@ -392,7 +373,6 @@ function SettingsSection({
           maxUploadFileMb={settings.maxUploadFileMb}
           maxVideoUploadFileMb={settings.maxVideoUploadFileMb}
           maxVideoWidth={settings.maxVideoWidth}
-          premiumStorageQuotaMb={settings.premiumStorageQuotaMb}
           videoCompressionCrf={settings.videoCompressionCrf}
         />
       </DashboardPanel>
@@ -408,17 +388,17 @@ function SettingsSection({
         <div className="rounded-xl border border-admin-primary/25 bg-admin-primary/10 p-4 dark:bg-admin-primary/10">
           <LayersIcon className="size-5 text-admin-primary" />
           <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
-            Stripe mode, media limits, compression defaults, premium storage
-            allocations, and social links are shared platform settings used
-            wherever those systems appear.
+            PayFast mode, Bob Go credentials, media limits, compression
+            defaults, storage allocations, and social links are shared platform
+            settings used wherever those systems appear.
           </p>
         </div>
 
         <div className="rounded-xl border border-amber-500/20 bg-amber-600/10 p-4 dark:bg-amber-500/10">
           <GlobeIcon className="size-5 text-amber-600 dark:text-amber-300" />
           <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
-            The coming soon gate only protects the public marketplace. Admin and
-            seller dashboards remain accessible on their own subdomains.
+            The coming soon gate only protects the public marketplace. The admin
+            dashboard remains accessible on its own surface.
           </p>
         </div>
       </div>

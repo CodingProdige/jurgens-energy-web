@@ -7,7 +7,7 @@ import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 export const metadata: Metadata = {
   title: "Admin Products",
-  description: "Browse and inspect products across every seller on Piessang.",
+  description: "Browse and manage Jurgens Energy catalog products.",
   robots: {
     follow: false,
     index: false,

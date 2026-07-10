@@ -8,8 +8,7 @@ import { getAdminMediaLibrary } from "@/src/modules/media/admin";
 
 export const metadata: Metadata = {
   title: "Admin Brands",
-  description:
-    "Manage Piessang marketplace brands and product brand visibility.",
+  description: "Manage Jurgens Energy catalog brands and product brand visibility.",
   robots: {
     index: false,
     follow: false,

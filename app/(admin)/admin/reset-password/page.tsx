@@ -6,7 +6,7 @@ import { isPasswordResetTokenValid } from "@/src/modules/auth/service";
 
 export const metadata: Metadata = {
   title: "Reset Admin Password",
-  description: "Set a new password for Piessang admin access.",
+  description: "Set a new password for Jurgens Energy admin access.",
   robots: {
     index: false,
     follow: false,

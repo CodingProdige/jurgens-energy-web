@@ -625,7 +625,7 @@ export function BrandDashboard({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `piessang-brands-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `jurgens-energy-brands-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -637,7 +637,7 @@ export function BrandDashboard({
       <div className="grid gap-4">
         <DashboardCompactMetrics
           metrics={brandMetrics}
-          storageKey="piessang:admin:catalog-brand-metrics"
+          storageKey="jurgens:admin:catalog-brand-metrics"
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -820,7 +820,7 @@ export function BrandDashboard({
           <DialogHeader>
             <DialogTitle>Add brand</DialogTitle>
             <DialogDescription>
-              Create a brand customers and sellers can select for products.
+              Create a brand that can be selected for catalog products.
             </DialogDescription>
           </DialogHeader>
           <BrandForm mediaLibrary={mediaLibrary} />

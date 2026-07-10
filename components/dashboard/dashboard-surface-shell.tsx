@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { CurrencySelector } from "@/components/currency/currency-selector";
+import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -104,19 +105,7 @@ function SurfaceBrand({
 }) {
   return (
     <Link href="/" className="flex min-w-0 items-center gap-3" aria-label={ariaLabel}>
-      <span className="relative block h-8 w-8 shrink-0 overflow-hidden">
-        <Image
-          src="/brand/logo/jurgens-icon.png"
-          alt=""
-          width={146}
-          height={32}
-          priority
-          className="h-8 w-[146px] max-w-none object-left"
-        />
-      </span>
-      <span className={cn("text-sm font-extrabold tracking-[0.18em]", className)}>
-        PIESSANG
-      </span>
+      <JurgensEnergyLogo compact className={className} />
     </Link>
   );
 }

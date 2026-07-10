@@ -1,27 +1,15 @@
 import type { Metadata } from "next";
-
-import { BrandRequestDashboard } from "@/app/(admin)/admin/(dashboard)/catalog/brand-requests/brand-request-manager";
-import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
-import { requireAdminCapability } from "@/src/modules/auth/permissions";
-import { getAdminBrandRequests } from "@/src/modules/catalog/admin";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Admin Brand Requests",
-  description: "Review seller-submitted brand requests for Piessang catalog.",
+  title: "Admin Brands",
+  description: "Brand requests have been retired for the single Jurgens Energy catalog.",
   robots: {
-    index: false,
     follow: false,
+    index: false,
   },
 };
 
-export default async function AdminBrandRequestsPage() {
-  const access = await requireAdminCapability("admin.catalog.view");
-
-  if (!access.ok) {
-    return <RestrictedAdminPage />;
-  }
-
-  const requestData = await getAdminBrandRequests();
-
-  return <BrandRequestDashboard {...requestData} />;
+export default function AdminBrandRequestsPage() {
+  redirect("/catalog/brands");
 }

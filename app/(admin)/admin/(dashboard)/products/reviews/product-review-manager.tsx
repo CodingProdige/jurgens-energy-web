@@ -165,7 +165,7 @@ function FulfillmentBadge({
           : "bg-slate-100 text-slate-700",
       )}
     >
-      {mode === "piessang_fulfilled" ? "FBP" : "Seller fulfilled"}
+      {mode === "piessang_fulfilled" ? "Jurgens delivery" : "Bob Go courier"}
     </Badge>
   );
 }
@@ -221,7 +221,7 @@ function ProductReviewSummary({ review }: { review: AdminProductReviewRow }) {
         <div className="grid gap-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-white/10 sm:grid-cols-2">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-              Seller
+              Catalog
             </p>
             <p className="truncate font-medium">{review.sellerName}</p>
             <p className="truncate text-xs text-slate-500">{review.sellerSlug}</p>
@@ -388,16 +388,9 @@ function ApproveProductForm({
             before approving the product.
           </p>
         ) : null}
-        {review.fulfillmentMode === "piessang_fulfilled" ? (
-          <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-            FBP products are approved for stock intake first. They do not go live
-            until Piessang receives and processes stock.
-          </p>
-        ) : (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-            Seller-fulfilled products become live after approval.
-          </p>
-        )}
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          Approved products become live immediately.
+        </p>
       </DialogBody>
       <DialogFooter>
         <Button
@@ -444,7 +437,7 @@ function RequestChangesForm({
             maxLength={1000}
             minLength={10}
             name="reason"
-            placeholder="Tell the seller exactly what must be fixed before this product can go live."
+            placeholder="Describe exactly what must be fixed before this product can go live."
             required
           />
         </div>
@@ -490,38 +483,38 @@ export function ProductReviewManager({
       },
       {
         color: "#ef4444",
-        description: "Products returned to sellers with requested changes.",
+        description: "Products returned for requested changes.",
         id: "changes-requested",
         label: "Changes requested",
         value: metrics.changesRequested,
       },
       {
         color: "#3b82f6",
-        description: "FBP products approved for Piessang stock intake.",
+        description: "Products in the approved status from earlier workflows.",
         id: "approved",
         label: "Approved",
         value: metrics.approved,
       },
       {
         color: "#10b981",
-        description: "Seller-fulfilled products approved and visible to buyers.",
+        description: "Approved products visible to buyers.",
         id: "live",
         label: "Live",
         value: metrics.live,
       },
       {
         color: "#8b5cf6",
-        description: "Submitted products using Fulfilled by Piessang.",
-        id: "fbp",
-        label: "FBP",
-        value: metrics.fbp,
+        description: "Submitted products delivered through Bob Go courier bookings.",
+        id: "in-house-fulfillment",
+        label: "Bob Go",
+        value: metrics.inHouseFulfilled,
       },
       {
         color: "#64748b",
-        description: "Submitted products where sellers ship the product.",
-        id: "seller-fulfilled",
-        label: "Seller fulfilled",
-        value: metrics.sellerFulfilled,
+        description: "Submitted products configured for Jurgens Energy delivery.",
+        id: "warehouse-fulfillment",
+        label: "Jurgens delivery",
+        value: metrics.warehouseFulfilled,
       },
       {
         color: "#f97316",
@@ -575,7 +568,7 @@ export function ProductReviewManager({
   function exportReviewsCsv() {
     const headers = [
       "Product",
-      "Seller",
+      "Catalog",
       "Status",
       "Fulfillment",
       "Brand",
@@ -602,7 +595,7 @@ export function ProductReviewManager({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `piessang-product-reviews-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `jurgens-energy-product-reviews-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -617,7 +610,7 @@ export function ProductReviewManager({
       <div className="grid gap-4">
         <DashboardCompactMetrics
           metrics={reviewMetrics}
-          storageKey="piessang:admin:product-review-metrics"
+          storageKey="jurgens:admin:product-review-metrics"
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -783,7 +776,7 @@ export function ProductReviewManager({
                       <p className="text-sm text-slate-500 dark:text-zinc-400">
                         {searchTerm || statusFilter !== "all"
                           ? "Try changing the search or filters."
-                          : "Submitted products will appear here when sellers request review."}
+                          : "Submitted products will appear here when review is required."}
                       </p>
                     </div>
                   </TableCell>
@@ -857,7 +850,7 @@ export function ProductReviewManager({
           <DialogHeader>
             <DialogTitle>Review product</DialogTitle>
             <DialogDescription>
-              Inspect the submitted listing, seller, fulfillment, and variants.
+              Inspect the submitted listing, delivery method, and variants.
             </DialogDescription>
           </DialogHeader>
           {viewReview ? (
@@ -925,7 +918,7 @@ export function ProductReviewManager({
           <DialogHeader>
             <DialogTitle>Request changes</DialogTitle>
             <DialogDescription>
-              The seller will see this reason before resubmitting the product.
+              Keep the reason specific so staff can fix the listing cleanly.
             </DialogDescription>
           </DialogHeader>
           {changesReview ? (

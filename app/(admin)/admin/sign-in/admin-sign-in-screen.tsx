@@ -36,8 +36,8 @@ const featureItems = [
   },
   {
     icon: Shield,
-    title: "User & Seller Management",
-    description: "Manage users, sellers, and permissions seamlessly.",
+    title: "User & Access Management",
+    description: "Manage users, admin staff, and permissions seamlessly.",
   },
   {
     icon: Settings,
@@ -268,11 +268,11 @@ export function AdminSignInScreen({
             <h2 className="max-w-[360px] text-[34px] font-extrabold leading-[1.08] xl:text-[36px]">
               Welcome to
               <br />
-              <span className="text-[#ffc400]">Piessang</span> Admin
+              <span className="text-[#ffc400]">Jurgens Energy</span> Admin
             </h2>
             <p className="mt-5 max-w-[385px] text-[14px] font-medium leading-6 text-white/88">
               Sign in to access the powerful admin dashboard and manage your
-              marketplace with ease.
+              catalog with ease.
             </p>
           </div>
 

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Admin Users",
-  description: "Manage Piessang marketplace user accounts and access roles.",
+  description: "Manage Jurgens Energy user accounts and access roles.",
   robots: {
     index: false,
     follow: false,
@@ -28,10 +28,6 @@ export default async function AdminUsersPage({
 
   if (roleFilter === "admins") {
     redirect("/users/admins");
-  }
-
-  if (roleFilter === "sellers") {
-    redirect("/users/sellers");
   }
 
   redirect("/users/all");

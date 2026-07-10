@@ -33,7 +33,7 @@ export const bobGoCheckoutRatesInputSchema = z.object({
   handlingTime: z.coerce.number().int().min(0).default(2),
   items: z.array(itemSchema).min(1),
   orderId: z.string().uuid().optional(),
-  sellerId: z.string().uuid(),
+  sellerId: z.string().uuid().nullable().optional(),
 });
 
 export type BobGoCheckoutRatesInput = z.infer<
@@ -122,7 +122,7 @@ export async function getBobGoCheckoutRates(input: BobGoCheckoutRatesInput) {
         providerAmount: rate.providerAmount.toFixed(2),
         providerPayload,
         providerRateId: rate.providerRateId,
-        sellerId: parsed.sellerId,
+        sellerId: parsed.sellerId ?? null,
         serviceLevel: rate.serviceLevel,
         serviceName: rate.serviceName,
       })),

@@ -120,12 +120,76 @@ export const sellerParcelPresets = pgTable(
   }),
 );
 
+export const jurgensDeliveryZones = pgTable(
+  "jurgens_delivery_zones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    postalCodes: jsonb("postal_codes").$type<string[]>().notNull().default([]),
+    minimumOrderAmount: numeric("minimum_order_amount", {
+      mode: "number",
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default(0),
+    deliveryInformation: text("delivery_information"),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (zone) => ({
+    activeIdx: index("jurgens_delivery_zones_active_idx").on(zone.isActive),
+    sortIdx: index("jurgens_delivery_zones_sort_idx").on(zone.sortOrder),
+  }),
+);
+
+export const jurgensDeliveryZoneRates = pgTable(
+  "jurgens_delivery_zone_rates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    zoneId: uuid("zone_id")
+      .notNull()
+      .references(() => jurgensDeliveryZones.id, { onDelete: "cascade" }),
+    fromAmount: numeric("from_amount", {
+      mode: "number",
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default(0),
+    upToAmount: numeric("up_to_amount", {
+      mode: "number",
+      precision: 12,
+      scale: 2,
+    }),
+    price: numeric("price", {
+      mode: "number",
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default(0),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (rate) => ({
+    zoneIdx: index("jurgens_delivery_zone_rates_zone_id_idx").on(rate.zoneId),
+    zoneSortIdx: index("jurgens_delivery_zone_rates_zone_sort_idx").on(
+      rate.zoneId,
+      rate.sortOrder,
+    ),
+  }),
+);
+
 export const shippingRateQuotes = pgTable("shipping_rate_quotes", {
   id: uuid("id").defaultRandom().primaryKey(),
   orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-  sellerId: uuid("seller_id")
-    .notNull()
-    .references(() => sellers.id),
+  sellerId: uuid("seller_id").references(() => sellers.id, {
+    onDelete: "set null",
+  }),
   provider: shippingProvider("provider").notNull(),
   status: shippingQuoteStatus("status").notNull().default("quoted"),
   providerRateId: text("provider_rate_id"),
@@ -156,9 +220,9 @@ export const shipments = pgTable("shipments", {
   orderId: uuid("order_id")
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
-  sellerId: uuid("seller_id")
-    .notNull()
-    .references(() => sellers.id),
+  sellerId: uuid("seller_id").references(() => sellers.id, {
+    onDelete: "set null",
+  }),
   quoteId: uuid("quote_id").references(() => shippingRateQuotes.id, {
     onDelete: "set null",
   }),

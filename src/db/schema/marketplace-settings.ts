@@ -15,9 +15,6 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   instagramUrl: text("instagram_url"),
   twitterUrl: text("twitter_url"),
   freeStorageQuotaMb: integer("free_storage_quota_mb").notNull().default(512),
-  premiumStorageQuotaMb: integer("premium_storage_quota_mb")
-    .notNull()
-    .default(5120),
   maxUploadFileMb: integer("max_upload_file_mb").notNull().default(10),
   maxVideoUploadFileMb: integer("max_video_upload_file_mb")
     .notNull()
@@ -41,9 +38,35 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   stripeSandboxWebhookSecretEncrypted: text(
     "stripe_sandbox_webhook_secret_encrypted",
   ),
+  payfastMode: varchar("payfast_mode", { length: 16 })
+    .notNull()
+    .default("sandbox"),
+  payfastOnsiteEnabled: boolean("payfast_onsite_enabled")
+    .notNull()
+    .default(false),
+  payfastTokenizationEnabled: boolean("payfast_tokenization_enabled")
+    .notNull()
+    .default(false),
+  payfastLiveMerchantId: text("payfast_live_merchant_id"),
+  payfastLiveMerchantKeyEncrypted: text(
+    "payfast_live_merchant_key_encrypted",
+  ),
+  payfastLivePassphraseEncrypted: text("payfast_live_passphrase_encrypted"),
+  payfastSandboxMerchantId: text("payfast_sandbox_merchant_id"),
+  payfastSandboxMerchantKeyEncrypted: text(
+    "payfast_sandbox_merchant_key_encrypted",
+  ),
+  payfastSandboxPassphraseEncrypted: text(
+    "payfast_sandbox_passphrase_encrypted",
+  ),
   shippingEnabled: boolean("shipping_enabled").notNull().default(false),
   shippingMarginBps: integer("shipping_margin_bps").notNull().default(0),
   shippingBufferBps: integer("shipping_buffer_bps").notNull().default(0),
+  jurgensDeliveryCutoffTime: varchar("jurgens_delivery_cutoff_time", {
+    length: 5,
+  })
+    .notNull()
+    .default("14:00"),
   bobgoEnabled: boolean("bobgo_enabled").notNull().default(false),
   bobgoMode: varchar("bobgo_mode", { length: 16 }).notNull().default("sandbox"),
   bobgoBookingMode: varchar("bobgo_booking_mode", { length: 32 })

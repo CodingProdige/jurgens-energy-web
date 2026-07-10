@@ -6,7 +6,7 @@ import { getValidAdminStaffInvitation } from "@/src/modules/admin/staff";
 
 export const metadata: Metadata = {
   title: "Accept Admin Invitation",
-  description: "Accept your Piessang admin staff invitation.",
+  description: "Accept your Jurgens Energy admin staff invitation.",
   robots: {
     index: false,
     follow: false,

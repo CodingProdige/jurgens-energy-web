@@ -4,6 +4,7 @@ import {
   type ComponentProps,
   type ChangeEvent,
   type DragEvent,
+  type ReactElement,
   type RefObject,
   useActionState,
   useEffect,
@@ -15,7 +16,6 @@ import {
   BellIcon,
   BracesIcon,
   Code2Icon,
-  CrownIcon,
   CreditCardIcon,
   EyeOffIcon,
   EyeIcon,
@@ -28,12 +28,12 @@ import {
   MailCheckIcon,
   MonitorIcon,
   MousePointerClickIcon,
+  PencilIcon,
   PlusIcon,
   RotateCcwIcon,
   SaveIcon,
   SearchIcon,
   SendIcon,
-  SparklesIcon,
   Redo2Icon,
   Trash2Icon,
   TruckIcon,
@@ -51,7 +51,6 @@ import {
   updateMarketplaceSocialLinkSettings,
   updateMarketplaceGateSettings,
   updateMediaStorageSettings,
-  savePremiumPlanSettings,
   deleteNotificationGlobalVariableSettings,
   saveNotificationGlobalVariableSettings,
   saveInAppNotificationTemplateSettings,
@@ -60,11 +59,13 @@ import {
   restoreNotificationTemplateSettings,
   sendInAppNotificationTemplateTestSettings,
   sendNotificationTemplateTestSettings,
-  updateStripePaymentSettings,
+  deleteJurgensDeliveryZoneSettings,
+  saveJurgensDeliveryZoneSettings,
+  updatePayFastPaymentSettings,
   updateShippingIntegrationSettings,
   type AdminSettingsState,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
-import type { AdminPremiumPlan } from "@/src/modules/billing/premium-plans";
+import type { JurgensDeliveryZone } from "@/src/modules/shipping/jurgens-delivery";
 import type { getAdminMediaLibrary } from "@/src/modules/media/admin";
 import type {
   AdminInAppNotificationTemplate,
@@ -128,7 +129,12 @@ function SecretTextInput({
   placeholder: string;
 }) {
   const [isVisible, setIsVisible] = useState(false);
+  const [inputValue, setInputValue] = useState(defaultValue ?? "");
   const Icon = isVisible ? EyeOffIcon : EyeIcon;
+
+  useEffect(() => {
+    setInputValue(defaultValue ?? "");
+  }, [defaultValue]);
 
   return (
     <div className="relative">
@@ -140,7 +146,8 @@ function SecretTextInput({
         name={name}
         type={isVisible ? "text" : "password"}
         autoComplete="off"
-        defaultValue={defaultValue ?? ""}
+        value={inputValue}
+        onChange={(event) => setInputValue(event.target.value)}
         minLength={minLength}
         placeholder={placeholder}
         className={cn(icon === "key" ? "pl-10 pr-12" : "pr-12", className)}
@@ -185,7 +192,7 @@ export function SettingsForm({
           </Label>
           <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
             When enabled, public marketplace pages require the preview password.
-            Admin and seller dashboards stay accessible.
+            The admin dashboard stays accessible.
           </p>
         </div>
       </div>
@@ -263,7 +270,7 @@ export function SocialLinksForm({
             autoComplete="url"
             value={facebookValue}
             onChange={(event) => setFacebookValue(event.target.value)}
-            placeholder="https://facebook.com/piessang"
+            placeholder="https://facebook.com/jurgensenergy"
             className="pl-10"
           />
         </div>
@@ -280,7 +287,7 @@ export function SocialLinksForm({
             autoComplete="url"
             value={instagramValue}
             onChange={(event) => setInstagramValue(event.target.value)}
-            placeholder="https://instagram.com/piessang"
+            placeholder="https://instagram.com/jurgensenergy"
             className="pl-10"
           />
         </div>
@@ -297,7 +304,7 @@ export function SocialLinksForm({
             autoComplete="url"
             value={twitterValue}
             onChange={(event) => setTwitterValue(event.target.value)}
-            placeholder="https://x.com/piessang"
+            placeholder="https://x.com/jurgensenergy"
             className="pl-10"
           />
         </div>
@@ -334,7 +341,6 @@ type MediaStorageSettingsFormProps = {
   maxUploadFileMb: number;
   maxVideoUploadFileMb: number;
   maxVideoWidth: number;
-  premiumStorageQuotaMb: number;
   videoCompressionCrf: number;
 };
 
@@ -345,7 +351,6 @@ export function MediaStorageSettingsForm({
   maxUploadFileMb,
   maxVideoUploadFileMb,
   maxVideoWidth,
-  premiumStorageQuotaMb,
   videoCompressionCrf,
 }: MediaStorageSettingsFormProps) {
   const [state, formAction, isPending] = useActionState(
@@ -357,7 +362,7 @@ export function MediaStorageSettingsForm({
     <form action={formAction} className="grid gap-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="freeStorageQuotaMb">Free storage quota</Label>
+          <Label htmlFor="freeStorageQuotaMb">Media storage quota</Label>
           <Input
             id="freeStorageQuotaMb"
             name="freeStorageQuotaMb"
@@ -367,22 +372,7 @@ export function MediaStorageSettingsForm({
             defaultValue={freeStorageQuotaMb}
           />
           <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            Default storage shown to regular users and sellers.
-          </p>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="premiumStorageQuotaMb">Premium storage quota</Label>
-          <Input
-            id="premiumStorageQuotaMb"
-            name="premiumStorageQuotaMb"
-            type="number"
-            min={100}
-            max={512000}
-            defaultValue={premiumStorageQuotaMb}
-          />
-          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            Upgrade value shown in media-heavy workflows.
+            Storage available to the Jurgens Energy media library.
           </p>
         </div>
 
@@ -495,36 +485,40 @@ export function MediaStorageSettingsForm({
   );
 }
 
-type StripeSettingsFormProps = {
-  hasStripeLiveSecretKey: boolean;
-  hasStripeLiveWebhookSecret: boolean;
-  hasStripeSandboxSecretKey: boolean;
-  hasStripeSandboxWebhookSecret: boolean;
-  stripeLivePublishableKey: string | null;
-  stripeLiveSecretKey: string | null;
-  stripeLiveWebhookSecret: string | null;
-  stripeMode: "live" | "sandbox";
-  stripeSandboxPublishableKey: string | null;
-  stripeSandboxSecretKey: string | null;
-  stripeSandboxWebhookSecret: string | null;
+type PayFastSettingsFormProps = {
+  hasPayfastLiveMerchantKey: boolean;
+  hasPayfastLivePassphrase: boolean;
+  hasPayfastSandboxMerchantKey: boolean;
+  hasPayfastSandboxPassphrase: boolean;
+  payfastLiveMerchantId: string | null;
+  payfastLiveMerchantKey: string | null;
+  payfastLivePassphrase: string | null;
+  payfastMode: "live" | "sandbox";
+  payfastOnsiteEnabled: boolean;
+  payfastSandboxMerchantId: string | null;
+  payfastSandboxMerchantKey: string | null;
+  payfastSandboxPassphrase: string | null;
+  payfastTokenizationEnabled: boolean;
 };
 
-export function StripeSettingsForm({
-  hasStripeLiveSecretKey,
-  hasStripeLiveWebhookSecret,
-  hasStripeSandboxSecretKey,
-  hasStripeSandboxWebhookSecret,
-  stripeLivePublishableKey,
-  stripeLiveSecretKey,
-  stripeLiveWebhookSecret,
-  stripeMode,
-  stripeSandboxPublishableKey,
-  stripeSandboxSecretKey,
-  stripeSandboxWebhookSecret,
-}: StripeSettingsFormProps) {
-  const [mode, setMode] = useState<"live" | "sandbox">(stripeMode);
+export function PayFastSettingsForm({
+  hasPayfastLiveMerchantKey,
+  hasPayfastLivePassphrase,
+  hasPayfastSandboxMerchantKey,
+  hasPayfastSandboxPassphrase,
+  payfastLiveMerchantId,
+  payfastLiveMerchantKey,
+  payfastLivePassphrase,
+  payfastMode,
+  payfastOnsiteEnabled,
+  payfastSandboxMerchantId,
+  payfastSandboxMerchantKey,
+  payfastSandboxPassphrase,
+  payfastTokenizationEnabled,
+}: PayFastSettingsFormProps) {
+  const [mode, setMode] = useState<"live" | "sandbox">(payfastMode);
   const [state, formAction, isPending] = useActionState(
-    updateStripePaymentSettings,
+    updatePayFastPaymentSettings,
     initialState,
   );
 
@@ -551,28 +545,66 @@ export function StripeSettingsForm({
         ))}
       </div>
 
+      <div className="grid gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <label className="flex items-start gap-3">
+          <Checkbox
+            className="mt-1"
+            defaultChecked={payfastOnsiteEnabled}
+            id="onsiteEnabled"
+            name="onsiteEnabled"
+          />
+          <span className="grid gap-1">
+            <span className="text-sm font-semibold text-zinc-950 dark:text-white">
+              Enable PayFast onsite payments
+            </span>
+            <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Checkout will use the secure PayFast onsite payment engine instead of
+              sending buyers to a hosted PayFast checkout page.
+            </span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-3">
+          <Checkbox
+            className="mt-1"
+            defaultChecked={payfastTokenizationEnabled}
+            id="tokenizationEnabled"
+            name="tokenizationEnabled"
+          />
+          <span className="grid gap-1">
+            <span className="text-sm font-semibold text-zinc-950 dark:text-white">
+              Enable PayFast tokenization
+            </span>
+            <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Allows future one-click style flows through the PayFast vault. Jurgens
+              Energy must never store raw card numbers or CVV values.
+            </span>
+          </span>
+        </label>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-2">
-        <StripeCredentialPanel
+        <PayFastCredentialPanel
           active={mode === "live"}
-          description="Used when the platform is processing real payments."
-          hasSecretKey={hasStripeLiveSecretKey}
-          hasWebhookSecret={hasStripeLiveWebhookSecret}
+          description="Used when Jurgens Energy is processing real payments."
+          hasMerchantKey={hasPayfastLiveMerchantKey}
+          hasPassphrase={hasPayfastLivePassphrase}
+          merchantId={payfastLiveMerchantId}
+          merchantKey={payfastLiveMerchantKey}
           mode="live"
-          publishableKey={stripeLivePublishableKey}
-          secretKey={stripeLiveSecretKey}
-          webhookSecret={stripeLiveWebhookSecret}
+          passphrase={payfastLivePassphrase}
           title="Live credentials"
         />
 
-        <StripeCredentialPanel
+        <PayFastCredentialPanel
           active={mode === "sandbox"}
           description="Used for local testing and payment-flow rehearsals."
-          hasSecretKey={hasStripeSandboxSecretKey}
-          hasWebhookSecret={hasStripeSandboxWebhookSecret}
+          hasMerchantKey={hasPayfastSandboxMerchantKey}
+          hasPassphrase={hasPayfastSandboxPassphrase}
+          merchantId={payfastSandboxMerchantId}
+          merchantKey={payfastSandboxMerchantKey}
           mode="sandbox"
-          publishableKey={stripeSandboxPublishableKey}
-          secretKey={stripeSandboxSecretKey}
-          webhookSecret={stripeSandboxWebhookSecret}
+          passphrase={payfastSandboxPassphrase}
           title="Sandbox credentials"
         />
       </div>
@@ -591,34 +623,39 @@ export function StripeSettingsForm({
 
       <Button type="submit" disabled={isPending} className="w-fit gap-2">
         <SaveIcon className="size-4" />
-        {isPending ? "Saving..." : "Save Stripe settings"}
+        {isPending ? "Saving..." : "Save PayFast settings"}
       </Button>
     </form>
   );
 }
 
-function StripeCredentialPanel({
+function PayFastCredentialPanel({
   active,
   description,
-  hasSecretKey,
-  hasWebhookSecret,
+  hasMerchantKey,
+  hasPassphrase,
+  merchantId,
+  merchantKey,
   mode,
-  publishableKey,
-  secretKey,
+  passphrase,
   title,
-  webhookSecret,
 }: {
   active: boolean;
   description: string;
-  hasSecretKey: boolean;
-  hasWebhookSecret: boolean;
+  hasMerchantKey: boolean;
+  hasPassphrase: boolean;
+  merchantId: string | null;
+  merchantKey: string | null;
   mode: "live" | "sandbox";
-  publishableKey: string | null;
-  secretKey: string | null;
+  passphrase: string | null;
   title: string;
-  webhookSecret: string | null;
 }) {
   const prefix = mode === "live" ? "live" : "sandbox";
+  const [merchantIdValue, setMerchantIdValue] = useState(merchantId ?? "");
+
+  useEffect(() => {
+    setMerchantIdValue(merchantId ?? "");
+  }, [merchantId]);
 
   return (
     <div
@@ -645,47 +682,49 @@ function StripeCredentialPanel({
 
       <div className="grid gap-4">
         <div className="grid gap-2">
-          <Label htmlFor={`${prefix}PublishableKey`}>Publishable key</Label>
-          <SecretTextInput
-            id={`${prefix}PublishableKey`}
-            name={`${prefix}PublishableKey`}
-            placeholder={mode === "live" ? "pk_live_..." : "pk_test_..."}
-            defaultValue={publishableKey ?? ""}
+          <Label htmlFor={`${prefix}MerchantId`}>Merchant ID</Label>
+          <Input
+            id={`${prefix}MerchantId`}
+            name={`${prefix}MerchantId`}
+            autoComplete="off"
+            inputMode="numeric"
+            value={merchantIdValue}
+            onChange={(event) => setMerchantIdValue(event.target.value)}
+            placeholder={mode === "live" ? "Live merchant ID" : "Sandbox merchant ID"}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor={`${prefix}SecretKey`}>Secret key</Label>
+          <Label htmlFor={`${prefix}MerchantKey`}>Merchant key</Label>
           <SecretTextInput
-            id={`${prefix}SecretKey`}
-            name={`${prefix}SecretKey`}
+            id={`${prefix}MerchantKey`}
+            name={`${prefix}MerchantKey`}
             icon="key"
-            defaultValue={secretKey}
+            defaultValue={merchantKey}
             placeholder={
-              hasSecretKey
-                ? "Saved - leave blank to keep current secret"
-                : mode === "live"
-                  ? "sk_live_..."
-                  : "sk_test_..."
+              hasMerchantKey
+                ? "Saved - leave blank to keep current merchant key"
+                : "Paste PayFast merchant key"
             }
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor={`${prefix}WebhookSecret`}>
-            Webhook signing secret
-          </Label>
+          <Label htmlFor={`${prefix}Passphrase`}>Passphrase</Label>
           <SecretTextInput
-            id={`${prefix}WebhookSecret`}
-            name={`${prefix}WebhookSecret`}
+            id={`${prefix}Passphrase`}
+            name={`${prefix}Passphrase`}
             icon="key"
-            defaultValue={webhookSecret}
+            defaultValue={passphrase}
             placeholder={
-              hasWebhookSecret
-                ? "Saved - leave blank to keep current secret"
-                : "whsec_..."
+              hasPassphrase
+                ? "Saved - leave blank to keep current passphrase"
+                : "Paste PayFast passphrase"
             }
           />
+          <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Used server-side for payment signatures and webhook validation.
+          </p>
         </div>
       </div>
     </div>
@@ -710,6 +749,8 @@ type ShippingSettingsFormProps = {
   hasBobgoLiveWebhookSecret: boolean;
   hasBobgoSandboxApiKey: boolean;
   hasBobgoSandboxWebhookSecret: boolean;
+  jurgensDeliveryCutoffTime: string;
+  jurgensDeliveryZones: JurgensDeliveryZone[];
   shippingBufferBps: number;
   shippingEnabled: boolean;
   shippingMarginBps: number;
@@ -733,6 +774,8 @@ export function ShippingSettingsForm({
   hasBobgoLiveWebhookSecret,
   hasBobgoSandboxApiKey,
   hasBobgoSandboxWebhookSecret,
+  jurgensDeliveryCutoffTime,
+  jurgensDeliveryZones,
   shippingBufferBps,
   shippingEnabled,
   shippingMarginBps,
@@ -770,6 +813,7 @@ export function ShippingSettingsForm({
   );
 
   return (
+    <div className="grid gap-6">
     <form action={formAction} className="grid gap-5">
       <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
         <div className="mb-5 flex items-start gap-3">
@@ -778,10 +822,10 @@ export function ShippingSettingsForm({
           </span>
           <div>
             <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-              Piessang shipping controls
+              Jurgens Energy shipping controls
             </h3>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Choose whether checkout can quote shipping, whether Piessang can
+              Choose whether checkout can quote shipping, whether Jurgens Energy can
               book Bob Go shipments, and how much margin or buffer is added to
               provider rates.
             </p>
@@ -806,6 +850,22 @@ export function ShippingSettingsForm({
             />
             Enable Bob Go provider integration
           </label>
+          <div className="grid gap-2 lg:col-span-2">
+            <Label htmlFor="jurgensDeliveryCutoffTime">
+              Jurgens same-day cutoff
+            </Label>
+            <Input
+              id="jurgensDeliveryCutoffTime"
+              name="jurgensDeliveryCutoffTime"
+              type="time"
+              defaultValue={jurgensDeliveryCutoffTime}
+            />
+            <p className="text-xs leading-5 text-slate-500">
+              Jurgens-delivered products show a same-day countdown until this
+              South African time, then switch to delivery tomorrow. Bob Go
+              courier items do not show delivery estimates.
+            </p>
+          </div>
           <div className="grid gap-2 lg:col-span-2">
             <Label htmlFor="bobgoMode">API environment</Label>
             <Select
@@ -835,7 +895,7 @@ export function ShippingSettingsForm({
             <p className="text-xs leading-5 text-slate-500">
               Sandbox uses https://api.sandbox.bobgo.co.za/v2/. Production uses
               https://api.bobgo.co.za/v2/. The selected environment controls
-              which bearer token and webhook secret Piessang uses.
+              which bearer token and webhook secret Jurgens Energy uses.
             </p>
           </div>
           <div className="grid gap-2 lg:col-span-2">
@@ -1028,7 +1088,7 @@ export function ShippingSettingsForm({
       </div>
       <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300">
         Keep Bob Go tracking emails disabled where possible. Bob Go should send
-        Piessang webhook events, then Piessang sends customer and seller
+        Jurgens Energy webhook events, then Jurgens Energy sends customer
         notifications through our notification templates.
       </div>
       {state.message ? (
@@ -1047,6 +1107,8 @@ export function ShippingSettingsForm({
         {isPending ? "Saving..." : "Save shipping settings"}
       </Button>
     </form>
+      <JurgensDeliveryZonesManager zones={jurgensDeliveryZones} />
+    </div>
   );
 }
 
@@ -1158,354 +1220,471 @@ function BobGoWebhookCheckbox({
   );
 }
 
-type PremiumPlansSettingsFormProps = {
-  plans: AdminPremiumPlan[];
-  stripeMode: "live" | "sandbox";
+type JurgensDeliveryRateDraft = {
+  fromAmount: string;
+  key: string;
+  price: string;
+  upToAmount: string;
 };
 
-export function PremiumPlansSettingsForm({
-  plans,
-  stripeMode,
-}: PremiumPlansSettingsFormProps) {
+function JurgensDeliveryZonesManager({
+  zones,
+}: {
+  zones: JurgensDeliveryZone[];
+}) {
   return (
-    <div className="grid gap-5">
-      <div className="rounded-xl border border-violet-500/20 bg-violet-500/8 p-4 dark:bg-violet-400/10">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-600 dark:text-violet-300">
-            <CrownIcon className="size-4" />
+    <section className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+            <TruckIcon className="size-4" />
           </span>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-              Stripe-managed plans
+              Jurgens Energy delivery zones
             </h3>
-            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-              Save plans here and Piessang creates or updates the matching
-              Stripe product and price for the current {stripeMode} mode.
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Set the postal codes Jurgens Energy delivers to directly, then
+              add minimum order rules and conditional local delivery prices.
             </p>
           </div>
         </div>
+
+        <JurgensDeliveryZoneDialog
+          trigger={
+            <Button type="button" className="w-fit gap-2">
+              <PlusIcon className="size-4" />
+              Add zone
+            </Button>
+          }
+        />
       </div>
 
-      <PremiumPlanEditor stripeMode={stripeMode} />
+      {zones.length > 0 ? (
+        <div className="grid gap-3">
+          {zones.map((zone) => (
+            <div
+              key={zone.id}
+              className="grid gap-3 rounded-xl border border-zinc-200 p-4 dark:border-white/10"
+            >
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="truncate text-sm font-bold text-zinc-950 dark:text-white">
+                      {zone.name}
+                    </h4>
+                    <Badge variant={zone.isActive ? "default" : "secondary"}>
+                      {zone.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                    {zone.postalCodes.length} postal code
+                    {zone.postalCodes.length === 1 ? "" : "s"} · minimum order{" "}
+                    {formatZar(zone.minimumOrderAmount)} ·{" "}
+                    {summarizeJurgensDeliveryRates(zone)}
+                  </p>
+                  {zone.deliveryInformation ? (
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-zinc-300">
+                      {zone.deliveryInformation}
+                    </p>
+                  ) : null}
+                </div>
 
-      {plans.length > 0 ? (
-        <div className="grid gap-4">
-          {plans.map((plan) => (
-            <PremiumPlanEditor
-              key={plan.id}
-              plan={plan}
-              stripeMode={stripeMode}
-            />
+                <div className="flex shrink-0 items-center gap-2">
+                  <JurgensDeliveryZoneDialog
+                    zone={zone}
+                    trigger={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <PencilIcon className="size-3.5" />
+                        Edit
+                      </Button>
+                    }
+                  />
+                  <DeleteJurgensDeliveryZoneButton zone={zone} />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {zone.postalCodes.slice(0, 12).map((postalCode) => (
+                  <span
+                    key={postalCode}
+                    className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300"
+                  >
+                    {postalCode}
+                  </span>
+                ))}
+                {zone.postalCodes.length > 12 ? (
+                  <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400">
+                    +{zone.postalCodes.length - 12} more
+                  </span>
+                ) : null}
+              </div>
+            </div>
           ))}
         </div>
       ) : (
-        <p className="rounded-xl border border-zinc-200 p-4 text-sm text-slate-600 dark:border-white/10 dark:text-zinc-300">
-          No premium plans exist yet. Create the first plan above.
-        </p>
+        <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-5 text-sm leading-6 text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-300">
+          No Jurgens Energy delivery zones yet. Add postal-code zones before
+          checkout can offer direct Jurgens delivery.
+        </div>
       )}
-    </div>
+    </section>
   );
 }
 
-function PremiumPlanEditor({
-  plan,
-  stripeMode,
+function JurgensDeliveryZoneDialog({
+  trigger,
+  zone,
 }: {
-  plan?: AdminPremiumPlan;
-  stripeMode: "live" | "sandbox";
+  trigger: ReactElement;
+  zone?: JurgensDeliveryZone;
 }) {
-  const [billingInterval, setBillingInterval] = useState<"month" | "year">(
-    plan?.billingInterval ?? "month",
-  );
-  const [scope, setScope] = useState<"user" | "seller">(plan?.scope ?? "user");
-  const [status, setStatus] = useState<"active" | "hidden" | "archived">(
-    plan?.status ?? "active",
-  );
   const [state, formAction, isPending] = useActionState(
-    savePremiumPlanSettings,
+    saveJurgensDeliveryZoneSettings,
     initialState,
   );
-  const activeStripePriceId =
-    stripeMode === "live"
-      ? plan?.stripeLivePriceId
-      : plan?.stripeSandboxPriceId;
+  const [rates, setRates] = useState<JurgensDeliveryRateDraft[]>(() =>
+    getInitialRateDrafts(zone),
+  );
+  const dialogId = zone?.id ?? "new";
+
+  function updateRate(
+    key: string,
+    field: keyof Omit<JurgensDeliveryRateDraft, "key">,
+    value: string,
+  ) {
+    setRates((current) =>
+      current.map((rate) =>
+        rate.key === key ? { ...rate, [field]: value } : rate,
+      ),
+    );
+  }
+
+  function addRate() {
+    setRates((current) => {
+      const previous = current[current.length - 1];
+
+      return [
+        ...current,
+        {
+          fromAmount: previous?.upToAmount || previous?.fromAmount || "0",
+          key: createDeliveryRateKey(),
+          price: "0",
+          upToAmount: "",
+        },
+      ];
+    });
+  }
+
+  function removeRate(key: string) {
+    setRates((current) =>
+      current.length === 1 ? current : current.filter((rate) => rate.key !== key),
+    );
+  }
 
   return (
-    <form
-      action={formAction}
-      className="grid gap-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]"
-    >
-      <input type="hidden" name="id" value={plan?.id ?? ""} />
-      <input type="hidden" name="billingInterval" value={billingInterval} />
-      <input type="hidden" name="scope" value={scope} />
-      <input type="hidden" name="status" value={status} />
+    <Dialog>
+      <DialogTrigger render={trigger} />
+      <DialogContent className="sm:max-w-2xl">
+        <form action={formAction} className="contents">
+          <DialogHeader>
+            <DialogTitle>{zone ? "Edit delivery zone" : "Add delivery zone"}</DialogTitle>
+            <DialogDescription>
+              Postal-code zones decide whether Jurgens Energy delivery can be
+              offered for direct-delivery products at checkout.
+            </DialogDescription>
+          </DialogHeader>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-bold text-zinc-950 dark:text-white">
-              {plan ? plan.name : "Create premium plan"}
-            </h3>
-            {plan?.isHighlighted ? (
-              <Badge className="bg-violet-500/15 text-violet-700 dark:text-violet-200">
-                Highlighted
-              </Badge>
+          <DialogBody className="grid gap-5">
+            <input type="hidden" name="zoneId" value={zone?.id ?? ""} />
+            <input
+              type="hidden"
+              name="ratesJson"
+              value={JSON.stringify(toRatePayload(rates))}
+            />
+
+            <div className="grid gap-2">
+              <Label htmlFor={`jurgens-zone-name-${dialogId}`}>Zone name</Label>
+              <Input
+                id={`jurgens-zone-name-${dialogId}`}
+                name="name"
+                defaultValue={zone?.name ?? ""}
+                maxLength={120}
+                placeholder="Paarl, Wellington, Franschhoek"
+                required
+              />
+            </div>
+
+            <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+              <Checkbox
+                name="isActive"
+                defaultChecked={zone?.isActive ?? true}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block font-semibold text-zinc-950 dark:text-white">
+                  Active delivery zone
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  Active zones can be matched at checkout. Inactive zones stay
+                  saved but are not offered to customers.
+                </span>
+              </span>
+            </label>
+
+            <div className="grid gap-2">
+              <Label htmlFor={`jurgens-zone-postal-codes-${dialogId}`}>
+                Postal codes
+              </Label>
+              <Textarea
+                id={`jurgens-zone-postal-codes-${dialogId}`}
+                name="postalCodes"
+                defaultValue={zone?.postalCodes.join(", ") ?? ""}
+                minLength={2}
+                placeholder="7646, 7655, 7600-7699, 76*"
+                rows={4}
+                required
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Separate codes with commas or new lines. Use ranges like
+                7600-7699, or prefix wildcards like 76*.
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor={`jurgens-zone-minimum-${dialogId}`}>
+                Minimum order price
+              </Label>
+              <Input
+                id={`jurgens-zone-minimum-${dialogId}`}
+                name="minimumOrderAmount"
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={zone?.minimumOrderAmount ?? 0}
+                required
+              />
+            </div>
+
+            <div className="grid gap-3 rounded-xl border border-zinc-200 p-3 dark:border-white/10">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-zinc-950 dark:text-white">
+                    Conditional pricing
+                  </h4>
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                    Match the direct-delivery subtotal to a local delivery price.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-fit gap-2"
+                  onClick={addRate}
+                >
+                  <PlusIcon className="size-3.5" />
+                  Add tier
+                </Button>
+              </div>
+
+              <div className="grid gap-2">
+                {rates.map((rate, index) => (
+                  <div
+                    key={rate.key}
+                    className="grid gap-2 rounded-lg border border-zinc-200 p-3 dark:border-white/10 lg:grid-cols-[1fr_1fr_1fr_auto]"
+                  >
+                    <div className="grid gap-1.5">
+                      <Label htmlFor={`rate-from-${dialogId}-${rate.key}`}>
+                        Orders from
+                      </Label>
+                      <Input
+                        id={`rate-from-${dialogId}-${rate.key}`}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={rate.fromAmount}
+                        onChange={(event) =>
+                          updateRate(rate.key, "fromAmount", event.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor={`rate-up-to-${dialogId}-${rate.key}`}>
+                        Up to
+                      </Label>
+                      <Input
+                        id={`rate-up-to-${dialogId}-${rate.key}`}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={rate.upToAmount}
+                        onChange={(event) =>
+                          updateRate(rate.key, "upToAmount", event.target.value)
+                        }
+                        placeholder="No limit"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor={`rate-price-${dialogId}-${rate.key}`}>
+                        Delivery price
+                      </Label>
+                      <Input
+                        id={`rate-price-${dialogId}-${rate.key}`}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={rate.price}
+                        onChange={(event) =>
+                          updateRate(rate.key, "price", event.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Remove delivery tier ${index + 1}`}
+                        disabled={rates.length === 1}
+                        onClick={() => removeRate(rate.key)}
+                      >
+                        <Trash2Icon className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor={`jurgens-zone-delivery-info-${dialogId}`}>
+                Delivery information
+              </Label>
+              <Textarea
+                id={`jurgens-zone-delivery-info-${dialogId}`}
+                name="deliveryInformation"
+                defaultValue={zone?.deliveryInformation ?? ""}
+                maxLength={255}
+                placeholder="Delivery to Paarl, Wellington and Franschhoek."
+                rows={3}
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                This message can appear at checkout and on order confirmations.
+              </p>
+            </div>
+
+            {state.message ? (
+              <p
+                className={
+                  state.ok
+                    ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+                    : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+                }
+              >
+                {state.message}
+              </p>
             ) : null}
-            {plan?.isDefault ? (
-              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-200">
-                Default
-              </Badge>
-            ) : null}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-            {plan
-              ? `${formatPlanPrice(plan.priceCents, plan.currency)} / ${
-                  plan.billingInterval
-                }`
-              : "Define the plan and Piessang will create the Stripe objects."}
-          </p>
-        </div>
+          </DialogBody>
 
-        {plan ? (
-          <div className="text-left sm:text-right">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
-              Stripe {stripeMode} price
-            </p>
-            <p className="mt-1 max-w-[260px] truncate text-xs text-slate-600 dark:text-zinc-300">
-              {activeStripePriceId ?? "Not synced yet"}
-            </p>
-          </div>
-        ) : null}
-      </div>
+          <DialogFooter showCloseButton>
+            <Button type="submit" disabled={isPending} className="gap-2">
+              <SaveIcon className="size-4" />
+              {isPending ? "Saving..." : "Save zone"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-plan-name`}>Plan name</Label>
-          <Input
-            id={`${plan?.id ?? "new"}-plan-name`}
-            name="name"
-            defaultValue={plan?.name ?? "Piessang Premium"}
-            maxLength={160}
-            required
-          />
-        </div>
+function DeleteJurgensDeliveryZoneButton({
+  zone,
+}: {
+  zone: JurgensDeliveryZone;
+}) {
+  const [state, formAction, isPending] = useActionState(
+    deleteJurgensDeliveryZoneSettings,
+    initialState,
+  );
 
-        <div className="grid gap-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-plan-code`}>Plan code</Label>
-          <Input
-            id={`${plan?.id ?? "new"}-plan-code`}
-            name="code"
-            defaultValue={plan?.code ?? "piessang-premium-monthly"}
-            maxLength={80}
-            pattern="[a-z0-9-]+"
-            required
-          />
-          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            Stable internal code. Use lowercase letters, numbers, and hyphens.
-          </p>
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Billing interval</Label>
-          <Select
-            value={billingInterval}
-            onValueChange={(value) =>
-              setBillingInterval(value as "month" | "year")
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">Monthly</SelectItem>
-              <SelectItem value="year">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Status</Label>
-          <Select
-            value={status}
-            onValueChange={(value) =>
-              setStatus(value as "active" | "hidden" | "archived")
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="hidden">Hidden</SelectItem>
-              <SelectItem value="archived">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-price-cents`}>
-            Price in cents
-          </Label>
-          <Input
-            id={`${plan?.id ?? "new"}-price-cents`}
-            name="priceCents"
-            type="number"
-            min={0}
-            max={100000000}
-            defaultValue={plan?.priceCents ?? 999}
-            required
-          />
-          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            999 = {formatPlanPrice(999, plan?.currency ?? "USD")}. Changing
-            price, currency, or interval creates a new Stripe Price.
-          </p>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-currency`}>Currency</Label>
-          <Input
-            id={`${plan?.id ?? "new"}-currency`}
-            name="currency"
-            defaultValue={plan?.currency ?? "USD"}
-            maxLength={3}
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Plan scope</Label>
-          <Select
-            value={scope}
-            onValueChange={(value) => setScope(value as "user" | "seller")}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="user">User account</SelectItem>
-              <SelectItem value="seller">Seller account</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-storage`}>
-            Storage quota
-          </Label>
-          <Input
-            id={`${plan?.id ?? "new"}-storage`}
-            name="storageQuotaMb"
-            type="number"
-            min={100}
-            max={512000}
-            defaultValue={plan?.storageQuotaMb ?? 5120}
-            required
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-sort`}>Sort order</Label>
-          <Input
-            id={`${plan?.id ?? "new"}-sort`}
-            name="sortOrder"
-            type="number"
-            min={0}
-            max={10000}
-            defaultValue={plan?.sortOrder ?? 10}
-            required
-          />
-        </div>
-
-        <div className="grid gap-2 lg:col-span-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-description`}>
-            Description
-          </Label>
-          <Input
-            id={`${plan?.id ?? "new"}-description`}
-            name="description"
-            defaultValue={plan?.description ?? ""}
-            maxLength={500}
-            placeholder="Unlock more storage, faster uploads, and premium tools."
-          />
-        </div>
-
-        <div className="grid gap-2 lg:col-span-2">
-          <Label htmlFor={`${plan?.id ?? "new"}-features`}>
-            Feature bullets
-          </Label>
-          <Textarea
-            id={`${plan?.id ?? "new"}-features`}
-            name="featureBullets"
-            defaultValue={
-              plan?.featureBullets.join("\n") ??
-              "5 GB of storage\nAdvanced media tools\nPriority support\nFaster uploads"
-            }
-            maxLength={1000}
-            required
-          />
-          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            One feature per line. The first 8 lines are shown in premium UI.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-white/10">
-          <Checkbox
-            name="isHighlighted"
-            defaultChecked={plan?.isHighlighted ?? true}
-            className="mt-1"
-          />
-          <span>
-            <span className="block text-sm font-semibold">Highlighted</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Give this plan the premium visual emphasis.
-            </span>
-          </span>
-        </label>
-
-        <label className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3 dark:border-white/10">
-          <Checkbox
-            name="isDefault"
-            defaultChecked={plan?.isDefault ?? false}
-            className="mt-1"
-          />
-          <span>
-            <span className="block text-sm font-semibold">Default plan</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Use as the preselected plan in upgrade flows.
-            </span>
-          </span>
-        </label>
-      </div>
-
-      {state.message ? (
-        <p
-          className={cn(
-            "rounded-lg border p-3 text-sm",
-            state.ok
-              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200"
-              : "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-200",
-          )}
-        >
-          {state.message}
-        </p>
-      ) : plan?.stripeSyncError ? (
-        <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
-          Last Stripe sync warning: {plan.stripeSyncError}
-        </p>
+  return (
+    <form action={formAction} className="flex items-center gap-2">
+      <input type="hidden" name="zoneId" value={zone.id} />
+      {state.message && !state.ok ? (
+        <span className="sr-only">{state.message}</span>
       ) : null}
-
-      <Button type="submit" disabled={isPending} className="w-fit gap-2">
-        {isPending ? (
-          <SparklesIcon className="size-4 animate-pulse" />
-        ) : (
-          <SaveIcon className="size-4" />
-        )}
-        {isPending ? "Syncing..." : plan ? "Save plan" : "Create plan"}
+      <Button
+        type="submit"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`Delete ${zone.name}`}
+        disabled={isPending}
+      >
+        <Trash2Icon className="size-4" />
       </Button>
     </form>
   );
+}
+
+function getInitialRateDrafts(
+  zone: JurgensDeliveryZone | undefined,
+): JurgensDeliveryRateDraft[] {
+  if (!zone || zone.rates.length === 0) {
+    return [
+      {
+        fromAmount: "0",
+        key: createDeliveryRateKey(),
+        price: "0",
+        upToAmount: "",
+      },
+    ];
+  }
+
+  return zone.rates.map((rate) => ({
+    fromAmount: String(rate.fromAmount),
+    key: rate.id,
+    price: String(rate.price),
+    upToAmount: rate.upToAmount === null ? "" : String(rate.upToAmount),
+  }));
+}
+
+function createDeliveryRateKey() {
+  return `rate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function toRatePayload(rates: JurgensDeliveryRateDraft[]) {
+  return rates.map((rate) => ({
+    fromAmount: rate.fromAmount,
+    price: rate.price,
+    upToAmount: rate.upToAmount.trim() ? rate.upToAmount : null,
+  }));
+}
+
+function summarizeJurgensDeliveryRates(zone: JurgensDeliveryZone) {
+  const firstRate = zone.rates[0];
+
+  if (!firstRate) {
+    return "no price tiers";
+  }
+
+  if (firstRate.price === 0) {
+    return `free from ${formatZar(firstRate.fromAmount)}`;
+  }
+
+  return `${formatZar(firstRate.price)} from ${formatZar(firstRate.fromAmount)}`;
+}
+
+function formatZar(value: number) {
+  return `R ${value.toFixed(2)}`;
 }
 
 type NotificationSettingsFormProps = {
@@ -1832,7 +2011,7 @@ export function NotificationSettingsForm({
           ) : (
             <p className="rounded-xl border border-zinc-200 p-4 text-sm text-slate-600 dark:border-white/10 dark:text-zinc-300">
               No notification templates exist yet. Run the latest database
-              migrations to seed the default seller application templates.
+              migrations to seed the default notification templates.
             </p>
           )}
         </div>
@@ -2483,7 +2662,7 @@ function DeliveryPolicyFields({
       <div className="grid gap-3 md:grid-cols-3">
         {[
           {
-            description: "Creates a bell notification inside Piessang.",
+            description: "Creates a bell notification inside Jurgens Energy.",
             label: "In-app",
             name: "deliveryInAppEnabled",
             value: policy.inAppEnabled,
@@ -2710,7 +2889,7 @@ function NotificationTemplateEditor({
     const alt =
       asset.altText ??
       asset.originalFileName?.replace(/\.[^.]+$/, "") ??
-      "Piessang image";
+      "Jurgens Energy image";
     insertHtmlSnippet(
       `<img src="${escapeHtmlAttribute(src)}" alt="${escapeHtmlAttribute(alt)}" style="display:block;max-width:100%;height:auto;border:0;" />`,
     );
@@ -3374,7 +3553,7 @@ function InAppNotificationTemplateEditor({
               value={variablesText}
               onChange={(event) => setVariablesText(event.target.value)}
               maxLength={1000}
-              placeholder="name, storeName, sellerDashboardUrl"
+              placeholder="name, orderNumber, adminDashboardUrl"
             />
           </div>
 
@@ -3423,7 +3602,7 @@ function InAppNotificationTemplateEditor({
               onDrop={(event) => handleVariableDrop(event, "actionUrl")}
               onDragOver={(event) => event.preventDefault()}
               maxLength={1000}
-              placeholder="{{sellerDashboardUrl}}"
+              placeholder="{{adminDashboardUrl}}"
             />
           </div>
         </div>
@@ -3753,11 +3932,10 @@ function getTemplateVariableSample(
 
   const normalized = variable.toLowerCase();
 
-  if (normalized.includes("sellerdashboard")) {
-    return "https://seller.jurgensenergy.com";
-  }
-
-  if (normalized.includes("admindashboard")) {
+  if (
+    normalized.includes("sellerdashboard") ||
+    normalized.includes("admindashboard")
+  ) {
     return "https://admin.jurgensenergy.com";
   }
 
@@ -4251,11 +4429,4 @@ function DeliveryStatusBadge({
       {status}
     </Badge>
   );
-}
-
-function formatPlanPrice(priceCents: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    currency,
-    style: "currency",
-  }).format(priceCents / 100);
 }

@@ -11,14 +11,10 @@ import {
 } from "react";
 import {
   ArrowDownIcon,
-  ArrowLeftIcon,
-  BarChart3Icon,
   CheckIcon,
   ChevronRightIcon,
   CloudUploadIcon,
   CopyIcon,
-  CrownIcon,
-  CreditCardIcon,
   DownloadIcon,
   FileImageIcon,
   FileTextIcon,
@@ -35,15 +31,12 @@ import {
   PlayIcon,
   RefreshCwIcon,
   SearchIcon,
-  ShieldCheckIcon,
   SlidersHorizontalIcon,
-  TagIcon,
   Trash2Icon,
   UploadIcon,
   Volume2Icon,
   VolumeXIcon,
   XIcon,
-  ZapIcon,
 } from "lucide-react";
 
 import {
@@ -139,8 +132,13 @@ type StorageQuotaNotice = {
   uploadBytes: number;
   usedBytes: number;
 };
-type PremiumPlan = "monthly" | "yearly";
-type PremiumStep = "intro" | "payment" | "plan" | "review" | "success";
+type MediaUploadResponse = {
+  asset?: AdminMediaAsset;
+  code?: string;
+  message?: string;
+  ok?: boolean;
+  storage?: StorageQuotaNotice;
+};
 type MediaDeleteRequest = {
   asset: AdminMediaAsset;
   source: "card" | "details";
@@ -243,7 +241,6 @@ export function MediaManagerDialog({
   const [deleteRequest, setDeleteRequest] = useState<MediaDeleteRequest>(null);
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isPremiumOpen, setIsPremiumOpen] = useState(false);
   const [storageQuotaNotice, setStorageQuotaNotice] =
     useState<StorageQuotaNotice | null>(null);
   const [mobilePanel, setMobilePanel] = useState<"library" | "details" | "storage">(
@@ -645,11 +642,6 @@ export function MediaManagerDialog({
     setSelectedAssetIds([]);
   }
 
-  function openPremiumSubscription() {
-    onOpenChange(false);
-    window.setTimeout(() => setIsPremiumOpen(true), 120);
-  }
-
   function useSelectedAsset() {
     if (allowMultipleSelection && onSelectMany) {
       if (!selectedAssetsAreSelectable) {
@@ -802,7 +794,6 @@ export function MediaManagerDialog({
                 <aside className="hidden min-h-0 overflow-y-auto border-r border-slate-200 bg-slate-50/60 p-4 [scrollbar-width:none] dark:border-white/10 dark:bg-[#101820]/70 lg:block [&::-webkit-scrollbar]:hidden">
                   <StorageSummary
                     accent={accent}
-                    onUnlockPremium={openPremiumSubscription}
                     storage={storage}
                     usedStorageBytes={localUsedStorageBytes}
                   />
@@ -953,7 +944,6 @@ export function MediaManagerDialog({
                     <div className="grid min-h-0 gap-5 overflow-y-auto p-5 [scrollbar-width:none] lg:hidden [&::-webkit-scrollbar]:hidden">
                       <StorageSummary
                         accent={accent}
-                        onUnlockPremium={openPremiumSubscription}
                         storage={storage}
                         usedStorageBytes={localUsedStorageBytes}
                         variant="mobile"
@@ -1205,10 +1195,6 @@ export function MediaManagerDialog({
             setStorageQuotaNotice(null);
           }
         }}
-        onUnlockPremium={() => {
-          setStorageQuotaNotice(null);
-          openPremiumSubscription();
-        }}
         storage={storage}
       />
       <MediaFilterDialog
@@ -1227,11 +1213,6 @@ export function MediaManagerDialog({
         setDateFilter={setDateFilter}
         setFolderFilter={setFolderFilter}
         setMediaTypeFilter={setMediaTypeFilter}
-      />
-      <PremiumSubscriptionDialog
-        open={isPremiumOpen}
-        onOpenChange={setIsPremiumOpen}
-        storage={storage}
       />
     </>
   );
@@ -1318,13 +1299,11 @@ function StorageFullDialog({
   notice,
   onFreeUpSpace,
   onOpenChange,
-  onUnlockPremium,
   storage,
 }: {
   notice: StorageQuotaNotice | null;
   onFreeUpSpace: () => void;
   onOpenChange: (open: boolean) => void;
-  onUnlockPremium: () => void;
   storage: MediaStorageSettings;
 }) {
   const quotaBytes = notice?.quotaBytes ?? storage.freeStorageQuotaMb * 1024 * 1024;
@@ -1335,7 +1314,6 @@ function StorageFullDialog({
   const usagePercent = quotaBytes > 0
     ? Math.min(100, Math.round((displayUsedBytes / quotaBytes) * 100))
     : 0;
-  const premiumBytes = storage.premiumStorageQuotaMb * 1024 * 1024;
 
   return (
     <Dialog open={Boolean(notice)} onOpenChange={onOpenChange}>
@@ -1359,8 +1337,8 @@ function StorageFullDialog({
             Not enough storage
           </DialogTitle>
           <p className="mx-auto mt-3 max-w-lg text-base leading-relaxed text-slate-300">
-            You have run out of storage space. Upgrade your plan or free up
-            space to continue uploading.
+            You have run out of storage space. Free up media files or increase
+            the storage quota in admin settings to continue uploading.
           </p>
         </DialogHeader>
 
@@ -1416,49 +1394,10 @@ function StorageFullDialog({
             </div>
           </section>
 
-          <section className="rounded-xl border border-[#fbe694]/20 bg-[#fbe694]/10 p-5">
-            <div className="grid gap-5 sm:grid-cols-[1.1fr_1fr] sm:items-center">
-              <div className="flex items-start gap-4">
-                <span className="grid size-14 shrink-0 place-items-center rounded-full bg-[#fbe694]/10 text-[#fbe694]">
-                  <CrownIcon className="size-7" />
-                </span>
-                <div>
-                  <p className="text-xl font-black text-white">Unlock more space</p>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                    Get more storage, advanced tools and priority support with
-                    Premium.
-                  </p>
-                </div>
-              </div>
-              <ul className="grid gap-3 text-sm text-slate-300">
-                {[
-                  `${formatBytes(premiumBytes)} of storage`,
-                  "Advanced media tools",
-                  "Priority support",
-                  "And much more",
-                ].map((benefit) => (
-                  <li className="flex items-center gap-3" key={benefit}>
-                    <CheckIcon className="size-4 text-[#fbe694]" />
-                    {benefit}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <Button
-              className="mt-5 h-11 w-full justify-center rounded-lg bg-gradient-to-r from-[#fbe694] to-[#f2bc05] font-bold text-zinc-950 hover:from-[#f4d96e] hover:to-[#d8a904] sm:w-80"
-              onClick={onUnlockPremium}
-              type="button"
-            >
-              Unlock Premium
-              <ChevronRightIcon className="ml-auto size-4" />
-            </Button>
-          </section>
-
-          <div className="grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
-            <div className="h-px bg-white/10" />
-            <p className="text-sm font-bold uppercase text-slate-300">Or</p>
-            <div className="h-px bg-white/10" />
-          </div>
+          <p className="rounded-xl border border-white/10 bg-white/[0.035] p-4 text-sm leading-6 text-slate-300">
+            The media library uses the quota configured under Admin Settings.
+            Raise that quota if this store needs more working storage.
+          </p>
         </DialogBody>
 
         <DialogFooter className="border-t-0 pt-0">
@@ -3039,682 +2978,18 @@ function MediaDetailAction({
   );
 }
 
-function PremiumSubscriptionDialog({
-  onOpenChange,
-  open,
-  storage,
-}: {
-  onOpenChange: (open: boolean) => void;
-  open: boolean;
-  storage: MediaStorageSettings;
-}) {
-  const [step, setStep] = useState<PremiumStep>("intro");
-  const [plan, setPlan] = useState<PremiumPlan>("monthly");
-  const premiumBytes = storage.premiumStorageQuotaMb * 1024 * 1024;
-  const isMonthly = plan === "monthly";
-  const planPrice = isMonthly ? "$9.99" : "$95.88";
-  const planPeriod = isMonthly ? "month" : "year";
-
-  useEffect(() => {
-    if (!open) {
-      window.setTimeout(() => {
-        setStep("intro");
-        setPlan("monthly");
-      }, 120);
-    }
-  }, [open]);
-
-  function close() {
-    onOpenChange(false);
-  }
-
-  function back() {
-    if (step === "intro") {
-      close();
-    } else if (step === "plan") {
-      setStep("intro");
-    } else if (step === "payment") {
-      setStep("plan");
-    } else if (step === "review") {
-      setStep("payment");
-    } else {
-      setStep("intro");
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className="z-[140] h-[min(52rem,calc(100dvh-1.5rem))] w-[min(34rem,calc(100vw-1.5rem))] max-w-none overflow-hidden border border-slate-200 bg-white p-0 text-zinc-950 shadow-2xl shadow-black/25 sm:max-w-none dark:border-white/10 dark:bg-[#071016] dark:text-white"
-        overlayClassName="z-[130] bg-black/75 backdrop-blur-md"
-      >
-        {step === "intro" ? (
-          <PremiumIntro
-            premiumBytes={premiumBytes}
-            onClose={close}
-            onContinue={() => setStep("plan")}
-          />
-        ) : null}
-
-        {step === "plan" ? (
-          <PremiumPlanStep
-            plan={plan}
-            premiumBytes={premiumBytes}
-            setPlan={setPlan}
-            onBack={back}
-            onClose={close}
-            onContinue={() => setStep("payment")}
-          />
-        ) : null}
-
-        {step === "payment" ? (
-          <PremiumPaymentStep
-            onBack={back}
-            onClose={close}
-            onContinue={() => setStep("review")}
-          />
-        ) : null}
-
-        {step === "review" ? (
-          <PremiumReviewStep
-            plan={plan}
-            planPeriod={planPeriod}
-            planPrice={planPrice}
-            premiumBytes={premiumBytes}
-            onBack={back}
-            onClose={close}
-            onContinue={() => setStep("success")}
-          />
-        ) : null}
-
-        {step === "success" ? (
-          <PremiumSuccessStep onClose={close} />
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function PremiumShell({
-  children,
-  currentStep,
-  onBack,
-  onClose,
-  showBrand = false,
-}: {
-  children: ReactNode;
-  currentStep?: 1 | 2 | 3;
-  onBack?: () => void;
-  onClose: () => void;
-  showBrand?: boolean;
-}) {
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_18%,rgba(124,58,237,0.16),transparent_32%),linear-gradient(135deg,#ffffff,#f8fafc)] dark:bg-[radial-gradient(circle_at_50%_18%,rgba(34,197,94,0.14),transparent_30%),linear-gradient(135deg,#071016,#0d141d)]">
-      <div className="flex shrink-0 items-center justify-between gap-3 px-5 py-5">
-        {onBack ? (
-          <button
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-zinc-950 dark:text-white/80 dark:hover:text-white"
-            onClick={onBack}
-            type="button"
-          >
-            <ArrowLeftIcon className="size-4" />
-            Back
-          </button>
-        ) : showBrand ? (
-          <PiessangPremiumBrand />
-        ) : (
-          <span />
-        )}
-        <button
-          aria-label="Close premium dialog"
-          className="grid size-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-zinc-950 dark:text-white/80 dark:hover:bg-white/10 dark:hover:text-white"
-          onClick={onClose}
-          type="button"
-        >
-          <XIcon className="size-5" />
-        </button>
-      </div>
-
-      {currentStep ? <PremiumStepper currentStep={currentStep} /> : null}
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function PiessangPremiumBrand() {
-  return (
-    <div className="flex items-center gap-2">
-      <img
-        alt=""
-        className="size-9 object-contain"
-        src="/brand/favicon-for-app/web-app-manifest-192x192.png"
-      />
-      <span className="text-sm font-black tracking-[0.18em]">PIESSANG</span>
-    </div>
-  );
-}
-
-function PremiumIntro({
-  onClose,
-  onContinue,
-  premiumBytes,
-}: {
-  onClose: () => void;
-  onContinue: () => void;
-  premiumBytes: number;
-}) {
-  return (
-    <PremiumShell onClose={onClose} showBrand>
-      <div className="mx-auto grid max-w-sm gap-5">
-        <div className="text-center">
-          <span className="inline-flex items-center gap-2 rounded-md border border-[#d7ccff] bg-violet-500/10 px-3 py-1 text-xs font-black uppercase tracking-wide text-violet-600 dark:border-violet-400/30 dark:text-violet-200">
-            <CrownIcon className="size-4" />
-            Premium
-          </span>
-          <h2 className="mt-5 text-3xl font-black leading-tight">
-            Unlock the full power of{" "}
-            <span className="bg-gradient-to-r from-[#a855f7] to-[#2563eb] bg-clip-text text-transparent">
-              Piessang
-            </span>
-          </h2>
-          <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-            Upgrade to Premium and get everything you need to manage your
-            marketplace like a pro.
-          </p>
-        </div>
-
-        <div className="relative mx-auto grid h-44 w-72 place-items-center">
-          <span className="absolute left-2 top-8 grid size-10 place-items-center rounded-xl border border-violet-400/20 bg-white/70 text-[#7c3aed] shadow-sm dark:bg-white/10">
-            <CloudUploadIcon className="size-5" />
-          </span>
-          <span className="absolute right-4 top-8 grid size-10 place-items-center rounded-xl border border-violet-400/20 bg-white/70 text-[#7c3aed] shadow-sm dark:bg-white/10">
-            <ShieldCheckIcon className="size-5" />
-          </span>
-          <span className="absolute bottom-12 left-0 grid size-10 place-items-center rounded-xl border border-violet-400/20 bg-white/70 text-[#7c3aed] shadow-sm dark:bg-white/10">
-            <ZapIcon className="size-5" />
-          </span>
-          <span className="absolute bottom-12 right-0 grid size-10 place-items-center rounded-xl border border-violet-400/20 bg-white/70 text-[#7c3aed] shadow-sm dark:bg-white/10">
-            <BarChart3Icon className="size-5" />
-          </span>
-          <div className="absolute bottom-4 h-12 w-44 rounded-[50%] bg-gradient-to-r from-violet-500/20 via-[#fbe694]/25 to-blue-500/20 blur-xl" />
-          <div className="relative grid size-32 place-items-center rounded-full border border-[#d7ccff]/60 bg-gradient-to-br from-[#fff7d6] via-white to-[#ede9fe] shadow-2xl shadow-violet-500/20 dark:border-white/10 dark:from-[#2a1d09] dark:via-[#0f1720] dark:to-[#20133a]">
-            <img
-              alt=""
-              className="size-24 object-contain drop-shadow-2xl"
-              src="/brand/favicon-for-app/web-app-manifest-192x192.png"
-            />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white/70 p-4 shadow-lg shadow-black/5 backdrop-blur dark:border-white/10 dark:bg-white/[0.045]">
-          <p className="text-sm font-black">Everything in Free, plus:</p>
-          <div className="mt-4 grid gap-3">
-            <PremiumBenefit title={`${formatBytes(premiumBytes)} of storage`} text="Store more images, videos and documents" />
-            <PremiumBenefit title="Advanced media tools" text="Bulk edit, format convert and more" />
-            <PremiumBenefit title="Priority support" text="Get help faster when you need it" />
-            <PremiumBenefit title="Faster uploads" text="Upload larger files in less time" />
-          </div>
-
-          <div className="mt-5 rounded-lg border border-violet-400/40 bg-violet-500/5 p-3">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-sm font-black">Monthly</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Cancel anytime
-                </p>
-              </div>
-              <p className="text-xl font-black text-[#7c3aed]">
-                $9.99{" "}
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  / month
-                </span>
-              </p>
-            </div>
-          </div>
-
-          <button
-            className="mt-4 h-11 w-full rounded-lg bg-gradient-to-r from-[#a855f7] to-[#2563eb] text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:from-[#9333ea] hover:to-[#1d4ed8]"
-            onClick={onContinue}
-            type="button"
-          >
-            Unlock Premium
-          </button>
-          <p className="mt-3 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <LockIcon className="size-3.5" />
-            Secure checkout powered by Stripe
-          </p>
-        </div>
-      </div>
-    </PremiumShell>
-  );
-}
-
-function PremiumBenefit({ text, title }: { text: string; title: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <CheckIcon className="mt-0.5 size-4 shrink-0 rounded-full bg-violet-500/10 p-0.5 text-[#7c3aed]" />
-      <span>
-        <span className="block text-sm font-bold">{title}</span>
-        <span className="block text-xs text-slate-500 dark:text-slate-400">
-          {text}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function PremiumStepper({ currentStep }: { currentStep: 1 | 2 | 3 }) {
-  const steps = [
-    { label: "Plan", value: 1 },
-    { label: "Payment", value: 2 },
-    { label: "Review", value: 3 },
-  ] as const;
-
-  return (
-    <div className="mx-auto mb-2 grid w-full max-w-xs grid-cols-[1fr_1fr_1fr] items-start px-5">
-      {steps.map((step, index) => (
-        <div className="relative grid place-items-center gap-2" key={step.value}>
-          {index > 0 ? (
-            <span className="absolute right-1/2 top-3 h-px w-full bg-slate-200 dark:bg-white/15" />
-          ) : null}
-          <span
-            className={cn(
-              "relative z-10 grid size-7 place-items-center rounded-full border text-xs font-bold",
-              currentStep >= step.value
-                ? "border-violet-400/40 bg-gradient-to-br from-[#a855f7] to-[#2563eb] text-white shadow-lg shadow-violet-500/25"
-                : "border-slate-300 bg-white text-slate-500 dark:border-white/20 dark:bg-transparent dark:text-slate-300",
-            )}
-          >
-            {step.value}
-          </span>
-          <span className="text-xs text-slate-500 dark:text-slate-300">
-            {step.label}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PremiumPlanStep({
-  onBack,
-  onClose,
-  onContinue,
-  plan,
-  premiumBytes,
-  setPlan,
-}: {
-  onBack: () => void;
-  onClose: () => void;
-  onContinue: () => void;
-  plan: PremiumPlan;
-  premiumBytes: number;
-  setPlan: (plan: PremiumPlan) => void;
-}) {
-  return (
-    <PremiumShell currentStep={1} onBack={onBack} onClose={onClose}>
-      <div className="mx-auto grid max-w-md gap-5">
-        <div className="text-center">
-          <h2 className="text-2xl font-black">Choose your plan</h2>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Choose the plan that works best for you.
-          </p>
-        </div>
-        <PremiumPlanCard
-          active={plan === "monthly"}
-          badge="Most flexible"
-          period="month"
-          price="$9.99"
-          title="Monthly Plan"
-          subtitle="Billed monthly"
-          premiumBytes={premiumBytes}
-          onClick={() => setPlan("monthly")}
-        />
-        <PremiumPlanCard
-          active={plan === "yearly"}
-          badge="Save 20%"
-          period="year"
-          price="$95.88"
-          title="Yearly Plan"
-          subtitle="Billed annually"
-          compareAt="$119.88 / year"
-          premiumBytes={premiumBytes}
-          onClick={() => setPlan("yearly")}
-        />
-        <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.045]">
-          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-violet-500/10 text-[#7c3aed]">
-            <TagIcon className="size-5" />
-          </span>
-          <div>
-            <p className="text-sm font-black">Cancel anytime</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              You can cancel your subscription at any time.
-            </p>
-          </div>
-        </div>
-        <button
-          className="h-12 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#2563eb] text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:from-[#9333ea] hover:to-[#1d4ed8]"
-          onClick={onContinue}
-          type="button"
-        >
-          Continue to payment
-        </button>
-      </div>
-    </PremiumShell>
-  );
-}
-
-function PremiumPlanCard({
-  active,
-  badge,
-  compareAt,
-  onClick,
-  period,
-  premiumBytes,
-  price,
-  subtitle,
-  title,
-}: {
-  active: boolean;
-  badge: string;
-  compareAt?: string;
-  onClick: () => void;
-  period: string;
-  premiumBytes: number;
-  price: string;
-  subtitle: string;
-  title: string;
-}) {
-  return (
-    <button
-      className={cn(
-        "relative grid gap-4 rounded-xl border p-5 text-left transition",
-        active
-          ? "border-[#7c3aed] bg-violet-500/10 shadow-lg shadow-violet-500/10"
-          : "border-slate-200 bg-white/70 hover:border-violet-300 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-violet-400/40",
-      )}
-      onClick={onClick}
-      type="button"
-    >
-      {active ? (
-        <span className="absolute right-4 top-4 grid size-6 place-items-center rounded-full bg-gradient-to-br from-[#a855f7] to-[#2563eb] text-white">
-          <CheckIcon className="size-4" />
-        </span>
-      ) : null}
-      <div>
-        <p className="text-base font-black">
-          {title}{" "}
-          <span className="ml-2 rounded bg-violet-500/10 px-2 py-1 text-xs font-bold text-[#7c3aed]">
-            {badge}
-          </span>
-        </p>
-        <p className="mt-5 text-3xl font-black">
-          {price}{" "}
-          <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-            / {period}
-          </span>
-        </p>
-        {compareAt ? (
-          <p className="mt-2 text-xs text-slate-500 line-through dark:text-slate-400">
-            {compareAt}
-          </p>
-        ) : null}
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {subtitle}
-        </p>
-      </div>
-      <div className="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
-        {[
-          `${formatBytes(premiumBytes)} storage`,
-          "Advanced media tools",
-          "Priority support",
-          "All premium features",
-        ].map((item) => (
-          <span className="flex items-center gap-2" key={item}>
-            <CheckIcon className="size-4 text-[#7c3aed]" />
-            {item}
-          </span>
-        ))}
-      </div>
-    </button>
-  );
-}
-
-function PremiumPaymentStep({
-  onBack,
-  onClose,
-  onContinue,
-}: {
-  onBack: () => void;
-  onClose: () => void;
-  onContinue: () => void;
-}) {
-  return (
-    <PremiumShell currentStep={2} onBack={onBack} onClose={onClose}>
-      <div className="mx-auto grid max-w-md gap-5">
-        <div className="text-center">
-          <h2 className="text-2xl font-black">Payment details</h2>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Enter your card information to continue.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.035]">
-          <div className="mb-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span className="inline-flex items-center gap-2">
-              <LockIcon className="size-4" />
-              Secure payment
-            </span>
-            <span className="rounded border border-slate-200 px-2 py-1 dark:border-white/10">
-              Powered by stripe
-            </span>
-          </div>
-          <div className="grid gap-3">
-            <PremiumInput label="Email" defaultValue="admin@example.com" />
-            <PremiumInput label="Card information" defaultValue="4242 4242 4242 4242" icon={<CreditCardIcon className="size-4" />} />
-            <div className="grid grid-cols-2 gap-3">
-              <PremiumInput label="Expiry" defaultValue="12 / 26" />
-              <PremiumInput label="CVC" defaultValue="123" />
-            </div>
-            <PremiumInput label="Name on card" defaultValue="Marketplace Admin" />
-            <PremiumInput label="Country or region" defaultValue="South Africa" />
-          </div>
-        </div>
-        <button
-          className="h-12 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#2563eb] text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:from-[#9333ea] hover:to-[#1d4ed8]"
-          onClick={onContinue}
-          type="button"
-        >
-          Continue to review
-        </button>
-        <p className="flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <LockIcon className="size-3.5" />
-          Your payment is secure and encrypted
-        </p>
-      </div>
-    </PremiumShell>
-  );
-}
-
-function PremiumInput({
-  defaultValue,
-  icon,
-  label,
-}: {
-  defaultValue?: string;
-  icon?: ReactNode;
-  label: string;
-}) {
-  return (
-    <label className="grid gap-1.5 text-xs font-bold">
-      {label}
-      <span className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 dark:border-white/10 dark:bg-white/[0.03]">
-        <input
-          className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-slate-400"
-          defaultValue={defaultValue}
-          placeholder={label}
-        />
-        {icon}
-      </span>
-    </label>
-  );
-}
-
-function PremiumReviewStep({
-  onBack,
-  onClose,
-  onContinue,
-  planPeriod,
-  planPrice,
-  premiumBytes,
-}: {
-  onBack: () => void;
-  onClose: () => void;
-  onContinue: () => void;
-  plan: PremiumPlan;
-  planPeriod: string;
-  planPrice: string;
-  premiumBytes: number;
-}) {
-  return (
-    <PremiumShell currentStep={3} onBack={onBack} onClose={onClose}>
-      <div className="mx-auto grid max-w-md gap-5">
-        <div className="text-center">
-          <h2 className="text-2xl font-black">Review your subscription</h2>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Please review your details before confirming.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.035]">
-          <p className="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Plan
-          </p>
-          <div className="mt-3 flex gap-3">
-            <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-[#7c3aed]">
-              <CrownIcon className="size-6" />
-            </span>
-            <div>
-              <p className="text-sm font-black">Premium</p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                {planPrice} / {planPeriod}
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                {formatBytes(premiumBytes)} storage<br />
-                Advanced media tools<br />
-                Priority support<br />
-                All premium features
-              </p>
-            </div>
-          </div>
-          <div className="my-4 h-px bg-slate-200 dark:bg-white/10" />
-          <ReviewLine label="Billed" value={planPeriod === "month" ? "Monthly" : "Annually"} />
-          <ReviewLine label="Tax (if applicable)" value="$0.00" />
-          <ReviewLine strong label="Total today" value={`${planPrice} USD`} />
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.035]">
-          <ReviewLine label="Payment method" value="Visa •••• 4242" />
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Exp 12 / 26
-          </p>
-        </div>
-        <p className="text-center text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-          By subscribing, you agree to our{" "}
-          <span className="font-bold text-[#7c3aed]">Terms of Service</span> and{" "}
-          <span className="font-bold text-[#7c3aed]">Privacy Policy</span>.
-        </p>
-        <button
-          className="h-12 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#2563eb] text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:from-[#9333ea] hover:to-[#1d4ed8]"
-          onClick={onContinue}
-          type="button"
-        >
-          Subscribe now
-        </button>
-      </div>
-    </PremiumShell>
-  );
-}
-
-function ReviewLine({
-  label,
-  strong,
-  value,
-}: {
-  label: string;
-  strong?: boolean;
-  value: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-4 py-1.5 text-sm",
-        strong && "font-black",
-      )}
-    >
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span>{value}</span>
-    </div>
-  );
-}
-
-function PremiumSuccessStep({ onClose }: { onClose: () => void }) {
-  return (
-    <PremiumShell onClose={onClose} showBrand>
-      <div className="mx-auto grid max-w-sm gap-6 text-center">
-        <div className="mx-auto grid size-28 place-items-center rounded-full bg-violet-500/10 text-white shadow-2xl shadow-violet-500/20">
-          <span className="grid size-20 place-items-center rounded-full bg-gradient-to-br from-[#a855f7] to-[#2563eb]">
-            <CheckIcon className="size-11" />
-          </span>
-        </div>
-        <div>
-          <h2 className="text-3xl font-black leading-tight">
-            You’re all set!<br />
-            Welcome to{" "}
-            <span className="bg-gradient-to-r from-[#a855f7] to-[#2563eb] bg-clip-text text-transparent">
-              Premium
-            </span>
-          </h2>
-          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-            You now have access to all Premium features.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white/70 p-4 text-left dark:border-white/10 dark:bg-white/[0.045]">
-          <p className="text-sm font-black">What’s next?</p>
-          <div className="mt-4 grid gap-3">
-            <PremiumBenefit title="Upload more files" text="Take advantage of your expanded storage" />
-            <PremiumBenefit title="Explore premium tools" text="Check out the new file features" />
-            <PremiumBenefit title="Need help?" text="Priority support is here for you" />
-          </div>
-        </div>
-        <button
-          className="h-12 rounded-lg bg-gradient-to-r from-[#a855f7] to-[#2563eb] text-sm font-black text-white shadow-lg shadow-violet-500/20 transition hover:from-[#9333ea] hover:to-[#1d4ed8]"
-          onClick={onClose}
-          type="button"
-        >
-          Go to Media Manager
-        </button>
-      </div>
-    </PremiumShell>
-  );
-}
-
 function StorageSummary({
   accent,
-  onUnlockPremium,
   storage,
   usedStorageBytes,
   variant = "sidebar",
 }: {
   accent: (typeof mediaManagerAccentClasses)[MediaManagerSurface];
-  onUnlockPremium: () => void;
   storage: MediaStorageSettings;
   usedStorageBytes: number;
   variant?: "details" | "mobile" | "sidebar";
 }) {
   const freeBytes = storage.freeStorageQuotaMb * 1024 * 1024;
-  const premiumBytes = storage.premiumStorageQuotaMb * 1024 * 1024;
   const usagePercent = Math.min(100, Math.round((usedStorageBytes / freeBytes) * 100));
   const visualUsagePercent =
     usedStorageBytes > 0 ? Math.max(3, usagePercent) : 0;
@@ -3765,32 +3040,6 @@ function StorageSummary({
             </div>
           </div>
         </div>
-
-        <div className="border-t border-slate-200 p-3 dark:border-white/10">
-          <div className="rounded-xl border border-[#d7ccff] bg-gradient-to-br from-[#fbf8ff] via-[#f3edff] to-[#eef3ff] p-3 dark:border-[#7c3aed]/25 dark:from-[#1d172b] dark:via-[#161925] dark:to-[#101827]">
-            <div className="flex items-start gap-2.5">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#a855f7] to-[#6366f1] text-white shadow-md shadow-violet-500/20">
-                <CrownIcon className="size-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-black leading-snug text-zinc-950 dark:text-white">
-                  Unlock {formatBytes(premiumBytes)} of premium storage
-                </p>
-                <p className="mt-1 text-[0.68rem] leading-relaxed text-[#586a8d] dark:text-slate-300">
-                  More space, faster uploads and advanced media tools.
-                </p>
-              </div>
-            </div>
-            <button
-              className="mt-3 flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-blue-600 px-3 text-xs font-bold text-white shadow-lg shadow-violet-500/20 transition hover:from-violet-600 hover:to-blue-700"
-              onClick={onUnlockPremium}
-              type="button"
-            >
-              Unlock Premium
-              <ChevronRightIcon className="ml-auto size-3.5" />
-            </button>
-          </div>
-        </div>
       </section>
     );
   }
@@ -3838,25 +3087,6 @@ function StorageSummary({
               <span className="text-[#2563eb]">{formatBytes(usedStorageBytes)} used</span>
               <span>{formatBytes(freeBytes)} total</span>
             </div>
-          </div>
-        </div>
-
-        <div className="border-t border-slate-200 p-3 dark:border-white/10">
-          <div className="rounded-xl border border-[#d7ccff] bg-gradient-to-br from-[#fbf8ff] via-[#f3edff] to-[#eef3ff] p-3 dark:border-[#7c3aed]/25 dark:from-[#1d172b] dark:via-[#161925] dark:to-[#101827]">
-            <p className="text-xs font-black leading-snug text-zinc-950 dark:text-white">
-              Unlock {formatBytes(premiumBytes)} of premium storage
-            </p>
-            <p className="mt-1 text-[0.68rem] leading-relaxed text-[#586a8d] dark:text-slate-300">
-              More space, faster uploads and advanced media tools.
-            </p>
-            <button
-              className="mt-3 flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-blue-600 px-3 text-xs font-bold text-white shadow-lg shadow-violet-500/20 transition hover:from-violet-600 hover:to-blue-700"
-              onClick={onUnlockPremium}
-              type="button"
-            >
-              Unlock Premium
-              <ChevronRightIcon className="ml-auto size-3.5" />
-            </button>
           </div>
         </div>
       </section>
@@ -3909,47 +3139,7 @@ function StorageSummary({
             style={{ width: `${usagePercent}%` }}
           />
         </div>
-
-        <div className="rounded-lg border border-[#d7ccff] bg-gradient-to-br from-[#fbf8ff] via-[#f3edff] to-[#eef3ff] p-4 dark:border-[#7c3aed]/25 dark:from-[#1d172b] dark:via-[#161925] dark:to-[#101827]">
-          <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#a855f7] to-[#6366f1] text-white shadow-md shadow-violet-500/20">
-              <CrownIcon className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-zinc-950 dark:text-white">
-                Unlock {formatBytes(premiumBytes)} of Premium storage
-              </p>
-              <ul className="mt-2 grid gap-1 text-xs text-[#586a8d] dark:text-slate-300">
-                <li>5 GB of total storage</li>
-                <li>Faster uploads</li>
-                <li>Advanced file tools</li>
-                <li>Priority support</li>
-              </ul>
-            </div>
-          </div>
-          <button
-            className={cn(
-              "mt-4 flex h-9 w-full items-center justify-center gap-2 rounded-lg text-xs font-bold",
-              "bg-gradient-to-r from-violet-500 to-blue-600 text-white shadow-lg shadow-violet-500/20 transition hover:from-violet-600 hover:to-blue-700",
-            )}
-            onClick={onUnlockPremium}
-            type="button"
-          >
-            Unlock Premium
-            <ChevronRightIcon className="ml-auto size-4" />
-          </button>
-        </div>
-
       </div>
-    </div>
-  );
-}
-
-function StorageBreakdownRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span>{label}</span>
-      <span className="text-slate-500 dark:text-slate-400">{value}</span>
     </div>
   );
 }
@@ -4166,15 +3356,9 @@ function uploadFileWithProgress({
   };
 
   request.onload = () => {
-    try {
-      const response = JSON.parse(request.responseText) as {
-        asset?: AdminMediaAsset;
-        code?: string;
-        message?: string;
-        ok?: boolean;
-        storage?: StorageQuotaNotice;
-      };
+    const response = parseMediaUploadResponse(request.responseText);
 
+    if (response) {
       if (request.status >= 200 && request.status < 300 && response.ok && response.asset) {
         onComplete({ asset: response.asset, id });
         return;
@@ -4186,9 +3370,10 @@ function uploadFileWithProgress({
         storageFull:
           response.code === "storage_full" ? response.storage : undefined,
       });
-    } catch {
-      onError({ id, message: "Could not read the upload response." });
+      return;
     }
+
+    onError({ id, message: getUnreadableUploadResponseMessage(request) });
   };
 
   request.onerror = () => {
@@ -4197,6 +3382,36 @@ function uploadFileWithProgress({
 
   request.open("POST", endpoint);
   request.send(formData);
+}
+
+function parseMediaUploadResponse(responseText: string): MediaUploadResponse | null {
+  try {
+    const response = JSON.parse(responseText) as MediaUploadResponse;
+
+    return typeof response === "object" && response !== null ? response : null;
+  } catch {
+    return null;
+  }
+}
+
+function getUnreadableUploadResponseMessage(request: XMLHttpRequest) {
+  if (request.status === 401 || request.status === 403) {
+    return "Your session could not be verified. Refresh the page and sign in again.";
+  }
+
+  if (request.status === 413) {
+    return "This file is larger than the upload limit.";
+  }
+
+  if (request.status >= 500) {
+    return "The upload service failed before returning details. Check the dev server log.";
+  }
+
+  if (request.status > 0) {
+    return `Upload failed with HTTP ${request.status}.`;
+  }
+
+  return "The upload connection ended before the server returned details.";
 }
 
 function MediaPreview({ asset }: { asset: AdminMediaAsset }) {

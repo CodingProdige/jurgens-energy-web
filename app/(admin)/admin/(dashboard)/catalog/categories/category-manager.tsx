@@ -116,7 +116,6 @@ type CategoryFilters = {
   createdFrom: string;
   createdTo: string;
   depth: "all" | "level-1" | "level-2" | "level-3-plus";
-  fee: "all" | "has-fee" | "no-fee";
   locked: "all" | "locked" | "editable";
   products: "all" | "has-products" | "no-products";
   status: "all" | "active" | "hidden" | "archived";
@@ -127,7 +126,6 @@ const defaultFilters: CategoryFilters = {
   createdFrom: "",
   createdTo: "",
   depth: "all",
-  fee: "all",
   locked: "all",
   products: "all",
   status: "all",
@@ -178,17 +176,6 @@ function formatDate(date: Date) {
     month: "short",
     year: "numeric",
   }).format(date);
-}
-
-function formatSuccessFee(rateBps: number | null) {
-  if (rateBps === null) {
-    return "No success fee set";
-  }
-
-  return `${(rateBps / 100).toLocaleString("en", {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 0,
-  })}% success fee`;
 }
 
 function escapeCsvValue(value: string | number | null) {
@@ -304,7 +291,6 @@ function countActiveFilters(filters: CategoryFilters) {
   if (filters.status !== "all") count += 1;
   if (filters.type !== "all") count += 1;
   if (filters.locked !== "all") count += 1;
-  if (filters.fee !== "all") count += 1;
   if (filters.products !== "all") count += 1;
   if (filters.depth !== "all") count += 1;
   if (filters.createdFrom) count += 1;
@@ -339,14 +325,6 @@ function matchesCategoryFilters(category: AdminCategory, filters: CategoryFilter
   }
 
   if (filters.locked === "editable" && category.isLocked) {
-    return false;
-  }
-
-  if (filters.fee === "has-fee" && !(category.commissionRateBps && category.commissionRateBps > 0)) {
-    return false;
-  }
-
-  if (filters.fee === "no-fee" && category.commissionRateBps !== null && category.commissionRateBps > 0) {
     return false;
   }
 
@@ -422,15 +400,11 @@ function CategoryForm({
     parentCategory?.id ?? "",
   );
   const [categoryName, setCategoryName] = useState(category?.name ?? "");
-  const [commissionRateBps, setCommissionRateBps] = useState(
-    category?.commissionRateBps?.toString() ?? "",
-  );
   const [availability, setAvailability] = useState<{
     available: boolean;
     message: string;
   } | null>(null);
   const [isCheckingAvailability, startAvailabilityTransition] = useTransition();
-  const isRootCategory = category ? category.depth === 0 : selectedParentId === "";
   const availabilityParentId = category
     ? category.parentId
     : (parentCategory?.id ?? selectedParentId) || null;
@@ -457,11 +431,6 @@ function CategoryForm({
   }, [availabilityParentId, category?.id, categoryName]);
 
   const isCategoryNameBlocked = availability?.available === false;
-  const formattedCommissionRate =
-    commissionRateBps === ""
-      ? "0.00%"
-      : `${(Number(commissionRateBps) / 100).toFixed(2)}%`;
-
   return (
     <form action={formAction} className="contents">
       {category ? <input type="hidden" name="id" value={category.id} /> : null}
@@ -603,41 +572,6 @@ function CategoryForm({
           </p>
         </div>
       ) : null}
-
-      {isRootCategory ? (
-        <div className="grid gap-2">
-          <Label
-            htmlFor={category ? `commission-${category.id}` : "commission"}
-            className={cn(modalLabelClass, "dark:text-white")}
-          >
-            Root success fee
-          </Label>
-          <Input
-            id={category ? `commission-${category.id}` : "commission"}
-            name="commissionRateBps"
-            type="text"
-            inputMode="numeric"
-            maxLength={4}
-            pattern="[0-9]*"
-            value={commissionRateBps}
-            onChange={(event) => {
-              setCommissionRateBps(
-                event.target.value.replace(/\D/g, "").slice(0, 4),
-              );
-            }}
-            placeholder="1200"
-            className={modalFieldClass}
-          />
-          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            {commissionRateBps || "0"} = {formattedCommissionRate}. Only root
-            categories carry fees. Subcategories inherit from their root.
-          </p>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400">
-          Subcategories inherit the success fee from their root category.
-        </div>
-      )}
 
       <div className="grid gap-2">
         <Label
@@ -860,11 +794,6 @@ function CategoryNameCell({
               </span>
             ) : null}
           </span>
-          {category.depth === 0 ? (
-            <span className="mt-0.5 block truncate text-[11px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
-              {formatSuccessFee(category.commissionRateBps)}
-            </span>
-          ) : null}
         </span>
       </div>
     </div>
@@ -1065,33 +994,6 @@ function CategoryFilterPanel({
           </div>
         </div>
 
-        <div className="grid gap-1.5">
-          <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-            Success fee
-          </Label>
-          <Select
-            value={filters.fee}
-            onValueChange={(value: string | null) =>
-              onChange({ fee: value as CategoryFilters["fee"] })
-            }
-          >
-            <SelectTrigger className={cn("w-full", modalSelectClass)}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className={modalSelectContentClass}>
-              <SelectItem value="all" className={modalSelectItemClass}>
-                All
-              </SelectItem>
-              <SelectItem value="has-fee" className={modalSelectItemClass}>
-                Has fee
-              </SelectItem>
-              <SelectItem value="no-fee" className={modalSelectItemClass}>
-                No fee
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
             <Label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
@@ -1285,7 +1187,6 @@ export function CategoryDashboard({
         "Type",
         "Status",
         "Products",
-        "Success Fee",
         "Locked",
         "Slug",
         "Path",
@@ -1298,9 +1199,6 @@ export function CategoryDashboard({
         category.depth === 0 ? "Parent" : "Subcategory",
         category.status,
         category.productCount,
-        category.commissionRateBps === null
-          ? "Inherited"
-          : `${(category.commissionRateBps / 100).toFixed(2)}%`,
         category.isLocked ? "Yes" : "No",
         category.slug,
         category.path,
@@ -1314,7 +1212,7 @@ export function CategoryDashboard({
     const today = new Date().toISOString().slice(0, 10);
 
     link.href = url;
-    link.download = `piessang-categories-${today}.csv`;
+    link.download = `jurgens-energy-categories-${today}.csv`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -1330,7 +1228,7 @@ export function CategoryDashboard({
 
         <DashboardCompactMetrics
           metrics={categoryMetrics}
-          storageKey="piessang:admin:catalog-category-metrics"
+          storageKey="jurgens:admin:catalog-category-metrics"
         />
 
         <section className="mt-4 grid gap-3 md:mt-5 md:flex md:items-center md:justify-between">
@@ -1674,8 +1572,7 @@ export function CategoryDashboard({
                 Category settings
               </DialogTitle>
               <DialogDescription className="text-sm leading-6 text-slate-600 dark:text-zinc-300">
-                Update display details, status, sort order, and root-level
-                success fee.
+                Update display details, status, and sort order.
               </DialogDescription>
             </DialogHeader>
             {activeEditCategory ? (

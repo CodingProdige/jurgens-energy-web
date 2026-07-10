@@ -35,6 +35,9 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
     "@base-ui/react": "^1.4.1",
+    "@tiptap/pm": "^3.27.3",
+    "@tiptap/react": "^3.27.3",
+    "@tiptap/starter-kit": "^3.27.3",
     "@types/web-push": "^3.6.4",
     "bcryptjs": "^3.0.2",
     "cheerio": "^1.2.0",

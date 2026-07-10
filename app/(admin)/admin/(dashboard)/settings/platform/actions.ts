@@ -7,11 +7,14 @@ import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
   updateMarketplaceComingSoonSettings,
   updateMarketplaceMediaSettings,
+  updateMarketplacePayFastSettings,
   updateMarketplaceSocialLinks,
   updateMarketplaceShippingSettings,
-  updateMarketplaceStripeSettings,
 } from "@/src/modules/marketplace/settings";
-import { savePremiumPlan } from "@/src/modules/billing/premium-plans";
+import {
+  deleteJurgensDeliveryZone,
+  upsertJurgensDeliveryZone,
+} from "@/src/modules/shipping/jurgens-delivery";
 import {
   createInAppNotificationTemplateTest,
   deleteNotificationGlobalVariable,
@@ -114,7 +117,6 @@ const mediaSettingsSchema = z.object({
   maxUploadFileMb: z.coerce.number().int().min(1).max(100),
   maxVideoUploadFileMb: z.coerce.number().int().min(10).max(2048),
   maxVideoWidth: z.coerce.number().int().min(480).max(3840),
-  premiumStorageQuotaMb: z.coerce.number().int().min(100).max(512000),
   videoCompressionCrf: z.coerce.number().int().min(18).max(35),
 });
 
@@ -131,7 +133,6 @@ export async function updateMediaStorageSettings(
     maxUploadFileMb: formData.get("maxUploadFileMb"),
     maxVideoUploadFileMb: formData.get("maxVideoUploadFileMb"),
     maxVideoWidth: formData.get("maxVideoWidth"),
-    premiumStorageQuotaMb: formData.get("premiumStorageQuotaMb"),
     videoCompressionCrf: formData.get("videoCompressionCrf"),
   });
 
@@ -142,13 +143,6 @@ export async function updateMediaStorageSettings(
     };
   }
 
-  if (parsed.data.premiumStorageQuotaMb < parsed.data.freeStorageQuotaMb) {
-    return {
-      ok: false,
-      message: "Premium storage must be greater than free storage.",
-    };
-  }
-
   const result = await updateMarketplaceMediaSettings(parsed.data);
 
   revalidatePath("/settings/platform");
@@ -156,88 +150,61 @@ export async function updateMediaStorageSettings(
   return result;
 }
 
-const stripeSettingsSchema = z.object({
-  livePublishableKey: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.startsWith("pk_live_"),
-      "Live publishable key must start with pk_live_.",
-    ),
-  liveSecretKey: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.startsWith("sk_live_"),
-      "Live secret key must start with sk_live_.",
-    ),
-  liveWebhookSecret: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.startsWith("whsec_"),
-      "Live webhook secret must start with whsec_.",
-    ),
+const optionalPayFastMerchantIdSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => value || undefined)
+  .refine(
+    (value) => !value || /^\d{4,20}$/.test(value),
+    "PayFast merchant ID must be numeric.",
+  );
+
+const optionalPayFastSecretSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => value || undefined)
+  .refine((value) => !value || value.length <= 255, "PayFast secret is too long.");
+
+const payFastSettingsSchema = z.object({
+  liveMerchantId: optionalPayFastMerchantIdSchema,
+  liveMerchantKey: optionalPayFastSecretSchema,
+  livePassphrase: optionalPayFastSecretSchema,
   mode: z.enum(["live", "sandbox"]),
-  sandboxPublishableKey: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.startsWith("pk_test_"),
-      "Sandbox publishable key must start with pk_test_.",
-    ),
-  sandboxSecretKey: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.startsWith("sk_test_"),
-      "Sandbox secret key must start with sk_test_.",
-    ),
-  sandboxWebhookSecret: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.startsWith("whsec_"),
-      "Sandbox webhook secret must start with whsec_.",
-    ),
+  onsiteEnabled: z.coerce.boolean().default(false),
+  sandboxMerchantId: optionalPayFastMerchantIdSchema,
+  sandboxMerchantKey: optionalPayFastSecretSchema,
+  sandboxPassphrase: optionalPayFastSecretSchema,
+  tokenizationEnabled: z.coerce.boolean().default(false),
 });
 
-export async function updateStripePaymentSettings(
+export async function updatePayFastPaymentSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
   await requireSettingsManageAccess();
 
-  const parsed = stripeSettingsSchema.safeParse({
-    livePublishableKey: String(formData.get("livePublishableKey") ?? ""),
-    liveSecretKey: String(formData.get("liveSecretKey") ?? ""),
-    liveWebhookSecret: String(formData.get("liveWebhookSecret") ?? ""),
+  const parsed = payFastSettingsSchema.safeParse({
+    liveMerchantId: String(formData.get("liveMerchantId") ?? ""),
+    liveMerchantKey: String(formData.get("liveMerchantKey") ?? ""),
+    livePassphrase: String(formData.get("livePassphrase") ?? ""),
     mode: String(formData.get("mode") ?? "sandbox"),
-    sandboxPublishableKey: String(formData.get("sandboxPublishableKey") ?? ""),
-    sandboxSecretKey: String(formData.get("sandboxSecretKey") ?? ""),
-    sandboxWebhookSecret: String(formData.get("sandboxWebhookSecret") ?? ""),
+    onsiteEnabled: formData.get("onsiteEnabled") === "on",
+    sandboxMerchantId: String(formData.get("sandboxMerchantId") ?? ""),
+    sandboxMerchantKey: String(formData.get("sandboxMerchantKey") ?? ""),
+    sandboxPassphrase: String(formData.get("sandboxPassphrase") ?? ""),
+    tokenizationEnabled: formData.get("tokenizationEnabled") === "on",
   });
 
   if (!parsed.success) {
     return {
       ok: false,
-      message: parsed.error.issues[0]?.message ?? "Check the Stripe settings.",
+      message: parsed.error.issues[0]?.message ?? "Check the PayFast settings.",
     };
   }
 
-  const result = await updateMarketplaceStripeSettings(parsed.data);
+  const result = await updateMarketplacePayFastSettings(parsed.data);
 
   revalidatePath("/settings/platform");
 
@@ -260,6 +227,10 @@ const shippingSettingsSchema = z.object({
   bobgoWebhookShipmentHealthStatusUpdated: z.coerce.boolean().default(false),
   bobgoWebhookShipmentSubmissionStatusUpdated: z.coerce.boolean().default(false),
   bobgoWebhookTrackingUpdated: z.coerce.boolean().default(false),
+  jurgensDeliveryCutoffTime: z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid cutoff time."),
   shippingBufferBps: z.coerce.number().int().min(0).max(10000),
   shippingEnabled: z.coerce.boolean().default(false),
   shippingMarginBps: z.coerce.number().int().min(0).max(10000),
@@ -295,6 +266,9 @@ export async function updateShippingIntegrationSettings(
       formData.get("bobgoWebhookShipmentSubmissionStatusUpdated") === "on",
     bobgoWebhookTrackingUpdated:
       formData.get("bobgoWebhookTrackingUpdated") === "on",
+    jurgensDeliveryCutoffTime: String(
+      formData.get("jurgensDeliveryCutoffTime") ?? "14:00",
+    ),
     shippingBufferBps: formData.get("shippingBufferBps"),
     shippingEnabled: formData.get("shippingEnabled") === "on",
     shippingMarginBps: formData.get("shippingMarginBps"),
@@ -314,87 +288,113 @@ export async function updateShippingIntegrationSettings(
   return result;
 }
 
-const premiumPlanSchema = z.object({
-  billingInterval: z.enum(["month", "year"]),
-  code: z
+const jurgensDeliveryRateSchema = z.object({
+  fromAmount: z.coerce.number().finite().min(0).max(1_000_000),
+  price: z.coerce.number().finite().min(0).max(1_000_000),
+  upToAmount: z.preprocess(
+    (value) => (value === "" || value === null || value === undefined ? null : value),
+    z.coerce.number().finite().min(0).max(1_000_000).nullable(),
+  ),
+});
+
+const jurgensDeliveryZoneSchema = z.object({
+  deliveryInformation: z
     .string()
     .trim()
-    .min(3, "Use a short stable plan code.")
-    .max(80)
-    .regex(
-      /^[a-z0-9-]+$/,
-      "Plan code can only use lowercase letters, numbers, and hyphens.",
-    ),
-  currency: z
-    .string()
-    .trim()
-    .length(3, "Use a three-letter currency code.")
-    .transform((value) => value.toUpperCase()),
-  description: z
-    .string()
-    .trim()
-    .max(500, "Description must be 500 characters or less.")
+    .max(255, "Delivery information must be 255 characters or less.")
     .optional()
     .transform((value) => value || undefined),
-  featureBullets: z
-    .string()
-    .trim()
-    .min(1, "Add at least one feature bullet.")
-    .max(1000, "Feature bullets are too long.")
-    .transform((value) =>
-      value
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .slice(0, 8),
-    ),
   id: z
     .string()
     .trim()
     .uuid()
     .optional()
     .or(z.literal("").transform(() => undefined)),
-  name: z.string().trim().min(2, "Plan name is required.").max(160),
-  priceCents: z.coerce.number().int().min(0).max(100000000),
-  scope: z.enum(["user", "seller"]),
-  sortOrder: z.coerce.number().int().min(0).max(10000),
-  status: z.enum(["active", "hidden", "archived"]),
-  storageQuotaMb: z.coerce.number().int().min(100).max(512000),
+  isActive: z.coerce.boolean().default(false),
+  minimumOrderAmount: z.coerce.number().finite().min(0).max(1_000_000),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Zone name is required.")
+    .max(120, "Zone name must be 120 characters or less."),
+  postalCodes: z
+    .string()
+    .trim()
+    .min(2, "Add at least one postal code.")
+    .max(5000, "Postal code list is too long.")
+    .transform((value) =>
+      value
+        .split(/[,\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  rates: z.array(jurgensDeliveryRateSchema).min(1),
 });
 
-export async function savePremiumPlanSettings(
+function parseJurgensDeliveryRates(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveJurgensDeliveryZoneSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
   await requireSettingsManageAccess();
 
-  const parsed = premiumPlanSchema.safeParse({
-    billingInterval: String(formData.get("billingInterval") ?? "month"),
-    code: String(formData.get("code") ?? ""),
-    currency: String(formData.get("currency") ?? "USD"),
-    description: String(formData.get("description") ?? ""),
-    featureBullets: String(formData.get("featureBullets") ?? ""),
-    id: String(formData.get("id") ?? ""),
+  const parsed = jurgensDeliveryZoneSchema.safeParse({
+    deliveryInformation: String(formData.get("deliveryInformation") ?? ""),
+    id: String(formData.get("zoneId") ?? ""),
+    isActive: formData.get("isActive") === "on",
+    minimumOrderAmount: formData.get("minimumOrderAmount"),
     name: String(formData.get("name") ?? ""),
-    priceCents: formData.get("priceCents"),
-    scope: String(formData.get("scope") ?? "user"),
-    sortOrder: formData.get("sortOrder"),
-    status: String(formData.get("status") ?? "active"),
-    storageQuotaMb: formData.get("storageQuotaMb"),
+    postalCodes: String(formData.get("postalCodes") ?? ""),
+    rates: parseJurgensDeliveryRates(formData.get("ratesJson")),
   });
 
   if (!parsed.success) {
     return {
       ok: false,
-      message: parsed.error.issues[0]?.message ?? "Check the premium plan.",
+      message:
+        parsed.error.issues[0]?.message ?? "Check the Jurgens delivery zone.",
     };
   }
 
-  const result = await savePremiumPlan({
-    ...parsed.data,
-    isDefault: formData.get("isDefault") === "on",
-    isHighlighted: formData.get("isHighlighted") === "on",
+  const result = await upsertJurgensDeliveryZone(parsed.data);
+
+  revalidatePath("/settings/platform");
+
+  return result;
+}
+
+const deleteJurgensDeliveryZoneSchema = z.object({
+  id: z.string().trim().uuid(),
+});
+
+export async function deleteJurgensDeliveryZoneSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  await requireSettingsManageAccess();
+
+  const parsed = deleteJurgensDeliveryZoneSchema.safeParse({
+    id: String(formData.get("zoneId") ?? ""),
   });
+
+  if (!parsed.success) {
+    return { ok: false, message: "Choose a valid delivery zone." };
+  }
+
+  const result = await deleteJurgensDeliveryZone(parsed.data.id);
 
   revalidatePath("/settings/platform");
 

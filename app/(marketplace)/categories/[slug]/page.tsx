@@ -62,9 +62,9 @@ export default async function CategoryPage({
   return (
     <MarketplaceGate>
       <MarketplaceHeader />
-      <main className="mx-auto grid w-[min(1180px,calc(100%-2rem))] gap-7 py-6">
+      <main className="grid w-full gap-4 px-1.5 py-3 sm:mx-auto sm:w-[min(1180px,calc(100%-2rem))] sm:gap-7 sm:px-0 sm:py-6">
         <section className="grid gap-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-4 px-2 sm:px-0 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <Link
                 className="text-sm font-semibold text-[#8a641f] hover:text-[#5f4416]"
@@ -72,7 +72,7 @@ export default async function CategoryPage({
               >
                 All products
               </Link>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-white sm:text-4xl">
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-zinc-950 dark:text-white sm:text-4xl">
                 {category.name}
               </h1>
               <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
@@ -82,7 +82,7 @@ export default async function CategoryPage({
             <form className="relative w-full lg:max-w-md">
               <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <Input
-                className="h-11 rounded-lg border-slate-300 bg-white pl-10 shadow-sm dark:border-white/12 dark:bg-white/[0.04]"
+                className="h-10 rounded-lg border-slate-300 bg-white pl-10 shadow-sm dark:border-white/12 dark:bg-white/[0.04] sm:h-11"
                 defaultValue={query ?? ""}
                 name="q"
                 placeholder={`Search ${category.name}`}
@@ -90,7 +90,7 @@ export default async function CategoryPage({
             </form>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="flex gap-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden">
             <Link
               className="inline-flex h-9 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-[#c4982d]/45 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300"
               href="/"
@@ -114,7 +114,7 @@ export default async function CategoryPage({
         </section>
 
         {catalog.products.length > 0 ? (
-          <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <section className="grid grid-cols-2 items-start gap-1.5 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
             {catalog.products.map((product) => (
               <MarketplaceProductCard key={product.id} product={product} />
             ))}

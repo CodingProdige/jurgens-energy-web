@@ -253,6 +253,62 @@
       "when": 1781096400000,
       "tag": "0035_dashboard_notification_events",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1781182800000,
+      "tag": "0036_single_store_product_ownership",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1781269200000,
+      "tag": "0037_single_store_order_shipping_ownership",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1781355600000,
+      "tag": "0038_payfast_payment_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1781442000000,
+      "tag": "0039_exchange_rules_and_delivery_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1781528400000,
+      "tag": "0040_jurgens_delivery_zones",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1781614800000,
+      "tag": "0041_jurgens_delivery_cutoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1781701200000,
+      "tag": "0042_storefront_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1781787600000,
+      "tag": "0043_blog_posts",
+      "breakpoints": true
     }
   ]
 }

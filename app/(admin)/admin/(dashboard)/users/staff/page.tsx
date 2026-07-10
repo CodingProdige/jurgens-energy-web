@@ -7,7 +7,7 @@ import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 export const metadata: Metadata = {
   title: "Admin Staff",
-  description: "Invite and manage Piessang admin dashboard staff access.",
+  description: "Invite and manage Jurgens Energy admin dashboard staff access.",
   robots: {
     index: false,
     follow: false,

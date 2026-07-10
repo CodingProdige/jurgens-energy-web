@@ -11,10 +11,6 @@ import {
   products,
 } from "@/src/db/schema";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
-import {
-  notifySellerProductApproved,
-  notifySellerProductChangesRequested,
-} from "@/src/modules/notifications/events";
 
 export type ProductReviewMutationState = {
   message?: string;
@@ -26,7 +22,7 @@ const productReviewSchema = z.object({
 });
 
 const requestChangesSchema = productReviewSchema.extend({
-  reason: z.string().trim().min(10, "Add a clear reason for the seller.").max(1000),
+  reason: z.string().trim().min(10, "Add a clear reason for the listing change.").max(1000),
 });
 
 async function requireProductReviewManageAccess() {
@@ -45,7 +41,6 @@ async function findReviewableProduct(productId: string) {
       brandRequestId: products.brandRequestId,
       fulfillmentMode: products.fulfillmentMode,
       id: products.id,
-      sellerId: products.sellerId,
       status: products.status,
       title: products.title,
     })
@@ -115,8 +110,7 @@ export async function approveProductReview(
     }
   }
 
-  const nextStatus =
-    product.fulfillmentMode === "piessang_fulfilled" ? "approved" : "live";
+  const nextStatus = "live";
 
   await db.transaction(async (tx) => {
     await tx
@@ -137,9 +131,7 @@ export async function approveProductReview(
       actorUserId: session.user.id,
       fromStatus: "pending_review",
       note:
-        nextStatus === "approved"
-          ? "Admin approved product for FBP stock intake."
-          : "Admin approved product and made it live.",
+        "Admin approved product and made it live.",
       productId: product.id,
       toStatus: nextStatus,
     });
@@ -159,20 +151,10 @@ export async function approveProductReview(
   });
 
   revalidatePath("/products/reviews");
-  revalidatePath("/seller/products");
-
-  await notifySellerProductApproved({
-    productId: product.id,
-    productTitle: product.title,
-    sellerId: product.sellerId,
-  });
 
   return {
     ok: true,
-    message:
-      nextStatus === "approved"
-        ? "Product approved for FBP stock intake."
-        : "Product approved and made live.",
+    message: "Product approved and made live.",
   };
 }
 
@@ -191,7 +173,7 @@ export async function requestProductReviewChanges(
       ok: false,
       message:
         parsed.error.issues[0]?.message ??
-        "Add a clear reason for the seller.",
+        "Add a clear reason for the listing change.",
     };
   }
 
@@ -245,14 +227,6 @@ export async function requestProductReviewChanges(
   });
 
   revalidatePath("/products/reviews");
-  revalidatePath("/seller/products");
 
-  await notifySellerProductChangesRequested({
-    productId: product.id,
-    productTitle: product.title,
-    reason: parsed.data.reason,
-    sellerId: product.sellerId,
-  });
-
-  return { ok: true, message: "Changes requested from seller." };
+  return { ok: true, message: "Changes requested." };
 }
