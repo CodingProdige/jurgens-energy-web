@@ -9,6 +9,11 @@ import {
   findUserByEmail,
 } from "@/src/modules/auth/service";
 import { registerSchema } from "@/src/modules/auth/validation";
+import { WhatsappNumberLinkedToAnotherUserError } from "@/src/modules/whatsapp-ordering/customer-links";
+import {
+  getWhatsappDraftResumePath,
+  parseWhatsappDraftToken,
+} from "@/src/modules/whatsapp-ordering/draft-tokens";
 
 export type RegisterState = {
   error?: string;
@@ -30,8 +35,15 @@ export async function registerCustomerWithPassword(
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
+    whatsappPhone: {
+      countryCode: formData.get("whatsappPhoneCountryCode"),
+      phone: formData.get("whatsappPhone"),
+    },
     password: formData.get("password"),
   });
+  const whatsappDraftToken = parseWhatsappDraftToken(
+    formData.get("whatsappDraft"),
+  );
 
   if (!parsed.success) {
     return {
@@ -51,10 +63,20 @@ export async function registerCustomerWithPassword(
   }
 
   try {
-    await createCustomerAccount(parsed.data);
+    await createCustomerAccount({
+      ...parsed.data,
+      whatsappDraftToken,
+    });
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { error: "An account already exists for this email address." };
+    }
+
+    if (error instanceof WhatsappNumberLinkedToAnotherUserError) {
+      return {
+        error:
+          "That WhatsApp number is already linked to another account. Sign in with that account or use a different number.",
+      };
     }
 
     throw error;
@@ -64,7 +86,9 @@ export async function registerCustomerWithPassword(
     await signIn("credentials", {
       email: parsed.data.email,
       password: parsed.data.password,
-      redirectTo: "/",
+      redirectTo: whatsappDraftToken
+        ? getWhatsappDraftResumePath(whatsappDraftToken)
+        : "/",
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -77,5 +101,7 @@ export async function registerCustomerWithPassword(
     throw error;
   }
 
-  redirect("/");
+  redirect(
+    whatsappDraftToken ? getWhatsappDraftResumePath(whatsappDraftToken) : "/",
+  );
 }

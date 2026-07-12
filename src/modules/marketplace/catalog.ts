@@ -12,9 +12,11 @@ import {
   products,
 } from "@/src/db/schema";
 import {
+  convertFromZar,
   formatRangeFromZar,
   type CurrencyContext,
 } from "@/src/modules/currency";
+import type { MarketplaceCatalogFilters } from "@/src/modules/marketplace/catalog-filters";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 
 const publicProductStatuses = ["live", "active"] as const;
@@ -151,6 +153,7 @@ async function getPublicProductsBaseRows() {
       shortDescription: products.shortDescription,
       slug: products.slug,
       title: products.title,
+      createdAt: products.createdAt,
       updatedAt: products.updatedAt,
     })
     .from(products)
@@ -337,6 +340,432 @@ export async function getMarketplaceCatalog({
     brands: brandsList,
     categories: categoriesList,
     products: productsList,
+  };
+}
+
+export type MarketplaceCatalogFacetOption = {
+  count: number;
+  label: string;
+  value: string;
+};
+
+export type MarketplaceCatalogPageContext =
+  | { kind: "all"; name: "All Products"; slug: null }
+  | { kind: "brand"; name: string; slug: string }
+  | { kind: "category"; name: string; path: string; slug: string };
+
+export type MarketplaceCatalogPageData = {
+  context: MarketplaceCatalogPageContext | null;
+  currencyCode: string;
+  facets: {
+    brands: MarketplaceCatalogFacetOption[];
+    categories: MarketplaceCatalogFacetOption[];
+    exchangeSupportedCount: number;
+    inStockCount: number;
+    onSaleCount: number;
+    priceMaximum: number | null;
+    priceMinimum: number | null;
+  };
+  page: number;
+  pageSize: number;
+  products: MarketplaceProductCard[];
+  totalCount: number;
+  totalPages: number;
+};
+
+type MarketplaceCatalogFilterVariant = {
+  compareAtPrice: string | null;
+  continueSellingOutOfStock: boolean;
+  id: string;
+  isActive: boolean;
+  price: string;
+  productId: string;
+  requiresExchangeEmpty: boolean;
+  status: string;
+  stockOnHand: number;
+};
+
+type MarketplaceCatalogFilterRecord = {
+  maximumPrice: number | null;
+  minimumPrice: number | null;
+  row: Awaited<ReturnType<typeof getPublicProductsBaseRows>>[number];
+  soldQuantity: number;
+  variants: MarketplaceCatalogFilterVariant[];
+};
+
+type MarketplaceCatalogOmittedFacet =
+  | "brand"
+  | "category"
+  | "exchange"
+  | "price"
+  | "sale"
+  | "stock"
+  | null;
+
+function getRecordInStock(record: MarketplaceCatalogFilterRecord) {
+  return record.variants.some(getVariantInStock);
+}
+
+function getRecordExchangeSupported(record: MarketplaceCatalogFilterRecord) {
+  return record.variants.some((variant) => variant.requiresExchangeEmpty);
+}
+
+function getRecordOnSale(record: MarketplaceCatalogFilterRecord) {
+  return record.variants.some(
+    (variant) =>
+      variant.compareAtPrice !== null &&
+      Number(variant.compareAtPrice) > Number(variant.price),
+  );
+}
+
+function matchesCatalogRecord({
+  context,
+  currencyContext,
+  filters,
+  omitFacet,
+  record,
+}: {
+  context: MarketplaceCatalogPageContext;
+  currencyContext: CurrencyContext;
+  filters: MarketplaceCatalogFilters;
+  omitFacet: MarketplaceCatalogOmittedFacet;
+  record: MarketplaceCatalogFilterRecord;
+}) {
+  if (context.kind === "category" && record.row.categorySlug !== context.slug) {
+    return false;
+  }
+
+  if (context.kind === "brand" && record.row.brandSlug !== context.slug) {
+    return false;
+  }
+
+  const normalizedQuery = filters.query.toLowerCase();
+
+  if (
+    normalizedQuery &&
+    ![
+      record.row.title,
+      record.row.shortDescription,
+      record.row.brandName,
+      record.row.categoryPath,
+    ]
+      .filter(Boolean)
+      .some((value) => value!.toLowerCase().includes(normalizedQuery))
+  ) {
+    return false;
+  }
+
+  if (
+    omitFacet !== "category" &&
+    context.kind !== "category" &&
+    filters.categorySlugs.length > 0 &&
+    (!record.row.categorySlug ||
+      !filters.categorySlugs.includes(record.row.categorySlug))
+  ) {
+    return false;
+  }
+
+  if (
+    omitFacet !== "brand" &&
+    context.kind !== "brand" &&
+    filters.brandSlugs.length > 0 &&
+    (!record.row.brandSlug || !filters.brandSlugs.includes(record.row.brandSlug))
+  ) {
+    return false;
+  }
+
+  if (omitFacet !== "stock" && filters.inStock && !getRecordInStock(record)) {
+    return false;
+  }
+
+  if (
+    omitFacet !== "exchange" &&
+    filters.exchangeSupported &&
+    !getRecordExchangeSupported(record)
+  ) {
+    return false;
+  }
+
+  if (omitFacet !== "sale" && filters.onSale && !getRecordOnSale(record)) {
+    return false;
+  }
+
+  if (omitFacet !== "price") {
+    const hasMatchingVariantPrice = record.variants.some((variant) => {
+      const price = convertFromZar(variant.price, currencyContext);
+
+      return (
+        (filters.minPrice === null || price >= filters.minPrice) &&
+        (filters.maxPrice === null || price <= filters.maxPrice)
+      );
+    });
+
+    if (
+      (filters.minPrice !== null || filters.maxPrice !== null) &&
+      !hasMatchingVariantPrice
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function sortCatalogRecords(
+  records: MarketplaceCatalogFilterRecord[],
+  sort: MarketplaceCatalogFilters["sort"],
+) {
+  return [...records].sort((first, second) => {
+    if (sort === "best-selling") {
+      return (
+        second.soldQuantity - first.soldQuantity ||
+        second.row.updatedAt.getTime() - first.row.updatedAt.getTime()
+      );
+    }
+
+    if (sort === "newest") {
+      return second.row.createdAt.getTime() - first.row.createdAt.getTime();
+    }
+
+    if (sort === "price-asc") {
+      return (
+        (first.minimumPrice ?? Number.POSITIVE_INFINITY) -
+        (second.minimumPrice ?? Number.POSITIVE_INFINITY)
+      );
+    }
+
+    if (sort === "price-desc") {
+      return (
+        (second.maximumPrice ?? Number.NEGATIVE_INFINITY) -
+        (first.maximumPrice ?? Number.NEGATIVE_INFINITY)
+      );
+    }
+
+    return (
+      second.soldQuantity - first.soldQuantity ||
+      second.row.updatedAt.getTime() - first.row.updatedAt.getTime()
+    );
+  });
+}
+
+export async function getMarketplaceCatalogPage({
+  accumulate = false,
+  brandSlug,
+  categorySlug,
+  currencyContext,
+  filters,
+  pageSize = 24,
+}: {
+  accumulate?: boolean;
+  brandSlug?: string;
+  categorySlug?: string;
+  currencyContext: CurrencyContext;
+  filters: MarketplaceCatalogFilters;
+  pageSize?: number;
+}): Promise<MarketplaceCatalogPageData> {
+  const [rows, categoriesList, brandsList] = await Promise.all([
+    getPublicProductsBaseRows(),
+    getMarketplaceCategories(),
+    getMarketplaceBrands(),
+  ]);
+  const lockedCategory = categorySlug
+    ? categoriesList.find((category) => category.slug === categorySlug) ?? null
+    : null;
+  const lockedBrand = brandSlug
+    ? brandsList.find((brand) => brand.slug === brandSlug) ?? null
+    : null;
+  const context: MarketplaceCatalogPageContext | null = categorySlug
+    ? lockedCategory
+      ? {
+          kind: "category",
+          name: lockedCategory.name,
+          path: lockedCategory.path,
+          slug: lockedCategory.slug,
+        }
+      : null
+    : brandSlug
+      ? lockedBrand
+        ? { kind: "brand", name: lockedBrand.name, slug: lockedBrand.slug }
+        : null
+      : { kind: "all", name: "All Products", slug: null };
+
+  if (!context) {
+    return {
+      context: null,
+      currencyCode: currencyContext.currency,
+      facets: {
+        brands: [],
+        categories: [],
+        exchangeSupportedCount: 0,
+        inStockCount: 0,
+        onSaleCount: 0,
+        priceMaximum: null,
+        priceMinimum: null,
+      },
+      page: 1,
+      pageSize,
+      products: [],
+      totalCount: 0,
+      totalPages: 1,
+    };
+  }
+
+  const productIds = rows.map((row) => row.id);
+  const variantRows: MarketplaceCatalogFilterVariant[] =
+    productIds.length > 0
+      ? await db
+          .select({
+            compareAtPrice: productVariants.compareAtPrice,
+            continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
+            id: productVariants.id,
+            isActive: productVariants.isActive,
+            price: productVariants.price,
+            productId: productVariants.productId,
+            requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
+            status: productVariants.status,
+            stockOnHand: productVariants.stockOnHand,
+          })
+          .from(productVariants)
+          .where(inArray(productVariants.productId, productIds))
+      : [];
+  const activeVariantRows = variantRows.filter(
+    (variant) => variant.status === "active" && variant.isActive,
+  );
+  const salesRows =
+    productIds.length > 0
+      ? await db
+          .select({
+            productId: productVariants.productId,
+            soldQuantity: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+          })
+          .from(orderItems)
+          .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+          .innerJoin(orders, eq(orders.id, orderItems.orderId))
+          .where(
+            and(
+              inArray(productVariants.productId, productIds),
+              inArray(orders.status, ["paid", "fulfilled"]),
+            ),
+          )
+          .groupBy(productVariants.productId)
+      : [];
+  const soldQuantityByProductId = new Map(
+    salesRows.map((row) => [row.productId, Number(row.soldQuantity) || 0]),
+  );
+  const variantsByProductId = new Map<string, MarketplaceCatalogFilterVariant[]>();
+
+  for (const variant of activeVariantRows) {
+    const productVariantsList = variantsByProductId.get(variant.productId) ?? [];
+    productVariantsList.push(variant);
+    variantsByProductId.set(variant.productId, productVariantsList);
+  }
+
+  const records = rows.map((row): MarketplaceCatalogFilterRecord => {
+    const variants = variantsByProductId.get(row.id) ?? [];
+    const prices = variants
+      .map((variant) => Number(variant.price))
+      .filter(Number.isFinite);
+
+    return {
+      maximumPrice: prices.length > 0 ? Math.max(...prices) : null,
+      minimumPrice: prices.length > 0 ? Math.min(...prices) : null,
+      row,
+      soldQuantity: soldQuantityByProductId.get(row.id) ?? 0,
+      variants,
+    };
+  });
+  const matches = (
+    record: MarketplaceCatalogFilterRecord,
+    omitFacet: MarketplaceCatalogOmittedFacet = null,
+  ) =>
+    matchesCatalogRecord({
+      context,
+      currencyContext,
+      filters,
+      omitFacet,
+      record,
+    });
+  const filteredRecords = sortCatalogRecords(
+    records.filter((record) => matches(record)),
+    filters.sort,
+  );
+  const totalCount = filteredRecords.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const page = Math.min(filters.page, totalPages);
+  const paginatedRecords = filteredRecords.slice(
+    accumulate ? 0 : (page - 1) * pageSize,
+    page * pageSize,
+  );
+  const pageProductIds = paginatedRecords.map((record) => record.row.id);
+  const coverByProductId = await getCoverUrlsByProductId(pageProductIds);
+  const productsList = paginatedRecords.map((record): MarketplaceProductCard => ({
+    brandId: record.row.brandId,
+    brandName: record.row.brandName,
+    brandSlug: record.row.brandSlug,
+    category: toCategory(record.row),
+    coverImageUrl: coverByProductId.get(record.row.id) ?? null,
+    fulfillmentMode: record.row.fulfillmentMode,
+    hasExchangeOption: getRecordExchangeSupported(record),
+    id: record.row.id,
+    inStock: getRecordInStock(record),
+    priceLabel: getPriceLabel(record.variants, currencyContext),
+    quickAddVariantId: getQuickAddVariantId(record.variants),
+    shortDescription: record.row.shortDescription,
+    slug: record.row.slug,
+    title: record.row.title,
+    variantCount: record.variants.length,
+  }));
+  const priceRecords = records.filter((record) => matches(record, "price"));
+  const availablePrices = priceRecords
+    .flatMap((record) => [record.minimumPrice, record.maximumPrice])
+    .filter((price): price is number => price !== null)
+    .map((price) => convertFromZar(price, currencyContext));
+  const categoryFacetRecords = records.filter((record) => matches(record, "category"));
+  const brandFacetRecords = records.filter((record) => matches(record, "brand"));
+
+  return {
+    context,
+    currencyCode: currencyContext.currency,
+    facets: {
+      brands: brandsList
+        .map((brand) => ({
+          count: brandFacetRecords.filter((record) => record.row.brandSlug === brand.slug)
+            .length,
+          label: brand.name,
+          value: brand.slug,
+        }))
+        .filter((brand) => brand.count > 0 || filters.brandSlugs.includes(brand.value)),
+      categories: categoriesList
+        .map((category) => ({
+          count: categoryFacetRecords.filter(
+            (record) => record.row.categorySlug === category.slug,
+          ).length,
+          label: category.name,
+          value: category.slug,
+        }))
+        .filter(
+          (category) =>
+            category.count > 0 || filters.categorySlugs.includes(category.value),
+        ),
+      exchangeSupportedCount: records.filter(
+        (record) => matches(record, "exchange") && getRecordExchangeSupported(record),
+      ).length,
+      inStockCount: records.filter(
+        (record) => matches(record, "stock") && getRecordInStock(record),
+      ).length,
+      onSaleCount: records.filter(
+        (record) => matches(record, "sale") && getRecordOnSale(record),
+      ).length,
+      priceMaximum:
+        availablePrices.length > 0 ? Math.ceil(Math.max(...availablePrices)) : null,
+      priceMinimum:
+        availablePrices.length > 0 ? Math.floor(Math.min(...availablePrices)) : null,
+    },
+    page,
+    pageSize,
+    products: productsList,
+    totalCount,
+    totalPages,
   };
 }
 

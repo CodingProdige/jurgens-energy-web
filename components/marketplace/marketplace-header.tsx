@@ -1,12 +1,13 @@
 import Link from "next/link";
-import {
-  ChevronDownIcon,
-  UserIcon,
-} from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 
 import { auth } from "@/auth";
 import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { CurrencySelector } from "@/components/currency/currency-selector";
+import {
+  MarketplaceAccountMenu,
+  type MarketplaceAccountSummary,
+} from "@/components/marketplace/marketplace-account-menu";
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
 import { MarketplaceCartLink } from "@/components/marketplace/marketplace-cart-link";
 import { MarketplaceHeaderShell } from "@/components/marketplace/marketplace-header-shell";
@@ -23,13 +24,13 @@ import { getCurrencyPreference } from "@/src/modules/currency/server";
 
 const navItems = [
   ["Home", "/"],
-  ["Shop", "#products"],
-  ["Cylinder Exchange", "#exchange"],
-  ["Accessories", "#accessories"],
-  ["Delivery", "#delivery"],
+  ["Shop", "/products"],
+  ["Cylinder Exchange", "/products?exchange=1"],
+  ["Accessories", "/products?category=accessories"],
+  ["Delivery", "/#delivery"],
   ["Blog", "/blog"],
-  ["About Us", "#about"],
-  ["Contact", "#contact"],
+  ["About Us", "/#about"],
+  ["Contact", "/#contact"],
 ] as const;
 
 export async function MarketplaceHeader() {
@@ -37,6 +38,14 @@ export async function MarketplaceHeader() {
     auth(),
     getCurrencyPreference(),
   ]);
+  const accountUser: MarketplaceAccountSummary | null = session?.user
+    ? {
+        email: session.user.email,
+        image: session.user.image,
+        name: session.user.name,
+        roles: session.user.roles ?? [],
+      }
+    : null;
   const notificationCenter = session?.user?.id
     ? await getNotificationCenter({
         surface: "marketplace",
@@ -66,24 +75,17 @@ export async function MarketplaceHeader() {
               {session?.user ? (
                 <NotificationBell
                   accent="marketplace"
-                  className="scale-[0.9] sm:scale-100"
                   initialState={notificationCenter}
                   surface="marketplace"
                 />
               ) : null}
-              <Link
-                aria-label={session?.user ? "Account" : "Sign in"}
-                className="grid size-8 place-items-center rounded-full border border-[#e8e8e2] bg-white/80 text-[#080808] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f7f7f2] sm:size-9"
-                href="/sign-in"
-              >
-                <UserIcon className="size-4" />
-              </Link>
+              <MarketplaceAccountMenu user={accountUser} />
             </div>
           </div>
         </div>
       </div>
       <div className="mx-auto flex h-16 w-full items-center justify-between gap-2 overflow-hidden px-3 sm:h-[82px] sm:w-[min(1500px,calc(100%-1rem))] sm:gap-3 sm:px-6 lg:px-10">
-        <MarketplaceMobileMenu navItems={navItems} />
+        <MarketplaceMobileMenu accountUser={accountUser} navItems={navItems} />
 
         <Link
           aria-label="Jurgens Energy home"
@@ -121,7 +123,7 @@ export async function MarketplaceHeader() {
               "hidden min-[390px]:inline-flex sm:px-5",
               marketplacePrimaryActionBaseClass,
             )}
-            href="#products"
+            href="/products"
           >
             Order Now
           </Link>

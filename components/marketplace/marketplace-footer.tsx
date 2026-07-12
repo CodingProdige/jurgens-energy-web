@@ -91,30 +91,30 @@ export function MarketplaceFooter() {
 
           <FooterColumn
             links={[
-              ["All Cylinders", "#products"],
-              ["Cylinder Exchange", "#exchange"],
-              ["Accessories", "#accessories"],
-              ["Bundles & Deals", "#products"],
-              ["Gift Cards", "#products"],
+              ["All Products", "/products"],
+              ["Cylinder Exchange", "/products?exchange=1"],
+              ["Accessories", "/products?category=accessories"],
+              ["Deals", "/products?sale=1"],
+              ["Brands", "/products"],
             ]}
             title="Shop"
           />
           <FooterColumn
             links={[
-              ["About Us", "#about"],
-              ["Safety", "#delivery"],
-              ["Delivery", "#delivery"],
-              ["FAQs", "#exchange"],
-              ["Contact Us", "#contact"],
+              ["About Us", "/#about"],
+              ["Safety", "/#delivery"],
+              ["Delivery", "/#delivery"],
+              ["FAQs", "/#exchange"],
+              ["Contact Us", "/#contact"],
             ]}
             title="Company"
           />
           <FooterColumn
             links={[
               ["My Orders", "/cart"],
-              ["Returns", "#contact"],
-              ["Terms & Conditions", "#contact"],
-              ["Privacy Policy", "#contact"],
+              ["Returns", "/#contact"],
+              ["Terms & Conditions", "/#contact"],
+              ["Privacy Policy", "/#contact"],
             ]}
             title="Help"
           />

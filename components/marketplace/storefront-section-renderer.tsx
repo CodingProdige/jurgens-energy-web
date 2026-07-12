@@ -715,6 +715,7 @@ function CategoryCard({
         <StorefrontCollectionImage
           alt={imageAlt}
           fallback={<FlameIcon className="size-10 stroke-[1.4]" />}
+          fit="cover"
           sizes="(min-width: 768px) 220px, 50vw"
           src={imageUrl}
         />
@@ -746,7 +747,7 @@ function BrandCard({
         "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:-translate-y-0.5 hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
         className,
       )}
-      href={`/?brand=${brand.slug}#products`}
+      href={`/brands/${brand.slug}`}
     >
       <div className="relative aspect-square bg-[#f7f7f2] dark:bg-[#1a1a1a]">
         <StorefrontCollectionImage
@@ -771,16 +772,20 @@ function BrandCard({
 function StorefrontCollectionImage({
   alt,
   fallback,
+  fit = "contain",
   sizes,
   src,
 }: {
   alt: string;
   fallback: ReactNode;
+  fit?: "contain" | "cover";
   sizes: string;
   src: string | null;
 }) {
-  const imageClass =
-    "size-full object-contain p-3 transition duration-300 group-hover/card:scale-[1.04] sm:p-4";
+  const imageClass = cn(
+    "size-full transition duration-300 group-hover/card:scale-[1.04]",
+    fit === "cover" ? "object-cover" : "object-contain p-3 sm:p-4",
+  );
   const isRemoteImage =
     src?.startsWith("http://") || src?.startsWith("https://");
 

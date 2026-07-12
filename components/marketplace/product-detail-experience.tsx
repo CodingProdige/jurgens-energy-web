@@ -239,7 +239,9 @@ export function ProductDetailExperience({
 
         {relatedProducts.length > 0 ? (
           <ProductRail
-            href={product.category ? `/categories/${product.category.slug}` : "/"}
+            href={
+              product.category ? `/categories/${product.category.slug}` : "/products"
+            }
             products={relatedProducts}
             title="More in this category"
             viewAllLabel="View category"
@@ -248,7 +250,7 @@ export function ProductDetailExperience({
 
         {previouslyViewedProducts.length > 0 ? (
           <ProductRail
-            href="/"
+            href="/products"
             products={previouslyViewedProducts}
             title="Previously viewed"
             viewAllLabel="Continue shopping"

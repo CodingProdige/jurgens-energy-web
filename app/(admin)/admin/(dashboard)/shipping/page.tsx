@@ -161,7 +161,7 @@ export default async function AdminShippingPage() {
             </div>
             <Link
               className="h-9 w-fit rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-zinc-950 transition hover:bg-slate-50 dark:border-white/18 dark:text-white dark:hover:bg-white/10"
-              href="/settings/platform"
+              href="/settings/platform?section=shipping"
             >
               Shipping settings
             </Link>

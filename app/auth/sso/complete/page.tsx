@@ -17,10 +17,20 @@ import {
 import { createSsoHandoffToken } from "@/src/modules/auth/sso-handoff";
 import { getSurfaceUrl, isSsoIntent } from "@/src/modules/auth/sso";
 import { addEmailSubscriber } from "@/src/modules/marketing/email-subscribers";
+import {
+  claimWhatsappDraftForUser,
+  getPrimaryWhatsappCustomerLinkForUser,
+  WhatsappNumberLinkedToAnotherUserError,
+} from "@/src/modules/whatsapp-ordering/customer-links";
+import {
+  getWhatsappDraftResumePath,
+  parseWhatsappDraftToken,
+} from "@/src/modules/whatsapp-ordering/draft-tokens";
 
 type SsoCompletePageProps = {
   searchParams: Promise<{
     intent?: string;
+    whatsappDraft?: string;
   }>;
 };
 
@@ -65,8 +75,9 @@ function getSellerRegisterUrlWithHandoff(user: {
 export default async function SsoCompletePage({
   searchParams,
 }: SsoCompletePageProps) {
-  const { intent: rawIntent } = await searchParams;
+  const { intent: rawIntent, whatsappDraft } = await searchParams;
   const intent = isSsoIntent(rawIntent) ? rawIntent : null;
+  const whatsappDraftToken = parseWhatsappDraftToken(whatsappDraft);
   const session = await auth();
 
   if (!intent || !session?.user?.id) {
@@ -91,6 +102,30 @@ export default async function SsoCompletePage({
         email: user.email,
         source: "customer_signup",
       });
+    }
+
+    if (whatsappDraftToken) {
+      try {
+        await claimWhatsappDraftForUser({
+          source: "sso_completion",
+          token: whatsappDraftToken,
+          userId: user.id,
+        });
+      } catch (error) {
+        if (error instanceof WhatsappNumberLinkedToAnotherUserError) {
+          redirect("/account/whatsapp?error=link_conflict");
+        }
+
+        throw error;
+      }
+
+      redirect(getWhatsappDraftResumePath(whatsappDraftToken));
+    }
+
+    const whatsappLink = await getPrimaryWhatsappCustomerLinkForUser(user.id);
+
+    if (!whatsappLink) {
+      redirect("/account/whatsapp?next=/");
     }
 
     redirect("/");

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  BarChart3Icon,
   ChevronRightIcon,
   CreditCardIcon,
   FolderUpIcon,
@@ -8,6 +9,7 @@ import {
   GlobeLockIcon,
   LayersIcon,
   MailIcon,
+  MessageCircleIcon,
   Share2Icon,
   TruckIcon,
 } from "lucide-react";
@@ -23,11 +25,13 @@ import {
 import { getJurgensDeliveryZones } from "@/src/modules/shipping/jurgens-delivery";
 import {
   SettingsForm,
+  GoogleMarketingSettingsForm,
   MediaStorageSettingsForm,
   NotificationSettingsForm,
   PayFastSettingsForm,
   SocialLinksForm,
   ShippingSettingsForm,
+  WhatsappOrderingSettingsForm,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/settings-form";
 import { getAdminMediaLibrary } from "@/src/modules/media/admin";
 import { getAdminNotificationSettings } from "@/src/modules/notifications/templates";
@@ -56,6 +60,20 @@ const settingSections = [
     description:
       "Manage Jurgens Energy shipping margins and encrypted Bob Go provider credentials.",
     icon: TruckIcon,
+  },
+  {
+    key: "whatsapp-ordering",
+    title: "WhatsApp ordering",
+    description:
+      "Manage 360dialog credentials, webhook URL, and the quick gas topup assistant.",
+    icon: MessageCircleIcon,
+  },
+  {
+    key: "google-tags",
+    title: "Google tags",
+    description:
+      "Manage Google Tag Manager, GA4, Ads, Merchant Center, and Search Console verification.",
+    icon: BarChart3Icon,
   },
   {
     key: "marketplace-gate",
@@ -137,7 +155,9 @@ export default async function AdminSettingsPage({
   const selectedConfig = getSectionConfig(selectedSection);
   const settings = await getMarketplaceSettings();
   const secrets =
-    selectedSection === "payfast-payments" || selectedSection === "shipping"
+    selectedSection === "payfast-payments" ||
+    selectedSection === "shipping" ||
+    selectedSection === "whatsapp-ordering"
       ? await getMarketplaceAdminSecrets()
       : null;
   const notificationSettings =
@@ -313,6 +333,65 @@ function SettingsSection({
     );
   }
 
+  if (section === "whatsapp-ordering") {
+    return (
+      <DashboardPanel
+        title="WhatsApp ordering"
+        description="Manage 360dialog provider credentials, the public webhook URL, and the marketplace WhatsApp ordering switch."
+      >
+        <WhatsappOrderingSettingsForm
+          hasWhatsappApiKey={settings.hasWhatsappApiKey}
+          hasWhatsappWebhookVerifyToken={
+            settings.hasWhatsappWebhookVerifyToken
+          }
+          whatsappApiKey={secrets?.whatsappApiKey ?? null}
+          whatsappBusinessPhoneNumber={settings.whatsappBusinessPhoneNumber}
+          whatsappFollowUpDefaultMessage={
+            settings.whatsappFollowUpDefaultMessage
+          }
+          whatsappFollowUpDelayMinutes={settings.whatsappFollowUpDelayMinutes}
+          whatsappFollowUpDraftMessage={settings.whatsappFollowUpDraftMessage}
+          whatsappFollowUpMaxCount={settings.whatsappFollowUpMaxCount}
+          whatsappFollowUpQuietHoursEnabled={
+            settings.whatsappFollowUpQuietHoursEnabled
+          }
+          whatsappFollowUpQuietHoursEnd={settings.whatsappFollowUpQuietHoursEnd}
+          whatsappFollowUpQuietHoursStart={
+            settings.whatsappFollowUpQuietHoursStart
+          }
+          whatsappFollowUpSupportMessage={
+            settings.whatsappFollowUpSupportMessage
+          }
+          whatsappFollowUpsEnabled={settings.whatsappFollowUpsEnabled}
+          whatsappMessageUrl={settings.whatsappMessageUrl}
+          whatsappOrderingEnabled={settings.whatsappOrderingEnabled}
+          whatsappWebhookUrl={settings.whatsappWebhookUrl}
+          whatsappWebhookVerifyToken={
+            secrets?.whatsappWebhookVerifyToken ?? null
+          }
+        />
+      </DashboardPanel>
+    );
+  }
+
+  if (section === "google-tags") {
+    return (
+      <DashboardPanel
+        title="Google tags"
+        description="Manage the Google tags and verification values injected into the public marketplace surface."
+      >
+        <GoogleMarketingSettingsForm
+          googleAdsConversionId={settings.googleAdsConversionId}
+          googleAdsConversionLabel={settings.googleAdsConversionLabel}
+          googleAnalyticsMeasurementId={settings.googleAnalyticsMeasurementId}
+          googleMerchantCenterId={settings.googleMerchantCenterId}
+          googleSiteVerificationToken={settings.googleSiteVerificationToken}
+          googleTagManagerId={settings.googleTagManagerId}
+        />
+      </DashboardPanel>
+    );
+  }
+
   if (section === "marketplace-gate") {
     return (
       <DashboardPanel
@@ -353,6 +432,7 @@ function SettingsSection({
       >
         <SocialLinksForm
           facebookUrl={settings.facebookUrl}
+          googleReviewUrl={settings.googleReviewUrl}
           instagramUrl={settings.instagramUrl}
           twitterUrl={settings.twitterUrl}
         />
@@ -388,9 +468,10 @@ function SettingsSection({
         <div className="rounded-xl border border-admin-primary/25 bg-admin-primary/10 p-4 dark:bg-admin-primary/10">
           <LayersIcon className="size-5 text-admin-primary" />
           <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
-            PayFast mode, Bob Go credentials, media limits, compression
-            defaults, storage allocations, and social links are shared platform
-            settings used wherever those systems appear.
+            PayFast mode, Bob Go credentials, WhatsApp ordering credentials,
+            Google tags, media limits, compression defaults, storage
+            allocations, and social links are shared platform settings used
+            wherever those systems appear.
           </p>
         </div>
 

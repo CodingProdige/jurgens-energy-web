@@ -7,6 +7,7 @@ import {
   FileTextIcon,
   FolderTreeIcon,
   LayoutDashboardIcon,
+  MessageCircleIcon,
   SettingsIcon,
   TruckIcon,
   UserCogIcon,
@@ -32,14 +33,30 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
   },
   {
     label: "Orders",
-    href: "/orders",
     icon: ClipboardListIcon,
-    capability: "admin.orders.view",
+    children: [
+      {
+        label: "All orders",
+        href: "/orders",
+        capability: "admin.orders.view",
+      },
+      {
+        label: "Scheduled",
+        href: "/orders/scheduled",
+        capability: "admin.orders.view",
+      },
+    ],
   },
   {
     label: "Shipping",
     href: "/shipping",
     icon: TruckIcon,
+    capability: "admin.orders.view",
+  },
+  {
+    label: "WhatsApp",
+    href: "/whatsapp",
+    icon: MessageCircleIcon,
     capability: "admin.orders.view",
   },
   {

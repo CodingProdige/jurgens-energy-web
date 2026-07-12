@@ -1,20 +1,18 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import {
-  BarChart3,
   Eye,
   EyeOff,
   Lock,
   LockKeyhole,
   Mail,
-  Settings,
-  Shield,
   ShieldCheck,
 } from "lucide-react";
 
 import type { SignInState } from "@/app/sign-in/actions";
+import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -28,36 +26,8 @@ type AdminSignInScreenProps = {
   ssoError?: string;
 };
 
-const featureItems = [
-  {
-    icon: BarChart3,
-    title: "Real-time Analytics",
-    description: "Monitor your platform performance in real-time.",
-  },
-  {
-    icon: Shield,
-    title: "User & Access Management",
-    description: "Manage users, admin staff, and permissions seamlessly.",
-  },
-  {
-    icon: Settings,
-    title: "Platform Control",
-    description: "Configure settings and keep your marketplace running smoothly.",
-  },
-];
-
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <Image
-      src="/brand/logo/jurgens-icon.png"
-      alt="Jurgens Energy"
-      width={164}
-      height={30}
-      priority
-      className={cn("h-auto w-[142px]", className)}
-    />
-  );
-}
+const adminVisualVideoSrc =
+  "/brand/video/show_this_truck_switching_on_i_Seedance_20_13976.mp4";
 
 function GoogleGlyph() {
   return (
@@ -83,9 +53,15 @@ function AdminSignInForm({
 
   return (
     <div className="w-full max-w-[390px]">
+      <Link
+        aria-label="Jurgens Energy admin home"
+        className="mb-10 inline-flex w-fit"
+        href="/"
+      >
+        <JurgensEnergyLogo className="scale-[0.92] origin-left" />
+      </Link>
       <form action={formAction}>
       <div className="mb-9 text-center lg:text-left">
-        <BrandMark className="mx-auto mb-12 w-[126px] lg:hidden" />
         <h1 className="m-0 text-[22px] font-extrabold leading-tight text-[#070b16] dark:text-white">
           Sign in to your account
         </h1>
@@ -217,7 +193,6 @@ export function AdminSignInScreen({
   ssoError,
 }: AdminSignInScreenProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
-  const [didVideoEnd, setDidVideoEnd] = useState(false);
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-white text-white dark:bg-[#0f1114] lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(430px,1fr)]">
@@ -231,11 +206,7 @@ export function AdminSignInScreen({
           muted
           onCanPlay={() => setIsVideoReady(true)}
           onLoadedData={() => setIsVideoReady(true)}
-          onEnded={() => setDidVideoEnd(true)}
-          onError={() => {
-            setIsVideoReady(true);
-            setDidVideoEnd(true);
-          }}
+          onError={() => setIsVideoReady(true)}
           onPlaying={() => setIsVideoReady(true)}
           playsInline
           preload="auto"
@@ -244,60 +215,8 @@ export function AdminSignInScreen({
             isVideoReady ? "opacity-100" : "opacity-0",
           )}
         >
-          <source
-            src="/brand/video/start_the_video_pitch_black_an_Seedance_20_53198.mp4"
-            type="video/mp4"
-          />
+          <source src={adminVisualVideoSrc} type="video/mp4" />
         </video>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_92%_11%,rgba(255,255,255,0.08),transparent_30%),radial-gradient(circle_at_67%_83%,rgba(255,196,0,0.16),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
-        <div
-          className={cn(
-            "absolute inset-y-0 left-0 w-[78%] bg-[linear-gradient(90deg,rgba(0,0,0,0.9),rgba(0,0,0,0.66)_42%,rgba(0,0,0,0.28)_72%,transparent)] transition-opacity duration-1000 ease-out",
-            didVideoEnd ? "opacity-100" : "opacity-0",
-          )}
-        />
-        <div
-          className={cn(
-            "relative z-20 transition-all duration-1000 ease-out",
-            didVideoEnd ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0",
-          )}
-        >
-          <BrandMark className="w-[116px]" />
-
-          <div className="mt-[100px]">
-            <h2 className="max-w-[360px] text-[34px] font-extrabold leading-[1.08] xl:text-[36px]">
-              Welcome to
-              <br />
-              <span className="text-[#ffc400]">Jurgens Energy</span> Admin
-            </h2>
-            <p className="mt-5 max-w-[385px] text-[14px] font-medium leading-6 text-white/88">
-              Sign in to access the powerful admin dashboard and manage your
-              catalog with ease.
-            </p>
-          </div>
-
-          <div className="mt-8 grid gap-5">
-            {featureItems.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <div key={item.title} className="grid grid-cols-[36px_1fr] gap-4">
-                  <div className="grid size-9 place-items-center rounded-[6px] border border-white/12 bg-white/[0.03] text-[#ffc400] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                    <Icon className="size-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-[12px] font-extrabold text-white">
-                      {item.title}
-                    </h3>
-                    <p className="mt-1 max-w-[290px] text-[12px] leading-[1.45] text-white/72">
-                      {item.description}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </section>
 
       <section className="grid min-h-[calc(100vh-430px)] min-w-0 place-items-center bg-white px-7 py-10 dark:bg-[#0f1114] sm:px-12 lg:min-h-screen lg:px-16">

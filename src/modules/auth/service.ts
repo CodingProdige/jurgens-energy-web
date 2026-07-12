@@ -14,6 +14,10 @@ import {
   type PlatformRole,
 } from "@/src/db/schema";
 import { addEmailSubscriber } from "@/src/modules/marketing/email-subscribers";
+import {
+  claimWhatsappDraftForUser,
+  linkWhatsappNumberToUser,
+} from "@/src/modules/whatsapp-ordering/customer-links";
 
 export const PASSWORD_RESET_TOKEN_TTL_MINUTES = 15;
 
@@ -125,10 +129,14 @@ export async function createCustomerAccount({
   email,
   name,
   password,
+  whatsappDraftToken,
+  whatsappPhone,
 }: {
   email: string;
   name: string;
   password: string;
+  whatsappDraftToken?: string | null;
+  whatsappPhone: string;
 }) {
   const passwordHash = await hashPassword(password);
 
@@ -152,6 +160,22 @@ export async function createCustomerAccount({
       email,
       source: "customer_signup",
     });
+
+    await linkWhatsappNumberToUser({
+      database: tx,
+      phone: whatsappPhone,
+      source: "registration",
+      userId: createdUser.id,
+      verified: false,
+    });
+
+    if (whatsappDraftToken) {
+      await claimWhatsappDraftForUser({
+        database: tx,
+        token: whatsappDraftToken,
+        userId: createdUser.id,
+      });
+    }
 
     return [createdUser];
   });

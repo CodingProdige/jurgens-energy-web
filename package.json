@@ -14,6 +14,8 @@
     "selfhost:deploy": "node --env-file=.env scripts/deploy-selfhost.mjs",
     "selfhost:logs": "docker compose -p jurgens_energy_selfhost --profile tunnel logs -f web caddy postgres redis cloudflared",
     "selfhost:status": "docker compose -p jurgens_energy_selfhost --profile tunnel ps",
+    "tunnel:cloudflare": "node scripts/start-cloudflare-tunnel.mjs",
+    "tunnel:cloudflare:docker": "node scripts/start-cloudflare-tunnel.mjs --docker",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

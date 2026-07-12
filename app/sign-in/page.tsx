@@ -8,6 +8,10 @@ import { signInCustomerWithPassword } from "@/app/sign-in/actions";
 import { MarketplaceAuthScreen } from "@/components/auth/marketplace-auth-screen";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { rememberedEmailCookieName } from "@/src/modules/auth/constants";
+import {
+  getWhatsappDraftResumePath,
+  parseWhatsappDraftToken,
+} from "@/src/modules/whatsapp-ordering/draft-tokens";
 
 export const metadata: Metadata = {
   title: "Customer Sign In",
@@ -18,22 +22,38 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ whatsappDraft?: string }>;
+}) {
   const session = await auth();
   const cookieStore = await cookies();
   const rememberedEmail = cookieStore.get(rememberedEmailCookieName)?.value;
+  const { whatsappDraft } = await searchParams;
+  const whatsappDraftToken = parseWhatsappDraftToken(whatsappDraft);
 
   if (session?.user) {
-    redirect("/");
+    redirect(
+      whatsappDraftToken
+        ? getWhatsappDraftResumePath(whatsappDraftToken)
+        : "/",
+    );
   }
+
+  const googleAction = signInMarketplaceWithGoogle.bind(
+    null,
+    whatsappDraftToken,
+  );
 
   return (
     <MarketplaceGate>
       <MarketplaceAuthScreen
         action={signInCustomerWithPassword}
-        googleAction={signInMarketplaceWithGoogle}
+        googleAction={googleAction}
         rememberedEmail={rememberedEmail}
         mode="sign-in"
+        whatsappDraftToken={whatsappDraftToken}
       />
     </MarketplaceGate>
   );

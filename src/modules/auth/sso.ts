@@ -14,8 +14,21 @@ export function isSsoIntent(value: unknown): value is SsoIntent {
   );
 }
 
-export function getSsoCompletionPath(intent: SsoIntent) {
-  return `/auth/sso/complete?intent=${intent}`;
+export function getSsoCompletionPath(
+  intent: SsoIntent,
+  searchParams?: Record<string, string | null | undefined>,
+) {
+  const params = new URLSearchParams({ intent });
+
+  if (searchParams) {
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value) {
+        params.set(key, value);
+      }
+    }
+  }
+
+  return `/auth/sso/complete?${params.toString()}`;
 }
 
 export function isGoogleAuthConfigured() {
@@ -40,10 +53,21 @@ function getConfiguredHostname(
   return process.env.SELLER_HOSTNAME ?? "seller.localhost";
 }
 
-export function getSsoStartUrl(intent: SsoIntent) {
+export function getSsoStartUrl(
+  intent: SsoIntent,
+  searchParams?: Record<string, string | null | undefined>,
+) {
   const url = getBaseAppUrl();
   url.pathname = "/auth/sso/start";
   url.search = new URLSearchParams({ intent }).toString();
+
+  if (searchParams) {
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value) {
+        url.searchParams.set(key, value);
+      }
+    }
+  }
 
   return url.toString();
 }

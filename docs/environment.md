@@ -42,9 +42,15 @@ SENDGRID_FROM_EMAIL=no-reply@jurgensenergy.com
 SENDGRID_FROM_NAME=Jurgens Energy
 SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
 
+OPENAI_API_KEY=replace-with-openai-api-key
+OPENAI_MODEL=gpt-5.6-luna
+OPENAI_REASONING_EFFORT=medium
+
 WEB_PUSH_PUBLIC_KEY=replace-with-vapid-public-key
 WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
 WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
+
+WHATSAPP_AUTOMATION_SECRET=replace-with-a-long-random-secret
 ```
 
 ## Self-Hosted Values
@@ -84,9 +90,15 @@ SENDGRID_FROM_EMAIL=no-reply@jurgensenergy.com
 SENDGRID_FROM_NAME=Jurgens Energy
 SENDGRID_WEBHOOK_PUBLIC_KEY=replace-with-sendgrid-signed-event-webhook-key
 
+OPENAI_API_KEY=replace-with-openai-api-key
+OPENAI_MODEL=gpt-5.6-luna
+OPENAI_REASONING_EFFORT=medium
+
 WEB_PUSH_PUBLIC_KEY=replace-with-vapid-public-key
 WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
 WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
+
+WHATSAPP_AUTOMATION_SECRET=replace-with-a-long-random-secret
 
 CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 ```
@@ -94,6 +106,30 @@ CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5433`. Docker Compose gives the `web` container its internal database URL automatically.
 
 The Docker Compose defaults intentionally avoid common ports used by the copied project: PostgreSQL publishes on `5433`, Redis on `6380`, Caddy HTTP on `3010`, and Caddy HTTPS on `3443`. Override `POSTGRES_PORT`, `REDIS_PORT`, `CADDY_HTTP_PORT`, or `CADDY_HTTPS_PORT` in the single root `.env` only if the server needs different bindings.
+
+## Local Webhook Tunnels
+
+For local provider webhooks such as 360dialog WhatsApp testing, start a temporary Cloudflare Quick Tunnel:
+
+```sh
+npm run tunnel:cloudflare
+```
+
+The script prefers a local `cloudflared` install and falls back to Docker when available. Use the printed `trycloudflare.com` URL with the webhook route:
+
+```text
+https://your-tunnel.trycloudflare.com/api/webhooks/whatsapp
+```
+
+Set `APP_URL` to the same tunnel URL while testing WhatsApp checkout links, then restart the dev server:
+
+```env
+APP_URL=https://your-tunnel.trycloudflare.com
+```
+
+`WHATSAPP_AUTOMATION_SECRET` protects the scheduled follow-up runner at
+`/api/whatsapp/follow-ups`. Call it with `POST` and either
+`Authorization: Bearer <secret>` or `x-whatsapp-automation-secret: <secret>`.
 
 `SENDGRID_FROM_EMAIL` must be a sender identity verified in SendGrid. If either SendGrid value is missing in local development, password reset requests keep showing the dev reset link instead of sending email.
 

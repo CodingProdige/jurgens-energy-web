@@ -10,12 +10,37 @@ import { decryptSecret, encryptSecret } from "@/src/modules/security/secrets";
 
 export const marketplaceComingSoonCookieName = "piessang_marketplace_preview";
 
-type MarketplaceSettings = {
+const defaultWhatsappMessageUrl = "https://waba-v2.360dialog.io";
+export const defaultWhatsappFollowUpMessages = {
+  default:
+    "Hi, just checking in. If you still need gas, send the cylinder size, quantity, and delivery suburb and we will help you finish it.",
+  draft:
+    "Hi, just checking in. Would you like to continue with this order? Reply YES to confirm, or tell us what to change.",
+  support:
+    "Hi, just checking in. Did you still need help with delivery, a gas order, or anything else from Jurgens Energy?",
+} as const;
+
+function getWhatsappWebhookUrl() {
+  return new URL("/api/webhooks/whatsapp", env.APP_URL).toString();
+}
+
+function normalizeWhatsappProvider(value: string | null | undefined): "360dialog" {
+  return value === "360dialog" ? "360dialog" : "360dialog";
+}
+
+export type MarketplaceSettings = {
   bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
   comingSoonEnabled: boolean;
   comingSoonPasswordHash: string | null;
   facebookUrl: string | null;
   freeStorageQuotaMb: number;
+  googleAdsConversionId: string | null;
+  googleAdsConversionLabel: string | null;
+  googleAnalyticsMeasurementId: string | null;
+  googleMerchantCenterId: string | null;
+  googleReviewUrl: string | null;
+  googleSiteVerificationToken: string | null;
+  googleTagManagerId: string | null;
   imageCompressionQuality: number;
   instagramUrl: string | null;
   maxImageWidth: number;
@@ -58,7 +83,36 @@ type MarketplaceSettings = {
   hasStripeSandboxSecretKey: boolean;
   hasStripeSandboxWebhookSecret: boolean;
   videoCompressionCrf: number;
+  hasWhatsappApiKey: boolean;
+  hasWhatsappWebhookVerifyToken: boolean;
+  whatsappBusinessPhoneNumber: string | null;
+  whatsappFollowUpDefaultMessage: string;
+  whatsappFollowUpDelayMinutes: number;
+  whatsappFollowUpDraftMessage: string;
+  whatsappFollowUpMaxCount: number;
+  whatsappFollowUpQuietHoursEnabled: boolean;
+  whatsappFollowUpQuietHoursEnd: string | null;
+  whatsappFollowUpQuietHoursStart: string | null;
+  whatsappFollowUpSupportMessage: string;
+  whatsappFollowUpsEnabled: boolean;
+  whatsappMessageUrl: string;
+  whatsappOrderingEnabled: boolean;
+  whatsappProvider: "360dialog";
+  whatsappWebhookUrl: string;
 };
+
+export type WhatsappFollowUpSettings = Pick<
+  MarketplaceSettings,
+  | "whatsappFollowUpDefaultMessage"
+  | "whatsappFollowUpDelayMinutes"
+  | "whatsappFollowUpDraftMessage"
+  | "whatsappFollowUpMaxCount"
+  | "whatsappFollowUpQuietHoursEnabled"
+  | "whatsappFollowUpQuietHoursEnd"
+  | "whatsappFollowUpQuietHoursStart"
+  | "whatsappFollowUpSupportMessage"
+  | "whatsappFollowUpsEnabled"
+>;
 
 export type MarketplaceAdminSecrets = {
   bobgoLiveApiKey: string | null;
@@ -73,6 +127,8 @@ export type MarketplaceAdminSecrets = {
   stripeLiveWebhookSecret: string | null;
   stripeSandboxSecretKey: string | null;
   stripeSandboxWebhookSecret: string | null;
+  whatsappApiKey: string | null;
+  whatsappWebhookVerifyToken: string | null;
 };
 
 const defaultSettings: MarketplaceSettings = {
@@ -81,6 +137,13 @@ const defaultSettings: MarketplaceSettings = {
   comingSoonPasswordHash: null,
   facebookUrl: null,
   freeStorageQuotaMb: 512,
+  googleAdsConversionId: null,
+  googleAdsConversionLabel: null,
+  googleAnalyticsMeasurementId: null,
+  googleMerchantCenterId: null,
+  googleReviewUrl: null,
+  googleSiteVerificationToken: null,
+  googleTagManagerId: null,
   imageCompressionQuality: 78,
   instagramUrl: null,
   maxImageWidth: 2000,
@@ -123,6 +186,22 @@ const defaultSettings: MarketplaceSettings = {
   hasStripeSandboxSecretKey: false,
   hasStripeSandboxWebhookSecret: false,
   videoCompressionCrf: 28,
+  hasWhatsappApiKey: Boolean(env.DIALOGUE_API_KEY),
+  hasWhatsappWebhookVerifyToken: Boolean(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
+  whatsappBusinessPhoneNumber: env.WHATSAPP_ORDERING_PHONE_NUMBER ?? null,
+  whatsappFollowUpDefaultMessage: defaultWhatsappFollowUpMessages.default,
+  whatsappFollowUpDelayMinutes: 30,
+  whatsappFollowUpDraftMessage: defaultWhatsappFollowUpMessages.draft,
+  whatsappFollowUpMaxCount: 1,
+  whatsappFollowUpQuietHoursEnabled: false,
+  whatsappFollowUpQuietHoursEnd: null,
+  whatsappFollowUpQuietHoursStart: null,
+  whatsappFollowUpSupportMessage: defaultWhatsappFollowUpMessages.support,
+  whatsappFollowUpsEnabled: true,
+  whatsappMessageUrl: env.DIALOGUE_MESSAGE_URL ?? defaultWhatsappMessageUrl,
+  whatsappOrderingEnabled: false,
+  whatsappProvider: "360dialog",
+  whatsappWebhookUrl: getWhatsappWebhookUrl(),
 };
 
 export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
@@ -132,6 +211,15 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       comingSoonPasswordHash: marketplaceSettings.comingSoonPasswordHash,
       facebookUrl: marketplaceSettings.facebookUrl,
       freeStorageQuotaMb: marketplaceSettings.freeStorageQuotaMb,
+      googleAdsConversionId: marketplaceSettings.googleAdsConversionId,
+      googleAdsConversionLabel: marketplaceSettings.googleAdsConversionLabel,
+      googleAnalyticsMeasurementId:
+        marketplaceSettings.googleAnalyticsMeasurementId,
+      googleMerchantCenterId: marketplaceSettings.googleMerchantCenterId,
+      googleReviewUrl: marketplaceSettings.googleReviewUrl,
+      googleSiteVerificationToken:
+        marketplaceSettings.googleSiteVerificationToken,
+      googleTagManagerId: marketplaceSettings.googleTagManagerId,
       imageCompressionQuality: marketplaceSettings.imageCompressionQuality,
       instagramUrl: marketplaceSettings.instagramUrl,
       maxImageWidth: marketplaceSettings.maxImageWidth,
@@ -195,6 +283,30 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
         marketplaceSettings.stripeSandboxWebhookSecretEncrypted,
       twitterUrl: marketplaceSettings.twitterUrl,
       videoCompressionCrf: marketplaceSettings.videoCompressionCrf,
+      whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
+      whatsappBusinessPhoneNumber:
+        marketplaceSettings.whatsappBusinessPhoneNumber,
+      whatsappFollowUpDefaultMessage:
+        marketplaceSettings.whatsappFollowUpDefaultMessage,
+      whatsappFollowUpDelayMinutes:
+        marketplaceSettings.whatsappFollowUpDelayMinutes,
+      whatsappFollowUpDraftMessage:
+        marketplaceSettings.whatsappFollowUpDraftMessage,
+      whatsappFollowUpMaxCount: marketplaceSettings.whatsappFollowUpMaxCount,
+      whatsappFollowUpQuietHoursEnabled:
+        marketplaceSettings.whatsappFollowUpQuietHoursEnabled,
+      whatsappFollowUpQuietHoursEnd:
+        marketplaceSettings.whatsappFollowUpQuietHoursEnd,
+      whatsappFollowUpQuietHoursStart:
+        marketplaceSettings.whatsappFollowUpQuietHoursStart,
+      whatsappFollowUpSupportMessage:
+        marketplaceSettings.whatsappFollowUpSupportMessage,
+      whatsappFollowUpsEnabled: marketplaceSettings.whatsappFollowUpsEnabled,
+      whatsappMessageUrl: marketplaceSettings.whatsappMessageUrl,
+      whatsappOrderingEnabled: marketplaceSettings.whatsappOrderingEnabled,
+      whatsappProvider: marketplaceSettings.whatsappProvider,
+      whatsappWebhookVerifyTokenEncrypted:
+        marketplaceSettings.whatsappWebhookVerifyTokenEncrypted,
     })
     .from(marketplaceSettings)
     .where(eq(marketplaceSettings.id, 1))
@@ -248,6 +360,44 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     hasStripeSandboxWebhookSecret: Boolean(
       settings.stripeSandboxWebhookSecretEncrypted,
     ),
+    hasWhatsappApiKey: Boolean(
+      settings.whatsappApiKeyEncrypted ?? env.DIALOGUE_API_KEY,
+    ),
+    hasWhatsappWebhookVerifyToken: Boolean(
+      settings.whatsappWebhookVerifyTokenEncrypted ??
+        env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+    ),
+    whatsappBusinessPhoneNumber:
+      settings.whatsappBusinessPhoneNumber ??
+      env.WHATSAPP_ORDERING_PHONE_NUMBER ??
+      null,
+    whatsappFollowUpDefaultMessage:
+      settings.whatsappFollowUpDefaultMessage ??
+      defaultWhatsappFollowUpMessages.default,
+    whatsappFollowUpDelayMinutes: Math.max(
+      1,
+      settings.whatsappFollowUpDelayMinutes ?? 30,
+    ),
+    whatsappFollowUpDraftMessage:
+      settings.whatsappFollowUpDraftMessage ??
+      defaultWhatsappFollowUpMessages.draft,
+    whatsappFollowUpMaxCount: Math.max(1, settings.whatsappFollowUpMaxCount ?? 1),
+    whatsappFollowUpQuietHoursEnabled:
+      settings.whatsappFollowUpQuietHoursEnabled ?? false,
+    whatsappFollowUpQuietHoursEnd:
+      settings.whatsappFollowUpQuietHoursEnd ?? null,
+    whatsappFollowUpQuietHoursStart:
+      settings.whatsappFollowUpQuietHoursStart ?? null,
+    whatsappFollowUpSupportMessage:
+      settings.whatsappFollowUpSupportMessage ??
+      defaultWhatsappFollowUpMessages.support,
+    whatsappFollowUpsEnabled: settings.whatsappFollowUpsEnabled ?? true,
+    whatsappMessageUrl:
+      settings.whatsappMessageUrl ??
+      env.DIALOGUE_MESSAGE_URL ??
+      defaultWhatsappMessageUrl,
+    whatsappProvider: normalizeWhatsappProvider(settings.whatsappProvider),
+    whatsappWebhookUrl: getWhatsappWebhookUrl(),
   };
 }
 
@@ -512,6 +662,138 @@ export async function updateMarketplaceShippingSettings({
   return { ok: true, message: "Shipping settings saved." };
 }
 
+export async function updateMarketplaceWhatsappSettings({
+  apiKey,
+  businessPhoneNumber,
+  enabled,
+  followUpDefaultMessage,
+  followUpDelayMinutes,
+  followUpDraftMessage,
+  followUpMaxCount,
+  followUpQuietHoursEnabled,
+  followUpQuietHoursEnd,
+  followUpQuietHoursStart,
+  followUpSupportMessage,
+  followUpsEnabled,
+  messageUrl,
+  provider,
+  webhookVerifyToken,
+}: {
+  apiKey?: string;
+  businessPhoneNumber?: string;
+  enabled: boolean;
+  followUpDefaultMessage: string;
+  followUpDelayMinutes: number;
+  followUpDraftMessage: string;
+  followUpMaxCount: number;
+  followUpQuietHoursEnabled: boolean;
+  followUpQuietHoursEnd: string | null;
+  followUpQuietHoursStart: string | null;
+  followUpSupportMessage: string;
+  followUpsEnabled: boolean;
+  messageUrl?: string;
+  provider: "360dialog";
+  webhookVerifyToken?: string;
+}) {
+  const existing = await getRawMarketplaceSettings();
+  const nextApiKey =
+    apiKey && apiKey.length > 0
+      ? encryptSecret(apiKey)
+      : (existing?.whatsappApiKeyEncrypted ??
+        (env.DIALOGUE_API_KEY ? encryptSecret(env.DIALOGUE_API_KEY) : null));
+  const nextWebhookVerifyToken =
+    webhookVerifyToken && webhookVerifyToken.length > 0
+      ? encryptSecret(webhookVerifyToken)
+      : (existing?.whatsappWebhookVerifyTokenEncrypted ??
+        (env.WHATSAPP_WEBHOOK_VERIFY_TOKEN
+          ? encryptSecret(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN)
+          : null));
+
+  if (enabled && !businessPhoneNumber) {
+    return {
+      ok: false,
+      message: "Add the WhatsApp business phone number before enabling ordering.",
+    };
+  }
+
+  if (enabled && !nextApiKey) {
+    return {
+      ok: false,
+      message: "Add the 360dialog API key before enabling WhatsApp ordering.",
+    };
+  }
+
+  await db
+    .insert(marketplaceSettings)
+    .values({
+      id: 1,
+      whatsappApiKeyEncrypted: nextApiKey,
+      whatsappBusinessPhoneNumber: businessPhoneNumber || null,
+      whatsappFollowUpDefaultMessage: followUpDefaultMessage,
+      whatsappFollowUpDelayMinutes: followUpDelayMinutes,
+      whatsappFollowUpDraftMessage: followUpDraftMessage,
+      whatsappFollowUpMaxCount: followUpMaxCount,
+      whatsappFollowUpQuietHoursEnabled: followUpQuietHoursEnabled,
+      whatsappFollowUpQuietHoursEnd: followUpQuietHoursEnabled
+        ? followUpQuietHoursEnd
+        : null,
+      whatsappFollowUpQuietHoursStart: followUpQuietHoursEnabled
+        ? followUpQuietHoursStart
+        : null,
+      whatsappFollowUpSupportMessage: followUpSupportMessage,
+      whatsappFollowUpsEnabled: followUpsEnabled,
+      whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
+      whatsappOrderingEnabled: enabled,
+      whatsappProvider: provider,
+      whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: marketplaceSettings.id,
+      set: {
+        whatsappApiKeyEncrypted: nextApiKey,
+        whatsappBusinessPhoneNumber: businessPhoneNumber || null,
+        whatsappFollowUpDefaultMessage: followUpDefaultMessage,
+        whatsappFollowUpDelayMinutes: followUpDelayMinutes,
+        whatsappFollowUpDraftMessage: followUpDraftMessage,
+        whatsappFollowUpMaxCount: followUpMaxCount,
+        whatsappFollowUpQuietHoursEnabled: followUpQuietHoursEnabled,
+        whatsappFollowUpQuietHoursEnd: followUpQuietHoursEnabled
+          ? followUpQuietHoursEnd
+          : null,
+        whatsappFollowUpQuietHoursStart: followUpQuietHoursEnabled
+          ? followUpQuietHoursStart
+          : null,
+        whatsappFollowUpSupportMessage: followUpSupportMessage,
+        whatsappFollowUpsEnabled: followUpsEnabled,
+        whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
+        whatsappOrderingEnabled: enabled,
+        whatsappProvider: provider,
+        whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
+        updatedAt: new Date(),
+      },
+    });
+
+  return { ok: true, message: "WhatsApp ordering settings saved." };
+}
+
+export async function getWhatsappFollowUpSettings(): Promise<WhatsappFollowUpSettings> {
+  const settings = await getMarketplaceSettings();
+
+  return {
+    whatsappFollowUpDefaultMessage: settings.whatsappFollowUpDefaultMessage,
+    whatsappFollowUpDelayMinutes: settings.whatsappFollowUpDelayMinutes,
+    whatsappFollowUpDraftMessage: settings.whatsappFollowUpDraftMessage,
+    whatsappFollowUpMaxCount: settings.whatsappFollowUpMaxCount,
+    whatsappFollowUpQuietHoursEnabled:
+      settings.whatsappFollowUpQuietHoursEnabled,
+    whatsappFollowUpQuietHoursEnd: settings.whatsappFollowUpQuietHoursEnd,
+    whatsappFollowUpQuietHoursStart: settings.whatsappFollowUpQuietHoursStart,
+    whatsappFollowUpSupportMessage: settings.whatsappFollowUpSupportMessage,
+    whatsappFollowUpsEnabled: settings.whatsappFollowUpsEnabled,
+  };
+}
+
 export async function getBobGoWebhookSecret() {
   const [settings, rawSettings] = await Promise.all([
     getMarketplaceSettings(),
@@ -596,6 +878,43 @@ export async function getPayFastIntegrationConfig() {
   };
 }
 
+export async function getWhatsappIntegrationConfig() {
+  const [rawSettings, settings] = await Promise.all([
+    getRawMarketplaceSettings(),
+    getMarketplaceSettings(),
+  ]);
+  const encryptedApiKey = rawSettings?.whatsappApiKeyEncrypted;
+  const apiKey = encryptedApiKey
+    ? decryptOptionalSecret(encryptedApiKey)
+    : (env.DIALOGUE_API_KEY ?? null);
+  const encryptedVerifyToken =
+    rawSettings?.whatsappWebhookVerifyTokenEncrypted;
+  const webhookVerifyToken = encryptedVerifyToken
+    ? decryptOptionalSecret(encryptedVerifyToken)
+    : (env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ?? null);
+  const businessPhoneNumber =
+    settings.whatsappBusinessPhoneNumber ??
+    env.WHATSAPP_ORDERING_PHONE_NUMBER ??
+    null;
+  const messageUrl =
+    settings.whatsappMessageUrl ??
+    env.DIALOGUE_MESSAGE_URL ??
+    defaultWhatsappMessageUrl;
+
+  return {
+    apiKey,
+    businessPhoneNumber,
+    isConfigured: Boolean(
+      settings.whatsappOrderingEnabled && apiKey && businessPhoneNumber,
+    ),
+    messageUrl,
+    provider: settings.whatsappProvider,
+    webhookUrl: getWhatsappWebhookUrl(),
+    webhookVerifyToken,
+    whatsappOrderingEnabled: settings.whatsappOrderingEnabled,
+  };
+}
+
 export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecrets> {
   const rawSettings = await getRawMarketplaceSettings();
 
@@ -636,6 +955,14 @@ export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecr
     stripeSandboxWebhookSecret: decryptOptionalSecret(
       rawSettings?.stripeSandboxWebhookSecretEncrypted,
     ),
+    whatsappApiKey:
+      decryptOptionalSecret(rawSettings?.whatsappApiKeyEncrypted) ??
+      env.DIALOGUE_API_KEY ??
+      null,
+    whatsappWebhookVerifyToken:
+      decryptOptionalSecret(rawSettings?.whatsappWebhookVerifyTokenEncrypted) ??
+      env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ??
+      null,
   };
 }
 
@@ -668,6 +995,9 @@ async function getRawMarketplaceSettings() {
         marketplaceSettings.stripeSandboxSecretKeyEncrypted,
       stripeSandboxWebhookSecretEncrypted:
         marketplaceSettings.stripeSandboxWebhookSecretEncrypted,
+      whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
+      whatsappWebhookVerifyTokenEncrypted:
+        marketplaceSettings.whatsappWebhookVerifyTokenEncrypted,
     })
     .from(marketplaceSettings)
     .where(eq(marketplaceSettings.id, 1))
@@ -746,10 +1076,12 @@ export async function updateMarketplaceComingSoonSettings({
 
 export async function updateMarketplaceSocialLinks({
   facebookUrl,
+  googleReviewUrl,
   instagramUrl,
   twitterUrl,
 }: {
   facebookUrl?: string;
+  googleReviewUrl?: string;
   instagramUrl?: string;
   twitterUrl?: string;
 }) {
@@ -758,6 +1090,7 @@ export async function updateMarketplaceSocialLinks({
     .values({
       id: 1,
       facebookUrl: facebookUrl || null,
+      googleReviewUrl: googleReviewUrl || null,
       instagramUrl: instagramUrl || null,
       twitterUrl: twitterUrl || null,
       updatedAt: new Date(),
@@ -766,6 +1099,7 @@ export async function updateMarketplaceSocialLinks({
       target: marketplaceSettings.id,
       set: {
         facebookUrl: facebookUrl || null,
+        googleReviewUrl: googleReviewUrl || null,
         instagramUrl: instagramUrl || null,
         twitterUrl: twitterUrl || null,
         updatedAt: new Date(),
@@ -773,6 +1107,49 @@ export async function updateMarketplaceSocialLinks({
     });
 
   return { ok: true, message: "Social links saved." };
+}
+
+export async function updateMarketplaceGoogleMarketingSettings({
+  googleAdsConversionId,
+  googleAdsConversionLabel,
+  googleAnalyticsMeasurementId,
+  googleMerchantCenterId,
+  googleSiteVerificationToken,
+  googleTagManagerId,
+}: {
+  googleAdsConversionId?: string;
+  googleAdsConversionLabel?: string;
+  googleAnalyticsMeasurementId?: string;
+  googleMerchantCenterId?: string;
+  googleSiteVerificationToken?: string;
+  googleTagManagerId?: string;
+}) {
+  await db
+    .insert(marketplaceSettings)
+    .values({
+      id: 1,
+      googleAdsConversionId: googleAdsConversionId || null,
+      googleAdsConversionLabel: googleAdsConversionLabel || null,
+      googleAnalyticsMeasurementId: googleAnalyticsMeasurementId || null,
+      googleMerchantCenterId: googleMerchantCenterId || null,
+      googleSiteVerificationToken: googleSiteVerificationToken || null,
+      googleTagManagerId: googleTagManagerId || null,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: marketplaceSettings.id,
+      set: {
+        googleAdsConversionId: googleAdsConversionId || null,
+        googleAdsConversionLabel: googleAdsConversionLabel || null,
+        googleAnalyticsMeasurementId: googleAnalyticsMeasurementId || null,
+        googleMerchantCenterId: googleMerchantCenterId || null,
+        googleSiteVerificationToken: googleSiteVerificationToken || null,
+        googleTagManagerId: googleTagManagerId || null,
+        updatedAt: new Date(),
+      },
+    });
+
+  return { ok: true, message: "Google tag settings saved." };
 }
 
 export async function verifyMarketplaceComingSoonPassword(password: string) {

@@ -6,11 +6,14 @@ import { z } from "zod";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
   updateMarketplaceComingSoonSettings,
+  updateMarketplaceGoogleMarketingSettings,
   updateMarketplaceMediaSettings,
   updateMarketplacePayFastSettings,
   updateMarketplaceSocialLinks,
   updateMarketplaceShippingSettings,
+  updateMarketplaceWhatsappSettings,
 } from "@/src/modules/marketplace/settings";
+import { normalizePhoneNumber } from "@/src/modules/phone";
 import {
   deleteJurgensDeliveryZone,
   upsertJurgensDeliveryZone,
@@ -79,6 +82,7 @@ const optionalUrlSchema = z
 
 const socialLinksSchema = z.object({
   facebookUrl: optionalUrlSchema,
+  googleReviewUrl: optionalUrlSchema,
   instagramUrl: optionalUrlSchema,
   twitterUrl: optionalUrlSchema,
 });
@@ -91,6 +95,7 @@ export async function updateMarketplaceSocialLinkSettings(
 
   const parsed = socialLinksSchema.safeParse({
     facebookUrl: String(formData.get("facebookUrl") ?? ""),
+    googleReviewUrl: String(formData.get("googleReviewUrl") ?? ""),
     instagramUrl: String(formData.get("instagramUrl") ?? ""),
     twitterUrl: String(formData.get("twitterUrl") ?? ""),
   });
@@ -103,6 +108,130 @@ export async function updateMarketplaceSocialLinkSettings(
   }
 
   const result = await updateMarketplaceSocialLinks(parsed.data);
+
+  revalidatePath("/");
+  revalidatePath("/settings/platform");
+
+  return result;
+}
+
+const optionalGoogleTagManagerIdSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value ? value.toUpperCase() : undefined))
+  .refine(
+    (value) => !value || /^GTM-[A-Z0-9]+$/.test(value),
+    "Google Tag Manager ID must look like GTM-XXXXXXX.",
+  );
+
+const optionalGoogleAnalyticsMeasurementIdSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value ? value.toUpperCase() : undefined))
+  .refine(
+    (value) => !value || /^G-[A-Z0-9]+$/.test(value),
+    "GA4 measurement ID must look like G-XXXXXXXXXX.",
+  );
+
+const optionalGoogleAdsConversionIdSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => {
+    const cleaned = value?.replace(/\s+/g, "") ?? "";
+
+    if (!cleaned) {
+      return undefined;
+    }
+
+    const upper = cleaned.toUpperCase();
+
+    return upper.startsWith("AW-") ? upper : `AW-${upper}`;
+  })
+  .refine(
+    (value) => !value || /^AW-\d{6,20}$/.test(value),
+    "Google Ads conversion ID must look like AW-123456789.",
+  );
+
+const optionalGoogleAdsConversionLabelSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => value || undefined)
+  .refine(
+    (value) => !value || /^[A-Za-z0-9_-]{1,120}$/.test(value),
+    "Google Ads conversion label can only contain letters, numbers, hyphens, and underscores.",
+  );
+
+const optionalGoogleMerchantCenterIdSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => value?.replace(/\s+/g, "") || undefined)
+  .refine(
+    (value) => !value || /^\d{5,30}$/.test(value),
+    "Google Merchant Center ID must be numeric.",
+  );
+
+const optionalGoogleVerificationTokenSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => value || undefined)
+  .refine(
+    (value) => !value || (!value.includes("<") && value.length <= 255),
+    "Paste only the Google verification token, or the full meta tag from Google.",
+  );
+
+const googleMarketingSettingsSchema = z.object({
+  googleAdsConversionId: optionalGoogleAdsConversionIdSchema,
+  googleAdsConversionLabel: optionalGoogleAdsConversionLabelSchema,
+  googleAnalyticsMeasurementId: optionalGoogleAnalyticsMeasurementIdSchema,
+  googleMerchantCenterId: optionalGoogleMerchantCenterIdSchema,
+  googleSiteVerificationToken: optionalGoogleVerificationTokenSchema,
+  googleTagManagerId: optionalGoogleTagManagerIdSchema,
+});
+
+function extractGoogleSiteVerificationToken(value: string) {
+  const trimmed = value.trim();
+  const metaContent = trimmed.match(/\bcontent=["']([^"']+)["']/i)?.[1];
+
+  return metaContent ?? trimmed;
+}
+
+export async function updateGoogleMarketingSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  await requireSettingsManageAccess();
+
+  const parsed = googleMarketingSettingsSchema.safeParse({
+    googleAdsConversionId: String(formData.get("googleAdsConversionId") ?? ""),
+    googleAdsConversionLabel: String(
+      formData.get("googleAdsConversionLabel") ?? "",
+    ),
+    googleAnalyticsMeasurementId: String(
+      formData.get("googleAnalyticsMeasurementId") ?? "",
+    ),
+    googleMerchantCenterId: String(
+      formData.get("googleMerchantCenterId") ?? "",
+    ),
+    googleSiteVerificationToken: extractGoogleSiteVerificationToken(
+      String(formData.get("googleSiteVerificationToken") ?? ""),
+    ),
+    googleTagManagerId: String(formData.get("googleTagManagerId") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Check the Google settings.",
+    };
+  }
+
+  const result = await updateMarketplaceGoogleMarketingSettings(parsed.data);
 
   revalidatePath("/");
   revalidatePath("/settings/platform");
@@ -235,6 +364,137 @@ const shippingSettingsSchema = z.object({
   shippingEnabled: z.coerce.boolean().default(false),
   shippingMarginBps: z.coerce.number().int().min(0).max(10000),
 });
+
+const whatsappOptionalTimeSchema = z
+  .string()
+  .trim()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm time.")
+  .optional()
+  .or(z.literal("").transform(() => undefined));
+
+const whatsappSettingsSchema = z.object({
+  apiKey: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined)
+    .refine((value) => !value || value.length <= 500, "API key is too long."),
+  businessPhoneNumber: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined)
+    .refine(
+      (value) =>
+        !value ||
+        Boolean(normalizePhoneNumber(value, { defaultCountryCode: "ZA" })),
+      "Use a valid WhatsApp business phone number.",
+    )
+    .transform((value) =>
+      value
+        ? normalizePhoneNumber(value, { defaultCountryCode: "ZA" }) ?? value
+        : undefined,
+    ),
+  enabled: z.coerce.boolean().default(false),
+  followUpDefaultMessage: z
+    .string()
+    .trim()
+    .min(10, "Default follow-up message is too short.")
+    .max(1000, "Default follow-up message must be 1000 characters or less."),
+  followUpDelayMinutes: z.coerce.number().int().min(5).max(1440),
+  followUpDraftMessage: z
+    .string()
+    .trim()
+    .min(10, "Draft follow-up message is too short.")
+    .max(1000, "Draft follow-up message must be 1000 characters or less."),
+  followUpMaxCount: z.coerce.number().int().min(1).max(5),
+  followUpQuietHoursEnabled: z.boolean(),
+  followUpQuietHoursEnd: whatsappOptionalTimeSchema.transform(
+    (value) => value ?? null,
+  ),
+  followUpQuietHoursStart: whatsappOptionalTimeSchema.transform(
+    (value) => value ?? null,
+  ),
+  followUpSupportMessage: z
+    .string()
+    .trim()
+    .min(10, "Support follow-up message is too short.")
+    .max(1000, "Support follow-up message must be 1000 characters or less."),
+  followUpsEnabled: z.coerce.boolean().default(false),
+  messageUrl: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined)
+    .refine(
+      (value) => !value || value.startsWith("https://"),
+      "Use the full https:// 360dialog API URL.",
+    )
+    .refine((value) => !value || value.length <= 500, "API URL is too long."),
+  provider: z.literal("360dialog"),
+  webhookVerifyToken: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined)
+    .refine(
+      (value) => !value || value.length <= 255,
+      "Webhook verify token is too long.",
+    ),
+});
+
+export async function updateWhatsappOrderingSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  await requireSettingsManageAccess();
+
+  const parsed = whatsappSettingsSchema.safeParse({
+    apiKey: String(formData.get("apiKey") ?? ""),
+    businessPhoneNumber: String(formData.get("businessPhoneNumber") ?? ""),
+    enabled: formData.get("enabled") === "on",
+    followUpDefaultMessage: String(formData.get("followUpDefaultMessage") ?? ""),
+    followUpDelayMinutes: String(formData.get("followUpDelayMinutes") ?? "30"),
+    followUpDraftMessage: String(formData.get("followUpDraftMessage") ?? ""),
+    followUpMaxCount: String(formData.get("followUpMaxCount") ?? "1"),
+    followUpQuietHoursEnabled:
+      formData.get("followUpQuietHoursEnabled") === "on",
+    followUpQuietHoursEnd: String(formData.get("followUpQuietHoursEnd") ?? ""),
+    followUpQuietHoursStart: String(
+      formData.get("followUpQuietHoursStart") ?? "",
+    ),
+    followUpSupportMessage: String(formData.get("followUpSupportMessage") ?? ""),
+    followUpsEnabled: formData.get("followUpsEnabled") === "on",
+    messageUrl: String(formData.get("messageUrl") ?? ""),
+    provider: String(formData.get("provider") ?? "360dialog"),
+    webhookVerifyToken: String(formData.get("webhookVerifyToken") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Check the WhatsApp settings.",
+    };
+  }
+
+  if (
+    parsed.data.followUpQuietHoursEnabled &&
+    (!parsed.data.followUpQuietHoursStart || !parsed.data.followUpQuietHoursEnd)
+  ) {
+    return {
+      ok: false,
+      message: "Set both quiet-hours start and end times.",
+    };
+  }
+
+  const result = await updateMarketplaceWhatsappSettings(parsed.data);
+
+  revalidatePath("/");
+  revalidatePath("/settings/platform");
+
+  return result;
+}
 
 export async function updateShippingIntegrationSettings(
   _state: AdminSettingsState,

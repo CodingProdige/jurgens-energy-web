@@ -27,6 +27,7 @@ const itemSchema = z.object({
 });
 
 export const bobGoCheckoutRatesInputSchema = z.object({
+  checkoutFingerprint: z.string().length(64).optional(),
   collectionAddress: addressSchema,
   declaredValue: z.coerce.number().finite().nonnegative(),
   deliveryAddress: addressSchema,
@@ -47,6 +48,7 @@ export type BobGoCheckoutRate = {
   marginAmount: number;
   providerAmount: number;
   providerRateId: string | null;
+  quoteId?: string;
   serviceLevel: string | null;
   serviceName: string;
 };
@@ -106,10 +108,15 @@ export async function getBobGoCheckoutRates(input: BobGoCheckoutRatesInput) {
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
+  let quoteRows: Array<{ id: string; providerRateId: string | null }> = [];
+
   if (normalizedRates.length > 0) {
-    await db.insert(shippingRateQuotes).values(
+    quoteRows = await db
+      .insert(shippingRateQuotes)
+      .values(
       normalizedRates.map((rate) => ({
         bufferBps: config.shippingBufferBps,
+        checkoutFingerprint: parsed.checkoutFingerprint,
         collectionAddressSnapshot: parsed.collectionAddress,
         customerAmount: rate.customerAmount.toFixed(2),
         deliveryAddressSnapshot: parsed.deliveryAddress,
@@ -126,13 +133,25 @@ export async function getBobGoCheckoutRates(input: BobGoCheckoutRatesInput) {
         serviceLevel: rate.serviceLevel,
         serviceName: rate.serviceName,
       })),
-    );
+      )
+      .returning({
+        id: shippingRateQuotes.id,
+        providerRateId: shippingRateQuotes.providerRateId,
+      });
   }
+
+  const quoteIdByProviderRateId = new Map(
+    quoteRows.map((quote) => [quote.providerRateId, quote.id]),
+  );
+  const rates = normalizedRates.map((rate) => ({
+    ...rate,
+    quoteId: quoteIdByProviderRateId.get(rate.providerRateId),
+  }));
 
   return {
     expiresAt,
     mode: config.mode,
-    rates: normalizedRates,
+    rates,
   };
 }
 

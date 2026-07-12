@@ -16,6 +16,7 @@ import {
   BellIcon,
   BracesIcon,
   Code2Icon,
+  ClipboardIcon,
   CreditCardIcon,
   EyeOffIcon,
   EyeIcon,
@@ -26,6 +27,7 @@ import {
   LinkIcon,
   LockIcon,
   MailCheckIcon,
+  MessageCircleIcon,
   MonitorIcon,
   MousePointerClickIcon,
   PencilIcon,
@@ -50,6 +52,7 @@ import {
 import {
   updateMarketplaceSocialLinkSettings,
   updateMarketplaceGateSettings,
+  updateGoogleMarketingSettings,
   updateMediaStorageSettings,
   deleteNotificationGlobalVariableSettings,
   saveNotificationGlobalVariableSettings,
@@ -63,6 +66,7 @@ import {
   saveJurgensDeliveryZoneSettings,
   updatePayFastPaymentSettings,
   updateShippingIntegrationSettings,
+  updateWhatsappOrderingSettings,
   type AdminSettingsState,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
 import type { JurgensDeliveryZone } from "@/src/modules/shipping/jurgens-delivery";
@@ -240,16 +244,21 @@ export function SettingsForm({
 
 type SocialLinksFormProps = {
   facebookUrl: string | null;
+  googleReviewUrl: string | null;
   instagramUrl: string | null;
   twitterUrl: string | null;
 };
 
 export function SocialLinksForm({
   facebookUrl,
+  googleReviewUrl,
   instagramUrl,
   twitterUrl,
 }: SocialLinksFormProps) {
   const [facebookValue, setFacebookValue] = useState(facebookUrl ?? "");
+  const [googleReviewValue, setGoogleReviewValue] = useState(
+    googleReviewUrl ?? "",
+  );
   const [instagramValue, setInstagramValue] = useState(instagramUrl ?? "");
   const [twitterValue, setTwitterValue] = useState(twitterUrl ?? "");
   const [state, formAction, isPending] = useActionState(
@@ -274,6 +283,26 @@ export function SocialLinksForm({
             className="pl-10"
           />
         </div>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="googleReviewUrl">Google review URL</Label>
+        <div className="relative">
+          <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+          <Input
+            id="googleReviewUrl"
+            name="googleReviewUrl"
+            type="url"
+            autoComplete="url"
+            value={googleReviewValue}
+            onChange={(event) => setGoogleReviewValue(event.target.value)}
+            placeholder="https://g.page/r/your-google-review-link"
+            className="pl-10"
+          />
+        </div>
+        <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+          Used in completed Jurgens delivery thank-you messages.
+        </p>
       </div>
 
       <div className="grid gap-2">
@@ -329,6 +358,160 @@ export function SocialLinksForm({
       <Button type="submit" disabled={isPending} className="justify-center gap-2">
         <SaveIcon className="size-4" />
         {isPending ? "Saving..." : "Save social links"}
+      </Button>
+    </form>
+  );
+}
+
+type GoogleMarketingSettingsFormProps = {
+  googleAdsConversionId: string | null;
+  googleAdsConversionLabel: string | null;
+  googleAnalyticsMeasurementId: string | null;
+  googleMerchantCenterId: string | null;
+  googleSiteVerificationToken: string | null;
+  googleTagManagerId: string | null;
+};
+
+export function GoogleMarketingSettingsForm({
+  googleAdsConversionId,
+  googleAdsConversionLabel,
+  googleAnalyticsMeasurementId,
+  googleMerchantCenterId,
+  googleSiteVerificationToken,
+  googleTagManagerId,
+}: GoogleMarketingSettingsFormProps) {
+  const [state, formAction, isPending] = useActionState(
+    updateGoogleMarketingSettings,
+    initialState,
+  );
+
+  return (
+    <form action={formAction} className="grid gap-5">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-2">
+          <Label htmlFor="googleTagManagerId">Google Tag Manager ID</Label>
+          <div className="relative">
+            <Code2Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Input
+              autoComplete="off"
+              className="pl-10"
+              defaultValue={googleTagManagerId ?? ""}
+              id="googleTagManagerId"
+              name="googleTagManagerId"
+              placeholder="GTM-XXXXXXX"
+            />
+          </div>
+          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            Loads the GTM container on public marketplace pages only.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="googleAnalyticsMeasurementId">
+            GA4 measurement ID
+          </Label>
+          <div className="relative">
+            <BarChart3Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Input
+              autoComplete="off"
+              className="pl-10"
+              defaultValue={googleAnalyticsMeasurementId ?? ""}
+              id="googleAnalyticsMeasurementId"
+              name="googleAnalyticsMeasurementId"
+              placeholder="G-XXXXXXXXXX"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="googleAdsConversionId">Google Ads conversion ID</Label>
+          <div className="relative">
+            <MousePointerClickIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Input
+              autoComplete="off"
+              className="pl-10"
+              defaultValue={googleAdsConversionId ?? ""}
+              id="googleAdsConversionId"
+              name="googleAdsConversionId"
+              placeholder="AW-123456789"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="googleAdsConversionLabel">
+            Google Ads conversion label
+          </Label>
+          <div className="relative">
+            <MousePointerClickIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Input
+              autoComplete="off"
+              className="pl-10"
+              defaultValue={googleAdsConversionLabel ?? ""}
+              id="googleAdsConversionLabel"
+              name="googleAdsConversionLabel"
+              placeholder="Optional conversion label"
+            />
+          </div>
+          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            Saved for checkout conversion events and future campaign-specific
+            tracking.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="googleMerchantCenterId">Merchant Center ID</Label>
+          <div className="relative">
+            <Globe2Icon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Input
+              autoComplete="off"
+              className="pl-10"
+              defaultValue={googleMerchantCenterId ?? ""}
+              id="googleMerchantCenterId"
+              inputMode="numeric"
+              name="googleMerchantCenterId"
+              placeholder="123456789"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="googleSiteVerificationToken">
+            Search Console verification
+          </Label>
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Input
+              autoComplete="off"
+              className="pl-10"
+              defaultValue={googleSiteVerificationToken ?? ""}
+              id="googleSiteVerificationToken"
+              name="googleSiteVerificationToken"
+              placeholder="Paste token or full meta tag"
+            />
+          </div>
+          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            If Google gives you a meta tag, paste it here and only the content
+            token will be saved.
+          </p>
+        </div>
+      </div>
+
+      {state.message ? (
+        <p
+          className={
+            state.ok
+              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+          }
+        >
+          {state.message}
+        </p>
+      ) : null}
+
+      <Button type="submit" disabled={isPending} className="w-fit gap-2">
+        <SaveIcon className="size-4" />
+        {isPending ? "Saving..." : "Save Google tags"}
       </Button>
     </form>
   );
@@ -728,6 +911,419 @@ function PayFastCredentialPanel({
         </div>
       </div>
     </div>
+  );
+}
+
+type WhatsappOrderingSettingsFormProps = {
+  hasWhatsappApiKey: boolean;
+  hasWhatsappWebhookVerifyToken: boolean;
+  whatsappApiKey: string | null;
+  whatsappBusinessPhoneNumber: string | null;
+  whatsappFollowUpDefaultMessage: string;
+  whatsappFollowUpDelayMinutes: number;
+  whatsappFollowUpDraftMessage: string;
+  whatsappFollowUpMaxCount: number;
+  whatsappFollowUpQuietHoursEnabled: boolean;
+  whatsappFollowUpQuietHoursEnd: string | null;
+  whatsappFollowUpQuietHoursStart: string | null;
+  whatsappFollowUpSupportMessage: string;
+  whatsappFollowUpsEnabled: boolean;
+  whatsappMessageUrl: string;
+  whatsappOrderingEnabled: boolean;
+  whatsappWebhookUrl: string;
+  whatsappWebhookVerifyToken: string | null;
+};
+
+export function WhatsappOrderingSettingsForm({
+  hasWhatsappApiKey,
+  hasWhatsappWebhookVerifyToken,
+  whatsappApiKey,
+  whatsappBusinessPhoneNumber,
+  whatsappFollowUpDefaultMessage,
+  whatsappFollowUpDelayMinutes,
+  whatsappFollowUpDraftMessage,
+  whatsappFollowUpMaxCount,
+  whatsappFollowUpQuietHoursEnabled,
+  whatsappFollowUpQuietHoursEnd,
+  whatsappFollowUpQuietHoursStart,
+  whatsappFollowUpSupportMessage,
+  whatsappFollowUpsEnabled,
+  whatsappMessageUrl,
+  whatsappOrderingEnabled,
+  whatsappWebhookUrl,
+  whatsappWebhookVerifyToken,
+}: WhatsappOrderingSettingsFormProps) {
+  const [isEnabled, setIsEnabled] = useState(whatsappOrderingEnabled);
+  const [businessPhoneValue, setBusinessPhoneValue] = useState(
+    whatsappBusinessPhoneNumber ?? "",
+  );
+  const [messageUrlValue, setMessageUrlValue] = useState(whatsappMessageUrl);
+  const [followUpsEnabledValue, setFollowUpsEnabledValue] = useState(
+    whatsappFollowUpsEnabled,
+  );
+  const [quietHoursEnabledValue, setQuietHoursEnabledValue] = useState(
+    whatsappFollowUpQuietHoursEnabled,
+  );
+  const [copied, setCopied] = useState(false);
+  const [state, formAction, isPending] = useActionState(
+    updateWhatsappOrderingSettings,
+    initialState,
+  );
+
+  async function copyWebhookUrl() {
+    try {
+      await navigator.clipboard.writeText(whatsappWebhookUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <form action={formAction} className="grid gap-5">
+      <input type="hidden" name="provider" value="360dialog" />
+
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="mb-5 flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#16a34a]/10 text-[#16a34a]">
+            <MessageCircleIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              WhatsApp ordering controls
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Receive customer WhatsApp messages, create secure checkout draft
+              links, and send replies back through 360dialog.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={isEnabled}
+              name="enabled"
+              onCheckedChange={(checked) => setIsEnabled(checked === true)}
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                Enable WhatsApp ordering
+              </span>
+              <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Shows the marketplace WhatsApp button and lets webhook replies
+                send through the configured provider.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid gap-2">
+            <Label htmlFor="businessPhoneNumber">
+              WhatsApp business number
+            </Label>
+            <Input
+              id="businessPhoneNumber"
+              name="businessPhoneNumber"
+              autoComplete="tel"
+              inputMode="tel"
+              value={businessPhoneValue}
+              onChange={(event) => setBusinessPhoneValue(event.target.value)}
+              placeholder="+27 60 689 3558"
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Used for the storefront WhatsApp launcher and customer-facing
+              ordering links.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+              <KeyRoundIcon className="size-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                360dialog credentials
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                The API key is encrypted before storage. Leave it blank to keep
+                the saved value.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="messageUrl">Messaging API URL</Label>
+              <Input
+                id="messageUrl"
+                name="messageUrl"
+                type="url"
+                value={messageUrlValue}
+                onChange={(event) => setMessageUrlValue(event.target.value)}
+                placeholder="https://waba-v2.360dialog.io"
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                The sender posts text replies to this URL plus /messages.
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="apiKey">360dialog API key</Label>
+              <SecretTextInput
+                id="apiKey"
+                name="apiKey"
+                icon="key"
+                defaultValue={whatsappApiKey}
+                placeholder={
+                  hasWhatsappApiKey
+                    ? "Saved - leave blank to keep current API key"
+                    : "Paste 360dialog API key"
+                }
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="webhookVerifyToken">
+                Webhook verify token
+              </Label>
+              <SecretTextInput
+                id="webhookVerifyToken"
+                name="webhookVerifyToken"
+                icon="key"
+                defaultValue={whatsappWebhookVerifyToken}
+                placeholder={
+                  hasWhatsappWebhookVerifyToken
+                    ? "Saved - leave blank to keep current token"
+                    : "Optional Meta-style verification token"
+                }
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Optional. 360dialog mainly needs the URL below; this token is
+                kept for providers that call the Meta verification handshake.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+              <Code2Icon className="size-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                Webhook URL
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Copy this into 360dialog. It is generated from APP_URL and the
+                canonical webhook route.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="whatsappWebhookUrl">Provider webhook URL</Label>
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+              <Input
+                id="whatsappWebhookUrl"
+                readOnly
+                value={whatsappWebhookUrl}
+                className="min-w-0 font-mono text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={copyWebhookUrl}
+                className="h-10 shrink-0 gap-2"
+              >
+                <ClipboardIcon className="size-4" />
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              For local testing, set APP_URL to your tunnel URL before starting
+              the dev server, then paste the generated URL into 360dialog.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="mb-5 flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#ff5a1f]/10 text-[#ff5a1f]">
+            <HistoryIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Follow-up automation
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Control when unresolved WhatsApp conversations become follow-up
+              candidates and what message gets sent.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={followUpsEnabledValue}
+              name="followUpsEnabled"
+              onCheckedChange={(checked) =>
+                setFollowUpsEnabledValue(checked === true)
+              }
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                Enable follow-ups
+              </span>
+              <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Allows conversations to be marked as needing a follow-up and
+                sent by the automation runner.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid gap-2">
+            <Label htmlFor="followUpDelayMinutes">Delay before follow-up</Label>
+            <Input
+              id="followUpDelayMinutes"
+              name="followUpDelayMinutes"
+              type="number"
+              min={5}
+              max={1440}
+              step={5}
+              defaultValue={whatsappFollowUpDelayMinutes}
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Minutes after the latest unresolved WhatsApp prompt.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="followUpMaxCount">Max automatic follow-ups</Label>
+            <Input
+              id="followUpMaxCount"
+              name="followUpMaxCount"
+              type="number"
+              min={1}
+              max={5}
+              defaultValue={whatsappFollowUpMaxCount}
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Limit per unresolved conversation turn.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={quietHoursEnabledValue}
+              name="followUpQuietHoursEnabled"
+              onCheckedChange={(checked) =>
+                setQuietHoursEnabledValue(checked === true)
+              }
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                Respect quiet hours
+              </span>
+              <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Automatic follow-ups pause during this window. Manual admin
+                replies still work.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="followUpQuietHoursStart">Quiet start</Label>
+              <Input
+                id="followUpQuietHoursStart"
+                name="followUpQuietHoursStart"
+                type="time"
+                defaultValue={whatsappFollowUpQuietHoursStart ?? ""}
+                disabled={!quietHoursEnabledValue}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="followUpQuietHoursEnd">Quiet end</Label>
+              <Input
+                id="followUpQuietHoursEnd"
+                name="followUpQuietHoursEnd"
+                type="time"
+                defaultValue={whatsappFollowUpQuietHoursEnd ?? ""}
+                disabled={!quietHoursEnabledValue}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-2">
+            <Label htmlFor="followUpDraftMessage">Pending order message</Label>
+            <Textarea
+              id="followUpDraftMessage"
+              name="followUpDraftMessage"
+              defaultValue={whatsappFollowUpDraftMessage}
+              rows={5}
+              className="min-h-32 resize-y"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="followUpSupportMessage">Support message</Label>
+            <Textarea
+              id="followUpSupportMessage"
+              name="followUpSupportMessage"
+              defaultValue={whatsappFollowUpSupportMessage}
+              rows={5}
+              className="min-h-32 resize-y"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="followUpDefaultMessage">Default gas message</Label>
+            <Textarea
+              id="followUpDefaultMessage"
+              name="followUpDefaultMessage"
+              defaultValue={whatsappFollowUpDefaultMessage}
+              rows={5}
+              className="min-h-32 resize-y"
+            />
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+          WhatsApp provider rules still apply: free-form follow-ups can only be
+          sent inside the customer-service window unless approved template
+          sending is added later.
+        </p>
+      </div>
+
+      {state.message ? (
+        <p
+          className={
+            state.ok
+              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+          }
+        >
+          {state.message}
+        </p>
+      ) : null}
+
+      <Button type="submit" disabled={isPending} className="w-fit gap-2">
+        <SaveIcon className="size-4" />
+        {isPending ? "Saving..." : "Save WhatsApp settings"}
+      </Button>
+    </form>
   );
 }
 

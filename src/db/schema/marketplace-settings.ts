@@ -14,6 +14,13 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   facebookUrl: text("facebook_url"),
   instagramUrl: text("instagram_url"),
   twitterUrl: text("twitter_url"),
+  googleReviewUrl: text("google_review_url"),
+  googleTagManagerId: text("google_tag_manager_id"),
+  googleAnalyticsMeasurementId: text("google_analytics_measurement_id"),
+  googleAdsConversionId: text("google_ads_conversion_id"),
+  googleAdsConversionLabel: text("google_ads_conversion_label"),
+  googleMerchantCenterId: text("google_merchant_center_id"),
+  googleSiteVerificationToken: text("google_site_verification_token"),
   freeStorageQuotaMb: integer("free_storage_quota_mb").notNull().default(512),
   maxUploadFileMb: integer("max_upload_file_mb").notNull().default(10),
   maxVideoUploadFileMb: integer("max_video_upload_file_mb")
@@ -108,5 +115,41 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   )
     .notNull()
     .default(true),
+  whatsappOrderingEnabled: boolean("whatsapp_ordering_enabled")
+    .notNull()
+    .default(false),
+  whatsappProvider: varchar("whatsapp_provider", { length: 32 })
+    .notNull()
+    .default("360dialog"),
+  whatsappBusinessPhoneNumber: text("whatsapp_business_phone_number"),
+  whatsappMessageUrl: text("whatsapp_message_url"),
+  whatsappApiKeyEncrypted: text("whatsapp_api_key_encrypted"),
+  whatsappWebhookVerifyTokenEncrypted: text(
+    "whatsapp_webhook_verify_token_encrypted",
+  ),
+  whatsappFollowUpsEnabled: boolean("whatsapp_follow_ups_enabled")
+    .notNull()
+    .default(true),
+  whatsappFollowUpDelayMinutes: integer("whatsapp_follow_up_delay_minutes")
+    .notNull()
+    .default(30),
+  whatsappFollowUpMaxCount: integer("whatsapp_follow_up_max_count")
+    .notNull()
+    .default(1),
+  whatsappFollowUpQuietHoursEnabled: boolean(
+    "whatsapp_follow_up_quiet_hours_enabled",
+  )
+    .notNull()
+    .default(false),
+  whatsappFollowUpQuietHoursStart: varchar(
+    "whatsapp_follow_up_quiet_hours_start",
+    { length: 5 },
+  ),
+  whatsappFollowUpQuietHoursEnd: varchar("whatsapp_follow_up_quiet_hours_end", {
+    length: 5,
+  }),
+  whatsappFollowUpDraftMessage: text("whatsapp_follow_up_draft_message"),
+  whatsappFollowUpSupportMessage: text("whatsapp_follow_up_support_message"),
+  whatsappFollowUpDefaultMessage: text("whatsapp_follow_up_default_message"),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

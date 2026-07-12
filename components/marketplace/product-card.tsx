@@ -26,7 +26,7 @@ export function MarketplaceProductCard({
   const detailLabel = product.category?.name ?? product.brandName ?? "Jurgens Energy";
 
   return (
-    <article className="group relative overflow-hidden rounded-[5px] border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-md">
+    <article className="group relative min-w-0 w-full overflow-hidden rounded-[5px] border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-md">
       <Link
         aria-label={`View ${product.title}`}
         className="absolute inset-0 z-10"

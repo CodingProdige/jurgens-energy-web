@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   BellIcon,
   CheckCheckIcon,
@@ -32,6 +33,9 @@ import type {
   NotificationCenterState,
 } from "@/src/modules/notifications/in-app";
 import type { InAppNotificationSurface } from "@/src/db/schema";
+
+const NOTIFICATION_PANEL_GUTTER = 12;
+const NOTIFICATION_PANEL_MAX_WIDTH = 360;
 
 type NotificationBellProps = {
   accent?: "amber" | "green" | "marketplace";
@@ -82,11 +86,22 @@ export function NotificationBell({
   const [isOpen, setIsOpen] = useState(false);
   const [pushStatus, setPushStatus] =
     useState<PushNotificationStatus>("checking");
+  const [promptPortal, setPromptPortal] = useState<HTMLElement | null>(null);
   const [showSessionPrompt, setShowSessionPrompt] = useState(false);
   const [state, setState] = useState(initialState);
   const [, startTransition] = useTransition();
+  const panelRef = useRef<HTMLElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [panelPosition, setPanelPosition] = useState({
+    left: NOTIFICATION_PANEL_GUTTER,
+    top: 64,
+    width: NOTIFICATION_PANEL_MAX_WIDTH,
+  });
   const styles = accentStyles[accent];
+
+  useEffect(() => {
+    setPromptPortal(document.body);
+  }, []);
 
   const refreshNotificationState = useCallback(async () => {
     try {
@@ -236,15 +251,65 @@ export function NotificationBell({
     }
 
     function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
+      const target = event.target as Node;
+
+      if (
+        rootRef.current?.contains(target) ||
+        panelRef.current?.contains(target)
+      ) {
+        return;
       }
+
+      setIsOpen(false);
     }
 
     document.addEventListener("pointerdown", onPointerDown);
 
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [isOpen]);
+
+  const updatePanelPosition = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect();
+
+    if (!rect) {
+      return;
+    }
+
+    const viewportWidth = window.innerWidth;
+    const width = Math.min(
+      NOTIFICATION_PANEL_MAX_WIDTH,
+      viewportWidth - NOTIFICATION_PANEL_GUTTER * 2,
+    );
+    const maxLeft = Math.max(
+      NOTIFICATION_PANEL_GUTTER,
+      viewportWidth - width - NOTIFICATION_PANEL_GUTTER,
+    );
+    const left = Math.min(
+      Math.max(NOTIFICATION_PANEL_GUTTER, rect.right - width),
+      maxLeft,
+    );
+
+    setPanelPosition({
+      left,
+      top: Math.max(NOTIFICATION_PANEL_GUTTER, rect.bottom + 10),
+      width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    updatePanelPosition();
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
+    };
+  }, [isOpen, updatePanelPosition]);
 
   const unreadLabel = useMemo(() => {
     if (state.unreadCount > 99) {
@@ -386,7 +451,11 @@ export function NotificationBell({
               ? `${state.unreadCount} unread notifications`
               : "Notifications"
           }
-          className="relative h-9 w-9 rounded-full text-zinc-700 hover:bg-slate-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+          className={cn(
+            "relative size-8 rounded-full border border-[#e8e8e2] bg-white/80 text-[#080808] shadow-sm transition hover:border-[#ff5a1f] hover:bg-white hover:text-[#ff5a1f] focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/40 dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f7f7f2] dark:hover:bg-white/10 sm:size-9",
+            isOpen &&
+              "border-[#e8e8e2] bg-[#f0f0eb] text-[#080808] dark:border-white/10 dark:bg-white/[0.08] dark:text-[#f7f7f2]",
+          )}
           onClick={() => setIsOpen((current) => !current)}
           size="icon"
           type="button"
@@ -405,8 +474,18 @@ export function NotificationBell({
           ) : null}
         </Button>
 
-        {isOpen ? (
-          <section className="absolute right-0 top-[calc(100%+0.5rem)] z-[80] flex max-h-[min(620px,calc(100vh-5.5rem))] w-[min(360px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-zinc-950/10 dark:border-white/10 dark:bg-[#111417] dark:shadow-black/40">
+        {isOpen && promptPortal
+          ? createPortal(
+          <section
+            ref={panelRef}
+            className="fixed z-[999] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-zinc-950/10 dark:border-white/10 dark:bg-[#111417] dark:shadow-black/40"
+            style={{
+              maxHeight: `min(620px, calc(100vh - ${panelPosition.top + 12}px))`,
+              left: panelPosition.left,
+              top: panelPosition.top,
+              width: panelPosition.width,
+            }}
+          >
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-white/10">
             <div>
               <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">
@@ -554,18 +633,23 @@ export function NotificationBell({
               </Link>
             </div>
           ) : null}
-          </section>
-        ) : null}
+          </section>,
+            promptPortal,
+          )
+          : null}
       </div>
 
-      {showSessionPrompt && !isOpen ? (
-        <PushNotificationPrompt
-          accent={accent}
-          onDismiss={dismissSessionPrompt}
-          onEnable={enablePushNotifications}
-          status={pushStatus}
-        />
-      ) : null}
+      {showSessionPrompt && !isOpen && promptPortal
+        ? createPortal(
+            <PushNotificationPrompt
+              accent={accent}
+              onDismiss={dismissSessionPrompt}
+              onEnable={enablePushNotifications}
+              status={pushStatus}
+            />,
+            promptPortal,
+          )
+        : null}
     </>
   );
 }

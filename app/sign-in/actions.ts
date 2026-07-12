@@ -25,6 +25,14 @@ import {
 } from "@/src/modules/auth/surface-access";
 import { getSurfaceUrl } from "@/src/modules/auth/sso";
 import { signInSchema } from "@/src/modules/auth/validation";
+import {
+  claimWhatsappDraftForUser,
+  WhatsappNumberLinkedToAnotherUserError,
+} from "@/src/modules/whatsapp-ordering/customer-links";
+import {
+  getWhatsappDraftResumePath,
+  parseWhatsappDraftToken,
+} from "@/src/modules/whatsapp-ordering/draft-tokens";
 
 export type SignInState = {
   error?: string;
@@ -60,6 +68,10 @@ async function signInWithPasswordForSurface(
     email: formData.get("email"),
     password: formData.get("password"),
   });
+  const whatsappDraftToken =
+    options.requiredCapability === "marketplace"
+      ? parseWhatsappDraftToken(formData.get("whatsappDraft"))
+      : null;
 
   if (!parsed.success) {
     return { error: "Enter a valid email and password." };
@@ -91,6 +103,25 @@ async function signInWithPasswordForSurface(
     !roles.includes("customer")
   ) {
     await ensureUserRole(user.id, "customer");
+  }
+
+  if (whatsappDraftToken) {
+    try {
+      await claimWhatsappDraftForUser({
+        source: "sso_completion",
+        token: whatsappDraftToken,
+        userId: user.id,
+      });
+    } catch (error) {
+      if (error instanceof WhatsappNumberLinkedToAnotherUserError) {
+        return {
+          error:
+            "That WhatsApp order link is already linked to another account. Sign in with the matching account or start a fresh WhatsApp order.",
+        };
+      }
+
+      throw error;
+    }
   }
 
   const cookieStore = await cookies();
@@ -133,7 +164,10 @@ async function signInWithPasswordForSurface(
   }
 
   try {
-    const redirectTo = await getRequestRedirectUrl(options.redirectTo);
+    const targetPath = whatsappDraftToken
+      ? getWhatsappDraftResumePath(whatsappDraftToken)
+      : options.redirectTo;
+    const redirectTo = await getRequestRedirectUrl(targetPath);
 
     await signIn("credentials", {
       email: parsed.data.email,
@@ -148,7 +182,13 @@ async function signInWithPasswordForSurface(
     throw error;
   }
 
-  redirect(await getRequestRedirectUrl(options.redirectTo));
+  redirect(
+    await getRequestRedirectUrl(
+      whatsappDraftToken
+        ? getWhatsappDraftResumePath(whatsappDraftToken)
+        : options.redirectTo,
+    ),
+  );
 }
 
 export async function signInCustomerWithPassword(

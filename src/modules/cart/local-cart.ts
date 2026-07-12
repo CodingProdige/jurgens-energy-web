@@ -40,7 +40,13 @@ export type LocalCartState = {
   items: LocalCartItem[];
 };
 
+type LocalCartSelectionRecord = {
+  knownVariantIds: string[];
+  selectedVariantIds: string[];
+};
+
 const localCartStorageKey = "jurgens-energy:cart";
+const localCartSelectionStorageKey = "jurgens-energy:cart-selection";
 const localCartUpdatedEventName = "jurgens-energy:cart-updated";
 const maxCartItemQuantity = 99;
 
@@ -194,6 +200,83 @@ function writeLocalCartItems(items: LocalCartItem[]) {
   }
 }
 
+function readLocalCartSelectionRecord(): LocalCartSelectionRecord | null {
+  if (!canUseBrowserStorage()) {
+    return null;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(localCartSelectionStorageKey);
+
+    if (!storedValue) {
+      return null;
+    }
+
+    const parsedValue: unknown = JSON.parse(storedValue);
+
+    if (!parsedValue || typeof parsedValue !== "object") {
+      return null;
+    }
+
+    const record = parsedValue as Partial<LocalCartSelectionRecord>;
+
+    return {
+      knownVariantIds: normalizeStringList(record.knownVariantIds),
+      selectedVariantIds: normalizeStringList(record.selectedVariantIds),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalCartSelectionRecord(record: LocalCartSelectionRecord) {
+  if (!canUseBrowserStorage()) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      localCartSelectionStorageKey,
+      JSON.stringify(record),
+    );
+  } catch {
+    // Selection persistence is optional when browser storage is unavailable.
+  }
+}
+
+export function getLocalCartSelectedVariantIds(items = readLocalCartItems()) {
+  const record = readLocalCartSelectionRecord();
+  const currentVariantIds = items.map((item) => item.variantId);
+
+  if (!record) {
+    return currentVariantIds;
+  }
+
+  const knownVariantIds = new Set(record.knownVariantIds);
+  const selectedVariantIds = new Set(record.selectedVariantIds);
+
+  for (const variantId of currentVariantIds) {
+    if (!knownVariantIds.has(variantId)) {
+      selectedVariantIds.add(variantId);
+    }
+  }
+
+  return currentVariantIds.filter((variantId) => selectedVariantIds.has(variantId));
+}
+
+export function setLocalCartSelectedVariantIds(variantIds: string[]) {
+  const items = readLocalCartItems();
+  const currentVariantIds = items.map((item) => item.variantId);
+  const currentVariantIdSet = new Set(currentVariantIds);
+
+  writeLocalCartSelectionRecord({
+    knownVariantIds: currentVariantIds,
+    selectedVariantIds: Array.from(new Set(variantIds)).filter((variantId) =>
+      currentVariantIdSet.has(variantId),
+    ),
+  });
+}
+
 function emitLocalCartUpdated() {
   if (typeof window === "undefined") {
     return;
@@ -282,9 +365,79 @@ export function addLocalCartItem(input: LocalCartInput): LocalCartState {
   }
 
   writeLocalCartItems(items);
+  const selectedVariantIds = getLocalCartSelectedVariantIds(items);
+
+  if (!selectedVariantIds.includes(input.variantId)) {
+    selectedVariantIds.push(input.variantId);
+  }
+
+  writeLocalCartSelectionRecord({
+    knownVariantIds: items.map((item) => item.variantId),
+    selectedVariantIds,
+  });
   emitLocalCartUpdated();
 
   return getLocalCartState();
+}
+
+export function updateLocalCartItemQuantity(
+  variantId: string,
+  quantity: number,
+): LocalCartState {
+  const items = readLocalCartItems();
+  const itemIndex = items.findIndex((item) => item.variantId === variantId);
+
+  if (itemIndex < 0) {
+    return getLocalCartState();
+  }
+
+  const item = items[itemIndex];
+  const nextQuantity = normalizeQuantity(quantity);
+
+  items[itemIndex] = {
+    ...item,
+    exchangeConfirmationText:
+      item.purchaseType === "exchange"
+        ? getExchangeConfirmationText({
+            emptySize: item.exchangeRequiredEmptyCylinderSize,
+            fallbackText: item.exchangeConfirmationText,
+            quantity: nextQuantity,
+          })
+        : null,
+    quantity: nextQuantity,
+    updatedAt: new Date().toISOString(),
+  };
+
+  writeLocalCartItems(items);
+  emitLocalCartUpdated();
+
+  return getLocalCartState();
+}
+
+export function removeLocalCartItems(variantIds: string[]): LocalCartState {
+  const variantIdSet = new Set(variantIds);
+
+  if (variantIdSet.size === 0) {
+    return getLocalCartState();
+  }
+
+  const items = readLocalCartItems().filter(
+    (item) => !variantIdSet.has(item.variantId),
+  );
+  const selectedVariantIds = getLocalCartSelectedVariantIds(items);
+
+  writeLocalCartItems(items);
+  writeLocalCartSelectionRecord({
+    knownVariantIds: items.map((item) => item.variantId),
+    selectedVariantIds,
+  });
+  emitLocalCartUpdated();
+
+  return getLocalCartState();
+}
+
+export function removeLocalCartItem(variantId: string) {
+  return removeLocalCartItems([variantId]);
 }
 
 export function subscribeToLocalCart(

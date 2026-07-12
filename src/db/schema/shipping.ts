@@ -44,6 +44,19 @@ export const shipmentStatus = pgEnum("shipment_status", [
   "cancelled",
 ]);
 
+export const jurgensDeliveryScheduleStatuses = [
+  "scheduled",
+  "preparing",
+  "out_for_delivery",
+  "completed",
+  "missed",
+  "rescheduled",
+  "cancelled",
+] as const;
+
+export type JurgensDeliveryScheduleStatus =
+  (typeof jurgensDeliveryScheduleStatuses)[number];
+
 export const sellerFulfillmentProfiles = pgTable(
   "seller_fulfillment_profiles",
   {
@@ -192,6 +205,7 @@ export const shippingRateQuotes = pgTable("shipping_rate_quotes", {
   }),
   provider: shippingProvider("provider").notNull(),
   status: shippingQuoteStatus("status").notNull().default("quoted"),
+  checkoutFingerprint: varchar("checkout_fingerprint", { length: 64 }),
   providerRateId: text("provider_rate_id"),
   serviceName: varchar("service_name", { length: 160 }).notNull(),
   serviceLevel: varchar("service_level", { length: 120 }),
@@ -283,6 +297,50 @@ export const shipmentEvents = pgTable("shipment_events", {
   payload: jsonb("payload"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+export const jurgensDeliverySchedules = pgTable(
+  "jurgens_delivery_schedules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    shipmentId: uuid("shipment_id").references(() => shipments.id, {
+      onDelete: "set null",
+    }),
+    quoteId: uuid("quote_id").references(() => shippingRateQuotes.id, {
+      onDelete: "set null",
+    }),
+    zoneId: uuid("zone_id").references(() => jurgensDeliveryZones.id, {
+      onDelete: "set null",
+    }),
+    status: varchar("status", { length: 32 })
+      .$type<JurgensDeliveryScheduleStatus>()
+      .notNull()
+      .default("scheduled"),
+    scheduledDate: varchar("scheduled_date", { length: 10 }).notNull(),
+    windowStart: varchar("window_start", { length: 5 }).notNull(),
+    windowEnd: varchar("window_end", { length: 5 }).notNull(),
+    windowLabel: varchar("window_label", { length: 80 }).notNull(),
+    deliveryInstructions: text("delivery_instructions"),
+    lastNotifiedStatus: varchar("last_notified_status", { length: 32 }),
+    lastNotifiedAt: timestamp("last_notified_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (schedule) => ({
+    dateStatusIdx: index("jurgens_delivery_schedules_date_status_idx").on(
+      schedule.scheduledDate,
+      schedule.status,
+    ),
+    orderIdx: index("jurgens_delivery_schedules_order_id_idx").on(
+      schedule.orderId,
+    ),
+    shipmentIdx: index("jurgens_delivery_schedules_shipment_id_idx").on(
+      schedule.shipmentId,
+    ),
+  }),
+);
 
 export const bobgoWebhookEvents = pgTable(
   "bobgo_webhook_events",

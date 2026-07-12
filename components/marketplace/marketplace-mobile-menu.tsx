@@ -1,15 +1,24 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import {
   ChevronRightIcon,
+  LayoutDashboardIcon,
+  LogOutIcon,
   MenuIcon,
+  MessageCircleIcon,
   ShoppingCartIcon,
   UserIcon,
 } from "lucide-react";
 import { useState } from "react";
 
 import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
+import {
+  getInitials,
+  type MarketplaceAccountSummary,
+} from "@/components/marketplace/marketplace-account-menu";
 import {
   marketplacePrimaryActionClass,
   marketplaceSecondaryActionClass,
@@ -26,10 +35,12 @@ import {
 export type MarketplaceNavItem = readonly [label: string, href: string];
 
 type MarketplaceMobileMenuProps = {
+  accountUser: MarketplaceAccountSummary | null;
   navItems: readonly MarketplaceNavItem[];
 };
 
 export function MarketplaceMobileMenu({
+  accountUser,
   navItems,
 }: MarketplaceMobileMenuProps) {
   const [open, setOpen] = useState(false);
@@ -69,6 +80,37 @@ export function MarketplaceMobileMenu({
           </DialogHeader>
 
           <DialogBody className="grid content-start gap-6 px-5 py-5">
+            {accountUser ? (
+              <div className="rounded-lg border border-[#e8e8e2] bg-[#f7f7f2] p-3 dark:border-white/10 dark:bg-white/[0.06]">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ff5a1f] text-sm font-black uppercase text-white">
+                    {accountUser.image ? (
+                      <Image
+                        alt=""
+                        className="size-full object-cover"
+                        height={44}
+                        src={accountUser.image}
+                        unoptimized
+                        width={44}
+                      />
+                    ) : (
+                      getInitials(accountUser)
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black">
+                      {accountUser.name || accountUser.email || "Account"}
+                    </p>
+                    {accountUser.email ? (
+                      <p className="truncate text-xs text-[#696963] dark:text-[#c8c8c0]">
+                        {accountUser.email}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <nav className="grid gap-1">
               {navItems.map(([label, href]) => (
                 <Link
@@ -86,14 +128,14 @@ export function MarketplaceMobileMenu({
             <div className="grid gap-3">
               <Link
                 className={`${marketplacePrimaryActionClass} w-full`}
-                href="#products"
+                href="/products"
                 onClick={closeMenu}
               >
                 Order Now
               </Link>
               <Link
                 className={`${marketplaceSecondaryActionClass} w-full`}
-                href="#accessories"
+                href="/products?category=accessories"
                 onClick={closeMenu}
               >
                 Shop Accessories
@@ -111,12 +153,49 @@ export function MarketplaceMobileMenu({
               </Link>
               <Link
                 className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
-                href="/sign-in"
+                href={accountUser ? "/account/whatsapp" : "/sign-in"}
                 onClick={closeMenu}
               >
-                <UserIcon className="size-4" />
-                Account
+                {accountUser ? (
+                  <MessageCircleIcon className="size-4" />
+                ) : (
+                  <UserIcon className="size-4" />
+                )}
+                {accountUser ? "WhatsApp number" : "Sign in"}
               </Link>
+              {accountUser?.roles.includes("admin") ? (
+                <Link
+                  className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                  href="/admin"
+                  onClick={closeMenu}
+                >
+                  <LayoutDashboardIcon className="size-4" />
+                  Admin dashboard
+                </Link>
+              ) : null}
+              {accountUser?.roles.includes("seller") ? (
+                <Link
+                  className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                  href="/seller"
+                  onClick={closeMenu}
+                >
+                  <LayoutDashboardIcon className="size-4" />
+                  Seller dashboard
+                </Link>
+              ) : null}
+              {accountUser ? (
+                <button
+                  className="flex h-10 items-center gap-3 rounded-md px-2 text-left text-[13px] font-bold text-[#b42318] transition hover:bg-[#fff2ef] dark:text-[#ffb19a] dark:hover:bg-[#ff5a1f]/10"
+                  onClick={() => {
+                    closeMenu();
+                    void signOut({ callbackUrl: "/" });
+                  }}
+                  type="button"
+                >
+                  <LogOutIcon className="size-4" />
+                  Sign out
+                </button>
+              ) : null}
             </div>
           </DialogBody>
         </DialogContent>

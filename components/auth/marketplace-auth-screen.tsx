@@ -1,22 +1,18 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import {
-  Boxes,
   Eye,
   EyeOff,
   Lock,
   LockKeyhole,
   Mail,
-  RotateCcw,
-  ShieldCheck,
-  Sparkles,
   User,
-  Users,
 } from "lucide-react";
 
+import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
+import { CountryPhoneInput } from "@/components/phone/country-phone-input";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -32,68 +28,14 @@ type MarketplaceAuthScreenProps = {
   googleAction: () => Promise<void>;
   rememberedEmail?: string;
   mode: "sign-in" | "register";
+  whatsappDraftToken?: string | null;
+  whatsappPhoneDefault?: string | null;
+  whatsappPhoneLocked?: boolean;
 };
 
 const initialState: MarketplaceAuthState = {};
-
-const signInFeatures = [
-  {
-    icon: Sparkles,
-    title: "Top Products",
-    description: "Explore best-selling gas essentials",
-  },
-  {
-    icon: Boxes,
-    title: "Multiple Categories",
-    description: "Find everything you want in one place",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Secure & Reliable",
-    description: "Safe payments and buyer protection you can trust",
-  },
-  {
-    icon: RotateCcw,
-    title: "Fast & Easy",
-    description: "Seamless shopping experience across all devices",
-  },
-];
-
-const registerFeatures = [
-  {
-    icon: Sparkles,
-    title: "Huge Selection",
-    description: "Shop from thousands of top products",
-  },
-  {
-    icon: Boxes,
-    title: "Best Deals",
-    description: "Exclusive offers and competitive prices",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Certified Supply",
-    description: "Quality products and trusted service",
-  },
-  {
-    icon: RotateCcw,
-    title: "Easy Returns",
-    description: "Hassle-free returns and refunds",
-  },
-];
-
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <Image
-      src="/brand/logo/jurgens-icon.png"
-      alt="Jurgens Energy"
-      width={164}
-      height={30}
-      priority
-      className={cn("h-auto w-[142px]", className)}
-    />
-  );
-}
+const authVisualVideoSrc =
+  "/brand/video/zoom_in_slowly_and_show_cars_p_Gemini_Omni_Flash_43068.mp4";
 
 function GoogleGlyph() {
   return (
@@ -128,23 +70,18 @@ function GoogleButton({
   );
 }
 
-function MarketplaceVisual({ mode }: { mode: "sign-in" | "register" }) {
-  const isRegister = mode === "register";
-  const features = isRegister ? registerFeatures : signInFeatures;
+function MarketplaceVisual() {
   const [isVideoReady, setIsVideoReady] = useState(false);
-  const [didVideoEnd, setDidVideoEnd] = useState(false);
-  const videoSrc = isRegister
-    ? "/brand/video/make_all_these_products_come_t_Seedance_20_70761.mp4"
-    : "/brand/video/cinematic-jurgens-energy-sign-in.mp4";
 
   return (
-    <section className="relative min-h-[430px] min-w-0 overflow-hidden bg-[#0c0d0b] px-7 py-8 text-white lg:min-h-screen lg:px-10 xl:px-12">
+    <section className="relative min-h-[430px] min-w-0 overflow-hidden bg-[#0c0d0b] text-white lg:min-h-screen">
       <video
         aria-hidden="true"
         autoPlay
         muted
         onCanPlay={() => setIsVideoReady(true)}
-        onEnded={() => setDidVideoEnd(true)}
+        onLoadedData={() => setIsVideoReady(true)}
+        onPlaying={() => setIsVideoReady(true)}
         playsInline
         preload="metadata"
         className={cn(
@@ -152,76 +89,8 @@ function MarketplaceVisual({ mode }: { mode: "sign-in" | "register" }) {
           isVideoReady ? "opacity-100" : "opacity-0",
         )}
       >
-        <source src={videoSrc} type="video/mp4" />
+        <source src={authVisualVideoSrc} type="video/mp4" />
       </video>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_77%_39%,rgba(255,196,0,0.16),transparent_30%),radial-gradient(circle_at_40%_89%,rgba(255,196,0,0.12),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),transparent)]" />
-      <div
-        className={cn(
-          "absolute inset-y-0 left-0 w-[78%] bg-[linear-gradient(90deg,rgba(0,0,0,0.9),rgba(0,0,0,0.66)_42%,rgba(0,0,0,0.28)_72%,transparent)] transition-opacity duration-1000 ease-out",
-          didVideoEnd ? "opacity-100" : "opacity-0",
-        )}
-      />
-      <div
-        className={cn(
-          "relative z-20 transition-all duration-1000 ease-out",
-          didVideoEnd
-            ? "translate-x-0 opacity-100"
-            : "-translate-x-4 opacity-0",
-        )}
-      >
-        <BrandMark className="w-[136px]" />
-
-        <div className="mt-14 max-w-[330px] lg:mt-[72px]">
-          <h1 className="text-[32px] font-extrabold leading-[1.08] lg:text-[34px]">
-            {isRegister ? (
-              <>
-                Create your account
-                <br />
-                and join <span className="text-[#ffc400]">Piessang</span>
-              </>
-            ) : (
-              <>
-                Welcome back
-                <br />
-                to <span className="text-[#ffc400]">Piessang</span>
-              </>
-            )}
-          </h1>
-          <p className="mt-5 text-[14px] font-medium leading-6 text-white/86">
-            {isRegister
-              ? "Create your account and shop gas essentials with confidence."
-              : "The Jurgens Energy store for cylinders, exchanges, and accessories."}
-          </p>
-        </div>
-
-        <div className="mt-8 hidden max-w-[315px] gap-4 lg:grid">
-          {features.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <div key={item.title} className="grid grid-cols-[42px_1fr] gap-4">
-                <div className="grid size-10 place-items-center rounded-full border border-white/15 bg-black/28 text-[#ffc400]">
-                  <Icon className="size-4" />
-                </div>
-                <div>
-                  <h2 className="text-[12px] font-extrabold">{item.title}</h2>
-                  <p className="mt-1 text-[12px] leading-[1.45] text-white/75">
-                    {item.description}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-8 hidden w-fit items-center gap-3 rounded-[6px] bg-white/8 px-4 py-3 text-[12px] text-white/82 lg:inline-flex">
-          <Users className="size-4 text-[#ffc400]" />
-          {isRegister
-            ? "Join thousands of happy customers today"
-            : "Trusted by thousands of shoppers worldwide"}
-        </div>
-      </div>
-
     </section>
   );
 }
@@ -231,14 +100,30 @@ function MarketplaceAuthForm({
   googleAction,
   rememberedEmail,
   mode,
+  whatsappDraftToken,
+  whatsappPhoneDefault,
+  whatsappPhoneLocked = false,
 }: MarketplaceAuthScreenProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const [showPassword, setShowPassword] = useState(false);
   const isRegister = mode === "register";
+  const alternateHref = isRegister
+    ? `/sign-in${whatsappDraftToken ? `?whatsappDraft=${encodeURIComponent(whatsappDraftToken)}` : ""}`
+    : `/register${whatsappDraftToken ? `?whatsappDraft=${encodeURIComponent(whatsappDraftToken)}` : ""}`;
 
   return (
     <div className="w-full max-w-[420px]">
+      <Link
+        aria-label="Jurgens Energy home"
+        className="mb-10 inline-flex w-fit"
+        href="/"
+      >
+        <JurgensEnergyLogo className="scale-[0.92] origin-left" />
+      </Link>
       <form action={formAction}>
+      {whatsappDraftToken ? (
+        <input name="whatsappDraft" type="hidden" value={whatsappDraftToken} />
+      ) : null}
       <div className="mb-8">
         <h2 className="text-[28px] font-extrabold leading-tight text-[#070b16] dark:text-white">
           {isRegister ? "Create account" : "Sign in"}
@@ -288,6 +173,33 @@ function MarketplaceAuthForm({
             />
           </span>
         </label>
+
+        {isRegister ? (
+          <label className="grid gap-2">
+            <span className="text-[13px] font-bold text-[#070b16] dark:text-white">
+              WhatsApp number
+            </span>
+            <CountryPhoneInput
+              className="grid-cols-[8.25rem_minmax(0,1fr)]"
+              defaultValue={whatsappPhoneDefault}
+              inputClassName={cn(
+                "h-[45px] rounded-[6px] border-[#d9deea] text-[14px] focus:border-[#ffc400] focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719]",
+                whatsappPhoneLocked &&
+                  "bg-[#f7f7f2] text-[#596176] dark:bg-white/[0.06]",
+              )}
+              name="whatsappPhone"
+              placeholder="82 123 4567"
+              readOnly={whatsappPhoneLocked}
+              required
+              selectClassName="h-[45px] rounded-[6px] border-[#d9deea] text-[13px] focus:border-[#ffc400] focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719]"
+            />
+            <span className="text-[12px] font-medium text-[#596176] dark:text-zinc-400">
+              {whatsappPhoneLocked
+                ? "Linked from the WhatsApp order that brought you here."
+                : "Used for delivery updates and WhatsApp gas support."}
+            </span>
+          </label>
+        ) : null}
 
         <label className="grid gap-2">
           <span className="flex items-center justify-between gap-4 text-[13px] font-bold text-[#070b16] dark:text-white">
@@ -361,7 +273,7 @@ function MarketplaceAuthForm({
       <p className="mt-7 text-center text-[14px] font-medium text-[#070b16] dark:text-zinc-300">
         {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
         <Link
-          href={isRegister ? "/sign-in" : "/register"}
+          href={alternateHref}
           className="font-semibold text-[#c4982d] transition hover:text-[#a77e1d] dark:text-[#ffc400]"
         >
           {isRegister ? "Sign in" : "Create account"}
@@ -377,7 +289,7 @@ export function MarketplaceAuthScreen(props: MarketplaceAuthScreenProps) {
       <div className="fixed right-4 top-4 z-50">
         <ThemeToggle />
       </div>
-      <MarketplaceVisual mode={props.mode} />
+      <MarketplaceVisual />
       <section className="grid min-h-[calc(100vh-430px)] min-w-0 place-items-center bg-white px-7 py-10 dark:bg-[#0f1114] sm:px-12 lg:min-h-screen lg:px-16">
         <MarketplaceAuthForm {...props} />
       </section>

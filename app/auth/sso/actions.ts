@@ -10,6 +10,7 @@ import {
   isGoogleAuthConfigured,
   type SsoIntent,
 } from "@/src/modules/auth/sso";
+import { parseWhatsappDraftToken } from "@/src/modules/whatsapp-ordering/draft-tokens";
 
 async function getRequestRedirectUrl(pathname: string) {
   const headerStore = await headers();
@@ -25,7 +26,10 @@ async function getRequestRedirectUrl(pathname: string) {
   return new URL(pathname, `${protocol}://${host}`).toString();
 }
 
-async function signInWithGoogleForIntent(intent: SsoIntent) {
+async function signInWithGoogleForIntent(
+  intent: SsoIntent,
+  whatsappDraftToken?: string | null,
+) {
   if (!isGoogleAuthConfigured()) {
     throw new Error(
       "Google auth is not configured. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET.",
@@ -40,20 +44,32 @@ async function signInWithGoogleForIntent(intent: SsoIntent) {
   ).host;
 
   if (host && host !== rootHost) {
-    redirect(getSsoStartUrl(intent));
+    redirect(
+      getSsoStartUrl(intent, {
+        whatsappDraft: parseWhatsappDraftToken(whatsappDraftToken),
+      }),
+    );
   }
 
   await signIn("google", {
-    redirectTo: await getRequestRedirectUrl(getSsoCompletionPath(intent)),
+    redirectTo: await getRequestRedirectUrl(
+      getSsoCompletionPath(intent, {
+        whatsappDraft: parseWhatsappDraftToken(whatsappDraftToken),
+      }),
+    ),
   });
 }
 
-export async function signInMarketplaceWithGoogle() {
-  await signInWithGoogleForIntent("marketplace_sign_in");
+export async function signInMarketplaceWithGoogle(
+  whatsappDraftToken?: string | null,
+) {
+  await signInWithGoogleForIntent("marketplace_sign_in", whatsappDraftToken);
 }
 
-export async function registerMarketplaceWithGoogle() {
-  await signInWithGoogleForIntent("marketplace_register");
+export async function registerMarketplaceWithGoogle(
+  whatsappDraftToken?: string | null,
+) {
+  await signInWithGoogleForIntent("marketplace_register", whatsappDraftToken);
 }
 
 export async function signInAdminWithGoogle() {

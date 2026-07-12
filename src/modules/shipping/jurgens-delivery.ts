@@ -32,6 +32,7 @@ const itemSchema = z.object({
 });
 
 export const jurgensDeliveryCheckoutRatesInputSchema = z.object({
+  checkoutFingerprint: z.string().length(64).optional(),
   declaredValue: z.coerce.number().finite().nonnegative(),
   deliveryAddress: addressSchema,
   items: z.array(itemSchema).min(1).optional().default([]),
@@ -273,33 +274,37 @@ export async function getJurgensDeliveryCheckoutRates(
     zone: toCheckoutZone(matchingZone),
   };
 
-  await db.insert(shippingRateQuotes).values({
-    bufferBps: 0,
-    collectionAddressSnapshot: {
-      deliveryMethod: "jurgens_energy_delivery",
-      provider: "jurgens_energy",
-    },
-    customerAmount: rate.customerAmount.toFixed(2),
-    deliveryAddressSnapshot: parsed.deliveryAddress,
-    expiresAt,
-    marginAmount: "0.00",
-    marginBps: 0,
-    orderId: parsed.orderId,
-    parcelSnapshot: parsed.items,
-    provider: "piessang_local",
-    providerAmount: rate.providerAmount.toFixed(2),
-    providerPayload,
-    providerRateId,
-    sellerId: parsed.sellerId ?? null,
-    serviceLevel: rate.serviceLevel,
-    serviceName: rate.serviceName,
-  });
+  const [quote] = await db
+    .insert(shippingRateQuotes)
+    .values({
+      bufferBps: 0,
+      checkoutFingerprint: parsed.checkoutFingerprint,
+      collectionAddressSnapshot: {
+        deliveryMethod: "jurgens_energy_delivery",
+        provider: "jurgens_energy",
+      },
+      customerAmount: rate.customerAmount.toFixed(2),
+      deliveryAddressSnapshot: parsed.deliveryAddress,
+      expiresAt,
+      marginAmount: "0.00",
+      marginBps: 0,
+      orderId: parsed.orderId,
+      parcelSnapshot: parsed.items,
+      provider: "piessang_local",
+      providerAmount: rate.providerAmount.toFixed(2),
+      providerPayload,
+      providerRateId,
+      sellerId: parsed.sellerId ?? null,
+      serviceLevel: rate.serviceLevel,
+      serviceName: rate.serviceName,
+    })
+    .returning({ id: shippingRateQuotes.id });
 
   return {
     eligible: true,
     expiresAt,
     mode: "jurgens_delivery" as const,
-    rates: [rate],
+    rates: [{ ...rate, quoteId: quote.id }],
     zone: toCheckoutZone(matchingZone),
   };
 }

@@ -26,14 +26,33 @@ export const orderStatus = pgEnum("order_status", [
 
 export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
+  orderNumber: varchar("order_number", { length: 32 }).notNull().unique(),
   userId: uuid("user_id").references(() => users.id),
+  customerName: text("customer_name").notNull(),
+  customerEmail: varchar("customer_email", { length: 254 }).notNull(),
+  customerPhone: varchar("customer_phone", { length: 40 }).notNull(),
+  deliveryAddressSnapshot: jsonb("delivery_address_snapshot")
+    .$type<{
+      addressLine1: string;
+      addressLine2: string | null;
+      city: string;
+      countryCode: string;
+      postalCode: string;
+      province: string;
+      suburb: string;
+    }>()
+    .notNull(),
+  checkoutTokenHash: varchar("checkout_token_hash", { length: 64 }),
+  currency: varchar("currency", { length: 3 }).notNull().default("ZAR"),
   status: orderStatus("status").notNull().default("pending"),
   subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
   shippingTotal: numeric("shipping_total", { precision: 12, scale: 2 })
     .notNull()
     .default("0"),
   grandTotal: numeric("grand_total", { precision: 12, scale: 2 }).notNull(),
+  paidAt: timestamp("paid_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 export const orderItems = pgTable("order_items", {

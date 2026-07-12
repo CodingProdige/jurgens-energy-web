@@ -1592,21 +1592,21 @@ function getProductCollectionAutoAction({
 }): Pick<StorefrontButtonAction, "href" | "label"> {
   if (settings.productSource === "accessories") {
     return {
-      href: "#accessories",
+      href: "/products?category=accessories",
       label: "View All Accessories",
     };
   }
 
   if (settings.productSource === "exchange") {
     return {
-      href: "#exchange",
+      href: "/products?exchange=1",
       label: "View Exchange Products",
     };
   }
 
   if (settings.productSource === "full_cylinders") {
     return {
-      href: "#products",
+      href: "/products",
       label: "View Full Cylinders",
     };
   }
@@ -1640,7 +1640,7 @@ function getProductCollectionAutoAction({
 
     if (selectedBrand) {
       return {
-        href: `/?brand=${selectedBrand.slug}#products`,
+        href: `/brands/${selectedBrand.slug}`,
         label: `View All ${selectedBrand.name}`,
       };
     }
@@ -1652,7 +1652,7 @@ function getProductCollectionAutoAction({
   }
 
   return {
-    href: "#products",
+    href: "/products",
     label: "View All Products",
   };
 }

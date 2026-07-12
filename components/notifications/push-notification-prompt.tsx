@@ -68,7 +68,7 @@ export function PushNotificationPrompt({
       className={cn(
         "relative overflow-hidden border border-slate-200 bg-white text-zinc-950 shadow-2xl shadow-zinc-950/10 dark:border-white/10 dark:bg-[#10151b] dark:text-white dark:shadow-black/50",
         variant === "floating"
-          ? "fixed bottom-4 right-4 z-[95] w-[min(420px,calc(100vw-1.5rem))] rounded-2xl p-4"
+          ? "fixed inset-x-3 bottom-3 z-[120] w-auto rounded-2xl p-4 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-[min(420px,calc(100vw-2rem))]"
           : "rounded-xl p-3",
         className,
       )}

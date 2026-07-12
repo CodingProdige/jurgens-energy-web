@@ -6,9 +6,13 @@ import {
   isGoogleAuthConfigured,
   isSsoIntent,
 } from "@/src/modules/auth/sso";
+import { parseWhatsappDraftToken } from "@/src/modules/whatsapp-ordering/draft-tokens";
 
 export async function GET(request: NextRequest) {
   const rawIntent = request.nextUrl.searchParams.get("intent");
+  const whatsappDraftToken = parseWhatsappDraftToken(
+    request.nextUrl.searchParams.get("whatsappDraft"),
+  );
 
   if (!isSsoIntent(rawIntent)) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
@@ -21,6 +25,8 @@ export async function GET(request: NextRequest) {
   }
 
   await signIn("google", {
-    redirectTo: getSsoCompletionPath(rawIntent),
+    redirectTo: getSsoCompletionPath(rawIntent, {
+      whatsappDraft: whatsappDraftToken,
+    }),
   });
 }
