@@ -154,7 +154,7 @@ export function ScheduledOrdersManager({
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const todayIso = useMemo(getTodayIsoDate, []);
+  const todayIso = useMemo(() => getTodayIsoDate(), []);
   const [monthCursor, setMonthCursor] = useState(() => dateToLocalDate(todayIso));
   const scheduleCountByDate = useMemo(() => {
     const countMap = new Map<string, number>();
