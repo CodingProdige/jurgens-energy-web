@@ -88,6 +88,16 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function getMostSpecificActiveChildHref(
+  pathname: string,
+  children?: DashboardSurfaceNavItem["children"],
+) {
+  return children
+    ?.filter((child) => child.href && isActivePath(pathname, child.href))
+    .sort((left, right) => (right.href?.length ?? 0) - (left.href?.length ?? 0))[0]
+    ?.href;
+}
+
 function SetupAttentionMarker() {
   return (
     <span className="pointer-events-none absolute left-1 top-1 text-amber-400 drop-shadow-sm">
@@ -140,11 +150,7 @@ function SurfaceNavList<TCapability extends string>({
         .filter((item) => item.children)
         .map((item) => [
           item.label,
-          Boolean(
-            item.children?.some(
-              (child) => child.href && isActivePath(pathname, child.href),
-            ),
-          ),
+          Boolean(getMostSpecificActiveChildHref(pathname, item.children)),
         ]),
     );
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
@@ -157,12 +163,7 @@ function SurfaceNavList<TCapability extends string>({
       const next = { ...current };
 
       for (const item of navItems) {
-        if (
-          item.children?.some(
-            (child) => child.href && isActivePath(pathname, child.href),
-          ) &&
-          !next[item.label]
-        ) {
+        if (getMostSpecificActiveChildHref(pathname, item.children) && !next[item.label]) {
           next[item.label] = true;
           changed = true;
         }
@@ -176,11 +177,13 @@ function SurfaceNavList<TCapability extends string>({
     <nav className="grid gap-1">
       {navItems.map((item) => {
         const Icon = item.icon;
+        const activeChildHref = getMostSpecificActiveChildHref(
+          pathname,
+          item.children,
+        );
         const isActive =
           (item.href ? isActivePath(pathname, item.href) : false) ||
-          item.children?.some(
-            (child) => child.href && isActivePath(pathname, child.href),
-          );
+          Boolean(activeChildHref);
         const itemNeedsAttention =
           hasAttention(item.href) ||
           Boolean(item.children?.some((child) => hasAttention(child.href)));
@@ -234,7 +237,7 @@ function SurfaceNavList<TCapability extends string>({
                 >
                   {item.children.map((child) => {
                     const isChildActive = child.href
-                      ? isActivePath(pathname, child.href)
+                      ? child.href === activeChildHref
                       : false;
                     const childNeedsAttention = hasAttention(child.href);
                     const isDisabled =

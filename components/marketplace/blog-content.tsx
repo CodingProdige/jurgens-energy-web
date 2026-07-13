@@ -116,11 +116,17 @@ function renderRichTextNode(node: BlogRichTextNode, key: string): ReactNode {
 
   if (node.type === "heading") {
     return node.attrs?.level === 3 ? (
-      <h3 className="pt-2 text-[21px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2]" key={key}>
+      <h3
+        className="pt-2 text-[22px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2]"
+        key={key}
+      >
         {children}
       </h3>
     ) : (
-      <h2 className="pt-3 text-[26px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2]" key={key}>
+      <h2
+        className="pt-4 text-[28px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2] sm:text-[32px]"
+        key={key}
+      >
         {children}
       </h2>
     );
@@ -182,7 +188,7 @@ export function MarketplaceBlogContent({ content }: { content: string }) {
 
   if (richTextDocument) {
     return (
-      <div className="grid gap-5 text-[16px] leading-8 text-[#1a1a1a] dark:text-[#deded7]">
+      <div className="grid gap-6 text-[16px] leading-8 text-[#1a1a1a] dark:text-[#deded7] sm:text-[17px] sm:leading-9">
         {renderRichTextNode(richTextDocument, "document")}
       </div>
     );
@@ -198,7 +204,7 @@ export function MarketplaceBlogContent({ content }: { content: string }) {
   }
 
   return (
-    <div className="grid gap-5 text-[16px] leading-8 text-[#1a1a1a] dark:text-[#deded7]">
+    <div className="grid gap-6 text-[16px] leading-8 text-[#1a1a1a] dark:text-[#deded7] sm:text-[17px] sm:leading-9">
       {blocks.map(renderPlainTextBlock)}
     </div>
   );

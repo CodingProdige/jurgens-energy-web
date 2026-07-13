@@ -82,6 +82,18 @@ function formatWindow(row: Pick<AdminScheduledOrderRow, "windowEnd" | "windowLab
   return `${row.windowLabel} (${row.windowStart}-${row.windowEnd})`;
 }
 
+function getTodayIsoDate() {
+  const parts = new Intl.DateTimeFormat("en-ZA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+  }).formatToParts(new Date());
+  const partMap = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${partMap.year}-${partMap.month}-${partMap.day}`;
+}
+
 function statusClass(status: string) {
   if (status === "completed") {
     return "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300";
@@ -142,11 +154,8 @@ export function ScheduledOrdersManager({
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [monthCursor, setMonthCursor] = useState(() => {
-    const firstDate = rows[0]?.scheduledDate;
-
-    return firstDate ? dateToLocalDate(firstDate) : new Date();
-  });
+  const todayIso = useMemo(getTodayIsoDate, []);
+  const [monthCursor, setMonthCursor] = useState(() => dateToLocalDate(todayIso));
   const scheduleCountByDate = useMemo(() => {
     const countMap = new Map<string, number>();
 
@@ -165,6 +174,10 @@ export function ScheduledOrdersManager({
     setMonthCursor(
       (current) => new Date(current.getFullYear(), current.getMonth() + offset, 1),
     );
+  }
+
+  function jumpToToday() {
+    setMonthCursor(dateToLocalDate(todayIso));
   }
 
   return (
@@ -202,6 +215,9 @@ export function ScheduledOrdersManager({
             >
               <ChevronRightIcon className="size-4" />
             </DashboardButton>
+            <DashboardButton onClick={jumpToToday} size="sm" type="button">
+              Today
+            </DashboardButton>
           </div>
         </div>
 
@@ -216,22 +232,40 @@ export function ScheduledOrdersManager({
           ))}
           {monthCells.map((cell, index) => {
             const count = cell.date ? scheduleCountByDate.get(cell.date) ?? 0 : 0;
+            const isToday = cell.date === todayIso;
 
             return (
               <div
                 className={cn(
-                  "min-h-20 border-b border-r border-slate-200 p-2 dark:border-white/10",
+                  "relative min-h-20 border-b border-r border-slate-200 p-2 dark:border-white/10",
                   !cell.date && "bg-slate-50/70 dark:bg-white/[0.02]",
+                  isToday &&
+                    "bg-[#fff3ec] ring-2 ring-inset ring-[#ff5a1f] dark:bg-[#ff5a1f]/12 dark:ring-[#ff7a4b]",
                 )}
                 key={`${cell.date ?? "empty"}-${index}`}
               >
                 {cell.day ? (
                   <>
-                    <span className="text-xs font-semibold text-zinc-950 dark:text-white">
+                    <span
+                      className={cn(
+                        "inline-grid size-6 place-items-center rounded-full text-xs font-semibold text-zinc-950 dark:text-white",
+                        isToday && "bg-[#ff5a1f] text-white shadow-sm",
+                      )}
+                    >
                       {cell.day}
                     </span>
+                    {isToday ? (
+                      <span className="ml-2 align-middle text-[10px] font-black uppercase tracking-[0.14em] text-[#c44511] dark:text-[#ffb196]">
+                        Today
+                      </span>
+                    ) : null}
                     {count > 0 ? (
-                      <span className="mt-2 block w-fit rounded-md bg-[#ff5a1f]/10 px-2 py-1 text-[11px] font-semibold text-[#c44511] dark:text-[#ffb196]">
+                      <span
+                        className={cn(
+                          "mt-2 block w-fit rounded-md bg-[#ff5a1f]/10 px-2 py-1 text-[11px] font-semibold text-[#c44511] dark:text-[#ffb196]",
+                          isToday && "bg-[#ff5a1f] text-white dark:text-white",
+                        )}
+                      >
                         {count} scheduled
                       </span>
                     ) : null}
