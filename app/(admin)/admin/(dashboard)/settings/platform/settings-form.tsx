@@ -52,6 +52,7 @@ import {
 import {
   updateMarketplaceSocialLinkSettings,
   updateMarketplaceGateSettings,
+  updateChatGptIntegrationSettings,
   updateGoogleMarketingSettings,
   updateMediaStorageSettings,
   deleteNotificationGlobalVariableSettings,
@@ -171,6 +172,15 @@ function SecretTextInput({
 }
 
 const initialState: AdminSettingsState = {};
+const chatGptReasoningEfforts = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as const;
+type ChatGptReasoningEffort = (typeof chatGptReasoningEfforts)[number];
 
 export function SettingsForm({
   comingSoonEnabled,
@@ -512,6 +522,162 @@ export function GoogleMarketingSettingsForm({
       <Button type="submit" disabled={isPending} className="w-fit gap-2">
         <SaveIcon className="size-4" />
         {isPending ? "Saving..." : "Save Google tags"}
+      </Button>
+    </form>
+  );
+}
+
+type ChatGptIntegrationSettingsFormProps = {
+  hasOpenAiApiKey: boolean;
+  openAiApiKey: string | null;
+  openAiEnabled: boolean;
+  openAiModel: string;
+  openAiReasoningEffort: ChatGptReasoningEffort;
+};
+
+export function ChatGptIntegrationSettingsForm({
+  hasOpenAiApiKey,
+  openAiApiKey,
+  openAiEnabled,
+  openAiModel,
+  openAiReasoningEffort,
+}: ChatGptIntegrationSettingsFormProps) {
+  const [isEnabled, setIsEnabled] = useState(openAiEnabled);
+  const [modelValue, setModelValue] = useState(openAiModel);
+  const [reasoningEffort, setReasoningEffort] =
+    useState<ChatGptReasoningEffort>(openAiReasoningEffort);
+  const [state, formAction, isPending] = useActionState(
+    updateChatGptIntegrationSettings,
+    initialState,
+  );
+
+  return (
+    <form action={formAction} className="grid gap-5">
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="mb-5 flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+            <BracesIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              ChatGPT controls
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Used by product copy generation, brand copy generation, and the
+              WhatsApp ordering assistant. Server env values remain the fallback.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={isEnabled}
+              name="enabled"
+              onCheckedChange={(checked) => setIsEnabled(checked === true)}
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                Enable ChatGPT features
+              </span>
+              <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Allows AI-assisted catalog copy and WhatsApp interpretation to
+                call the configured OpenAI model.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid gap-2">
+            <Label htmlFor="apiKey">OpenAI API key</Label>
+            <SecretTextInput
+              id="apiKey"
+              name="apiKey"
+              icon="key"
+              defaultValue={openAiApiKey}
+              placeholder={
+                hasOpenAiApiKey
+                  ? "Saved - leave blank to keep current API key"
+                  : "Paste OpenAI API key"
+              }
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              The key is encrypted before it is stored in Postgres.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04] lg:grid-cols-2">
+        <div className="grid gap-2">
+          <Label htmlFor="model">Model</Label>
+          <div className="relative">
+            <BracesIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+            <Input
+              autoComplete="off"
+              className="pl-10"
+              id="model"
+              name="model"
+              value={modelValue}
+              onChange={(event) => setModelValue(event.target.value)}
+              placeholder="gpt-5.6-luna"
+            />
+          </div>
+          <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Used as the default model for marketplace AI features.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="reasoningEffort">Reasoning effort</Label>
+          <Select
+            name="reasoningEffort"
+            value={reasoningEffort}
+            onValueChange={(value) => {
+              if (
+                chatGptReasoningEfforts.includes(
+                  value as ChatGptReasoningEffort,
+                )
+              ) {
+                setReasoningEffort(value as ChatGptReasoningEffort);
+              }
+            }}
+          >
+            <SelectTrigger id="reasoningEffort" className="w-full">
+              <SelectValue placeholder="Select reasoning effort" />
+            </SelectTrigger>
+            <SelectContent
+              align="start"
+              className="min-w-[220px] max-w-[calc(100vw-2rem)]"
+            >
+              {chatGptReasoningEfforts.map((effort) => (
+                <SelectItem key={effort} value={effort}>
+                  {effort}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Applied to WhatsApp interpretation and other structured reasoning
+            flows.
+          </p>
+        </div>
+      </div>
+
+      {state.message ? (
+        <p
+          className={
+            state.ok
+              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+          }
+        >
+          {state.message}
+        </p>
+      ) : null}
+
+      <Button type="submit" disabled={isPending} className="w-fit gap-2">
+        <SaveIcon className="size-4" />
+        {isPending ? "Saving..." : "Save ChatGPT settings"}
       </Button>
     </form>
   );

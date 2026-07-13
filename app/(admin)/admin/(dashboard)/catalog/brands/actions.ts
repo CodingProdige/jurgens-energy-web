@@ -6,8 +6,8 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import { brands } from "@/src/db/schema";
-import { env } from "@/src/config/env";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import { getOpenAiIntegrationConfig } from "@/src/modules/marketplace/settings";
 
 export type BrandMutationState = {
   message?: string;
@@ -201,10 +201,12 @@ export async function generateBrandDescription(input: {
     };
   }
 
-  if (!env.OPENAI_API_KEY) {
+  const openAiConfig = await getOpenAiIntegrationConfig();
+
+  if (!openAiConfig.isConfigured || !openAiConfig.apiKey) {
     return {
       ok: false,
-      message: "OPENAI_API_KEY is not configured.",
+      message: "ChatGPT integration is disabled or missing an OpenAI API key.",
     };
   }
 
@@ -227,10 +229,10 @@ export async function generateBrandDescription(input: {
         instructions:
           "You write concise marketplace catalog copy for brand profile pages. Return only the description text.",
         max_output_tokens: 140,
-        model: env.OPENAI_MODEL,
+        model: openAiConfig.model,
       }),
       headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAiConfig.apiKey}`,
         "Content-Type": "application/json",
       },
       method: "POST",

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { env } from "@/src/config/env";
+import { getOpenAiIntegrationConfig } from "@/src/modules/marketplace/settings";
 import type {
   MessageInterpretation,
   WhatsappSupportTopic,
@@ -135,7 +135,9 @@ export async function interpretWhatsappMessageWithAi({
   fallback: MessageInterpretation;
   message: string;
 }): Promise<MessageInterpretation | null> {
-  if (!env.OPENAI_API_KEY) {
+  const openAiConfig = await getOpenAiIntegrationConfig();
+
+  if (!openAiConfig.isConfigured || !openAiConfig.apiKey) {
     return null;
   }
 
@@ -154,9 +156,9 @@ export async function interpretWhatsappMessageWithAi({
           "If the user wants staff, complains, or the request is unsafe or unclear, use intent human.",
         ].join(" "),
         max_output_tokens: 180,
-        model: env.OPENAI_MODEL,
+        model: openAiConfig.model,
         reasoning: {
-          effort: env.OPENAI_REASONING_EFFORT,
+          effort: openAiConfig.reasoningEffort,
         },
         text: {
           format: {
@@ -168,7 +170,7 @@ export async function interpretWhatsappMessageWithAi({
         },
       }),
       headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAiConfig.apiKey}`,
         "Content-Type": "application/json",
       },
       method: "POST",

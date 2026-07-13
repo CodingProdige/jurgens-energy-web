@@ -11,6 +11,15 @@ import { decryptSecret, encryptSecret } from "@/src/modules/security/secrets";
 export const marketplaceComingSoonCookieName = "piessang_marketplace_preview";
 
 const defaultWhatsappMessageUrl = "https://waba-v2.360dialog.io";
+export const openAiReasoningEfforts = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as const;
+export type OpenAiReasoningEffort = (typeof openAiReasoningEfforts)[number];
 export const defaultWhatsappFollowUpMessages = {
   default:
     "Hi, just checking in. If you still need gas, send the cylinder size, quantity, and delivery suburb and we will help you finish it.",
@@ -28,6 +37,14 @@ function normalizeWhatsappProvider(value: string | null | undefined): "360dialog
   return value === "360dialog" ? "360dialog" : "360dialog";
 }
 
+function normalizeOpenAiReasoningEffort(
+  value: string | null | undefined,
+): OpenAiReasoningEffort {
+  return openAiReasoningEfforts.includes(value as OpenAiReasoningEffort)
+    ? (value as OpenAiReasoningEffort)
+    : env.OPENAI_REASONING_EFFORT;
+}
+
 export type MarketplaceSettings = {
   bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
   comingSoonEnabled: boolean;
@@ -41,6 +58,7 @@ export type MarketplaceSettings = {
   googleReviewUrl: string | null;
   googleSiteVerificationToken: string | null;
   googleTagManagerId: string | null;
+  hasOpenAiApiKey: boolean;
   imageCompressionQuality: number;
   instagramUrl: string | null;
   maxImageWidth: number;
@@ -70,6 +88,9 @@ export type MarketplaceSettings = {
   payfastOnsiteEnabled: boolean;
   payfastSandboxMerchantId: string | null;
   payfastTokenizationEnabled: boolean;
+  openAiEnabled: boolean;
+  openAiModel: string;
+  openAiReasoningEffort: OpenAiReasoningEffort;
   hasPayfastLiveMerchantKey: boolean;
   hasPayfastLivePassphrase: boolean;
   hasPayfastSandboxMerchantKey: boolean;
@@ -117,6 +138,7 @@ export type WhatsappFollowUpSettings = Pick<
 export type MarketplaceAdminSecrets = {
   bobgoLiveApiKey: string | null;
   bobgoLiveWebhookSecret: string | null;
+  openAiApiKey: string | null;
   bobgoSandboxApiKey: string | null;
   bobgoSandboxWebhookSecret: string | null;
   payfastLiveMerchantKey: string | null;
@@ -144,6 +166,7 @@ const defaultSettings: MarketplaceSettings = {
   googleReviewUrl: null,
   googleSiteVerificationToken: null,
   googleTagManagerId: null,
+  hasOpenAiApiKey: Boolean(env.OPENAI_API_KEY),
   imageCompressionQuality: 78,
   instagramUrl: null,
   maxImageWidth: 2000,
@@ -173,6 +196,9 @@ const defaultSettings: MarketplaceSettings = {
   payfastOnsiteEnabled: false,
   payfastSandboxMerchantId: null,
   payfastTokenizationEnabled: false,
+  openAiEnabled: true,
+  openAiModel: env.OPENAI_MODEL,
+  openAiReasoningEffort: env.OPENAI_REASONING_EFFORT,
   hasPayfastLiveMerchantKey: false,
   hasPayfastLivePassphrase: false,
   hasPayfastSandboxMerchantKey: false,
@@ -220,6 +246,10 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       googleSiteVerificationToken:
         marketplaceSettings.googleSiteVerificationToken,
       googleTagManagerId: marketplaceSettings.googleTagManagerId,
+      openAiApiKeyEncrypted: marketplaceSettings.openAiApiKeyEncrypted,
+      openAiEnabled: marketplaceSettings.openAiEnabled,
+      openAiModel: marketplaceSettings.openAiModel,
+      openAiReasoningEffort: marketplaceSettings.openAiReasoningEffort,
       imageCompressionQuality: marketplaceSettings.imageCompressionQuality,
       instagramUrl: marketplaceSettings.instagramUrl,
       maxImageWidth: marketplaceSettings.maxImageWidth,
@@ -337,6 +367,14 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     hasBobgoSandboxWebhookSecret: Boolean(
       settings.bobgoSandboxWebhookSecretEncrypted ??
         settings.bobgoWebhookSecretEncrypted,
+    ),
+    hasOpenAiApiKey: Boolean(
+      settings.openAiApiKeyEncrypted ?? env.OPENAI_API_KEY,
+    ),
+    openAiEnabled: settings.openAiEnabled ?? true,
+    openAiModel: settings.openAiModel || env.OPENAI_MODEL,
+    openAiReasoningEffort: normalizeOpenAiReasoningEffort(
+      settings.openAiReasoningEffort,
     ),
     payfastMode: settings.payfastMode === "live" ? "live" : "sandbox",
     hasPayfastLiveMerchantKey: Boolean(
@@ -878,6 +916,24 @@ export async function getPayFastIntegrationConfig() {
   };
 }
 
+export async function getOpenAiIntegrationConfig() {
+  const [rawSettings, settings] = await Promise.all([
+    getRawMarketplaceSettings(),
+    getMarketplaceSettings(),
+  ]);
+  const apiKey = rawSettings?.openAiApiKeyEncrypted
+    ? decryptOptionalSecret(rawSettings.openAiApiKeyEncrypted)
+    : (env.OPENAI_API_KEY ?? null);
+
+  return {
+    apiKey,
+    enabled: settings.openAiEnabled,
+    isConfigured: Boolean(settings.openAiEnabled && apiKey),
+    model: settings.openAiModel || env.OPENAI_MODEL,
+    reasoningEffort: settings.openAiReasoningEffort,
+  };
+}
+
 export async function getWhatsappIntegrationConfig() {
   const [rawSettings, settings] = await Promise.all([
     getRawMarketplaceSettings(),
@@ -923,6 +979,10 @@ export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecr
     bobgoLiveWebhookSecret: decryptOptionalSecret(
       rawSettings?.bobgoLiveWebhookSecretEncrypted,
     ),
+    openAiApiKey:
+      decryptOptionalSecret(rawSettings?.openAiApiKeyEncrypted) ??
+      env.OPENAI_API_KEY ??
+      null,
     bobgoSandboxApiKey: decryptOptionalSecret(
       rawSettings?.bobgoSandboxApiKeyEncrypted ??
         rawSettings?.bobgoApiKeyEncrypted,
@@ -995,6 +1055,7 @@ async function getRawMarketplaceSettings() {
         marketplaceSettings.stripeSandboxSecretKeyEncrypted,
       stripeSandboxWebhookSecretEncrypted:
         marketplaceSettings.stripeSandboxWebhookSecretEncrypted,
+      openAiApiKeyEncrypted: marketplaceSettings.openAiApiKeyEncrypted,
       whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
       whatsappWebhookVerifyTokenEncrypted:
         marketplaceSettings.whatsappWebhookVerifyTokenEncrypted,
@@ -1150,6 +1211,55 @@ export async function updateMarketplaceGoogleMarketingSettings({
     });
 
   return { ok: true, message: "Google tag settings saved." };
+}
+
+export async function updateMarketplaceOpenAiSettings({
+  apiKey,
+  enabled,
+  model,
+  reasoningEffort,
+}: {
+  apiKey?: string;
+  enabled: boolean;
+  model: string;
+  reasoningEffort: OpenAiReasoningEffort;
+}) {
+  const existing = await getRawMarketplaceSettings();
+  const nextApiKey =
+    apiKey && apiKey.length > 0
+      ? encryptSecret(apiKey)
+      : (existing?.openAiApiKeyEncrypted ??
+        (env.OPENAI_API_KEY ? encryptSecret(env.OPENAI_API_KEY) : null));
+
+  if (enabled && !nextApiKey) {
+    return {
+      ok: false,
+      message: "Add an OpenAI API key before enabling ChatGPT features.",
+    };
+  }
+
+  await db
+    .insert(marketplaceSettings)
+    .values({
+      id: 1,
+      openAiApiKeyEncrypted: nextApiKey,
+      openAiEnabled: enabled,
+      openAiModel: model,
+      openAiReasoningEffort: reasoningEffort,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: marketplaceSettings.id,
+      set: {
+        openAiApiKeyEncrypted: nextApiKey,
+        openAiEnabled: enabled,
+        openAiModel: model,
+        openAiReasoningEffort: reasoningEffort,
+        updatedAt: new Date(),
+      },
+    });
+
+  return { ok: true, message: "ChatGPT integration settings saved." };
 }
 
 export async function verifyMarketplaceComingSoonPassword(password: string) {

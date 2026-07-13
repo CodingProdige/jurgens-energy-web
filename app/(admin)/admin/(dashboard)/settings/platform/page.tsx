@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   BarChart3Icon,
+  BracesIcon,
   ChevronRightIcon,
   CreditCardIcon,
   FolderUpIcon,
@@ -24,6 +25,7 @@ import {
 } from "@/src/modules/marketplace/settings";
 import { getJurgensDeliveryZones } from "@/src/modules/shipping/jurgens-delivery";
 import {
+  ChatGptIntegrationSettingsForm,
   SettingsForm,
   GoogleMarketingSettingsForm,
   MediaStorageSettingsForm,
@@ -67,6 +69,13 @@ const settingSections = [
     description:
       "Manage 360dialog credentials, webhook URL, and the quick gas topup assistant.",
     icon: MessageCircleIcon,
+  },
+  {
+    key: "chatgpt-integration",
+    title: "ChatGPT integration",
+    description:
+      "Manage the OpenAI API key, default model, and reasoning effort used by AI features.",
+    icon: BracesIcon,
   },
   {
     key: "google-tags",
@@ -157,7 +166,8 @@ export default async function AdminSettingsPage({
   const secrets =
     selectedSection === "payfast-payments" ||
     selectedSection === "shipping" ||
-    selectedSection === "whatsapp-ordering"
+    selectedSection === "whatsapp-ordering" ||
+    selectedSection === "chatgpt-integration"
       ? await getMarketplaceAdminSecrets()
       : null;
   const notificationSettings =
@@ -387,6 +397,23 @@ function SettingsSection({
           googleMerchantCenterId={settings.googleMerchantCenterId}
           googleSiteVerificationToken={settings.googleSiteVerificationToken}
           googleTagManagerId={settings.googleTagManagerId}
+        />
+      </DashboardPanel>
+    );
+  }
+
+  if (section === "chatgpt-integration") {
+    return (
+      <DashboardPanel
+        title="ChatGPT integration"
+        description="Manage the OpenAI key, default model, and reasoning effort used by marketplace AI features."
+      >
+        <ChatGptIntegrationSettingsForm
+          hasOpenAiApiKey={settings.hasOpenAiApiKey}
+          openAiApiKey={secrets?.openAiApiKey ?? null}
+          openAiEnabled={settings.openAiEnabled}
+          openAiModel={settings.openAiModel}
+          openAiReasoningEffort={settings.openAiReasoningEffort}
         />
       </DashboardPanel>
     );

@@ -5,9 +5,11 @@ import { z } from "zod";
 
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
+  openAiReasoningEfforts,
   updateMarketplaceComingSoonSettings,
   updateMarketplaceGoogleMarketingSettings,
   updateMarketplaceMediaSettings,
+  updateMarketplaceOpenAiSettings,
   updateMarketplacePayFastSettings,
   updateMarketplaceSocialLinks,
   updateMarketplaceShippingSettings,
@@ -234,6 +236,54 @@ export async function updateGoogleMarketingSettings(
   const result = await updateMarketplaceGoogleMarketingSettings(parsed.data);
 
   revalidatePath("/");
+  revalidatePath("/settings/platform");
+
+  return result;
+}
+
+const openAiSettingsSchema = z.object({
+  apiKey: z
+    .string()
+    .trim()
+    .max(500, "The OpenAI API key is too long.")
+    .optional()
+    .transform((value) => value || undefined),
+  enabled: z.coerce.boolean().default(false),
+  model: z
+    .string()
+    .trim()
+    .min(2, "Choose an OpenAI model.")
+    .max(120, "The model name is too long.")
+    .refine(
+      (value) => /^[A-Za-z0-9._:-]+$/.test(value),
+      "Model names can only contain letters, numbers, dots, hyphens, underscores, and colons.",
+    ),
+  reasoningEffort: z.enum(openAiReasoningEfforts),
+});
+
+export async function updateChatGptIntegrationSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  await requireSettingsManageAccess();
+
+  const parsed = openAiSettingsSchema.safeParse({
+    apiKey: String(formData.get("apiKey") ?? ""),
+    enabled: formData.get("enabled") === "on",
+    model: String(formData.get("model") ?? ""),
+    reasoningEffort: String(formData.get("reasoningEffort") ?? "medium"),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Check the ChatGPT integration settings.",
+    };
+  }
+
+  const result = await updateMarketplaceOpenAiSettings(parsed.data);
+
   revalidatePath("/settings/platform");
 
   return result;

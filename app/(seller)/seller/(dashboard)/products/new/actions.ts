@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import { env } from "@/src/config/env";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { db } from "@/src/db";
 import {
@@ -19,9 +18,12 @@ import {
 import { processAndStoreMediaUpload } from "@/src/modules/media/admin";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
+import { getOpenAiIntegrationConfig } from "@/src/modules/marketplace/settings";
 import { fulfillmentModeSchema } from "@/src/modules/shipping";
 
 const productDescriptionGenerationSchema = z.object({
+  brandName: z.string().trim().max(120).optional(),
+  categoryName: z.string().trim().max(240).optional(),
   kind: z.enum(["short", "long"]),
   productName: z.string().trim().min(2).max(500),
 });
@@ -278,14 +280,24 @@ async function getUniqueProductSlug(title: string, productId?: string | null) {
   return `${base}-${crypto.randomUUID().slice(0, 8)}`;
 }
 
+function asRecord(value: unknown) {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getStringProperty(value: unknown, key: string) {
+  const record = asRecord(value);
+  const property = record?.[key];
+
+  return typeof property === "string" ? property : "";
+}
+
 function getResponseText(payload: unknown) {
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    "output_text" in payload &&
-    typeof payload.output_text === "string"
-  ) {
-    return payload.output_text;
+  const topLevelText = getStringProperty(payload, "output_text").trim();
+
+  if (topLevelText) {
+    return topLevelText;
   }
 
   if (
@@ -295,6 +307,12 @@ function getResponseText(payload: unknown) {
     Array.isArray(payload.output)
   ) {
     for (const item of payload.output) {
+      const itemText = getStringProperty(item, "text").trim();
+
+      if (itemText) {
+        return itemText;
+      }
+
       if (
         typeof item === "object" &&
         item !== null &&
@@ -320,11 +338,49 @@ function getResponseText(payload: unknown) {
     }
   }
 
+  const choices = asRecord(payload)?.choices;
+
+  if (Array.isArray(choices)) {
+    for (const choice of choices) {
+      const choiceRecord = asRecord(choice);
+      const message = asRecord(choiceRecord?.message);
+      const content = message?.content;
+
+      if (typeof content === "string" && content.trim()) {
+        return content.trim();
+      }
+    }
+  }
+
   return "";
 }
 
 function clampGeneratedText(value: string, maxLength: number) {
   return value.trim().replace(/^["']|["']$/g, "").slice(0, maxLength);
+}
+
+function getOpenAiResponseIssue(payload: unknown) {
+  const record = asRecord(payload);
+  const error = asRecord(record?.error);
+  const errorMessage = getStringProperty(error, "message");
+
+  if (errorMessage) {
+    return errorMessage;
+  }
+
+  const status = getStringProperty(record, "status");
+  const incompleteDetails = asRecord(record?.incomplete_details);
+  const incompleteReason = getStringProperty(incompleteDetails, "reason");
+
+  if (status === "incomplete" && incompleteReason === "max_output_tokens") {
+    return "The AI draft ran out of output budget. Try again.";
+  }
+
+  if (status === "failed") {
+    return "The AI generator failed before returning text. Try again.";
+  }
+
+  return "";
 }
 
 async function requireCatalogManageSession() {
@@ -334,6 +390,8 @@ async function requireCatalogManageSession() {
 }
 
 export async function generateProductDescription(input: {
+  brandName?: string;
+  categoryName?: string;
   kind: "long" | "short";
   productName: string;
 }) {
@@ -355,10 +413,12 @@ export async function generateProductDescription(input: {
     };
   }
 
-  if (!env.OPENAI_API_KEY) {
+  const openAiConfig = await getOpenAiIntegrationConfig();
+
+  if (!openAiConfig.isConfigured || !openAiConfig.apiKey) {
     return {
       ok: false,
-      message: "OPENAI_API_KEY is not configured.",
+      message: "ChatGPT integration is disabled or missing an OpenAI API key.",
     };
   }
 
@@ -371,48 +431,61 @@ export async function generateProductDescription(input: {
       body: JSON.stringify({
         input: [
           `Product name: ${parsed.data.productName}`,
+          parsed.data.brandName ? `Brand: ${parsed.data.brandName}` : null,
+          parsed.data.categoryName ? `Category: ${parsed.data.categoryName}` : null,
           isShort
-            ? "Write one concise marketplace product short description under 400 characters."
+            ? "Write one direct marketplace product-card short description in one sentence under 240 characters."
             : "Write a helpful marketplace product description under 2000 characters.",
           "Keep it neutral, buyer-friendly, specific enough to be useful, and do not invent certifications, stock availability, delivery promises, discounts, warranties, dimensions, or ingredients.",
-        ].join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n"),
         instructions:
           "You write concise marketplace product copy for catalog listings. Return only the product description text.",
-        max_output_tokens: isShort ? 80 : 420,
-        model: env.OPENAI_MODEL,
+        max_output_tokens: isShort ? 240 : 900,
+        model: openAiConfig.model,
       }),
       headers: {
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAiConfig.apiKey}`,
         "Content-Type": "application/json",
       },
       method: "POST",
       signal: controller.signal,
     });
 
+    const responsePayload = await response.json().catch(() => null);
+
     if (!response.ok) {
       return {
         ok: false,
-        message: "The AI generator is unavailable right now.",
+        message:
+          getOpenAiResponseIssue(responsePayload) ||
+          `The AI generator is unavailable right now. (${response.status})`,
       };
     }
 
     const description = clampGeneratedText(
-      getResponseText(await response.json()),
+      getResponseText(responsePayload),
       isShort ? 400 : 2000,
     );
 
     if (!description) {
       return {
         ok: false,
-        message: "The AI generator did not return usable text.",
+        message:
+          getOpenAiResponseIssue(responsePayload) ||
+          "OpenAI returned an empty draft. Try again after adding more product details.",
       };
     }
 
     return { ok: true, description };
-  } catch {
+  } catch (error) {
     return {
       ok: false,
-      message: "The AI generator timed out. Try again.",
+      message:
+        error instanceof Error && error.name === "AbortError"
+          ? "The AI generator timed out. Try again."
+          : "The AI generator failed. Try again.",
     };
   } finally {
     clearTimeout(timeoutId);

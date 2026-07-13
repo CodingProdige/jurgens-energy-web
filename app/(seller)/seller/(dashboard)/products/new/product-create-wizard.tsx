@@ -2465,7 +2465,12 @@ export function ProductCreateWizard({
 
     setAiFeedback(null);
     startDescriptionTransition(() => {
-      void generateProductDescription({ kind, productName: name }).then((result) => {
+      void generateProductDescription({
+        brandName: brandName.trim() || undefined,
+        categoryName: selectedCategoryLabel || undefined,
+        kind,
+        productName: name,
+      }).then((result) => {
         if (result.ok && result.description) {
           if (kind === "short") {
             setDescription(result.description.slice(0, 400));

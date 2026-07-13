@@ -21,6 +21,12 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   googleAdsConversionLabel: text("google_ads_conversion_label"),
   googleMerchantCenterId: text("google_merchant_center_id"),
   googleSiteVerificationToken: text("google_site_verification_token"),
+  openAiEnabled: boolean("openai_enabled").notNull().default(true),
+  openAiApiKeyEncrypted: text("openai_api_key_encrypted"),
+  openAiModel: text("openai_model").notNull().default("gpt-5.6-luna"),
+  openAiReasoningEffort: varchar("openai_reasoning_effort", { length: 16 })
+    .notNull()
+    .default("medium"),
   freeStorageQuotaMb: integer("free_storage_quota_mb").notNull().default(512),
   maxUploadFileMb: integer("max_upload_file_mb").notNull().default(10),
   maxVideoUploadFileMb: integer("max_video_upload_file_mb")
