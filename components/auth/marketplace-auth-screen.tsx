@@ -150,7 +150,7 @@ function MarketplaceAuthForm({
                 required
                 minLength={2}
                 placeholder="Enter your full name"
-                className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+                className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
               />
             </span>
           </label>
@@ -169,7 +169,7 @@ function MarketplaceAuthForm({
               required
               defaultValue={rememberedEmail}
               placeholder="youremail@example.com"
-              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
             />
           </span>
         </label>
@@ -183,7 +183,7 @@ function MarketplaceAuthForm({
               className="grid-cols-[8.25rem_minmax(0,1fr)]"
               defaultValue={whatsappPhoneDefault}
               inputClassName={cn(
-                "h-[45px] rounded-[6px] border-[#d9deea] text-[14px] focus:border-[#ffc400] focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719]",
+                "h-[45px] rounded-[6px] border-[#d9deea] text-[14px] focus:border-primary focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719]",
                 whatsappPhoneLocked &&
                   "bg-[#f7f7f2] text-[#596176] dark:bg-white/[0.06]",
               )}
@@ -191,7 +191,7 @@ function MarketplaceAuthForm({
               placeholder="82 123 4567"
               readOnly={whatsappPhoneLocked}
               required
-              selectClassName="h-[45px] rounded-[6px] border-[#d9deea] text-[13px] focus:border-[#ffc400] focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719]"
+              selectClassName="h-[45px] rounded-[6px] border-[#d9deea] text-[13px] focus:border-primary focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719]"
             />
             <span className="text-[12px] font-medium text-[#596176] dark:text-zinc-400">
               {whatsappPhoneLocked
@@ -207,7 +207,7 @@ function MarketplaceAuthForm({
             {!isRegister ? (
               <Link
                 href="/forgot-password"
-                className="text-[12px] font-semibold text-[#070b16] transition hover:text-[#c4982d] dark:text-zinc-300 dark:hover:text-[#ffc400]"
+                className="text-[12px] font-semibold text-[#070b16] transition hover:text-primary dark:text-zinc-300 dark:hover:text-brand-amber"
               >
                 Forgot password?
               </Link>
@@ -222,7 +222,7 @@ function MarketplaceAuthForm({
               required
               minLength={8}
               placeholder={isRegister ? "Enter your password" : "Password"}
-              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
             />
             <button
               type="button"
@@ -250,7 +250,7 @@ function MarketplaceAuthForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-7 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#f0b800] bg-[linear-gradient(180deg,#ffd21b,#ffc400)] text-[13px] font-extrabold text-[#070b16] shadow-[0_10px_24px_rgba(255,196,0,0.22)] transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-7 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-primary bg-[linear-gradient(180deg,#ff6b35,#ff5a1f)] text-[13px] font-extrabold text-white shadow-[0_10px_24px_rgba(255,90,31,0.26)] transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
       >
         <LockKeyhole className="size-4" />
         {pending ? "Working..." : isRegister ? "Create account" : "Sign in"}
@@ -274,7 +274,7 @@ function MarketplaceAuthForm({
         {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
         <Link
           href={alternateHref}
-          className="font-semibold text-[#c4982d] transition hover:text-[#a77e1d] dark:text-[#ffc400]"
+          className="font-semibold text-primary transition hover:text-[#d94514] dark:text-brand-amber"
         >
           {isRegister ? "Sign in" : "Create account"}
         </Link>

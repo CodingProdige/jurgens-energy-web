@@ -30,13 +30,13 @@ type ForgotPasswordScreenProps = {
 
 const accentStyles = {
   gold: {
-    highlight: "text-[#ffc400]",
-    focus: "focus:border-[#ffc400] focus:ring-[#ffc400]/20",
+    highlight: "text-primary",
+    focus: "focus:border-primary focus:ring-primary/20",
     button:
-      "border-[#070b16] bg-[linear-gradient(180deg,#111827,#030712)] text-white shadow-[0_10px_24px_rgba(3,7,18,0.18)]",
-    glow: "rgba(255,196,0,0.18)",
-    icon: "text-[#f3b400]",
-    iconBg: "bg-[#ffc400]/14",
+      "border-primary bg-[linear-gradient(180deg,#ff6b35,#ff5a1f)] text-white shadow-[0_10px_24px_rgba(255,90,31,0.24)]",
+    glow: "rgba(255,90,31,0.18)",
+    icon: "text-primary",
+    iconBg: "bg-primary/12",
   },
   green: {
     highlight: "text-[#58d83f]",

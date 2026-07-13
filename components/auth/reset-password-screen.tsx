@@ -22,10 +22,10 @@ type ResetPasswordScreenProps = {
 
 const accentStyles = {
   gold: {
-    focus: "focus:border-[#ffc400] focus:ring-[#ffc400]/20",
+    focus: "focus:border-primary focus:ring-primary/20",
     button:
-      "border-[#f0b800] bg-[linear-gradient(180deg,#ffd21b,#ffc400)] text-[#070b16]",
-    icon: "text-[#cca137]",
+      "border-primary bg-[linear-gradient(180deg,#ff6b35,#ff5a1f)] text-white",
+    icon: "text-primary",
   },
   green: {
     focus: "focus:border-[#58d83f] focus:ring-[#58d83f]/20",

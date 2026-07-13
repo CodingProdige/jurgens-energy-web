@@ -47,9 +47,9 @@ type NotificationBellProps = {
 
 const accentStyles = {
   amber: {
-    badge: "bg-[#c4982d] text-white",
-    unreadDot: "bg-[#c4982d]",
-    action: "text-[#8a641f] dark:text-[#f0c760]",
+    badge: "bg-primary text-primary-foreground",
+    unreadDot: "bg-primary",
+    action: "text-primary dark:text-brand-amber",
   },
   green: {
     badge: "bg-emerald-600 text-white",

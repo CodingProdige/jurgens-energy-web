@@ -74,7 +74,7 @@ function SocialLink({
       rel="noreferrer"
       target="_blank"
       className={cn(
-        "grid size-7 place-items-center rounded-full transition hover:bg-[#f1f1ed] hover:text-[#cca137] dark:hover:bg-white/10",
+        "grid size-7 place-items-center rounded-full transition hover:bg-[#f1f1ed] hover:text-primary dark:hover:bg-white/10",
         className,
       )}
     >

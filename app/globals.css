@@ -118,6 +118,10 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-admin-primary: var(--brand-flame);
+  --color-admin-primary-foreground: #ffffff;
+  --color-brand-flame: var(--brand-flame);
+  --color-brand-amber: var(--brand-amber);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);

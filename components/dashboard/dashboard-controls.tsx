@@ -274,7 +274,7 @@ export function DashboardTablePagination({
                 className={cn(
                   dashboardControlClass,
                   item === activePage &&
-                    "border-[#c4982d] text-[#a87920] dark:border-[#c4982d] dark:text-[#f3c96b]",
+                    "border-primary text-primary dark:border-primary dark:text-brand-amber",
                 )}
                 onClick={() => onPageChange(item)}
                 aria-label={`Go to ${itemLabel} page ${item}`}

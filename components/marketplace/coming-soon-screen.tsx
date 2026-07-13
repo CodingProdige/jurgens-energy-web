@@ -69,7 +69,7 @@ function ComingSoonVisual() {
       >
         <source src={comingSoonVideoSrc} type="video/mp4" />
       </video>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_86%_24%,rgba(255,196,0,0.18),transparent_30%),radial-gradient(circle_at_48%_90%,rgba(255,196,0,0.14),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_86%_24%,rgba(255,90,31,0.18),transparent_30%),radial-gradient(circle_at_48%_90%,rgba(255,176,0,0.12),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.035),transparent)]" />
       <div
         className={cn(
           "absolute inset-y-0 left-0 w-[82%] bg-[linear-gradient(90deg,rgba(0,0,0,0.9),rgba(0,0,0,0.68)_42%,rgba(0,0,0,0.3)_72%,transparent)] transition-opacity duration-1000 ease-out",
@@ -85,12 +85,12 @@ function ComingSoonVisual() {
         <BrandMark className="w-[136px]" />
 
         <div className="mt-16 max-w-[390px] lg:mt-[92px]">
-          <p className="text-[12px] font-extrabold uppercase tracking-[0.22em] text-[#ffc400]">
+          <p className="text-[12px] font-extrabold uppercase tracking-[0.22em] text-primary">
             Coming soon
           </p>
           <h1 className="mt-5 text-[36px] font-extrabold leading-[1.05] sm:text-[42px] lg:text-[48px]">
             A new{" "}
-            <span className="text-[#ffc400]">global</span>
+            <span className="text-primary">global</span>
             <br />
             marketplace is coming.
           </h1>
@@ -123,15 +123,15 @@ function ComingSoonPanel({
     <div className="w-full max-w-[420px]">
       <div className="mb-8 text-center lg:text-left">
         <BrandMark className="mx-auto mb-10 w-[126px] lg:hidden" />
-        <div className="mx-auto mb-6 grid size-[74px] place-items-center rounded-full bg-[#fbe694]/35 text-[#cca137] lg:hidden">
+        <div className="mx-auto mb-6 grid size-[74px] place-items-center rounded-full bg-primary/12 text-primary lg:hidden">
           <Sparkles className="size-9" />
         </div>
-        <p className="text-[12px] font-extrabold uppercase tracking-[0.22em] text-[#c4982d]">
+        <p className="text-[12px] font-extrabold uppercase tracking-[0.22em] text-primary">
           Coming soon
         </p>
         <h2 className="mt-4 text-[30px] font-extrabold leading-[1.08] text-[#070b16] dark:text-white sm:text-[34px]">
           A new{" "}
-          <span className="text-[#f0b800]">global</span>
+          <span className="text-primary">global</span>
           <br />
           marketplace is coming.
         </h2>
@@ -152,13 +152,13 @@ function ComingSoonPanel({
             type="email"
             autoComplete="email"
             placeholder="Enter your email address"
-            className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+            className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
           />
         </label>
         <button
           type="submit"
           disabled={isWaitlistPending}
-          className="mt-4 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#f0b800] bg-[linear-gradient(180deg,#ffd21b,#ffc400)] text-[13px] font-extrabold text-[#070b16] shadow-[0_10px_24px_rgba(255,196,0,0.22)] transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+          className="mt-4 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-primary bg-[linear-gradient(180deg,#ff6b35,#ff5a1f)] text-[13px] font-extrabold text-white shadow-[0_10px_24px_rgba(255,90,31,0.26)] transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isWaitlistPending ? "Saving..." : "Notify Me"}
         </button>
@@ -192,7 +192,7 @@ function ComingSoonPanel({
             type={showAccessPassword ? "text" : "password"}
             autoComplete="current-password"
             placeholder="Enter access password"
-            className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+            className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
           />
           <button
             type="button"

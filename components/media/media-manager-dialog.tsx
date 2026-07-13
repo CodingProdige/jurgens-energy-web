@@ -165,31 +165,31 @@ const systemMediaFolders = [
 const mediaManagerAccentClasses = {
   admin: {
     activeLibrary:
-      "border-[#c4982d]/25 bg-[#c4982d]/10 text-[#7a5b19] dark:text-[#f3d27a]",
-    button: "bg-[#c4982d] text-white hover:bg-[#a87920]",
+      "border-primary/25 bg-primary/10 text-[#b53610] dark:text-brand-amber",
+    button: "bg-primary text-white hover:bg-[#d94514]",
     dropzone:
-      "hover:border-[#c4982d] hover:bg-[#c4982d]/5 dark:hover:border-[#c4982d]",
-    icon: "text-[#c4982d]",
-    progress: "bg-[#c4982d]",
-    ring: "border-[#c4982d] ring-2 ring-[#c4982d]/20",
-    selected: "bg-[#c4982d] text-white",
+      "hover:border-primary hover:bg-primary/5 dark:hover:border-primary",
+    icon: "text-primary",
+    progress: "bg-primary",
+    ring: "border-primary ring-2 ring-primary/20",
+    selected: "bg-primary text-white",
     success:
-      "border-[#c4982d]/25 bg-[#c4982d]/10 text-[#7a5b19] dark:text-[#f3d27a]",
-    tag: "bg-[#c4982d]/10 text-[#7a5b19] dark:text-[#f3d27a]",
+      "border-primary/25 bg-primary/10 text-[#b53610] dark:text-brand-amber",
+    tag: "bg-primary/10 text-[#b53610] dark:text-brand-amber",
   },
   marketplace: {
     activeLibrary:
-      "border-[#fbe694]/40 bg-[#fbe694]/20 text-[#7a5b19] dark:text-[#fbe694]",
-    button: "bg-[#f2bc05] text-zinc-950 hover:bg-[#d8a904]",
+      "border-primary/25 bg-primary/10 text-[#b53610] dark:text-brand-amber",
+    button: "bg-primary text-white hover:bg-[#d94514]",
     dropzone:
-      "hover:border-[#f2bc05] hover:bg-[#fbe694]/15 dark:hover:border-[#f2bc05]",
-    icon: "text-[#f2bc05]",
-    progress: "bg-[#f2bc05]",
-    ring: "border-[#f2bc05] ring-2 ring-[#f2bc05]/20",
-    selected: "bg-[#f2bc05] text-zinc-950",
+      "hover:border-primary hover:bg-primary/5 dark:hover:border-primary",
+    icon: "text-primary",
+    progress: "bg-primary",
+    ring: "border-primary ring-2 ring-primary/20",
+    selected: "bg-primary text-white",
     success:
-      "border-[#fbe694]/40 bg-[#fbe694]/20 text-[#7a5b19] dark:text-[#fbe694]",
-    tag: "bg-[#fbe694]/25 text-[#7a5b19] dark:text-[#fbe694]",
+      "border-primary/25 bg-primary/10 text-[#b53610] dark:text-brand-amber",
+    tag: "bg-primary/10 text-[#b53610] dark:text-brand-amber",
   },
   seller: {
     activeLibrary:

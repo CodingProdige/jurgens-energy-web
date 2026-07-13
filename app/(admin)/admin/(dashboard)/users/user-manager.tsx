@@ -127,10 +127,10 @@ const roleBadgeClass: Record<PlatformRole, string> = {
   seller_staff:
     "bg-teal-100 text-teal-800 dark:bg-teal-400/15 dark:text-teal-200",
   superadmin:
-    "bg-[#fbe694] text-[#5d4711] dark:bg-[#fbe694]/20 dark:text-[#fbe694]",
+    "bg-brand-amber/20 text-[#7a2b13] dark:bg-brand-amber/20 dark:text-brand-amber",
 };
 const modalSelectClass =
-  "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-zinc-950 outline-none transition focus:border-[#c4982d] focus:ring-4 focus:ring-[#c4982d]/10 dark:border-white/18 dark:bg-[#151719] dark:text-white";
+  "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-zinc-950 outline-none transition focus:border-admin-primary focus:ring-4 focus:ring-admin-primary/10 dark:border-white/18 dark:bg-[#151719] dark:text-white";
 const modalSelectContentClass =
   "border border-slate-200 bg-white p-1 text-zinc-950 shadow-xl dark:border-white/10 dark:bg-[#151719] dark:text-white";
 const modalSelectItemClass =
@@ -138,7 +138,7 @@ const modalSelectItemClass =
 const modalContentClass =
   "max-w-xl border border-slate-200 bg-white text-zinc-950 shadow-2xl dark:border-white/10 dark:bg-[#101214] dark:text-white";
 const modalFieldClass =
-  "h-10 border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-[#c4982d] focus-visible:ring-[#c4982d]/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
+  "h-10 border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-admin-primary focus-visible:ring-admin-primary/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
 const modalLabelClass = "text-sm font-semibold text-zinc-900 dark:text-white";
 const initialUserMutationState: UserMutationState = {};
 
@@ -248,7 +248,7 @@ function UserAvatar({
       <div
         aria-label={`${getDisplayName(user)} profile picture`}
         className={cn(
-          "shrink-0 rounded-full border border-[#fbe694]/70 bg-cover bg-center bg-no-repeat shadow-sm dark:border-[#fbe694]/25",
+          "shrink-0 rounded-full border border-brand-amber/70 bg-cover bg-center bg-no-repeat shadow-sm dark:border-brand-amber/25",
           className,
         )}
         role="img"
@@ -260,7 +260,7 @@ function UserAvatar({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-[#fbe694] text-xs font-bold text-[#5d4711] dark:bg-[#fbe694]/20 dark:text-[#fbe694]",
+        "flex shrink-0 items-center justify-center rounded-full bg-brand-amber/20 text-xs font-bold text-[#7a2b13] dark:bg-brand-amber/20 dark:text-brand-amber",
         className,
       )}
     >
@@ -1101,7 +1101,7 @@ export function UserManager({
               <FilterIcon className="size-3.5" />
               Filter
               {activeFilterCount > 0 ? (
-                <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#c4982d] px-1 text-[10px] font-bold text-white">
+                <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-admin-primary px-1 text-[10px] font-bold text-white">
                   {activeFilterCount}
                 </span>
               ) : null}

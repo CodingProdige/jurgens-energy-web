@@ -399,7 +399,7 @@ export function SellerApplicationManager({
               <FilterIcon className="size-3.5" />
               Filter
               {activeFilterCount > 0 ? (
-                <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#c4982d] px-1 text-[10px] font-bold text-white">
+                <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-admin-primary px-1 text-[10px] font-bold text-white">
                   {activeFilterCount}
                 </span>
               ) : null}

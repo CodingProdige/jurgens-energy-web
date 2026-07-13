@@ -82,7 +82,7 @@ function AdminSignInForm({
               required
               defaultValue={rememberedEmail}
               placeholder="admin@jurgensenergy.com"
-              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
             />
           </span>
         </label>
@@ -92,7 +92,7 @@ function AdminSignInForm({
             Password
             <a
               href="/forgot-password"
-              className="text-[12px] font-semibold text-[#f5b900] transition hover:text-[#d99f00]"
+              className="text-[12px] font-semibold text-primary transition hover:text-[#d94514]"
             >
               Forgot password?
             </a>
@@ -106,7 +106,7 @@ function AdminSignInForm({
               required
               minLength={8}
               placeholder="Enter your password"
-              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+              className="h-[45px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
             />
             <button
               type="button"
@@ -125,7 +125,7 @@ function AdminSignInForm({
           <Checkbox
             name="remember"
             defaultChecked={Boolean(rememberedEmail)}
-            className="size-4 rounded-[4px] border-[#cbd2df] bg-white data-checked:border-[#ffc400] data-checked:bg-[#ffc400] data-checked:text-[#070b16]"
+            className="size-4 rounded-[4px] border-[#cbd2df] bg-white data-checked:border-primary data-checked:bg-primary data-checked:text-white"
           />
           Keep me signed in for 30 days
         </label>
@@ -150,7 +150,7 @@ function AdminSignInForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-7 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#f0b800] bg-[linear-gradient(180deg,#ffd21b,#ffc400)] text-[13px] font-extrabold text-[#070b16] shadow-[0_10px_24px_rgba(255,196,0,0.22)] transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-7 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-primary bg-[linear-gradient(180deg,#ff6b35,#ff5a1f)] text-[13px] font-extrabold text-white shadow-[0_10px_24px_rgba(255,90,31,0.26)] transition hover:brightness-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
       >
         <LockKeyhole className="size-4" />
         {pending ? "Signing in..." : "Sign in"}
@@ -174,7 +174,7 @@ function AdminSignInForm({
       </form>
 
       <div className="mt-13 text-center">
-        <ShieldCheck className="mx-auto size-9 text-[#cca137]" />
+        <ShieldCheck className="mx-auto size-9 text-primary" />
         <p className="mt-4 text-[13px] font-extrabold text-[#070b16] dark:text-white">
           Secure admin access
         </p>

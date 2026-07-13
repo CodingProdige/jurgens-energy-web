@@ -54,7 +54,7 @@ export function AdminInviteAcceptScreen({
           className="mx-auto mb-8 h-auto w-[142px]"
         />
         <div className="mb-8 text-center">
-          <ShieldCheck className="mx-auto size-12 text-[#cca137]" />
+          <ShieldCheck className="mx-auto size-12 text-primary" />
           <h1 className="mt-6 text-[28px] font-extrabold leading-tight">
             Accept admin invite
           </h1>
@@ -81,7 +81,7 @@ export function AdminInviteAcceptScreen({
                 name="name"
                 defaultValue={name ?? ""}
                 placeholder="Your name"
-                className="h-[50px] w-full rounded-[6px] border border-[#d9deea] bg-white px-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+                className="h-[50px] w-full rounded-[6px] border border-[#d9deea] bg-white px-4 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
               />
             </label>
 
@@ -99,7 +99,7 @@ export function AdminInviteAcceptScreen({
                     required
                     minLength={12}
                     placeholder="At least 12 characters"
-                    className="h-[50px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ffc400] focus:ring-4 focus:ring-[#ffc400]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
+                    className="h-[50px] w-full rounded-[6px] border border-[#d9deea] bg-white pl-11 pr-11 text-[14px] font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-primary focus:ring-4 focus:ring-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500"
                   />
                   {field === "password" ? (
                     <button
@@ -131,7 +131,7 @@ export function AdminInviteAcceptScreen({
           type="submit"
           disabled={pending || !isTokenValid}
           className={cn(
-            "mt-8 inline-flex h-[50px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#f0b800] bg-[linear-gradient(180deg,#ffd21b,#ffc400)] text-[14px] font-extrabold text-[#070b16] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-70",
+            "mt-8 inline-flex h-[50px] w-full items-center justify-center gap-3 rounded-[6px] border border-primary bg-[linear-gradient(180deg,#ff6b35,#ff5a1f)] text-[14px] font-extrabold text-white transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-70",
           )}
         >
           {pending ? "Accepting..." : "Accept invitation"}

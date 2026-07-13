@@ -78,11 +78,11 @@ type StatusFilter = "all" | AdminProductReviewStatus;
 
 const initialMutationState: ProductReviewMutationState = {};
 const adminPrimaryClass =
-  "bg-[#c4982d] text-white shadow-[#c4982d]/20 hover:bg-[#a87920]";
+  "bg-admin-primary text-white shadow-admin-primary/20 hover:bg-[#d94514]";
 const modalContentClass =
   "!w-[min(64rem,calc(100vw-2rem))] !max-w-[min(64rem,calc(100vw-2rem))] border border-slate-200 bg-white text-zinc-950 shadow-2xl dark:border-white/10 dark:bg-[#101214] dark:text-white";
 const modalInputClass =
-  "border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-[#c4982d] focus-visible:ring-[#c4982d]/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
+  "border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-admin-primary focus-visible:ring-admin-primary/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
 const selectContentClass =
   "border border-slate-200 bg-white p-1 text-zinc-950 shadow-xl dark:border-white/10 dark:bg-[#151719] dark:text-white";
 const selectItemClass =

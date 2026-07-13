@@ -36,7 +36,7 @@ type DashboardMetricPreference = {
 };
 
 const metricDefaultColors: Record<string, string> = {
-  amber: "#f59e0b",
+  amber: "#ffb000",
   blue: "#3b82f6",
   emerald: "#10b981",
   red: "#ef4444",
@@ -105,7 +105,7 @@ function MetricInfo({ description, label }: { description: string; label: string
     <span className="group/info relative inline-flex shrink-0">
       <button
         aria-label={`${label} info`}
-        className="grid size-[18px] place-items-center rounded-full border border-slate-200 bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c4982d]/30 dark:border-white/10 dark:bg-white/10 dark:text-zinc-400 dark:hover:bg-white/15 dark:hover:text-zinc-200"
+        className="grid size-[18px] place-items-center rounded-full border border-slate-200 bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-white/10 dark:bg-white/10 dark:text-zinc-400 dark:hover:bg-white/15 dark:hover:text-zinc-200"
         type="button"
       >
         <CircleHelpIcon className="size-3.5" />
@@ -231,7 +231,7 @@ export function DashboardCompactMetrics({
                 Pick counts
               </p>
               <button
-                className="text-xs font-medium text-[#9a6a16] hover:text-[#6f4a0d] dark:text-[#fbe694]"
+                className="text-xs font-medium text-primary hover:text-[#d94514] dark:text-brand-amber"
                 onClick={resetMetrics}
                 type="button"
               >
@@ -253,7 +253,7 @@ export function DashboardCompactMetrics({
                     <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm">
                       <input
                         checked={preference?.visible ?? false}
-                        className="size-4 accent-[#c4982d]"
+                        className="size-4 accent-primary"
                         onChange={() => toggleMetric(metric.id)}
                         type="checkbox"
                       />

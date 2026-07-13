@@ -100,14 +100,14 @@ type BrandFilter = "all" | "active" | "hidden" | "archived";
 const initialState: BrandMutationState = {};
 const brandDescriptionMaxLength = 500;
 const adminPrimaryClass =
-  "bg-[#c4982d] text-white shadow-[#c4982d]/20 hover:bg-[#a87920]";
+  "bg-admin-primary text-white shadow-admin-primary/20 hover:bg-[#d94514]";
 const modalLabelClass = "text-sm font-semibold text-zinc-900 dark:text-white";
 const modalFieldClass =
-  "h-10 border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-[#c4982d] focus-visible:ring-[#c4982d]/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
+  "h-10 border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-admin-primary focus-visible:ring-admin-primary/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
 const modalTextareaClass =
-  "min-h-24 border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-[#c4982d] focus-visible:ring-[#c4982d]/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
+  "min-h-24 border-slate-300 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-admin-primary focus-visible:ring-admin-primary/20 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
 const modalSelectClass =
-  "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-zinc-950 outline-none transition focus:border-[#c4982d] focus:ring-4 focus:ring-[#c4982d]/10 dark:border-white/18 dark:bg-[#151719] dark:text-white";
+  "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-zinc-950 outline-none transition focus:border-admin-primary focus:ring-4 focus:ring-admin-primary/10 dark:border-white/18 dark:bg-[#151719] dark:text-white";
 const modalSelectContentClass =
   "border border-slate-200 bg-white p-1 text-zinc-950 shadow-xl dark:border-white/10 dark:bg-[#151719] dark:text-white";
 const modalSelectItemClass =

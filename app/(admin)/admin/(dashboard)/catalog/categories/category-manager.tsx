@@ -134,19 +134,19 @@ const defaultFilters: CategoryFilters = {
 
 const modalLabelClass = "text-sm font-semibold text-zinc-900";
 const modalFieldClass =
-  "h-10 border-slate-200 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-[#c4982d] focus-visible:ring-[#c4982d]/20 disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500 dark:disabled:bg-white/[0.04] dark:disabled:text-zinc-500";
+  "h-10 border-slate-200 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-admin-primary focus-visible:ring-admin-primary/20 disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500 dark:disabled:bg-white/[0.04] dark:disabled:text-zinc-500";
 const modalSelectClass =
-  "h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-zinc-950 outline-none transition focus:border-[#c4982d] focus:ring-4 focus:ring-[#c4982d]/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:disabled:bg-white/[0.04] dark:disabled:text-zinc-500";
+  "h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-zinc-950 outline-none transition focus:border-admin-primary focus:ring-4 focus:ring-admin-primary/10 disabled:bg-slate-50 disabled:text-slate-500 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:disabled:bg-white/[0.04] dark:disabled:text-zinc-500";
 const modalSelectContentClass =
   "border border-slate-200 bg-white p-1 text-zinc-950 shadow-xl dark:border-white/10 dark:bg-[#151719] dark:text-white";
 const modalSelectItemClass =
   "cursor-pointer px-2 py-2 text-zinc-800 focus:bg-slate-100 focus:text-zinc-950 dark:text-zinc-200 dark:focus:bg-white/10 dark:focus:text-white";
 const modalTextareaClass =
-  "min-h-24 border-slate-200 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-[#c4982d] focus-visible:ring-[#c4982d]/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
+  "min-h-24 border-slate-200 bg-white text-zinc-950 placeholder:text-slate-400 focus-visible:border-admin-primary focus-visible:ring-admin-primary/20 dark:border-white/12 dark:bg-[#151719] dark:text-white dark:placeholder:text-zinc-500";
 const modalContentClass =
   "max-w-xl border border-slate-200 bg-white text-zinc-950 shadow-2xl dark:border-white/10 dark:bg-[#101214] dark:text-white";
 const adminPrimaryClass =
-  "bg-[#c4982d] text-white shadow-[#c4982d]/20 hover:bg-[#a87920]";
+  "bg-admin-primary text-white shadow-admin-primary/20 hover:bg-[#d94514]";
 
 function buildPaginationItems(currentPage: number, totalPages: number) {
   const pageSet = new Set(
@@ -787,7 +787,7 @@ function CategoryNameCell({
             </span>
             {category.isLocked ? (
               <span
-                className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[#c4982d]/12 text-[#c4982d] dark:bg-[#c4982d]/18"
+                className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-admin-primary/12 text-admin-primary dark:bg-admin-primary/18"
                 title="Locked category"
               >
                 <LockIcon className="size-3" />
@@ -1252,7 +1252,7 @@ export function CategoryDashboard({
               <FilterIcon className="size-3.5" />
               Filter
               {activeFilterCount > 0 ? (
-                <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#c4982d] px-1 text-[10px] font-bold text-white">
+                <span className="ml-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-admin-primary px-1 text-[10px] font-bold text-white">
                   {activeFilterCount}
                 </span>
               ) : null}
@@ -1390,7 +1390,7 @@ export function CategoryDashboard({
                         type="button"
                       >
                           {category.isLocked ? (
-                            <LockIcon className="size-4 text-[#c4982d]" />
+                            <LockIcon className="size-4 text-admin-primary" />
                           ) : (
                             <Edit3Icon className="size-4" />
                           )}
@@ -1533,7 +1533,7 @@ export function CategoryDashboard({
                       className={cn(
                       dashboardControlClass,
                       item === activePage &&
-                          "border-[#c4982d] text-[#a87920] dark:border-[#c4982d] dark:text-[#f3c96b]",
+                          "border-admin-primary text-admin-primary dark:border-admin-primary dark:text-brand-amber",
                       )}
                       onClick={() => setCurrentPage(item)}
                       aria-label={`Go to categories page ${item}`}

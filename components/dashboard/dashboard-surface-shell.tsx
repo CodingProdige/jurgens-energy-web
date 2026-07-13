@@ -51,14 +51,14 @@ const surfaceControlClass =
 const accentStyles = {
   amber: {
     activeResponsive:
-      "bg-[#c4982d]/12 font-semibold text-[#8a641f] ring-1 ring-[#c4982d]/25 dark:bg-[#c4982d]/18 dark:text-[#f0c760] dark:ring-[#c4982d]/25",
+      "bg-primary/12 font-semibold text-[#b53610] ring-1 ring-primary/25 dark:bg-primary/18 dark:text-brand-amber dark:ring-primary/25",
     activeDark:
-      "bg-[#c4982d]/16 font-semibold text-white ring-1 ring-[#c4982d]/35",
+      "bg-primary/16 font-semibold text-white ring-1 ring-primary/35",
     childResponsive:
-      "bg-[#c4982d]/10 font-semibold text-[#8a641f] dark:bg-[#c4982d]/16 dark:text-[#f0c760]",
-    childDark: "bg-[#c4982d]/14 font-semibold text-white",
-    icon: "text-[#c4982d]",
-    avatar: "bg-[#c4982d] text-white",
+      "bg-primary/10 font-semibold text-[#b53610] dark:bg-primary/16 dark:text-brand-amber",
+    childDark: "bg-primary/14 font-semibold text-white",
+    icon: "text-primary",
+    avatar: "bg-primary text-white",
   },
   green: {
     activeResponsive:
