@@ -44,6 +44,11 @@ export type PublicBlogPostDetail = PublicBlogPostSummary & {
   updatedAt: Date;
 };
 
+export type PublicBlogPostSitemapEntry = {
+  slug: string;
+  updatedAt: Date;
+};
+
 function toMediaUrl(
   relativePath: string | null,
   thumbnailRelativePath: string | null,
@@ -217,6 +222,19 @@ export async function getPublishedBlogPosts(limit?: number) {
   const rows = await getBlogPostRows({ limit, publicOnly: true });
 
   return rows.map(toPublicBlogPostSummary);
+}
+
+export async function getPublishedBlogPostSitemapEntries(): Promise<
+  PublicBlogPostSitemapEntry[]
+> {
+  return db
+    .select({
+      slug: blogPosts.slug,
+      updatedAt: blogPosts.updatedAt,
+    })
+    .from(blogPosts)
+    .where(publicBlogPostCondition())
+    .orderBy(desc(blogPosts.updatedAt), asc(blogPosts.title));
 }
 
 export async function getPublishedBlogPostBySlug(slug: string) {

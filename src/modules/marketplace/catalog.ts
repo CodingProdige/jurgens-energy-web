@@ -90,6 +90,16 @@ export type MarketplaceProductDetail = MarketplaceProductCard & {
   variants: MarketplaceVariant[];
 };
 
+export type MarketplaceSitemapEntries = {
+  brands: Array<{ slug: string; updatedAt: Date }>;
+  categories: Array<{ slug: string; updatedAt: Date }>;
+  products: Array<{ slug: string; updatedAt: Date }>;
+};
+
+function latestDate(first: Date, second: Date) {
+  return first.getTime() >= second.getTime() ? first : second;
+}
+
 function toMediaUrl(relativePath: string | null, thumbnailRelativePath: string | null) {
   const path = thumbnailRelativePath ?? relativePath;
 
@@ -824,6 +834,82 @@ export async function getMarketplaceCategories(): Promise<
       slug: row.slug,
     };
   });
+}
+
+export async function getMarketplaceSitemapEntries(): Promise<MarketplaceSitemapEntries> {
+  const [productRows, categoryRows, brandRows] = await Promise.all([
+    getPublicProductsBaseRows(),
+    db
+      .select({
+        id: categories.id,
+        slug: categories.slug,
+        updatedAt: categories.updatedAt,
+      })
+      .from(categories)
+      .where(eq(categories.status, "active")),
+    db
+      .select({
+        id: brands.id,
+        slug: brands.slug,
+        updatedAt: brands.updatedAt,
+      })
+      .from(brands)
+      .where(eq(brands.status, "active")),
+  ]);
+  const latestProductDateByCategoryId = new Map<string, Date>();
+  const latestProductDateByBrandId = new Map<string, Date>();
+
+  for (const row of productRows) {
+    if (row.categoryId) {
+      const current = latestProductDateByCategoryId.get(row.categoryId);
+      latestProductDateByCategoryId.set(
+        row.categoryId,
+        current ? latestDate(current, row.updatedAt) : row.updatedAt,
+      );
+    }
+
+    if (row.brandId) {
+      const current = latestProductDateByBrandId.get(row.brandId);
+      latestProductDateByBrandId.set(
+        row.brandId,
+        current ? latestDate(current, row.updatedAt) : row.updatedAt,
+      );
+    }
+  }
+
+  return {
+    brands: brandRows
+      .map((brand) => {
+        const productUpdatedAt = latestProductDateByBrandId.get(brand.id);
+
+        return productUpdatedAt
+          ? {
+              slug: brand.slug,
+              updatedAt: latestDate(brand.updatedAt, productUpdatedAt),
+            }
+          : null;
+      })
+      .filter((brand): brand is { slug: string; updatedAt: Date } => Boolean(brand)),
+    categories: categoryRows
+      .map((category) => {
+        const productUpdatedAt = latestProductDateByCategoryId.get(category.id);
+
+        return productUpdatedAt
+          ? {
+              slug: category.slug,
+              updatedAt: latestDate(category.updatedAt, productUpdatedAt),
+            }
+          : null;
+      })
+      .filter(
+        (category): category is { slug: string; updatedAt: Date } =>
+          Boolean(category),
+      ),
+    products: productRows.map((product) => ({
+      slug: product.slug,
+      updatedAt: product.updatedAt,
+    })),
+  };
 }
 
 export async function getMarketplaceBrands(): Promise<
