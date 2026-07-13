@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 
-export const revalidate = 86400;
+export const dynamic = "force-dynamic";
 
 export default function robots(): MetadataRoute.Robots {
   return {

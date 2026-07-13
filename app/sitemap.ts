@@ -4,7 +4,7 @@ import { getPublishedBlogPostSitemapEntries } from "@/src/modules/blog";
 import { getMarketplaceSitemapEntries } from "@/src/modules/marketplace/catalog";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
 type SitemapChangeFrequency = NonNullable<SitemapEntry["changeFrequency"]>;
