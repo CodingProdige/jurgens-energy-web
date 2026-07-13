@@ -103,7 +103,7 @@ export function BlogRichTextEditor({
       bulletList: currentEditor?.isActive("bulletList") ?? false,
       canRedo: currentEditor?.can().chain().focus().redo().run() ?? false,
       canUndo: currentEditor?.can().chain().focus().undo().run() ?? false,
-      code: currentEditor?.isActive("code") ?? false,
+      codeBlock: currentEditor?.isActive("codeBlock") ?? false,
       heading2: currentEditor?.isActive("heading", { level: 2 }) ?? false,
       heading3: currentEditor?.isActive("heading", { level: 3 }) ?? false,
       italic: currentEditor?.isActive("italic") ?? false,
@@ -207,10 +207,10 @@ export function BlogRichTextEditor({
           onClick: () => editor.chain().focus().toggleBlockquote().run(),
         },
         {
-          active: editorState?.code,
+          active: editorState?.codeBlock,
           icon: Code2Icon,
-          label: "Inline code",
-          onClick: () => editor.chain().focus().toggleCode().run(),
+          label: "Code block",
+          onClick: () => editor.chain().focus().toggleCodeBlock().run(),
         },
         {
           active: editorState?.link,

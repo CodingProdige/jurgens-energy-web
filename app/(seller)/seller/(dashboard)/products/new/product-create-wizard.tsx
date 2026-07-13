@@ -99,6 +99,7 @@ type VariantOption = {
   values: string[];
 };
 type VariantStatus = "active" | "draft" | "sold_out" | "unavailable";
+type ProductPublishStatus = "active" | "draft";
 type GeneratedVariant = {
   barcode: string;
   compareAtPrice: string;
@@ -227,6 +228,34 @@ const variantStatusConfig: Record<
     label: "Unavailable",
   },
 };
+const productPublishStatusConfig: Record<
+  ProductPublishStatus,
+  { description: string; label: string }
+> = {
+  active: {
+    description: "Visible on the marketplace once the product has active variants.",
+    label: "Active",
+  },
+  draft: {
+    description: "Saved internally and hidden from the marketplace.",
+    label: "Draft",
+  },
+};
+const productPublishStatusOptions = Object.entries(
+  productPublishStatusConfig,
+) as Array<
+  [
+    ProductPublishStatus,
+    (typeof productPublishStatusConfig)[ProductPublishStatus],
+  ]
+>;
+
+function getInitialProductPublishStatus(
+  status?: SellerEditableProductData["status"],
+): ProductPublishStatus {
+  return status === "draft" ? "draft" : "active";
+}
+
 function formatCategoryPath(
   path: string,
   categoriesByPath: Map<string, SellerProductCategory>,
@@ -1501,9 +1530,13 @@ export function ProductCreateWizard({
   const [isGeneratingDescription, startDescriptionTransition] =
     useTransition();
   const [isSavingDraft, startSaveDraftTransition] = useTransition();
-  const productStatus = initialProduct?.status ?? "draft";
+  const [productPublishStatus, setProductPublishStatus] =
+    useState<ProductPublishStatus>(
+      getInitialProductPublishStatus(initialProduct?.status),
+    );
+  const initialProductStatus = initialProduct?.status ?? "draft";
   const canFullyEditProduct =
-    !["archived", "admin_suspended"].includes(productStatus);
+    !["archived", "admin_suspended"].includes(initialProductStatus);
   const canSaveOperationalFields = false;
   const fullListingControlsDisabled = !canFullyEditProduct;
   const productIsLocked = Boolean(
@@ -2496,70 +2529,71 @@ export function ProductCreateWizard({
     });
   }
 
-  function getProductDraftInput() {
+  function getProductDraftInput(status: ProductPublishStatus = productPublishStatus) {
     return {
-        barcode,
-        brandName,
-        categoryId: selectedCategoryId,
-        compareAtPrice,
-        continueSellingOutOfStock,
-        description,
-        exchangeAcceptedReturnBrands: parseExchangeBrandInput(
-          exchangeAcceptedReturnBrandsInput,
-        ),
-        exchangeConfirmationText,
-        exchangeEmptyCylinderSize,
-        exchangeRequiresEmpty,
-        fulfillmentMode,
-        hasVariants,
-        heightMm,
-        lengthMm,
-        longDescription,
-        mediaIds: selectedMediaIds,
-        optionSchema: hasVariants
-          ? usableVariantOptions.map((option) => ({
-              name: option.name,
-              values: option.values,
-            }))
-          : [],
-        parcelPresetId,
-        price,
-        productId: draftProductId,
-        productName,
-        sku,
-        stock,
-        variants: hasVariants
-          ? generatedVariants.map((variant) => ({
-              barcode: variant.barcode,
-              compareAtPrice: variant.compareAtPrice,
-              continueSellingOutOfStock: variant.continueSellingOutOfStock,
-              exchangeAcceptedReturnBrands: parseExchangeBrandInput(
-                variant.exchangeAcceptedReturnBrandsInput,
-              ),
-              exchangeConfirmationText: variant.exchangeConfirmationText,
-              exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
-              exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
-              heightMm: variant.heightMm,
-              imageId: variant.imageId,
-              lengthMm: variant.lengthMm,
-              lowStockAlert: variant.lowStockAlert,
-              notes: variant.notes,
-              optionValues: variant.optionValues,
-              parcelPresetId: variant.parcelPresetId,
-              price: variant.price,
-              sku: variant.sku,
-              status: variant.status,
-              stock: variant.stock,
-              weightGrams: variant.weightGrams,
-              widthMm: variant.widthMm,
-            }))
-          : [],
-        weightGrams,
-        widthMm,
-      };
+      barcode,
+      brandName,
+      categoryId: selectedCategoryId,
+      compareAtPrice,
+      continueSellingOutOfStock,
+      description,
+      exchangeAcceptedReturnBrands: parseExchangeBrandInput(
+        exchangeAcceptedReturnBrandsInput,
+      ),
+      exchangeConfirmationText,
+      exchangeEmptyCylinderSize,
+      exchangeRequiresEmpty,
+      fulfillmentMode,
+      hasVariants,
+      heightMm,
+      lengthMm,
+      longDescription,
+      mediaIds: selectedMediaIds,
+      optionSchema: hasVariants
+        ? usableVariantOptions.map((option) => ({
+            name: option.name,
+            values: option.values,
+          }))
+        : [],
+      parcelPresetId,
+      price,
+      productId: draftProductId,
+      productName,
+      sku,
+      status,
+      stock,
+      variants: hasVariants
+        ? generatedVariants.map((variant) => ({
+            barcode: variant.barcode,
+            compareAtPrice: variant.compareAtPrice,
+            continueSellingOutOfStock: variant.continueSellingOutOfStock,
+            exchangeAcceptedReturnBrands: parseExchangeBrandInput(
+              variant.exchangeAcceptedReturnBrandsInput,
+            ),
+            exchangeConfirmationText: variant.exchangeConfirmationText,
+            exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
+            exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
+            heightMm: variant.heightMm,
+            imageId: variant.imageId,
+            lengthMm: variant.lengthMm,
+            lowStockAlert: variant.lowStockAlert,
+            notes: variant.notes,
+            optionValues: variant.optionValues,
+            parcelPresetId: variant.parcelPresetId,
+            price: variant.price,
+            sku: variant.sku,
+            status: variant.status,
+            stock: variant.stock,
+            weightGrams: variant.weightGrams,
+            widthMm: variant.widthMm,
+          }))
+        : [],
+      weightGrams,
+      widthMm,
+    };
   }
 
-  function handleSaveDraft() {
+  function handleSaveProduct(status: ProductPublishStatus) {
     if (!canFullyEditProduct) {
       setDraftSaveFeedback({
         message: "This product status is locked from full editing.",
@@ -2570,9 +2604,10 @@ export function ProductCreateWizard({
 
     setDraftSaveFeedback(null);
     startSaveDraftTransition(() => {
-      void saveProductDraft(getProductDraftInput()).then((result) => {
+      void saveProductDraft(getProductDraftInput(status)).then((result) => {
         if (result.ok) {
           setDraftProductId(result.productId ?? draftProductId);
+          setProductPublishStatus(status);
           setDraftSaveFeedback({
             message: result.message ?? "Product saved.",
             tone: "success",
@@ -2849,9 +2884,8 @@ export function ProductCreateWizard({
             Import from product link
           </DashboardButton>
           <DashboardButton
-            className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
             disabled={saveDisabled}
-            onClick={handleSaveDraft}
+            onClick={() => handleSaveProduct("draft")}
             type="button"
           >
             {isSavingDraft ? (
@@ -2859,15 +2893,28 @@ export function ProductCreateWizard({
             ) : (
               <SaveIcon className="size-3.5" />
             )}
-            {isSavingDraft ? "Saving..." : "Save product"}
+            {isSavingDraft ? "Saving..." : "Save draft"}
+          </DashboardButton>
+          <DashboardButton
+            className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+            disabled={saveDisabled}
+            onClick={() => handleSaveProduct("active")}
+            type="button"
+          >
+            {isSavingDraft ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <SaveIcon className="size-3.5" />
+            )}
+            {isSavingDraft ? "Saving..." : "Save active"}
           </DashboardButton>
         </div>
       </div>
       {productIsLocked || canSaveOperationalFields ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
           {canSaveOperationalFields
-            ? `This product is currently ${productStatus.replaceAll("_", " ")}. Core listing fields are locked, but operational fields such as price, stock, variant availability, and parcel data can be updated.`
-            : `This product is currently ${productStatus.replaceAll("_", " ")}. Full listing edits are locked for this status.`}
+            ? `This product is currently ${initialProductStatus.replaceAll("_", " ")}. Core listing fields are locked, but operational fields such as price, stock, variant availability, and parcel data can be updated.`
+            : `This product is currently ${initialProductStatus.replaceAll("_", " ")}. Full listing edits are locked for this status.`}
         </div>
       ) : null}
       {draftSaveFeedback ? (
@@ -2964,6 +3011,37 @@ export function ProductCreateWizard({
                   placeholder="Enter barcode"
                   value={barcode}
                 />
+              </label>
+
+              <label className="grid gap-1.5">
+                <FieldLabel info="Draft products are saved internally and hidden from the marketplace. Active products can sell when their variants are active and in stock.">
+                  Product status
+                </FieldLabel>
+                <Select
+                  disabled={fullListingControlsDisabled}
+                  value={productPublishStatus}
+                  onValueChange={(value) =>
+                    setProductPublishStatus(value as ProductPublishStatus)
+                  }
+                >
+                  <SelectTrigger className="h-10 border-slate-300 bg-white text-sm text-zinc-950 dark:border-white/18 dark:bg-[#151719] dark:text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className={selectContentClass}>
+                    {productPublishStatusOptions.map(([status, config]) => (
+                      <SelectItem
+                        key={status}
+                        value={status}
+                        className={selectItemClass}
+                      >
+                        {config.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  {productPublishStatusConfig[productPublishStatus].description}
+                </p>
               </label>
 
               <div className="grid gap-1.5">
@@ -4483,9 +4561,8 @@ export function ProductCreateWizard({
           Cancel
         </DashboardButton>
         <DashboardButton
-          className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
           disabled={saveDisabled}
-          onClick={handleSaveDraft}
+          onClick={() => handleSaveProduct("draft")}
           type="button"
         >
           {isSavingDraft ? (
@@ -4493,7 +4570,20 @@ export function ProductCreateWizard({
           ) : (
             <SaveIcon className="size-3.5" />
           )}
-          {isSavingDraft ? "Saving..." : "Save product"}
+          {isSavingDraft ? "Saving..." : "Save draft"}
+        </DashboardButton>
+        <DashboardButton
+          className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
+          disabled={saveDisabled}
+          onClick={() => handleSaveProduct("active")}
+          type="button"
+        >
+          {isSavingDraft ? (
+            <Loader2Icon className="size-3.5 animate-spin" />
+          ) : (
+            <SaveIcon className="size-3.5" />
+          )}
+          {isSavingDraft ? "Saving..." : "Save active"}
         </DashboardButton>
       </div>
 

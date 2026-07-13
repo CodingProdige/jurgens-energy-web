@@ -509,6 +509,28 @@ h6:not([class]) {
   background: rgb(255 255 255 / 10%);
 }
 
+.blog-rich-text-editor .ProseMirror pre {
+  margin: 1rem 0;
+  overflow-x: auto;
+  border-radius: 0.65rem;
+  background: #151719;
+  padding: 0.9rem 1rem;
+  color: #f7f7f2;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.blog-rich-text-editor .ProseMirror pre code {
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+}
+
 .blog-rich-text-editor .ProseMirror hr {
   margin: 1.25rem 0;
   border-color: #deded7;

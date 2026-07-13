@@ -8,10 +8,12 @@ import { z } from "zod";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { db } from "@/src/db";
 import {
+  auditLogs,
   brands,
   categories,
   media,
   productMedia,
+  productReviewEvents,
   products,
   productVariants,
 } from "@/src/db/schema";
@@ -38,6 +40,7 @@ const importedMediaSchema = z.object({
     .max(10),
 });
 const variantStatusSchema = z.enum(["active", "draft", "sold_out", "unavailable"]);
+const productPublishStatusSchema = z.enum(["active", "draft"]);
 const productOptionSchema = z.object({
   name: z.string().trim().min(1).max(80),
   values: z.array(z.string().trim().min(1).max(80)).max(100),
@@ -93,13 +96,15 @@ const productDraftSchema = z.object({
   productId: z.string().uuid().nullable().optional(),
   productName: z.string().trim().min(1).max(240),
   sku: z.string().trim().min(1).max(120),
+  status: productPublishStatusSchema.default("active"),
   stock: z.string().trim().max(20).optional(),
   variants: z.array(productDraftVariantSchema).max(250).default([]),
   weightGrams: z.string().trim().max(40).optional(),
   widthMm: z.string().trim().max(40).optional(),
 });
 
-type ProductDraftInput = z.infer<typeof productDraftSchema>;
+type ProductDraftInput = z.input<typeof productDraftSchema>;
+type ParsedProductDraftInput = z.output<typeof productDraftSchema>;
 export type ImportedProductMediaState = {
   assets?: AdminMediaAsset[];
   message?: string;
@@ -188,7 +193,7 @@ function getExchangeConfirmationText({
     : "I confirm I have an empty cylinder in acceptable condition to exchange on delivery.";
 }
 
-function buildVariantRows(input: ProductDraftInput) {
+function buildVariantRows(input: ParsedProductDraftInput) {
   if (input.hasVariants) {
     return input.variants.map((variant) => ({
       barcode: variant.barcode?.trim() || null,
@@ -676,13 +681,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
 
   const now = new Date();
   const productSlug = await getUniqueProductSlug(draft.productName, draft.productId);
-  const nextProductStatus =
-    existingProduct &&
-    !["draft", "pending_review", "changes_requested", "approved"].includes(
-      existingProduct.status,
-    )
-      ? existingProduct.status
-      : "active";
+  const nextProductStatus = draft.status;
 
   const productId = await db.transaction(async (tx) => {
     const savedProductId = draft.productId
@@ -772,17 +771,50 @@ export async function saveProductDraft(input: ProductDraftInput) {
       })),
     );
 
+    await tx.insert(productReviewEvents).values({
+      action:
+        nextProductStatus === "draft" ? "saved_as_draft" : "saved_as_active",
+      actorUserId: session.user.id,
+      fromStatus: existingProduct?.status ?? null,
+      note:
+        nextProductStatus === "draft"
+          ? "Admin saved product as draft."
+          : "Admin saved product as active.",
+      productId: savedProductId,
+      toStatus: nextProductStatus,
+    });
+
+    await tx.insert(auditLogs).values({
+      action:
+        nextProductStatus === "draft"
+          ? "product.saved_as_draft"
+          : "product.saved_as_active",
+      actorUserId: session.user.id,
+      entityId: savedProductId,
+      entityType: "product",
+      metadata: JSON.stringify({
+        fromStatus: existingProduct?.status ?? null,
+        title: draft.productName,
+        toStatus: nextProductStatus,
+      }),
+    });
+
     return savedProductId;
   });
 
   revalidatePath("/admin/products/all");
   revalidatePath("/admin/products/new");
+  revalidatePath("/products");
   revalidatePath("/products/all");
   revalidatePath("/products/new");
+  revalidatePath(`/products/${productSlug}`);
 
   return {
     ok: true,
-    message: "Product saved.",
+    message:
+      nextProductStatus === "draft"
+        ? "Product saved as draft."
+        : "Product saved as active.",
     productId,
   };
 }

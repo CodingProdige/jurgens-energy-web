@@ -2,11 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import {
+  ArchiveIcon,
+  CheckCircleIcon,
   DownloadIcon,
   EyeIcon,
   FilterIcon,
+  Loader2Icon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
@@ -62,6 +66,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { updateAdminProductStatus } from "@/app/(admin)/admin/(dashboard)/products/all/actions";
 import type {
   AdminProductReviewRow,
   AdminProductReviewStatus,
@@ -69,6 +74,7 @@ import type {
 } from "@/src/modules/admin/product-reviews";
 
 type StatusFilter = "all" | AdminProductReviewStatus;
+type ProductTableStatusMutation = "active" | "draft";
 type FulfillmentFilter = "all" | "seller_fulfilled" | "piessang_fulfilled";
 type CategoryFilter = "all" | string;
 
@@ -467,6 +473,7 @@ function ProductDetails({ product }: { product: AdminProductReviewRow }) {
 }
 
 export function AdminProductManager({ metrics, products }: AdminProductsData) {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [fulfillmentFilter, setFulfillmentFilter] =
@@ -478,6 +485,14 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
   const [viewProduct, setViewProduct] = useState<AdminProductReviewRow | null>(
     null,
   );
+  const [statusFeedback, setStatusFeedback] = useState<{
+    message: string;
+    tone: "error" | "success";
+  } | null>(null);
+  const [pendingStatusProductId, setPendingStatusProductId] = useState<
+    string | null
+  >(null);
+  const [, startStatusTransition] = useTransition();
 
   const productMetrics = useMemo<DashboardMetricDefinition[]>(
     () => [
@@ -623,6 +638,42 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
     URL.revokeObjectURL(url);
   }
 
+  function handleProductStatusChange(
+    product: AdminProductReviewRow,
+    status: ProductTableStatusMutation,
+  ) {
+    setStatusFeedback(null);
+    setPendingStatusProductId(product.id);
+    startStatusTransition(() => {
+      void updateAdminProductStatus({
+        productId: product.id,
+        status,
+      })
+        .then((result) => {
+          setPendingStatusProductId(null);
+          setStatusFeedback({
+            message:
+              result.message ??
+              (result.ok
+                ? "Product status updated."
+                : "Product status could not be updated."),
+            tone: result.ok ? "success" : "error",
+          });
+
+          if (result.ok) {
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          setPendingStatusProductId(null);
+          setStatusFeedback({
+            message: "Product status could not be updated.",
+            tone: "error",
+          });
+        });
+    });
+  }
+
   return (
     <>
       <DashboardPageHeader
@@ -704,6 +755,19 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
             </DashboardButton>
           </div>
         </div>
+
+        {statusFeedback ? (
+          <div
+            className={cn(
+              "rounded-lg border px-3 py-2 text-sm",
+              statusFeedback.tone === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+                : "border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100",
+            )}
+          >
+            {statusFeedback.message}
+          </div>
+        ) : null}
 
         <section
           className={cn(
@@ -799,6 +863,34 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                             <PencilIcon className="size-4" />
                             Edit product
                           </Link>
+                          {!["archived", "admin_suspended"].includes(
+                            product.status,
+                          ) ? (
+                            <button
+                              className="flex w-full items-center gap-3 px-4 py-3 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 dark:text-zinc-200 dark:hover:bg-white/10"
+                              disabled={pendingStatusProductId === product.id}
+                              onClick={() =>
+                                handleProductStatusChange(
+                                  product,
+                                  product.status === "draft"
+                                    ? "active"
+                                    : "draft",
+                                )
+                              }
+                              type="button"
+                            >
+                              {pendingStatusProductId === product.id ? (
+                                <Loader2Icon className="size-4 animate-spin" />
+                              ) : product.status === "draft" ? (
+                                <CheckCircleIcon className="size-4" />
+                              ) : (
+                                <ArchiveIcon className="size-4" />
+                              )}
+                              {product.status === "draft"
+                                ? "Set active"
+                                : "Set as draft"}
+                            </button>
+                          ) : null}
                         </DashboardRowActionMenu>
                       </div>
                     </TableCell>
