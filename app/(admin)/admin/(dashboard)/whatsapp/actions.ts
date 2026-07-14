@@ -44,45 +44,71 @@ const sendMessageSchema = conversationActionSchema.extend({
   message: "Message or attachment is required.",
 });
 
-export async function pauseWhatsappAutomation(formData: FormData) {
+export type AdminWhatsappActionResult = {
+  message: string;
+  ok: boolean;
+};
+
+export async function pauseWhatsappAutomation(
+  input: unknown,
+): Promise<AdminWhatsappActionResult> {
   const access = await requireAdminCapability("admin.orders.manage");
 
   if (!access.ok) {
-    return;
+    return {
+      message: "WhatsApp management access could not be confirmed.",
+      ok: false,
+    };
   }
 
-  const parsed = conversationActionSchema.safeParse({
-    conversationId: formData.get("conversationId"),
-  });
+  const parsed = conversationActionSchema.safeParse(input);
 
   if (!parsed.success) {
-    return;
+    return { message: "The conversation could not be confirmed.", ok: false };
   }
 
-  await pauseWhatsappConversationAutomation({
+  const result = await pauseWhatsappConversationAutomation({
     adminUserId: access.session.user.id,
     conversationId: parsed.data.conversationId,
   });
-  revalidatePath("/whatsapp");
+
+  if (result.ok) {
+    revalidatePath("/whatsapp");
+    revalidatePath(`/whatsapp/${parsed.data.conversationId}`);
+  }
+
+  return result;
 }
 
-export async function resumeWhatsappAutomation(formData: FormData) {
+export async function resumeWhatsappAutomation(
+  input: unknown,
+): Promise<AdminWhatsappActionResult> {
   const access = await requireAdminCapability("admin.orders.manage");
 
   if (!access.ok) {
-    return;
+    return {
+      message: "WhatsApp management access could not be confirmed.",
+      ok: false,
+    };
   }
 
-  const parsed = conversationActionSchema.safeParse({
-    conversationId: formData.get("conversationId"),
-  });
+  const parsed = conversationActionSchema.safeParse(input);
 
   if (!parsed.success) {
-    return;
+    return { message: "The conversation could not be confirmed.", ok: false };
   }
 
-  await resumeWhatsappConversationAutomation(parsed.data.conversationId);
-  revalidatePath("/whatsapp");
+  const result = await resumeWhatsappConversationAutomation({
+    adminUserId: access.session.user.id,
+    conversationId: parsed.data.conversationId,
+  });
+
+  if (result.ok) {
+    revalidatePath("/whatsapp");
+    revalidatePath(`/whatsapp/${parsed.data.conversationId}`);
+  }
+
+  return result;
 }
 
 export async function clearWhatsappModeration(formData: FormData) {
@@ -148,25 +174,33 @@ export async function sendAdminWhatsappMessage(formData: FormData) {
   revalidatePath(`/whatsapp/${parsed.data.conversationId}`);
 }
 
-export async function sendWhatsappFollowUp(formData: FormData) {
+export async function sendWhatsappFollowUp(
+  input: unknown,
+): Promise<AdminWhatsappActionResult> {
   const access = await requireAdminCapability("admin.orders.manage");
 
   if (!access.ok) {
-    return;
+    return {
+      message: "WhatsApp management access could not be confirmed.",
+      ok: false,
+    };
   }
 
-  const parsed = conversationActionSchema.safeParse({
-    conversationId: formData.get("conversationId"),
-  });
+  const parsed = conversationActionSchema.safeParse(input);
 
   if (!parsed.success) {
-    return;
+    return { message: "The conversation could not be confirmed.", ok: false };
   }
 
-  await sendAdminWhatsappFollowUp({
+  const result = await sendAdminWhatsappFollowUp({
     adminUserId: access.session.user.id,
     conversationId: parsed.data.conversationId,
   });
-  revalidatePath("/whatsapp");
-  revalidatePath(`/whatsapp/${parsed.data.conversationId}`);
+
+  if (result.ok) {
+    revalidatePath("/whatsapp");
+    revalidatePath(`/whatsapp/${parsed.data.conversationId}`);
+  }
+
+  return result;
 }

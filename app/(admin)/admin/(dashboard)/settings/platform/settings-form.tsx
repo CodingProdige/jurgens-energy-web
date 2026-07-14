@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   type ComponentProps,
   type ChangeEvent,
@@ -27,10 +28,12 @@ import {
   LinkIcon,
   LockIcon,
   MailCheckIcon,
+  MapPinIcon,
   MessageCircleIcon,
   MonitorIcon,
   MousePointerClickIcon,
   PencilIcon,
+  PhoneIcon,
   PlusIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -40,6 +43,7 @@ import {
   Trash2Icon,
   TruckIcon,
   Undo2Icon,
+  XIcon,
 } from "lucide-react";
 import {
   Area,
@@ -71,7 +75,11 @@ import {
   type AdminSettingsState,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
 import type { JurgensDeliveryZone } from "@/src/modules/shipping/jurgens-delivery";
-import type { getAdminMediaLibrary } from "@/src/modules/media/admin";
+import type {
+  AdminMediaAsset,
+  getAdminMediaLibrary,
+} from "@/src/modules/media/admin";
+import type { MarketplacePaymentMethodBadge } from "@/src/modules/marketplace/settings";
 import type {
   AdminInAppNotificationTemplate,
   AdminNotificationDeliveryPolicy,
@@ -253,16 +261,34 @@ export function SettingsForm({
 }
 
 type SocialLinksFormProps = {
+  contactAddress: string;
+  contactEmail: string;
+  contactPhonePrimary: string;
+  contactPhoneSecondary: string;
   facebookUrl: string | null;
+  footerTagline: string;
   googleReviewUrl: string | null;
   instagramUrl: string | null;
+  mediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
+  paymentMethodBadges: MarketplacePaymentMethodBadge[];
   twitterUrl: string | null;
 };
 
+type EditablePaymentMethodBadge = MarketplacePaymentMethodBadge & {
+  editorId: string;
+};
+
 export function SocialLinksForm({
+  contactAddress,
+  contactEmail,
+  contactPhonePrimary,
+  contactPhoneSecondary,
   facebookUrl,
+  footerTagline,
   googleReviewUrl,
   instagramUrl,
+  mediaLibrary,
+  paymentMethodBadges,
   twitterUrl,
 }: SocialLinksFormProps) {
   const [facebookValue, setFacebookValue] = useState(facebookUrl ?? "");
@@ -271,85 +297,383 @@ export function SocialLinksForm({
   );
   const [instagramValue, setInstagramValue] = useState(instagramUrl ?? "");
   const [twitterValue, setTwitterValue] = useState(twitterUrl ?? "");
+  const [paymentMethods, setPaymentMethods] = useState<
+    EditablePaymentMethodBadge[]
+  >(() =>
+    paymentMethodBadges.map((badge, index) => ({
+      ...badge,
+      editorId: `payment-method-${index}`,
+    })),
+  );
+  const [activePaymentMethodId, setActivePaymentMethodId] = useState<
+    string | null
+  >(null);
+  const [isPaymentMediaManagerOpen, setIsPaymentMediaManagerOpen] =
+    useState(false);
+  const nextPaymentMethodId = useRef(paymentMethodBadges.length);
   const [state, formAction, isPending] = useActionState(
     updateMarketplaceSocialLinkSettings,
     initialState,
   );
+  const activePaymentMethod = paymentMethods.find(
+    (paymentMethod) => paymentMethod.editorId === activePaymentMethodId,
+  );
+
+  function updatePaymentMethod(
+    editorId: string,
+    update: Partial<MarketplacePaymentMethodBadge>,
+  ) {
+    setPaymentMethods((current) =>
+      current.map((paymentMethod) =>
+        paymentMethod.editorId === editorId
+          ? { ...paymentMethod, ...update }
+          : paymentMethod,
+      ),
+    );
+  }
+
+  function addPaymentMethod() {
+    setPaymentMethods((current) => {
+      if (current.length >= 12) {
+        return current;
+      }
+
+      const editorId = `payment-method-${nextPaymentMethodId.current}`;
+      nextPaymentMethodId.current += 1;
+
+      return [
+        ...current,
+        { editorId, iconUrl: null, label: "", mediaId: null },
+      ];
+    });
+  }
+
+  function removePaymentMethod(editorId: string) {
+    setPaymentMethods((current) =>
+      current.filter((paymentMethod) => paymentMethod.editorId !== editorId),
+    );
+
+    if (activePaymentMethodId === editorId) {
+      setActivePaymentMethodId(null);
+      setIsPaymentMediaManagerOpen(false);
+    }
+  }
+
+  function openPaymentIconPicker(editorId: string) {
+    setActivePaymentMethodId(editorId);
+    setIsPaymentMediaManagerOpen(true);
+  }
+
+  function selectPaymentIcon(asset: AdminMediaAsset) {
+    if (!activePaymentMethodId) {
+      return;
+    }
+
+    updatePaymentMethod(activePaymentMethodId, {
+      iconUrl: asset.publicUrl,
+      mediaId: asset.id,
+    });
+  }
 
   return (
     <form action={formAction} className="grid gap-5">
-      <div className="grid gap-2">
-        <Label htmlFor="facebookUrl">Facebook URL</Label>
-        <div className="relative">
-          <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+      <input
+        name="paymentMethodBadges"
+        type="hidden"
+        value={JSON.stringify(
+          paymentMethods.map(({ label, mediaId }) => ({ label, mediaId })),
+        )}
+      />
+
+      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div>
+          <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+            Footer content
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            These values power the public marketplace footer and other shared
+            public contact blocks.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="footerTagline">Footer tagline</Label>
           <Input
-            id="facebookUrl"
-            name="facebookUrl"
-            type="url"
-            autoComplete="url"
-            value={facebookValue}
-            onChange={(event) => setFacebookValue(event.target.value)}
-            placeholder="https://facebook.com/jurgensenergy"
-            className="pl-10"
+            id="footerTagline"
+            name="footerTagline"
+            defaultValue={footerTagline}
+            placeholder="Modern energy, delivered."
           />
+        </div>
+
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="contactPhonePrimary">Primary phone</Label>
+            <div className="relative">
+              <PhoneIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                id="contactPhonePrimary"
+                name="contactPhonePrimary"
+                type="tel"
+                autoComplete="tel"
+                defaultValue={contactPhonePrimary}
+                placeholder="+27 60 689 3558"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="contactPhoneSecondary">Secondary phone</Label>
+            <div className="relative">
+              <PhoneIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                id="contactPhoneSecondary"
+                name="contactPhoneSecondary"
+                type="tel"
+                autoComplete="tel"
+                defaultValue={contactPhoneSecondary}
+                placeholder="Optional second phone"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="contactEmail">Contact email</Label>
+            <div className="relative">
+              <MailCheckIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                id="contactEmail"
+                name="contactEmail"
+                type="email"
+                autoComplete="email"
+                defaultValue={contactEmail}
+                placeholder="support@jurgensenergy.com"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="contactAddress">Address</Label>
+            <div className="relative">
+              <MapPinIcon className="pointer-events-none absolute left-3 top-3.5 size-4 text-zinc-400" />
+              <Textarea
+                id="contactAddress"
+                name="contactAddress"
+                defaultValue={contactAddress}
+                placeholder="6 Christelle Street, Denneburg, Paarl, Western Cape 7646, South Africa"
+                className="min-h-24 pl-10"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="googleReviewUrl">Google review URL</Label>
-        <div className="relative">
-          <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-          <Input
-            id="googleReviewUrl"
-            name="googleReviewUrl"
-            type="url"
-            autoComplete="url"
-            value={googleReviewValue}
-            onChange={(event) => setGoogleReviewValue(event.target.value)}
-            placeholder="https://g.page/r/your-google-review-link"
-            className="pl-10"
-          />
+      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div>
+          <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+            Social links
+          </h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Leave a field blank to hide that social icon from marketplace
+            surfaces. WhatsApp uses the number from WhatsApp ordering settings.
+          </p>
         </div>
+
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="facebookUrl">Facebook URL</Label>
+            <div className="relative">
+              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                id="facebookUrl"
+                name="facebookUrl"
+                type="url"
+                autoComplete="url"
+                value={facebookValue}
+                onChange={(event) => setFacebookValue(event.target.value)}
+                placeholder="https://facebook.com/jurgensenergy"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="instagramUrl">Instagram URL</Label>
+            <div className="relative">
+              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                id="instagramUrl"
+                name="instagramUrl"
+                type="url"
+                autoComplete="url"
+                value={instagramValue}
+                onChange={(event) => setInstagramValue(event.target.value)}
+                placeholder="https://instagram.com/jurgensenergy"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="twitterUrl">X / Twitter URL</Label>
+            <div className="relative">
+              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                id="twitterUrl"
+                name="twitterUrl"
+                type="url"
+                autoComplete="url"
+                value={twitterValue}
+                onChange={(event) => setTwitterValue(event.target.value)}
+                placeholder="https://x.com/jurgensenergy"
+                className="pl-10"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="googleReviewUrl">Google review URL</Label>
+            <div className="relative">
+              <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                id="googleReviewUrl"
+                name="googleReviewUrl"
+                type="url"
+                autoComplete="url"
+                value={googleReviewValue}
+                onChange={(event) => setGoogleReviewValue(event.target.value)}
+                placeholder="https://g.page/r/your-google-review-link"
+                className="pl-10"
+              />
+            </div>
+            <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+              Used in completed Jurgens delivery thank-you messages.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Payment methods
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Add a label and upload or select its logo. Methods without an icon
+              use a text badge in the public footer.
+            </p>
+          </div>
+          <Button
+            className="h-9 w-full shrink-0 gap-2 sm:w-auto"
+            disabled={paymentMethods.length >= 12}
+            onClick={addPaymentMethod}
+            type="button"
+            variant="outline"
+          >
+            <PlusIcon className="size-4" />
+            Add payment method
+          </Button>
+        </div>
+
+        {paymentMethods.length > 0 ? (
+          <div className="grid gap-3">
+            {paymentMethods.map((paymentMethod, index) => (
+              <div
+                className="grid min-w-0 gap-3 rounded-xl border border-zinc-200 bg-zinc-50/70 p-3 dark:border-white/10 dark:bg-black/15 sm:grid-cols-[7rem_minmax(0,1fr)]"
+                key={paymentMethod.editorId}
+              >
+                <div className="relative flex h-20 min-w-0 items-center justify-center overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10">
+                  {paymentMethod.iconUrl ? (
+                    <Image
+                      alt={paymentMethod.label || `Payment method ${index + 1}`}
+                      className="object-contain p-2"
+                      fill
+                      sizes="112px"
+                      src={paymentMethod.iconUrl}
+                    />
+                  ) : (
+                    <CreditCardIcon className="size-7 text-zinc-400" />
+                  )}
+                </div>
+
+                <div className="grid min-w-0 gap-3">
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor={`${paymentMethod.editorId}-label`}>
+                      Payment method {index + 1}
+                    </Label>
+                    <Input
+                      id={`${paymentMethod.editorId}-label`}
+                      maxLength={40}
+                      onChange={(event) =>
+                        updatePaymentMethod(paymentMethod.editorId, {
+                          label: event.target.value,
+                        })
+                      }
+                      placeholder="e.g. PayFast, VISA or Mastercard"
+                      value={paymentMethod.label}
+                    />
+                  </div>
+
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Button
+                      className="h-9 min-w-0 gap-2"
+                      disabled={!mediaLibrary}
+                      onClick={() =>
+                        openPaymentIconPicker(paymentMethod.editorId)
+                      }
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <ImageIcon className="size-4" />
+                      {paymentMethod.iconUrl ? "Change icon" : "Upload / choose icon"}
+                    </Button>
+                    {paymentMethod.iconUrl ? (
+                      <Button
+                        className="h-9 gap-2"
+                        onClick={() =>
+                          updatePaymentMethod(paymentMethod.editorId, {
+                            iconUrl: null,
+                            mediaId: null,
+                          })
+                        }
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <XIcon className="size-4" />
+                        Remove icon
+                      </Button>
+                    ) : null}
+                    <Button
+                      aria-label={`Remove ${paymentMethod.label || `payment method ${index + 1}`}`}
+                      className="h-9 gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-300 dark:hover:bg-red-500/10 dark:hover:text-red-200 sm:ml-auto"
+                      onClick={() => removePaymentMethod(paymentMethod.editorId)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Trash2Icon className="size-4" />
+                      Remove method
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500 dark:border-white/15 dark:text-zinc-400">
+            No payment methods are shown in the footer.
+          </div>
+        )}
+
         <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-          Used in completed Jurgens delivery thank-you messages.
-        </p>
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="instagramUrl">Instagram URL</Label>
-        <div className="relative">
-          <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-          <Input
-            id="instagramUrl"
-            name="instagramUrl"
-            type="url"
-            autoComplete="url"
-            value={instagramValue}
-            onChange={(event) => setInstagramValue(event.target.value)}
-            placeholder="https://instagram.com/jurgensenergy"
-            className="pl-10"
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="twitterUrl">X / Twitter URL</Label>
-        <div className="relative">
-          <LinkIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
-          <Input
-            id="twitterUrl"
-            name="twitterUrl"
-            type="url"
-            autoComplete="url"
-            value={twitterValue}
-            onChange={(event) => setTwitterValue(event.target.value)}
-            placeholder="https://x.com/jurgensenergy"
-            className="pl-10"
-          />
-        </div>
-        <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-          Leave a field blank to hide that social icon from marketplace
-          surfaces.
+          Up to 12 payment methods. Uploaded icons use the existing admin media
+          library and storage limits.
         </p>
       </div>
 
@@ -367,8 +691,25 @@ export function SocialLinksForm({
 
       <Button type="submit" disabled={isPending} className="justify-center gap-2">
         <SaveIcon className="size-4" />
-        {isPending ? "Saving..." : "Save social links"}
+        {isPending ? "Saving..." : "Save footer details"}
       </Button>
+
+      {mediaLibrary ? (
+        <MediaManagerDialog
+          acceptedMediaTypes={["image"]}
+          assets={mediaLibrary.assets}
+          folders={mediaLibrary.folders}
+          key={activePaymentMethodId ?? "payment-method-icon-picker"}
+          onOpenChange={setIsPaymentMediaManagerOpen}
+          onSelect={selectPaymentIcon}
+          open={isPaymentMediaManagerOpen}
+          selectedAssetId={activePaymentMethod?.mediaId}
+          storage={mediaLibrary.storage}
+          surface="admin"
+          title={`Select ${activePaymentMethod?.label || "payment method"} icon`}
+          usedStorageBytes={mediaLibrary.usedStorageBytes}
+        />
+      ) : null}
     </form>
   );
 }

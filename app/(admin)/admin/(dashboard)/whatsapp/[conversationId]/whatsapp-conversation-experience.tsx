@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import {
   ArrowLeftIcon,
   CheckCheckIcon,
   FileTextIcon,
   ImageIcon,
+  Loader2Icon,
   MoreVerticalIcon,
   PaperclipIcon,
   RefreshCwIcon,
@@ -54,6 +56,13 @@ const timeFormatter = new Intl.DateTimeFormat("en-ZA", {
 });
 const menuItemClass =
   "flex w-full items-center gap-3 px-4 py-3 text-sm text-zinc-800 transition hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-white/10";
+
+type ConversationActionKind = "automation" | "follow_up";
+
+type ConversationActionFeedback = {
+  message: string;
+  tone: "error" | "success";
+};
 
 function formatTime(value: Date | string) {
   return timeFormatter.format(new Date(value));
@@ -173,9 +182,15 @@ function ChatMessage({ message }: { message: AdminWhatsappMessage }) {
 function HeaderActions({
   canManage,
   conversation,
+  onSendFollowUp,
+  onToggleAutomation,
+  pendingAction,
 }: {
   canManage: boolean;
   conversation: AdminWhatsappConversation;
+  onSendFollowUp: () => void;
+  onToggleAutomation: () => void;
+  pendingAction: ConversationActionKind | null;
 }) {
   if (!canManage) {
     return null;
@@ -185,35 +200,66 @@ function HeaderActions({
     <DashboardRowActionMenu
       ariaLabel="Open conversation actions"
       className="w-60"
-      trigger={<MoreVerticalIcon className="size-5" />}
+      trigger={
+        pendingAction ? (
+          <Loader2Icon className="size-5 animate-spin" />
+        ) : (
+          <MoreVerticalIcon className="size-5" />
+        )
+      }
       triggerClassName="rounded-full text-[#54656f] hover:bg-black/5 dark:text-zinc-300 dark:hover:bg-white/10"
     >
-      <form
-        action={
-          conversation.isAutomationPaused || conversation.isMuted
-            ? resumeWhatsappAutomation
-            : pauseWhatsappAutomation
-        }
+      <button
+        className={cn(
+          menuItemClass,
+          "disabled:cursor-wait disabled:opacity-60",
+        )}
+        disabled={Boolean(pendingAction)}
+        onClick={onToggleAutomation}
+        type="button"
       >
-        <input name="conversationId" type="hidden" value={conversation.id} />
-        <button className={menuItemClass} type="submit">
-          {conversation.isAutomationPaused || conversation.isMuted ? (
-            <RefreshCwIcon className="size-4" />
-          ) : (
-            <UserCheckIcon className="size-4" />
-          )}
-          {conversation.isAutomationPaused || conversation.isMuted
+        {pendingAction === "automation" ? (
+          <Loader2Icon className="size-4 animate-spin" />
+        ) : conversation.isAutomationPaused || conversation.isMuted ? (
+          <RefreshCwIcon className="size-4" />
+        ) : (
+          <UserCheckIcon className="size-4" />
+        )}
+        {pendingAction === "automation"
+          ? "Updating automation..."
+          : conversation.isAutomationPaused || conversation.isMuted
             ? "Resume automation"
             : "Manual handover"}
-        </button>
-      </form>
-      <form action={sendWhatsappFollowUp}>
-        <input name="conversationId" type="hidden" value={conversation.id} />
-        <button className={menuItemClass} type="submit">
-          <SendHorizontalIcon className="size-4" />
-          Send follow-up
-        </button>
-      </form>
+      </button>
+      <button
+        className={cn(
+          menuItemClass,
+          "items-start disabled:cursor-not-allowed disabled:opacity-60",
+        )}
+        disabled={Boolean(pendingAction) || !conversation.followUp.canSend}
+        onClick={onSendFollowUp}
+        title={conversation.followUp.unavailableReason ?? undefined}
+        type="button"
+      >
+        {pendingAction === "follow_up" ? (
+          <Loader2Icon className="mt-0.5 size-4 animate-spin" />
+        ) : (
+          <SendHorizontalIcon className="mt-0.5 size-4" />
+        )}
+        <span className="min-w-0 text-left">
+          <span className="block">
+            {pendingAction === "follow_up"
+              ? "Sending follow-up..."
+              : "Send follow-up"}
+          </span>
+          {!conversation.followUp.canSend &&
+          conversation.followUp.unavailableReason ? (
+            <span className="mt-0.5 block text-xs leading-4 text-slate-500 dark:text-zinc-400">
+              {conversation.followUp.unavailableReason}
+            </span>
+          ) : null}
+        </span>
+      </button>
       <form action={clearWhatsappModeration}>
         <input name="conversationId" type="hidden" value={conversation.id} />
         <button className={menuItemClass} type="submit">
@@ -234,10 +280,16 @@ export function AdminWhatsappConversationExperience({
   conversation: AdminWhatsappConversation;
   mediaLibrary: MediaLibrary;
 }) {
+  const router = useRouter();
   const [isCustomerDetailsOpen, setIsCustomerDetailsOpen] = useState(false);
   const [isMediaManagerOpen, setIsMediaManagerOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] =
     useState<AdminWhatsappMessageAttachment | null>(null);
+  const [actionFeedback, setActionFeedback] =
+    useState<ConversationActionFeedback | null>(null);
+  const [pendingAction, setPendingAction] =
+    useState<ConversationActionKind | null>(null);
+  const [, startActionTransition] = useTransition();
   const customerLabel = conversation.customer.name ?? conversation.phone;
   const selectedAttachmentIcon = useMemo(() => {
     if (!selectedAttachment) {
@@ -247,6 +299,46 @@ export function AdminWhatsappConversationExperience({
     return selectedAttachment.type === "document" ? FileTextIcon : ImageIcon;
   }, [selectedAttachment]);
   const SelectedAttachmentIcon = selectedAttachmentIcon;
+
+  function runConversationAction(kind: ConversationActionKind) {
+    if (pendingAction) {
+      return;
+    }
+
+    setActionFeedback(null);
+    setPendingAction(kind);
+    const action =
+      kind === "follow_up"
+        ? sendWhatsappFollowUp
+        : conversation.isAutomationPaused || conversation.isMuted
+          ? resumeWhatsappAutomation
+          : pauseWhatsappAutomation;
+
+    startActionTransition(() => {
+      void action({ conversationId: conversation.id })
+        .then((result) => {
+          setPendingAction(null);
+          setActionFeedback({
+            message: result.message,
+            tone: result.ok ? "success" : "error",
+          });
+
+          if (result.ok) {
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          setPendingAction(null);
+          setActionFeedback({
+            message:
+              kind === "follow_up"
+                ? "The WhatsApp follow-up could not be sent."
+                : "The automation setting could not be updated.",
+            tone: "error",
+          });
+        });
+    });
+  }
 
   return (
     <div className="grid gap-3">
@@ -258,17 +350,31 @@ export function AdminWhatsappConversationExperience({
         Back to WhatsApp
       </Link>
 
+      {actionFeedback ? (
+        <div
+          aria-live="polite"
+          className={cn(
+            "rounded-lg border px-3 py-2 text-sm",
+            actionFeedback.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+              : "border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100",
+          )}
+        >
+          {actionFeedback.message}
+        </div>
+      ) : null}
+
       <section className="h-[calc(100dvh-9rem)] min-h-[42rem] overflow-hidden rounded-xl border border-slate-300 bg-[#efeae2] shadow-sm dark:border-white/10 dark:bg-[#0b141a]">
         <div
           className={cn(
-            "grid h-full min-w-0",
+            "grid h-full min-h-0 min-w-0",
             isCustomerDetailsOpen
               ? "xl:grid-cols-[minmax(0,1fr)_24rem]"
               : "grid-cols-1",
           )}
         >
-          <div className="flex min-w-0 flex-col">
-            <header className="flex min-h-16 items-center justify-between gap-3 border-b border-black/5 bg-[#f0f2f5] px-4 dark:border-white/10 dark:bg-[#202c33]">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+            <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-black/5 bg-[#f0f2f5] px-4 dark:border-white/10 dark:bg-[#202c33]">
               <button
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 onClick={() => setIsCustomerDetailsOpen(true)}
@@ -289,7 +395,13 @@ export function AdminWhatsappConversationExperience({
                   </p>
                 </div>
               </button>
-              <HeaderActions canManage={canManage} conversation={conversation} />
+              <HeaderActions
+                canManage={canManage}
+                conversation={conversation}
+                onSendFollowUp={() => runConversationAction("follow_up")}
+                onToggleAutomation={() => runConversationAction("automation")}
+                pendingAction={pendingAction}
+              />
             </header>
 
             <div className="relative min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_1px_1px,rgba(17,27,33,0.08)_1px,transparent_0)] [background-size:22px_22px]">
@@ -308,7 +420,7 @@ export function AdminWhatsappConversationExperience({
 
             <form
               action={sendAdminWhatsappMessage}
-              className="border-t border-black/5 bg-[#f0f2f5] p-3 dark:border-white/10 dark:bg-[#202c33]"
+              className="shrink-0 border-t border-black/5 bg-[#f0f2f5] p-3 dark:border-white/10 dark:bg-[#202c33]"
             >
               <input name="conversationId" type="hidden" value={conversation.id} />
               {selectedAttachment ? (

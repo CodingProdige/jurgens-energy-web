@@ -1,16 +1,25 @@
 import crypto from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/src/db";
-import { marketplaceSettings } from "@/src/db/schema";
+import { marketplaceSettings, media } from "@/src/db/schema";
 import { env } from "@/src/config/env";
 import { hashPassword, verifyPassword } from "@/src/modules/auth/service";
+import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import { decryptSecret, encryptSecret } from "@/src/modules/security/secrets";
 
 export const marketplaceComingSoonCookieName = "piessang_marketplace_preview";
 
 const defaultWhatsappMessageUrl = "https://waba-v2.360dialog.io";
+const defaultFooterPaymentMethodLabels = [
+  "VISA",
+  "Mastercard",
+  "zapper",
+  "mobicred",
+] as const;
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const openAiReasoningEfforts = [
   "none",
   "minimal",
@@ -45,11 +54,149 @@ function normalizeOpenAiReasoningEffort(
     : env.OPENAI_REASONING_EFFORT;
 }
 
+export type MarketplacePaymentMethodBadge = {
+  iconUrl: string | null;
+  label: string;
+  mediaId: string | null;
+};
+
+export type MarketplacePaymentMethodBadgeInput = Omit<
+  MarketplacePaymentMethodBadge,
+  "iconUrl"
+>;
+
+function defaultFooterPaymentMethodBadges(): MarketplacePaymentMethodBadgeInput[] {
+  return defaultFooterPaymentMethodLabels.map((label) => ({
+    label,
+    mediaId: null,
+  }));
+}
+
+function normalizePaymentMethodBadge(
+  value: unknown,
+): MarketplacePaymentMethodBadgeInput | null {
+  if (typeof value === "string") {
+    const label = value.trim();
+
+    return label ? { label: label.slice(0, 40), mediaId: null } : null;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as { label?: unknown; mediaId?: unknown };
+  const label = typeof candidate.label === "string" ? candidate.label.trim() : "";
+  const mediaId =
+    typeof candidate.mediaId === "string" && uuidPattern.test(candidate.mediaId)
+      ? candidate.mediaId
+      : null;
+
+  return label ? { label: label.slice(0, 40), mediaId } : null;
+}
+
+function parsePaymentMethodBadges(
+  value: string | null | undefined,
+): MarketplacePaymentMethodBadgeInput[] {
+  if (value === null || typeof value === "undefined") {
+    return defaultFooterPaymentMethodBadges();
+  }
+
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmedValue) as unknown;
+
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(normalizePaymentMethodBadge)
+          .filter(
+            (item): item is MarketplacePaymentMethodBadgeInput => Boolean(item),
+          )
+          .slice(0, 12);
+      }
+    } catch {
+      // Fall through to the legacy newline/comma format.
+    }
+  }
+
+  return value
+    .split(/[\n,]+/g)
+    .map(normalizePaymentMethodBadge)
+    .filter(
+      (item): item is MarketplacePaymentMethodBadgeInput => Boolean(item),
+    )
+    .slice(0, 12);
+}
+
+function serializePaymentMethodBadges(
+  values: MarketplacePaymentMethodBadgeInput[],
+) {
+  return JSON.stringify(
+    values
+      .map(normalizePaymentMethodBadge)
+      .filter(
+        (item): item is MarketplacePaymentMethodBadgeInput => Boolean(item),
+      )
+      .slice(0, 12),
+  );
+}
+
+async function resolvePaymentMethodBadges(
+  value: string | null | undefined,
+): Promise<MarketplacePaymentMethodBadge[]> {
+  const badges = parsePaymentMethodBadges(value);
+  const mediaIds = Array.from(
+    new Set(
+      badges
+        .map((badge) => badge.mediaId)
+        .filter((mediaId): mediaId is string => Boolean(mediaId)),
+    ),
+  );
+
+  if (mediaIds.length === 0) {
+    return badges.map((badge) => ({ ...badge, iconUrl: null }));
+  }
+
+  const assets = await db
+    .select({
+      id: media.id,
+      isPublic: media.isPublic,
+      mimeType: media.mimeType,
+      relativePath: media.relativePath,
+    })
+    .from(media)
+    .where(inArray(media.id, mediaIds));
+  const iconUrlByMediaId = new Map(
+    assets
+      .filter(
+        (asset) =>
+          asset.isPublic &&
+          asset.mimeType.startsWith("image/") &&
+          asset.relativePath.startsWith("admin-media/"),
+      )
+      .map((asset) => [asset.id, getMediaPublicUrl(asset.relativePath)]),
+  );
+
+  return badges.map((badge) => ({
+    ...badge,
+    iconUrl: badge.mediaId
+      ? (iconUrlByMediaId.get(badge.mediaId) ?? null)
+      : null,
+  }));
+}
+
 export type MarketplaceSettings = {
   bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
   comingSoonEnabled: boolean;
   comingSoonPasswordHash: string | null;
+  contactAddress: string;
+  contactEmail: string;
+  contactPhonePrimary: string;
+  contactPhoneSecondary: string;
   facebookUrl: string | null;
+  footerTagline: string;
   freeStorageQuotaMb: number;
   googleAdsConversionId: string | null;
   googleAdsConversionLabel: string | null;
@@ -88,6 +235,7 @@ export type MarketplaceSettings = {
   payfastOnsiteEnabled: boolean;
   payfastSandboxMerchantId: string | null;
   payfastTokenizationEnabled: boolean;
+  paymentMethodBadges: MarketplacePaymentMethodBadge[];
   openAiEnabled: boolean;
   openAiModel: string;
   openAiReasoningEffort: OpenAiReasoningEffort;
@@ -157,7 +305,13 @@ const defaultSettings: MarketplaceSettings = {
   bobgoBookingMode: "disabled",
   comingSoonEnabled: false,
   comingSoonPasswordHash: null,
+  contactAddress:
+    "6 Christelle Street, Denneburg, Paarl, Western Cape 7646, South Africa",
+  contactEmail: "support@jurgensenergy.com",
+  contactPhonePrimary: "+27 60 689 3558",
+  contactPhoneSecondary: "",
   facebookUrl: null,
+  footerTagline: "Modern energy, delivered.",
   freeStorageQuotaMb: 512,
   googleAdsConversionId: null,
   googleAdsConversionLabel: null,
@@ -196,6 +350,10 @@ const defaultSettings: MarketplaceSettings = {
   payfastOnsiteEnabled: false,
   payfastSandboxMerchantId: null,
   payfastTokenizationEnabled: false,
+  paymentMethodBadges: defaultFooterPaymentMethodBadges().map((badge) => ({
+    ...badge,
+    iconUrl: null,
+  })),
   openAiEnabled: true,
   openAiModel: env.OPENAI_MODEL,
   openAiReasoningEffort: env.OPENAI_REASONING_EFFORT,
@@ -235,7 +393,12 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     .select({
       comingSoonEnabled: marketplaceSettings.comingSoonEnabled,
       comingSoonPasswordHash: marketplaceSettings.comingSoonPasswordHash,
+      contactAddress: marketplaceSettings.contactAddress,
+      contactEmail: marketplaceSettings.contactEmail,
+      contactPhonePrimary: marketplaceSettings.contactPhonePrimary,
+      contactPhoneSecondary: marketplaceSettings.contactPhoneSecondary,
       facebookUrl: marketplaceSettings.facebookUrl,
+      footerTagline: marketplaceSettings.footerTagline,
       freeStorageQuotaMb: marketplaceSettings.freeStorageQuotaMb,
       googleAdsConversionId: marketplaceSettings.googleAdsConversionId,
       googleAdsConversionLabel: marketplaceSettings.googleAdsConversionLabel,
@@ -299,6 +462,7 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
         marketplaceSettings.payfastSandboxPassphraseEncrypted,
       payfastTokenizationEnabled:
         marketplaceSettings.payfastTokenizationEnabled,
+      paymentMethodBadges: marketplaceSettings.paymentMethodBadges,
       stripeLivePublishableKey: marketplaceSettings.stripeLivePublishableKey,
       stripeLiveSecretKeyEncrypted:
         marketplaceSettings.stripeLiveSecretKeyEncrypted,
@@ -346,10 +510,21 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     return defaultSettings;
   }
 
+  const paymentMethodBadges = await resolvePaymentMethodBadges(
+    settings.paymentMethodBadges,
+  );
+
   return {
     ...settings,
     bobgoBookingMode: normalizeBobgoBookingMode(settings.bobgoBookingMode),
     bobgoMode: settings.bobgoMode === "live" ? "live" : "sandbox",
+    contactAddress: settings.contactAddress ?? defaultSettings.contactAddress,
+    contactEmail: settings.contactEmail ?? defaultSettings.contactEmail,
+    contactPhonePrimary:
+      settings.contactPhonePrimary ?? defaultSettings.contactPhonePrimary,
+    contactPhoneSecondary:
+      settings.contactPhoneSecondary ?? defaultSettings.contactPhoneSecondary,
+    footerTagline: settings.footerTagline ?? defaultSettings.footerTagline,
     hasBobgoApiKey: Boolean(
       settings.bobgoApiKeyEncrypted ?? settings.bobgoSandboxApiKeyEncrypted,
     ),
@@ -377,6 +552,7 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       settings.openAiReasoningEffort,
     ),
     payfastMode: settings.payfastMode === "live" ? "live" : "sandbox",
+    paymentMethodBadges,
     hasPayfastLiveMerchantKey: Boolean(
       settings.payfastLiveMerchantKeyEncrypted,
     ),
@@ -1168,6 +1344,108 @@ export async function updateMarketplaceSocialLinks({
     });
 
   return { ok: true, message: "Social links saved." };
+}
+
+export async function updateMarketplaceFooterSettings({
+  contactAddress,
+  contactEmail,
+  contactPhonePrimary,
+  contactPhoneSecondary,
+  facebookUrl,
+  footerTagline,
+  googleReviewUrl,
+  instagramUrl,
+  paymentMethodBadges,
+  twitterUrl,
+}: {
+  contactAddress: string;
+  contactEmail: string;
+  contactPhonePrimary: string;
+  contactPhoneSecondary: string;
+  facebookUrl?: string;
+  footerTagline: string;
+  googleReviewUrl?: string;
+  instagramUrl?: string;
+  paymentMethodBadges: MarketplacePaymentMethodBadgeInput[];
+  twitterUrl?: string;
+}) {
+  const paymentMethodMediaIds = Array.from(
+    new Set(
+      paymentMethodBadges
+        .map((badge) => badge.mediaId)
+        .filter((mediaId): mediaId is string => Boolean(mediaId)),
+    ),
+  );
+
+  if (paymentMethodMediaIds.length > 0) {
+    const selectedAssets = await db
+      .select({
+        id: media.id,
+        isPublic: media.isPublic,
+        mimeType: media.mimeType,
+        relativePath: media.relativePath,
+      })
+      .from(media)
+      .where(inArray(media.id, paymentMethodMediaIds));
+    const validAssetIds = new Set(
+      selectedAssets
+        .filter(
+          (asset) =>
+            asset.isPublic &&
+            asset.mimeType.startsWith("image/") &&
+            asset.relativePath.startsWith("admin-media/"),
+        )
+        .map((asset) => asset.id),
+    );
+
+    if (
+      paymentMethodMediaIds.some((mediaId) => !validAssetIds.has(mediaId))
+    ) {
+      return {
+        ok: false,
+        message: "One or more payment icons are unavailable. Choose them again.",
+      };
+    }
+  }
+
+  const paymentMethodBadgesValue = serializePaymentMethodBadges(
+    paymentMethodBadges,
+  );
+
+  await db
+    .insert(marketplaceSettings)
+    .values({
+      id: 1,
+      contactAddress,
+      contactEmail,
+      contactPhonePrimary,
+      contactPhoneSecondary,
+      facebookUrl: facebookUrl || null,
+      footerTagline,
+      googleReviewUrl: googleReviewUrl || null,
+      instagramUrl: instagramUrl || null,
+      paymentMethodBadges: paymentMethodBadgesValue,
+      twitterUrl: twitterUrl || null,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: marketplaceSettings.id,
+      set: {
+        contactAddress,
+        contactEmail,
+        contactPhonePrimary,
+        contactPhoneSecondary,
+        facebookUrl: facebookUrl || null,
+        footerTagline,
+        googleReviewUrl: googleReviewUrl || null,
+        instagramUrl: instagramUrl || null,
+        paymentMethodBadges: paymentMethodBadgesValue,
+        twitterUrl: twitterUrl || null,
+        updatedAt: new Date(),
+      },
+    });
+
+  return { ok: true, message: "Footer details saved." };
 }
 
 export async function updateMarketplaceGoogleMarketingSettings({

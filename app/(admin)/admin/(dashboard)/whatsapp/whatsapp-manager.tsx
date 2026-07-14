@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import {
   BarChart3Icon,
   EyeIcon,
+  Loader2Icon,
   RefreshCwIcon,
   SendIcon,
   UserCheckIcon,
@@ -74,6 +76,16 @@ const tablePreviewCellClass = cn(
   "min-w-0 overflow-hidden whitespace-normal align-middle",
 );
 
+type PendingConversationAction = {
+  conversationId: string;
+  kind: "automation" | "follow_up";
+};
+
+type ConversationActionFeedback = {
+  message: string;
+  tone: "error" | "success";
+};
+
 function formatDate(value: Date | string | null | undefined) {
   if (!value) {
     return "Never";
@@ -138,21 +150,39 @@ function AutomationBadge({
 function ConversationQuickActions({
   canManage,
   conversation,
+  onSendFollowUp,
+  onToggleAutomation,
   onViewCustomerDetails,
+  pendingAction,
 }: {
   canManage: boolean;
   conversation: AdminWhatsappConversation;
+  onSendFollowUp: (conversation: AdminWhatsappConversation) => void;
+  onToggleAutomation: (conversation: AdminWhatsappConversation) => void;
   onViewCustomerDetails: (conversation: AdminWhatsappConversation) => void;
+  pendingAction: PendingConversationAction | null;
 }) {
   const hasFlags =
     (conversation.moderation.abuseCount ?? 0) > 0 ||
     (conversation.moderation.unknownCount ?? 0) > 0;
+  const isAutomationPending =
+    pendingAction?.conversationId === conversation.id &&
+    pendingAction.kind === "automation";
+  const isFollowUpPending =
+    pendingAction?.conversationId === conversation.id &&
+    pendingAction.kind === "follow_up";
+  const isConversationActionPending = isAutomationPending || isFollowUpPending;
 
   return (
     <div className="inline-flex items-center justify-end">
       <DashboardRowActionMenu
         ariaLabel={`Open actions for ${conversation.customer.name ?? conversation.phone}`}
         className="w-60"
+        trigger={
+          isConversationActionPending ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : undefined
+        }
       >
         <Link
           className={rowActionMenuItemClass}
@@ -171,33 +201,56 @@ function ConversationQuickActions({
         </button>
         {canManage ? (
           <>
-            <form
-              action={
-                conversation.isAutomationPaused || conversation.isMuted
-                  ? resumeWhatsappAutomation
-                  : pauseWhatsappAutomation
-              }
+            <button
+              className={cn(
+                rowActionMenuItemClass,
+                "disabled:cursor-wait disabled:opacity-60",
+              )}
+              disabled={Boolean(pendingAction)}
+              onClick={() => onToggleAutomation(conversation)}
+              type="button"
             >
-              <input name="conversationId" type="hidden" value={conversation.id} />
-              <button className={rowActionMenuItemClass} type="submit">
-                {conversation.isAutomationPaused || conversation.isMuted ? (
-                  <RefreshCwIcon className="size-4" />
-                ) : (
-                  <UserCheckIcon className="size-4" />
-                )}
-                {conversation.isAutomationPaused || conversation.isMuted
+              {isAutomationPending ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : conversation.isAutomationPaused || conversation.isMuted ? (
+                <RefreshCwIcon className="size-4" />
+              ) : (
+                <UserCheckIcon className="size-4" />
+              )}
+              {isAutomationPending
+                ? "Updating automation..."
+                : conversation.isAutomationPaused || conversation.isMuted
                   ? "Resume automation"
                   : "Manual handover"}
-              </button>
-            </form>
+            </button>
             {conversation.activity.status === "needs_follow_up" ? (
-              <form action={sendWhatsappFollowUp}>
-                <input name="conversationId" type="hidden" value={conversation.id} />
-                <button className={rowActionMenuItemClass} type="submit">
-                  <SendIcon className="size-4" />
-                  Send follow-up
-                </button>
-              </form>
+              <button
+                className={cn(
+                  rowActionMenuItemClass,
+                  "items-start disabled:cursor-not-allowed disabled:opacity-60",
+                )}
+                disabled={Boolean(pendingAction) || !conversation.followUp.canSend}
+                onClick={() => onSendFollowUp(conversation)}
+                title={conversation.followUp.unavailableReason ?? undefined}
+                type="button"
+              >
+                {isFollowUpPending ? (
+                  <Loader2Icon className="mt-0.5 size-4 animate-spin" />
+                ) : (
+                  <SendIcon className="mt-0.5 size-4" />
+                )}
+                <span className="min-w-0 text-left">
+                  <span className="block">
+                    {isFollowUpPending ? "Sending follow-up..." : "Send follow-up"}
+                  </span>
+                  {!conversation.followUp.canSend &&
+                  conversation.followUp.unavailableReason ? (
+                    <span className="mt-0.5 block text-xs leading-4 text-slate-500 dark:text-zinc-400">
+                      {conversation.followUp.unavailableReason}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
             ) : null}
             {hasFlags ? (
               <form action={clearWhatsappModeration}>
@@ -222,10 +275,16 @@ export function AdminWhatsappManager({
   canManage: boolean;
   data: AdminWhatsappConversationsData;
 }) {
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [customerDetailsConversation, setCustomerDetailsConversation] =
     useState<AdminWhatsappConversation | null>(null);
+  const [actionFeedback, setActionFeedback] =
+    useState<ConversationActionFeedback | null>(null);
+  const [pendingAction, setPendingAction] =
+    useState<PendingConversationAction | null>(null);
+  const [, startActionTransition] = useTransition();
   const metrics = useMemo<DashboardMetricDefinition[]>(
     () => [
       {
@@ -294,6 +353,49 @@ export function AdminWhatsappManager({
     activePage * pageSize,
   );
 
+  function runConversationAction(
+    conversation: AdminWhatsappConversation,
+    kind: PendingConversationAction["kind"],
+  ) {
+    if (pendingAction) {
+      return;
+    }
+
+    setActionFeedback(null);
+    setPendingAction({ conversationId: conversation.id, kind });
+    const action =
+      kind === "follow_up"
+        ? sendWhatsappFollowUp
+        : conversation.isAutomationPaused || conversation.isMuted
+          ? resumeWhatsappAutomation
+          : pauseWhatsappAutomation;
+
+    startActionTransition(() => {
+      void action({ conversationId: conversation.id })
+        .then((result) => {
+          setPendingAction(null);
+          setActionFeedback({
+            message: result.message,
+            tone: result.ok ? "success" : "error",
+          });
+
+          if (result.ok) {
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          setPendingAction(null);
+          setActionFeedback({
+            message:
+              kind === "follow_up"
+                ? "The WhatsApp follow-up could not be sent."
+                : "The automation setting could not be updated.",
+            tone: "error",
+          });
+        });
+    });
+  }
+
   return (
     <>
       <DashboardPageHeader
@@ -306,6 +408,20 @@ export function AdminWhatsappManager({
           metrics={metrics}
           storageKey="jurgens:admin:whatsapp-conversation-metrics"
         />
+
+        {actionFeedback ? (
+          <div
+            aria-live="polite"
+            className={cn(
+              "rounded-lg border px-3 py-2 text-sm",
+              actionFeedback.tone === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+                : "border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100",
+            )}
+          >
+            {actionFeedback.message}
+          </div>
+        ) : null}
 
         <section
           className={cn(
@@ -433,7 +549,14 @@ export function AdminWhatsappManager({
                         <ConversationQuickActions
                           canManage={canManage}
                           conversation={conversation}
+                          onSendFollowUp={(selectedConversation) =>
+                            runConversationAction(selectedConversation, "follow_up")
+                          }
+                          onToggleAutomation={(selectedConversation) =>
+                            runConversationAction(selectedConversation, "automation")
+                          }
                           onViewCustomerDetails={setCustomerDetailsConversation}
+                          pendingAction={pendingAction}
                         />
                       </TableCell>
                     </TableRow>

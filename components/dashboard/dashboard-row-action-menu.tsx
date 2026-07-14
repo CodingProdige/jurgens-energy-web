@@ -152,7 +152,18 @@ export function DashboardRowActionMenu({
                   left: position?.left ?? -9999,
                   top: position?.top ?? -9999,
                 }}
-                onClick={() => setIsOpen(false)}
+                onClick={(event) => {
+                  const target = event.target;
+
+                  if (target instanceof Element && target.closest("form")) {
+                    return;
+                  }
+
+                  setIsOpen(false);
+                }}
+                onSubmitCapture={() => {
+                  window.setTimeout(() => setIsOpen(false), 0);
+                }}
               >
                 {children}
               </div>

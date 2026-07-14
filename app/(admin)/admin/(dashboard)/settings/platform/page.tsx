@@ -100,9 +100,9 @@ const settingSections = [
   },
   {
     key: "social-links",
-    title: "Marketplace social links",
+    title: "Footer and public details",
     description:
-      "Set the public Jurgens Energy links shown across marketplace surfaces.",
+      "Manage footer contact details, social links, and payment badges.",
     icon: Share2Icon,
   },
   {
@@ -178,6 +178,10 @@ export default async function AdminSettingsPage({
     selectedSection === "notifications"
       ? await getAdminMediaLibrary(session.user.id)
       : null;
+  const footerMediaLibrary =
+    selectedSection === "social-links"
+      ? await getAdminMediaLibrary(session.user.id)
+      : null;
   const jurgensDeliveryZones =
     selectedSection === "shipping" ? await getJurgensDeliveryZones() : [];
 
@@ -210,6 +214,7 @@ export default async function AdminSettingsPage({
       {selectedSection ? (
         <section className="w-full">
           <SettingsSection
+            footerMediaLibrary={footerMediaLibrary}
             notificationMediaLibrary={notificationMediaLibrary}
             jurgensDeliveryZones={jurgensDeliveryZones}
             selectedNotificationItem={selectedNotificationItem ?? null}
@@ -258,6 +263,7 @@ function SettingsMenu() {
 }
 
 function SettingsSection({
+  footerMediaLibrary,
   notificationMediaLibrary,
   jurgensDeliveryZones,
   notificationSettings,
@@ -266,6 +272,7 @@ function SettingsSection({
   secrets,
   settings,
 }: {
+  footerMediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
   notificationMediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
   jurgensDeliveryZones: Awaited<ReturnType<typeof getJurgensDeliveryZones>>;
   notificationSettings: Awaited<ReturnType<typeof getAdminNotificationSettings>>;
@@ -454,13 +461,20 @@ function SettingsSection({
   if (section === "social-links") {
     return (
       <DashboardPanel
-        title="Marketplace social links"
-        description="Set the public Jurgens Energy links shown on marketplace surfaces like the coming soon page."
+        title="Footer and public details"
+        description="Set the public Jurgens Energy footer details, contact information, social links, and payment badges."
       >
         <SocialLinksForm
+          contactAddress={settings.contactAddress}
+          contactEmail={settings.contactEmail}
+          contactPhonePrimary={settings.contactPhonePrimary}
+          contactPhoneSecondary={settings.contactPhoneSecondary}
           facebookUrl={settings.facebookUrl}
+          footerTagline={settings.footerTagline}
           googleReviewUrl={settings.googleReviewUrl}
           instagramUrl={settings.instagramUrl}
+          mediaLibrary={footerMediaLibrary}
+          paymentMethodBadges={settings.paymentMethodBadges}
           twitterUrl={settings.twitterUrl}
         />
       </DashboardPanel>
@@ -497,7 +511,7 @@ function SettingsSection({
           <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
             PayFast mode, Bob Go credentials, WhatsApp ordering credentials,
             Google tags, media limits, compression defaults, storage
-            allocations, and social links are shared platform settings used
+            allocations, footer details, and social links are shared platform settings used
             wherever those systems appear.
           </p>
         </div>

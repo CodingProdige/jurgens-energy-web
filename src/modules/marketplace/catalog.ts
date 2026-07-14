@@ -13,6 +13,7 @@ import {
 } from "@/src/db/schema";
 import {
   convertFromZar,
+  formatFromZar,
   formatRangeFromZar,
   type CurrencyContext,
 } from "@/src/modules/currency";
@@ -45,10 +46,13 @@ export type MarketplaceProductCard = {
   brandSlug: string | null;
   category: MarketplaceCategorySummary | null;
   coverImageUrl: string | null;
+  compareAtPriceLabel: string | null;
+  discountLabel: string | null;
   fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
   hasExchangeOption: boolean;
   id: string;
   inStock: boolean;
+  isOnSale: boolean;
   priceLabel: string;
   quickAddVariantId: string | null;
   shortDescription: string | null;
@@ -121,6 +125,52 @@ function getPriceLabel(
     variants.map((variant) => variant.price),
     currencyContext,
   );
+}
+
+function getProductCardSaleData(
+  variants: Array<{ compareAtPrice: string | null; price: string }>,
+  currencyContext: CurrencyContext,
+) {
+  const saleVariants = variants.filter((variant) => {
+    const price = Number(variant.price);
+    const compareAtPrice = Number(variant.compareAtPrice);
+
+    return (
+      Number.isFinite(price) &&
+      Number.isFinite(compareAtPrice) &&
+      price > 0 &&
+      compareAtPrice > price
+    );
+  });
+  const representativeVariant = [...variants]
+    .filter((variant) => Number.isFinite(Number(variant.price)))
+    .sort((first, second) => Number(first.price) - Number(second.price))[0];
+  const price = Number(representativeVariant?.price);
+  const compareAtPrice = Number(representativeVariant?.compareAtPrice);
+
+  if (
+    !Number.isFinite(price) ||
+    !Number.isFinite(compareAtPrice) ||
+    price <= 0 ||
+    compareAtPrice <= price
+  ) {
+    return {
+      compareAtPriceLabel: null,
+      discountLabel: null,
+      isOnSale: saleVariants.length > 0,
+    };
+  }
+
+  const discountPercent = Math.max(
+    1,
+    Math.round(((compareAtPrice - price) / compareAtPrice) * 100),
+  );
+
+  return {
+    compareAtPriceLabel: formatFromZar(compareAtPrice, currencyContext),
+    discountLabel: `${discountPercent}% off`,
+    isOnSale: true,
+  };
 }
 
 function getQuickAddVariantId(
@@ -286,6 +336,7 @@ export async function getMarketplaceCatalog({
     await Promise.all([
       db
         .select({
+          compareAtPrice: productVariants.compareAtPrice,
           continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
           id: productVariants.id,
           price: productVariants.price,
@@ -305,6 +356,7 @@ export async function getMarketplaceCatalog({
   const variantsByProductId = new Map<
     string,
     Array<{
+      compareAtPrice: string | null;
       continueSellingOutOfStock: boolean;
       id: string;
       price: string;
@@ -338,6 +390,7 @@ export async function getMarketplaceCatalog({
       id: row.id,
       inStock: variants.some(getVariantInStock),
       priceLabel: getPriceLabel(variants, currencyContext),
+      ...getProductCardSaleData(variants, currencyContext),
       quickAddVariantId: getQuickAddVariantId(variants),
       shortDescription: row.shortDescription,
       slug: row.slug,
@@ -719,6 +772,7 @@ export async function getMarketplaceCatalogPage({
     id: record.row.id,
     inStock: getRecordInStock(record),
     priceLabel: getPriceLabel(record.variants, currencyContext),
+    ...getProductCardSaleData(record.variants, currencyContext),
     quickAddVariantId: getQuickAddVariantId(record.variants),
     shortDescription: record.row.shortDescription,
     slug: record.row.slug,
@@ -1105,6 +1159,7 @@ export async function getMarketplaceProductBySlug(
     inStock: variants.some((variant) => variant.inStock),
     optionSchema: product.optionSchema ?? [],
     priceLabel: getPriceLabel(variants, currencyContext),
+    ...getProductCardSaleData(variants, currencyContext),
     quickAddVariantId: getQuickAddVariantId(activeVariantRows),
     shortDescription: product.shortDescription,
     slug: product.slug,

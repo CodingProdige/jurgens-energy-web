@@ -4,6 +4,7 @@ import { asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
+  auditLogs,
   orders,
   users,
   whatsappConversations,
@@ -31,6 +32,7 @@ type WhatsappModerationState = {
 };
 
 type WhatsappConversationState = {
+  deliveryInquiry?: unknown;
   followUp?: {
     count?: number;
     lastIntent?: string;
@@ -38,6 +40,7 @@ type WhatsappConversationState = {
   };
   moderation?: WhatsappModerationState;
   pendingOrder?: unknown;
+  partialOrder?: unknown;
 };
 
 export type AdminWhatsappMessageAttachment = {
@@ -88,6 +91,10 @@ export type AdminWhatsappConversation = {
     orderCount: number;
     whatsappDraftCount: number;
     whatsappOrderCount: number;
+  };
+  followUp: {
+    canSend: boolean;
+    unavailableReason: string | null;
   };
   id: string;
   isAutomationPaused: boolean;
@@ -382,33 +389,81 @@ export async function pauseWhatsappConversationAutomation({
   adminUserId: string;
   conversationId: string;
 }) {
-  const state = await getConversationState(conversationId);
-  const now = new Date().toISOString();
+  const now = new Date();
+  const moderationPatch = {
+    automationPausedAt: now.toISOString(),
+    automationPausedBy: "admin",
+    lastFlagReason: `Manual handover by admin ${adminUserId}`,
+    lastFlaggedAt: now.toISOString(),
+  };
+  const updated = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(whatsappConversations)
+      .set({
+        state: sql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{moderation}', COALESCE(${whatsappConversations.state}->'moderation', '{}'::jsonb) || ${JSON.stringify(moderationPatch)}::jsonb, true)`,
+        updatedAt: now,
+      })
+      .where(eq(whatsappConversations.id, conversationId))
+      .returning({ id: whatsappConversations.id });
 
-  await updateConversationState(conversationId, {
-    ...state,
-    moderation: {
-      ...state.moderation,
-      automationPausedAt: now,
-      automationPausedBy: "admin",
-      lastFlagReason: `Manual handover by admin ${adminUserId}`,
-      lastFlaggedAt: now,
-    },
+    if (rows.length === 0) {
+      return false;
+    }
+
+    await tx.insert(auditLogs).values({
+      action: "whatsapp.conversation.manual_handover",
+      actorUserId: adminUserId,
+      entityId: conversationId,
+      entityType: "whatsapp_conversation",
+      metadata: JSON.stringify({ automationPausedAt: now.toISOString() }),
+    });
+
+    return true;
   });
+
+  return updated
+    ? {
+        ok: true,
+        message: "Automation paused. This conversation is now in manual handover.",
+      }
+    : { ok: false, message: "Conversation was not found." };
 }
 
-export async function resumeWhatsappConversationAutomation(conversationId: string) {
-  const state = await getConversationState(conversationId);
-  const moderation = { ...state.moderation };
+export async function resumeWhatsappConversationAutomation({
+  adminUserId,
+  conversationId,
+}: {
+  adminUserId: string;
+  conversationId: string;
+}) {
+  const now = new Date();
+  const updated = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(whatsappConversations)
+      .set({
+        state: sql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{moderation}', COALESCE(${whatsappConversations.state}->'moderation', '{}'::jsonb) - 'automationPausedAt' - 'automationPausedBy' - 'mutedUntil', true)`,
+        updatedAt: now,
+      })
+      .where(eq(whatsappConversations.id, conversationId))
+      .returning({ id: whatsappConversations.id });
 
-  delete moderation.automationPausedAt;
-  delete moderation.automationPausedBy;
-  delete moderation.mutedUntil;
+    if (rows.length === 0) {
+      return false;
+    }
 
-  await updateConversationState(conversationId, {
-    ...state,
-    moderation,
+    await tx.insert(auditLogs).values({
+      action: "whatsapp.conversation.resume_automation",
+      actorUserId: adminUserId,
+      entityId: conversationId,
+      entityType: "whatsapp_conversation",
+    });
+
+    return true;
   });
+
+  return updated
+    ? { ok: true, message: "WhatsApp automation resumed." }
+    : { ok: false, message: "Conversation was not found." };
 }
 
 export async function clearWhatsappConversationModeration(conversationId: string) {
@@ -514,8 +569,19 @@ export async function sendAdminWhatsappFollowUp({
   adminUserId: string;
   conversationId: string;
 }) {
-  const [conversation, followUpSettings] = await Promise.all([
-    getAdminWhatsappConversation(conversationId),
+  const [[conversation], followUpSettings] = await Promise.all([
+    db
+      .select({
+        lastInboundAt: whatsappConversations.lastInboundAt,
+        lastIntent: whatsappConversations.lastIntent,
+        phone: whatsappConversations.phone,
+        provider: whatsappConversations.provider,
+        state: whatsappConversations.state,
+        status: whatsappConversations.status,
+      })
+      .from(whatsappConversations)
+      .where(eq(whatsappConversations.id, conversationId))
+      .limit(1),
     getWhatsappFollowUpSettings(),
   ]);
 
@@ -523,12 +589,90 @@ export async function sendAdminWhatsappFollowUp({
     return { ok: false, message: "Conversation was not found." };
   }
 
-  return sendAdminWhatsappConversationMessage({
-    adminUserId,
-    body: buildFollowUpMessage(conversation.lastIntent, followUpSettings),
-    conversationId,
-    intent: "manual_follow_up",
+  const state = normalizeConversationState(conversation.state);
+  const availability = getFollowUpAvailability({
+    followUpCount: state.followUp?.count ?? 0,
+    lastInboundAt: conversation.lastInboundAt,
+    settings: followUpSettings,
+    status: conversation.status,
   });
+
+  if (!availability.canSend) {
+    return {
+      ok: false,
+      message: availability.unavailableReason ?? "A follow-up cannot be sent right now.",
+    };
+  }
+
+  const body = buildFollowUpMessage(conversation.lastIntent, followUpSettings);
+  let sendResult: Awaited<ReturnType<typeof send360DialogTextMessage>>;
+
+  try {
+    sendResult = await send360DialogTextMessage({
+      body,
+      to: conversation.phone,
+    });
+  } catch {
+    return {
+      ok: false,
+      message: "The WhatsApp provider could not be reached. Please try again.",
+    };
+  }
+
+  if (!sendResult.ok) {
+    return {
+      ok: false,
+      message: sendResult.skipped
+        ? "WhatsApp sending is not configured for this conversation."
+        : "The WhatsApp provider rejected the follow-up. Please try again or check the integration.",
+    };
+  }
+
+  const now = new Date();
+  const nextFollowUp = {
+    count: (state.followUp?.count ?? 0) + 1,
+    lastIntent: conversation.lastIntent ?? undefined,
+    lastSentAt: now.toISOString(),
+  };
+
+  await db.transaction(async (tx) => {
+    await tx.insert(whatsappMessages).values({
+      body,
+      conversationId,
+      direction: "outbound",
+      payload: {
+        automation: {
+          adminUserId,
+          kind: "manual_follow_up",
+        },
+      },
+      provider: normalizeProvider(conversation.provider),
+      providerMessageId: `follow-up:${crypto.randomUUID()}`,
+    });
+
+    await tx
+      .update(whatsappConversations)
+      .set({
+        lastIntent: "manual_follow_up",
+        lastOutboundAt: now,
+        state: sql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{followUp}', ${JSON.stringify(nextFollowUp)}::jsonb, true)`,
+        updatedAt: now,
+      })
+      .where(eq(whatsappConversations.id, conversationId));
+
+    await tx.insert(auditLogs).values({
+      action: "whatsapp.conversation.send_follow_up",
+      actorUserId: adminUserId,
+      entityId: conversationId,
+      entityType: "whatsapp_conversation",
+      metadata: JSON.stringify({
+        followUpCount: nextFollowUp.count,
+        previousIntent: conversation.lastIntent,
+      }),
+    });
+  });
+
+  return { ok: true, message: "WhatsApp follow-up sent." };
 }
 
 export type WhatsappFollowUpRunResult = {
@@ -713,6 +857,12 @@ function toAdminConversation({
   const moderation = state.moderation ?? {};
   const isAutomationPaused = Boolean(moderation.automationPausedAt);
   const isMuted = isFutureIsoDate(moderation.mutedUntil);
+  const followUp = getFollowUpAvailability({
+    followUpCount: state.followUp?.count ?? 0,
+    lastInboundAt: row.lastInboundAt,
+    settings: followUpSettings,
+    status: row.status,
+  });
 
   return {
     activity: getConversationActivity({
@@ -731,6 +881,7 @@ function toAdminConversation({
       userId: row.userId,
     },
     customerStats,
+    followUp,
     id: row.id,
     isAutomationPaused,
     isMuted,
@@ -866,6 +1017,56 @@ function isWithinWhatsappCustomerServiceWindow(lastInboundAt: Date | null) {
   }
 
   return Date.now() - lastInboundAt.getTime() < 24 * 60 * 60 * 1000;
+}
+
+function getFollowUpAvailability({
+  followUpCount,
+  lastInboundAt,
+  settings,
+  status,
+}: {
+  followUpCount: number;
+  lastInboundAt: Date | null;
+  settings: WhatsappFollowUpSettings;
+  status: string;
+}): AdminWhatsappConversation["followUp"] {
+  if (status !== "open") {
+    return {
+      canSend: false,
+      unavailableReason: "This conversation is closed.",
+    };
+  }
+
+  if (!settings.whatsappFollowUpsEnabled) {
+    return {
+      canSend: false,
+      unavailableReason: "WhatsApp follow-ups are disabled in platform settings.",
+    };
+  }
+
+  if (followUpCount >= settings.whatsappFollowUpMaxCount) {
+    return {
+      canSend: false,
+      unavailableReason: "The configured follow-up limit has been reached.",
+    };
+  }
+
+  if (!isWithinWhatsappCustomerServiceWindow(lastInboundAt)) {
+    return {
+      canSend: false,
+      unavailableReason:
+        "The customer's 24-hour WhatsApp reply window has closed. An approved template is required.",
+    };
+  }
+
+  if (isWhatsappFollowUpQuietHours(settings)) {
+    return {
+      canSend: false,
+      unavailableReason: "Follow-ups are paused during the configured quiet hours.",
+    };
+  }
+
+  return { canSend: true, unavailableReason: null };
 }
 
 function isWhatsappFollowUpQuietHours(settings: WhatsappFollowUpSettings) {
@@ -1027,7 +1228,17 @@ function normalizeConversationState(value: unknown): WhatsappConversationState {
           },
         }
       : {}),
+    ...(state.deliveryInquiry &&
+    typeof state.deliveryInquiry === "object" &&
+    !Array.isArray(state.deliveryInquiry)
+      ? { deliveryInquiry: state.deliveryInquiry }
+      : {}),
     ...(state.pendingOrder ? { pendingOrder: state.pendingOrder } : {}),
+    ...(state.partialOrder &&
+    typeof state.partialOrder === "object" &&
+    !Array.isArray(state.partialOrder)
+      ? { partialOrder: state.partialOrder }
+      : {}),
   };
 }
 

@@ -40,6 +40,50 @@ export const jurgensDeliveryCheckoutRatesInputSchema = z.object({
   sellerId: z.string().uuid().nullable().optional(),
 });
 
+export const jurgensDeliveryAvailabilityInputSchema = z.object({
+  declaredValue: z.coerce.number().finite().nonnegative(),
+  postalCode: z.string().trim().min(1),
+});
+
+export type JurgensDeliveryAvailabilityInput = z.infer<
+  typeof jurgensDeliveryAvailabilityInputSchema
+>;
+
+export type JurgensDeliveryAvailabilityUnavailableCode =
+  | "shipping_disabled"
+  | "postal_code_unavailable"
+  | "minimum_order_not_met"
+  | "rate_not_configured";
+
+export type JurgensDeliveryAvailabilityZone = {
+  deliveryInformation: string | null;
+  id: string;
+  minimumOrderAmount: number;
+  name: string;
+};
+
+export type JurgensDeliveryAvailabilityResult =
+  | {
+      currency: "ZAR";
+      deliveryFee: number;
+      eligible: true;
+      mode: "jurgens_delivery";
+      postalCode: string;
+      unavailableCode: null;
+      unavailableReason: null;
+      zone: JurgensDeliveryAvailabilityZone;
+    }
+  | {
+      currency: "ZAR";
+      deliveryFee: null;
+      eligible: false;
+      mode: "jurgens_delivery";
+      postalCode: string;
+      unavailableCode: JurgensDeliveryAvailabilityUnavailableCode;
+      unavailableReason: string;
+      zone: JurgensDeliveryAvailabilityZone | null;
+    };
+
 export type JurgensDeliveryZoneRate = {
   fromAmount: number;
   id: string;
@@ -193,63 +237,69 @@ export async function deleteJurgensDeliveryZone(id: string) {
   return { ok: true, message: "Jurgens delivery zone deleted." };
 }
 
+export async function checkJurgensDeliveryAvailability(
+  input: JurgensDeliveryAvailabilityInput,
+): Promise<JurgensDeliveryAvailabilityResult> {
+  const parsed = jurgensDeliveryAvailabilityInputSchema.parse(input);
+  const evaluation = await evaluateJurgensDeliveryAvailability(parsed);
+  const zone = evaluation.zone ? toCheckoutZone(evaluation.zone) : null;
+
+  if (!evaluation.eligible) {
+    return {
+      currency: "ZAR",
+      deliveryFee: null,
+      eligible: false,
+      mode: "jurgens_delivery",
+      postalCode: evaluation.postalCode,
+      unavailableCode: evaluation.unavailableCode,
+      unavailableReason: evaluation.unavailableReason,
+      zone,
+    };
+  }
+
+  return {
+    currency: "ZAR",
+    deliveryFee: roundMoney(evaluation.rate.price),
+    eligible: true,
+    mode: "jurgens_delivery",
+    postalCode: evaluation.postalCode,
+    unavailableCode: null,
+    unavailableReason: null,
+    zone: toCheckoutZone(evaluation.zone),
+  };
+}
+
 export async function getJurgensDeliveryCheckoutRates(
   input: z.infer<typeof jurgensDeliveryCheckoutRatesInputSchema>,
 ) {
   const parsed = jurgensDeliveryCheckoutRatesInputSchema.parse(input);
-  const settings = await getMarketplaceSettings();
+  const evaluation = await evaluateJurgensDeliveryAvailability({
+    declaredValue: parsed.declaredValue,
+    postalCode: parsed.deliveryAddress.code,
+  });
 
-  if (!settings.shippingEnabled) {
-    throw new Error("Shipping rates are disabled.");
+  if (
+    !evaluation.eligible &&
+    evaluation.unavailableCode === "shipping_disabled"
+  ) {
+    throw new Error(evaluation.unavailableReason);
   }
 
-  const postalCode = normalizePostalCode(parsed.deliveryAddress.code);
-
-  if (!postalCode) {
-    throw new Error("A delivery postal code is required.");
-  }
-
-  const zones = await getJurgensDeliveryZones({ activeOnly: true });
-  const matchingZone = zones.find((zone) =>
-    zone.postalCodes.some((rule) => postalCodeMatchesRule(postalCode, rule)),
-  );
-
-  if (!matchingZone) {
+  if (!evaluation.eligible) {
     return {
-      eligible: false,
+      eligible: false as const,
       mode: "jurgens_delivery" as const,
       rates: [],
-      unavailableReason:
-        "Jurgens Energy delivery is not available for this postal code.",
+      unavailableReason: evaluation.unavailableReason,
+      ...(evaluation.zone
+        ? { zone: toCheckoutZone(evaluation.zone) }
+        : {}),
     };
   }
 
-  const subtotal = roundMoney(parsed.declaredValue);
-
-  if (subtotal < matchingZone.minimumOrderAmount) {
-    return {
-      eligible: false,
-      mode: "jurgens_delivery" as const,
-      rates: [],
-      unavailableReason: `Jurgens Energy delivery for ${matchingZone.name} requires a minimum order of R ${formatMoney(matchingZone.minimumOrderAmount)}.`,
-      zone: toCheckoutZone(matchingZone),
-    };
-  }
-
-  const matchingRate = matchingZone.rates.find((rate) =>
-    subtotalMatchesRate(subtotal, rate),
-  );
-
-  if (!matchingRate) {
-    return {
-      eligible: false,
-      mode: "jurgens_delivery" as const,
-      rates: [],
-      unavailableReason:
-        "No Jurgens Energy delivery price is configured for this order value.",
-      zone: toCheckoutZone(matchingZone),
-    };
-  }
+  const matchingRate = evaluation.rate;
+  const matchingZone = evaluation.zone;
+  const postalCode = evaluation.postalCode;
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
   const providerRateId = `jurgens-${matchingZone.id}-${matchingRate.id}`;
@@ -301,11 +351,101 @@ export async function getJurgensDeliveryCheckoutRates(
     .returning({ id: shippingRateQuotes.id });
 
   return {
-    eligible: true,
+    eligible: true as const,
     expiresAt,
     mode: "jurgens_delivery" as const,
     rates: [{ ...rate, quoteId: quote.id }],
     zone: toCheckoutZone(matchingZone),
+  };
+}
+
+type JurgensDeliveryAvailabilityEvaluation =
+  | {
+      eligible: true;
+      postalCode: string;
+      rate: JurgensDeliveryZoneRate;
+      zone: JurgensDeliveryZone;
+    }
+  | {
+      eligible: false;
+      postalCode: string;
+      unavailableCode: JurgensDeliveryAvailabilityUnavailableCode;
+      unavailableReason: string;
+      zone: JurgensDeliveryZone | null;
+    };
+
+async function evaluateJurgensDeliveryAvailability({
+  declaredValue,
+  postalCode: postalCodeInput,
+}: z.infer<
+  typeof jurgensDeliveryAvailabilityInputSchema
+>): Promise<JurgensDeliveryAvailabilityEvaluation> {
+  const postalCode = normalizePostalCode(postalCodeInput);
+
+  if (!postalCode) {
+    throw new Error("A delivery postal code is required.");
+  }
+
+  const settings = await getMarketplaceSettings();
+
+  if (!settings.shippingEnabled) {
+    return {
+      eligible: false,
+      postalCode,
+      unavailableCode: "shipping_disabled",
+      unavailableReason: "Shipping rates are disabled.",
+      zone: null,
+    };
+  }
+
+  const zones = await getJurgensDeliveryZones({ activeOnly: true });
+  const matchingZone = zones.find((zone) =>
+    zone.postalCodes.some((rule) => postalCodeMatchesRule(postalCode, rule)),
+  );
+
+  if (!matchingZone) {
+    return {
+      eligible: false,
+      postalCode,
+      unavailableCode: "postal_code_unavailable",
+      unavailableReason:
+        "Jurgens Energy delivery is not available for this postal code.",
+      zone: null,
+    };
+  }
+
+  const subtotal = roundMoney(declaredValue);
+
+  if (subtotal < matchingZone.minimumOrderAmount) {
+    return {
+      eligible: false,
+      postalCode,
+      unavailableCode: "minimum_order_not_met",
+      unavailableReason: `Jurgens Energy delivery for ${matchingZone.name} requires a minimum order of R ${formatMoney(matchingZone.minimumOrderAmount)}.`,
+      zone: matchingZone,
+    };
+  }
+
+  const matchingRate = matchingZone.rates.find((rate) =>
+    subtotalMatchesRate(subtotal, rate),
+  );
+
+  if (!matchingRate) {
+    return {
+      eligible: false,
+      postalCode,
+      unavailableCode: "rate_not_configured",
+      unavailableReason:
+        "No Jurgens Energy delivery price is configured for this order value.",
+      zone: matchingZone,
+    };
+  }
+
+  return {
+    eligible: true,
+    postalCode,
+    rate: matchingRate,
+    zone: matchingZone,
   };
 }
 

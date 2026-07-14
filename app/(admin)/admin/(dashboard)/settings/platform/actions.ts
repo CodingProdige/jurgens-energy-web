@@ -7,11 +7,11 @@ import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
   openAiReasoningEfforts,
   updateMarketplaceComingSoonSettings,
+  updateMarketplaceFooterSettings,
   updateMarketplaceGoogleMarketingSettings,
   updateMarketplaceMediaSettings,
   updateMarketplaceOpenAiSettings,
   updateMarketplacePayFastSettings,
-  updateMarketplaceSocialLinks,
   updateMarketplaceShippingSettings,
   updateMarketplaceWhatsappSettings,
 } from "@/src/modules/marketplace/settings";
@@ -82,10 +82,73 @@ const optionalUrlSchema = z
   )
   .refine((value) => !value || value.length <= 500, "URL is too long.");
 
+const paymentMethodBadgesSchema = z
+  .string()
+  .max(5000, "Payment method data is too long.")
+  .transform((value, context) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      context.addIssue({
+        code: "custom",
+        message: "Payment methods could not be read. Refresh and try again.",
+      });
+
+      return z.NEVER;
+    }
+  })
+  .pipe(
+    z
+      .array(
+        z.object({
+          label: z
+            .string()
+            .trim()
+            .min(1, "Each payment method needs a label.")
+            .max(40, "Each payment method label must be 40 characters or fewer."),
+          mediaId: z.string().uuid("Choose a valid payment icon.").nullable(),
+        }),
+      )
+      .max(12, "Use 12 payment methods or fewer."),
+  );
+
 const socialLinksSchema = z.object({
+  contactAddress: z
+    .string()
+    .trim()
+    .max(300, "Contact address is too long."),
+  contactEmail: z
+    .string()
+    .trim()
+    .max(180, "Contact email is too long.")
+    .refine(
+      (value) => !value || z.string().email().safeParse(value).success,
+      "Enter a valid contact email address.",
+    ),
+  contactPhonePrimary: z
+    .string()
+    .trim()
+    .max(80, "Primary phone number is too long.")
+    .refine(
+      (value) => !value || /^[+()\d\s-]+$/.test(value),
+      "Primary phone number can only contain digits, spaces, +, -, and brackets.",
+    ),
+  contactPhoneSecondary: z
+    .string()
+    .trim()
+    .max(80, "Secondary phone number is too long.")
+    .refine(
+      (value) => !value || /^[+()\d\s-]+$/.test(value),
+      "Secondary phone number can only contain digits, spaces, +, -, and brackets.",
+    ),
   facebookUrl: optionalUrlSchema,
+  footerTagline: z
+    .string()
+    .trim()
+    .max(160, "Footer tagline is too long."),
   googleReviewUrl: optionalUrlSchema,
   instagramUrl: optionalUrlSchema,
+  paymentMethodBadges: paymentMethodBadgesSchema,
   twitterUrl: optionalUrlSchema,
 });
 
@@ -96,9 +159,15 @@ export async function updateMarketplaceSocialLinkSettings(
   await requireSettingsManageAccess();
 
   const parsed = socialLinksSchema.safeParse({
+    contactAddress: String(formData.get("contactAddress") ?? ""),
+    contactEmail: String(formData.get("contactEmail") ?? ""),
+    contactPhonePrimary: String(formData.get("contactPhonePrimary") ?? ""),
+    contactPhoneSecondary: String(formData.get("contactPhoneSecondary") ?? ""),
     facebookUrl: String(formData.get("facebookUrl") ?? ""),
+    footerTagline: String(formData.get("footerTagline") ?? ""),
     googleReviewUrl: String(formData.get("googleReviewUrl") ?? ""),
     instagramUrl: String(formData.get("instagramUrl") ?? ""),
+    paymentMethodBadges: String(formData.get("paymentMethodBadges") ?? ""),
     twitterUrl: String(formData.get("twitterUrl") ?? ""),
   });
 
@@ -109,9 +178,13 @@ export async function updateMarketplaceSocialLinkSettings(
     };
   }
 
-  const result = await updateMarketplaceSocialLinks(parsed.data);
+  const result = await updateMarketplaceFooterSettings(parsed.data);
 
   revalidatePath("/");
+  revalidatePath("/blog");
+  revalidatePath("/cart");
+  revalidatePath("/checkout");
+  revalidatePath("/products");
   revalidatePath("/settings/platform");
 
   return result;

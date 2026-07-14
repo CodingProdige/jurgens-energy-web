@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { and, asc, desc, eq, gt, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, or, sql as drizzleSql } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
@@ -13,15 +13,20 @@ import {
   productMedia,
   products,
   productVariants,
+  sellerFulfillmentProfiles,
+  sellers,
   shipments,
   whatsappConversations,
   whatsappMessages,
   whatsappOrderDrafts,
 } from "@/src/db/schema";
 import { env } from "@/src/config/env";
+import { validateCartLines } from "@/src/modules/cart/server";
 import { formatFromZar } from "@/src/modules/currency";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
-import { getJurgensDeliveryZones } from "@/src/modules/shipping/jurgens-delivery";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import { probeBobGoCheckoutRates } from "@/src/modules/shipping/bobgo-client";
+import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
 import { send360DialogTextMessage } from "@/src/modules/whatsapp-ordering/360dialog";
 import { interpretWhatsappMessageWithAi } from "@/src/modules/whatsapp-ordering/ai";
 import {
@@ -29,18 +34,31 @@ import {
   normalizeWhatsappAccountPhone,
   rememberWhatsappCustomerLink,
 } from "@/src/modules/whatsapp-ordering/customer-links";
+import {
+  deliveryAddressDraftsEqual,
+  extractDeliveryDestinationHint,
+  extractSouthAfricanPostalCode,
+  getCompleteDeliveryAddress,
+  getMissingDeliveryAddressFields,
+  isDeliveryCoverageQuestion,
+  mergeDeliveryAddressDraft,
+  parseDeliveryProductChoice,
+  parseWhatsappDeliveryInquiry,
+  type WhatsappDeliveryInquiry,
+  type WhatsappDeliveryProductChoice,
+} from "@/src/modules/whatsapp-ordering/delivery-inquiry";
 import type { LocalCartInput } from "@/src/modules/cart";
 
 const zarCurrencyContext = {
+  country: "ZA",
   currency: "ZAR",
   locale: "en-ZA",
   rate: 1,
+  rateUpdatedAt: null,
 } as const;
 const draftTtlMs = 60 * 60 * 1000;
 const publicProductStatuses = new Set(["active", "live"]);
 const checkoutLinkExpiryLabel = "1 hour";
-const contactPhoneNumbers = ["021 123 4567", "081 234 5678"] as const;
-const contactEmail = "info@jurgensenergy.com";
 
 type WhatsappProvider = "360dialog" | "generic" | "meta" | "take_app" | "twilio";
 export type WhatsappPurchaseType = "exchange" | "standard";
@@ -148,6 +166,7 @@ type VariantSnapshot = {
 };
 
 type WhatsappConversationState = {
+  deliveryInquiry?: WhatsappDeliveryInquiry;
   moderation?: {
     abuseCount?: number;
     automationPausedAt?: string;
@@ -207,15 +226,63 @@ function hashMessageBody(value: string) {
 }
 
 function parseQuantity(text: string) {
-  const match =
-    text.match(/\b(?:x|qty|quantity)\s*(\d{1,2})\b/) ??
-    text.match(/\b(\d{1,2})\s*(?:cylinders?|bottles?)\b/);
+  return parseExplicitQuantity(text) ?? 1;
+}
 
-  if (!match?.[1]) {
-    return 1;
+function parseExplicitQuantity(text: string) {
+  const normalized = normalizeText(text);
+  const match =
+    normalized.match(/\b(\d{1,2})\s*x\b/) ??
+    normalized.match(/\b(?:x|qty|quantity)\s*(\d{1,2})\b/) ??
+    normalized.match(
+      /\b(?:make\s+(?:it|that)|change\s+(?:it|that)?\s*to)\s+(\d{1,2})\b/,
+    ) ??
+    normalized.match(
+      /\b(?:deliver|ship|courier)\s+(\d{1,2})(?:\s+(?:of\s+)?(?:these|them|units?))?\s+(?:to|in)\b/,
+    ) ??
+    normalized.match(
+      /\b(?:order|buy|get|take)\s+(\d{1,2})(?:\s+(?:of\s+)?(?:these|them|those|units?|items?))?$/,
+    ) ??
+    normalized.match(
+      /\b(\d{1,2})\s+(?=\d{1,2}\s*k(?:g|gs|ilo|ilos)?\b)/,
+    ) ??
+    normalized.match(
+      /\b(\d{1,2})\s*(?:cylinders?|bottles?|units?|items?|exchanges?|refills?|heaters?|stoves?)\b/,
+    );
+
+  let quantity = match?.[1] ? Number(match[1]) : null;
+
+  if (quantity === null) {
+    const wordMatch =
+      normalized.match(
+        /\b(?:order|buy|get|take)\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?:\s+(?:of\s+)?(?:these|them|those|units?|items?))?$/,
+      ) ??
+      normalized.match(
+        /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b(?=\s+(?:\d{1,2}\s*k(?:g|gs|ilo|ilos)?\b|cylinders?|bottles?|units?|items?|exchanges?|refills?|heaters?|stoves?))/,
+      );
+    const numberWords: Record<string, number> = {
+      eight: 8,
+      eleven: 11,
+      five: 5,
+      four: 4,
+      nine: 9,
+      one: 1,
+      seven: 7,
+      six: 6,
+      ten: 10,
+      three: 3,
+      twelve: 12,
+      two: 2,
+    };
+
+    quantity = wordMatch?.[1] ? numberWords[wordMatch[1]] ?? null : null;
   }
 
-  return Math.max(1, Math.min(12, Number(match[1]) || 1));
+  if (quantity === null || !Number.isFinite(quantity)) {
+    return null;
+  }
+
+  return Math.max(1, Math.min(12, quantity));
 }
 
 function parseCylinderSize(text: string) {
@@ -265,7 +332,11 @@ function checkMessageModeration(
     };
   }
 
-  if (previousHash === currentHash && previousCount >= 2) {
+  if (
+    text !== "retry" &&
+    previousHash === currentHash &&
+    previousCount >= 3
+  ) {
     return {
       flagged: true,
       kind: "spam",
@@ -484,7 +555,7 @@ function interpretMessage(message: string): MessageInterpretation {
     });
   }
 
-  if (/(\bwhere do you deliver\b|\bdelivery areas?\b|\bdeliver to\b|\bpostal code\b)/.test(text)) {
+  if (/(\bwhere do you deliver\b|\bdelivery areas?\b|\bdeliver(?:y)? to\b|\bship to\b|\bcourier to\b|\bpostal code\b)/.test(text)) {
     return createInterpretation({
       intent: "support",
       quantity,
@@ -692,6 +763,7 @@ function getConversationState(value: unknown): WhatsappConversationState {
   }
 
   const state = value as WhatsappConversationState;
+  const deliveryInquiry = parseWhatsappDeliveryInquiry(state.deliveryInquiry);
   const pendingOrder = state.pendingOrder;
   const partialOrder =
     state.partialOrder &&
@@ -706,6 +778,10 @@ function getConversationState(value: unknown): WhatsappConversationState {
       ? state.moderation
       : undefined;
   const nextState: WhatsappConversationState = {};
+
+  if (deliveryInquiry) {
+    nextState.deliveryInquiry = deliveryInquiry;
+  }
 
   if (moderation) {
     nextState.moderation = {
@@ -874,11 +950,51 @@ async function updateConversationState(
     .where(eq(whatsappConversations.id, conversationId));
 }
 
+async function updateConversationModerationState(
+  conversationId: string,
+  moderation: NonNullable<WhatsappConversationState["moderation"]>,
+) {
+  await db
+    .update(whatsappConversations)
+    .set({
+      state: drizzleSql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{moderation}', ${JSON.stringify(moderation)}::jsonb, true)`,
+      updatedAt: new Date(),
+    })
+    .where(eq(whatsappConversations.id, conversationId));
+}
+
+async function updateDeliveryInquiryState(
+  conversationId: string,
+  inquiry: WhatsappDeliveryInquiry,
+  expectedProbeAt?: string,
+) {
+  const rows = await db
+    .update(whatsappConversations)
+    .set({
+      state: drizzleSql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{deliveryInquiry}', ${JSON.stringify(inquiry)}::jsonb, true)`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(whatsappConversations.id, conversationId),
+        ...(expectedProbeAt
+          ? [
+              drizzleSql`${whatsappConversations.state} #>> '{deliveryInquiry,lastProbeAt}' = ${expectedProbeAt}`,
+            ]
+          : []),
+      ),
+    )
+    .returning({ id: whatsappConversations.id });
+
+  return rows.length > 0;
+}
+
 async function clearPendingOrder(
   conversationId: string,
   state: WhatsappConversationState,
 ) {
   const nextState = { ...state };
+  delete nextState.deliveryInquiry;
   delete nextState.pendingOrder;
   delete nextState.partialOrder;
 
@@ -1294,6 +1410,56 @@ function buildOrderConfirmationReply({
 }
 
 async function buildGreetingReply(state: WhatsappConversationState) {
+  const deliveryInquiry = state.deliveryInquiry;
+
+  if (deliveryInquiry) {
+    if (deliveryInquiry.step === "awaiting_product") {
+      return "Hi, welcome back. I still need the exact product and quantity before I can check delivery.";
+    }
+
+    if (deliveryInquiry.step === "awaiting_product_choice") {
+      return [
+        "Hi, welcome back. Choose the product you want me to check:",
+        ...deliveryInquiry.choices.map(
+          (choice, index) => `${index + 1}. ${choice.label}`,
+        ),
+      ].join("\n");
+    }
+
+    if (deliveryInquiry.step === "awaiting_postal_code") {
+      if (deliveryInquiry.postalCode) {
+        return "Hi, welcome back. I still have the postal code, but the last local delivery check did not complete. Reply RETRY and I will try again, or ask for a human.";
+      }
+
+      return "Hi, welcome back. Send the four-digit delivery postal code and I will finish the local delivery check.";
+    }
+
+    if (deliveryInquiry.step === "awaiting_address") {
+      if (
+        getCompleteDeliveryAddress(deliveryInquiry.address) &&
+        deliveryInquiry.lastProbeAt
+      ) {
+        return "Hi, welcome back. I already have the courier address, but the last live check did not complete. Reply RETRY after a minute and I will try again, or ask for a human.";
+      }
+
+      return buildDeliveryAddressPrompt(
+        getMissingDeliveryAddressFields(deliveryInquiry.address),
+      );
+    }
+
+    if (deliveryInquiry.lastResult) {
+      const expiresAt = deliveryInquiry.lastResult.expiresAt
+        ? new Date(deliveryInquiry.lastResult.expiresAt).getTime()
+        : null;
+
+      if (expiresAt !== null && expiresAt <= Date.now()) {
+        return "Hi, welcome back. That live courier estimate has expired. Reply RETRY and I will request current delivery options again.";
+      }
+
+      return deliveryInquiry.lastResult.reply;
+    }
+  }
+
   const pendingOrder = state.pendingOrder;
 
   if (pendingOrder) {
@@ -1545,66 +1711,38 @@ async function answerOrderStatus({
     .join("\n");
 }
 
-function rateLabel(rate: {
-  fromAmount: number;
-  price: number;
-  upToAmount: number | null;
-}) {
-  const range = rate.upToAmount
-    ? `${formatMoney(rate.fromAmount)}-${formatMoney(rate.upToAmount)}`
-    : `${formatMoney(rate.fromAmount)}+`;
-
-  return `${range}: ${formatMoney(rate.price)}`;
-}
-
 async function answerDeliveryAreas() {
-  const zones = await getJurgensDeliveryZones({ activeOnly: true });
-  const intro = [
-    "It depends on what you are looking for.",
-    "Jurgens Energy direct LPG delivery and Bob Go courier delivery do not use the same coverage rules.",
-    "Are you looking for a cylinder exchange/top-up, a full/new cylinder, or accessories? Send the item and delivery suburb or postal code and I can guide you.",
-  ];
-
-  if (zones.length === 0) {
-    return [
-      ...intro,
-      "Jurgens Energy direct delivery zones are not configured yet. Courier options, where available, are calculated at checkout from the delivery address.",
-    ].join("\n");
-  }
-
-  return [
-    ...intro,
-    "Current Jurgens Energy direct delivery zones:",
-    ...zones.slice(0, 8).map((zone) => {
-      const codes = zone.postalCodes.slice(0, 8).join(", ");
-      const more = zone.postalCodes.length > 8 ? "..." : "";
-
-      return `- ${zone.name}: ${codes}${more}`;
-    }),
-    "For seller-fulfilled marketplace items, Bob Go courier availability is calculated at checkout from the delivery address and parcel data.",
-  ].join("\n");
+  return "Delivery depends on the exact product because some items use Jurgens Energy local delivery and others use live courier delivery. Send the product, variant and quantity so I can check the correct method.";
 }
 
 async function answerShippingRates() {
-  const zones = await getJurgensDeliveryZones({ activeOnly: true });
+  return "Delivery pricing depends on the exact product, quantity and destination. Send the product and quantity first so I can route the check through Jurgens Energy local delivery or the live courier provider.";
+}
 
-  if (zones.length === 0) {
-    return "Shipping rates are calculated at checkout from your address. Jurgens Energy direct delivery zones are not configured yet.";
-  }
+async function answerContactDetails() {
+  const settings = await getMarketplaceSettings();
+  const phoneNumbers = [
+    settings.contactPhonePrimary,
+    settings.contactPhoneSecondary,
+  ].filter(Boolean);
+  const details = [
+    settings.contactEmail ? `Email: ${settings.contactEmail}` : null,
+    phoneNumbers.length > 0 ? `Phone: ${phoneNumbers.join(" / ")}` : null,
+    settings.contactAddress ? `Address: ${settings.contactAddress}` : null,
+    `Website: ${createStoreUrl("/")}`,
+  ].filter(Boolean);
 
-  return [
-    "Configured Jurgens Energy direct delivery rates:",
-    ...zones.slice(0, 6).map((zone) => {
-      const rates = zone.rates.map(rateLabel).join("; ");
-      const minimum =
-        zone.minimumOrderAmount > 0
-          ? ` Minimum order: ${formatMoney(zone.minimumOrderAmount)}.`
-          : "";
+  return details.length > 0
+    ? ["You can contact Jurgens Energy here:", ...details].join("\n")
+    : `You can contact Jurgens Energy through the marketplace: ${createStoreUrl("/")}`;
+}
 
-      return `- ${zone.name}: ${rates || "No rate tiers configured."}${minimum}`;
-    }),
-    "Courier delivery for Bob Go/seller items is calculated at checkout from the delivery address and parcel data.",
-  ].join("\n");
+async function answerLocation() {
+  const settings = await getMarketplaceSettings();
+
+  return settings.contactAddress
+    ? `Jurgens Energy is located at ${settings.contactAddress}.`
+    : "Jurgens Energy is based in South Africa. Ask for a human if you need a specific branch or collection address.";
 }
 
 function searchTerms(value: string | null) {
@@ -1627,6 +1765,363 @@ function searchTerms(value: string | null) {
   return normalizeText(value ?? "")
     .split(" ")
     .filter((term) => term.length > 1 && !stopWords.has(term));
+}
+
+const deliverySearchStopWords = new Set([
+  "a",
+  "about",
+  "again",
+  "actually",
+  "address",
+  "an",
+  "another",
+  "afternoon",
+  "area",
+  "are",
+  "available",
+  "availability",
+  "buy",
+  "can",
+  "check",
+  "change",
+  "code",
+  "cost",
+  "could",
+  "courier",
+  "deliver",
+  "delivered",
+  "delivering",
+  "delivers",
+  "delivery",
+  "date",
+  "day",
+  "do",
+  "does",
+  "different",
+  "fee",
+  "friday",
+  "for",
+  "guys",
+  "get",
+  "have",
+  "how",
+  "i",
+  "in",
+  "is",
+  "it",
+  "item",
+  "last",
+  "later",
+  "make",
+  "monday",
+  "morning",
+  "me",
+  "meant",
+  "my",
+  "next",
+  "of",
+  "now",
+  "order",
+  "other",
+  "please",
+  "prefer",
+  "product",
+  "postal",
+  "postcode",
+  "price",
+  "qty",
+  "quantity",
+  "rate",
+  "rates",
+  "ship",
+  "shipped",
+  "shipping",
+  "same",
+  "saturday",
+  "some",
+  "sunday",
+  "instead",
+  "switch",
+  "that",
+  "take",
+  "the",
+  "there",
+  "thursday",
+  "this",
+  "to",
+  "today",
+  "tomorrow",
+  "tuesday",
+  "time",
+  "us",
+  "urgent",
+  "urgently",
+  "use",
+  "usual",
+  "variant",
+  "want",
+  "we",
+  "what",
+  "when",
+  "wednesday",
+  "week",
+  "weekend",
+  "where",
+  "whether",
+  "you",
+]);
+
+function getRequestedDeliveryPurchaseType(value: string) {
+  const text = normalizeText(value);
+  const wantsExchange =
+    /\b(exchange|swap|refill|top up|topup|empty)\b/.test(text);
+  const wantsStandard =
+    /\b(full|new|buy|purchase)\b/.test(text) && !wantsExchange;
+
+  return wantsExchange
+    ? ("exchange" as const)
+    : wantsStandard
+      ? ("standard" as const)
+      : null;
+}
+
+function withoutStructuredDeliveryAddress(value: string) {
+  const pipeParts = value
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (
+    (pipeParts.length === 5 || pipeParts.length === 6) &&
+    /^\d{4}$/.test(pipeParts[4] ?? "")
+  ) {
+    return "";
+  }
+
+  return value
+    .split(/\r?\n/)
+    .filter((rawLine) => {
+      const line = rawLine.trim();
+      const separatorIndex = line.search(/[:=-]/);
+
+      if (separatorIndex <= 0) {
+        return true;
+      }
+
+      const label = normalizeText(line.slice(0, separatorIndex));
+
+      return !/^(street|street address|address|address line 1|address line 2|unit|complex|suburb|local area|area|city|town|province|state|postal code|postcode|zip code)$/.test(
+        label,
+      );
+    })
+    .join(" ");
+}
+
+function getDeliveryProductSearchContext({
+  interpretation,
+  query,
+}: {
+  interpretation: MessageInterpretation;
+  query: string;
+}) {
+  let productText = normalizeText(withoutStructuredDeliveryAddress(query));
+  const deliveryMatch = /\b(deliver(?:ed|ing|s|y)?|ship(?:ped|ping|s)?|courier)\b/.exec(
+    productText,
+  );
+
+  if (deliveryMatch?.index !== undefined) {
+    const afterDeliveryIndex = deliveryMatch.index + deliveryMatch[0].length;
+    const afterDelivery = productText.slice(afterDeliveryIndex);
+    const destinationBoundary = /\b(?:to|in)\b/.exec(afterDelivery);
+
+    if (destinationBoundary?.index !== undefined) {
+      productText = `${productText.slice(0, deliveryMatch.index)} ${afterDelivery.slice(0, destinationBoundary.index)}`;
+    }
+  }
+
+  const terms = productText
+    .split(" ")
+    .filter(
+      (term) =>
+        term.length > 1 &&
+        !deliverySearchStopWords.has(term) &&
+        !/^\d{4}$/.test(term),
+    );
+  const purchaseType =
+    interpretation.purchaseType ?? getRequestedDeliveryPurchaseType(productText);
+  const sizeKg = interpretation.sizeKg ?? parseCylinderSize(productText);
+
+  return {
+    hasProductSignal:
+      terms.length > 0 || sizeKg !== null || purchaseType !== null,
+    purchaseType,
+    sizeKg,
+    terms,
+  };
+}
+
+function normalizeDeliveryCatalogToken(value: string) {
+  if (value.length > 4 && value.endsWith("ies")) {
+    return `${value.slice(0, -3)}y`;
+  }
+
+  if (value.length > 3 && value.endsWith("s")) {
+    return value.slice(0, -1);
+  }
+
+  return value;
+}
+
+function getDeliveryCatalogPurchaseType(candidate: {
+  productTitle: string;
+  requiresExchangeEmpty: boolean;
+  variantTitle: string;
+}) {
+  const labelledAsExchange = /\b(exchange|refill|swap|top\s*up)\b/.test(
+    normalizeText(`${candidate.productTitle} ${candidate.variantTitle}`),
+  );
+
+  return candidate.requiresExchangeEmpty || labelledAsExchange
+    ? ("exchange" as const)
+    : ("standard" as const);
+}
+
+async function findDeliveryProductChoices({
+  interpretation,
+  query,
+}: {
+  interpretation: MessageInterpretation;
+  query: string;
+}): Promise<WhatsappDeliveryProductChoice[]> {
+  const search = getDeliveryProductSearchContext({ interpretation, query });
+
+  if (!search.hasProductSignal) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      brandName: brands.name,
+      categoryPath: categories.path,
+      continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
+      exchangeEmptyCylinderSize: productVariants.exchangeEmptyCylinderSize,
+      price: productVariants.price,
+      productStatus: products.status,
+      productTitle: products.title,
+      requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
+      shortDescription: products.shortDescription,
+      stockOnHand: productVariants.stockOnHand,
+      variantId: productVariants.id,
+      variantIsActive: productVariants.isActive,
+      variantOptionValues: productVariants.optionValues,
+      variantStatus: productVariants.status,
+      variantTitle: productVariants.title,
+    })
+    .from(productVariants)
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .leftJoin(brands, eq(brands.id, products.brandId))
+    .leftJoin(categories, eq(categories.id, products.categoryId));
+
+  return rows
+    .filter((row) => {
+      const inStock = row.continueSellingOutOfStock || row.stockOnHand > 0;
+      const sizeMatches = search.sizeKg
+        ? candidateHasSize(row, search.sizeKg)
+        : true;
+      const purchaseTypeMatches = search.purchaseType
+        ? search.purchaseType === getDeliveryCatalogPurchaseType(row)
+        : true;
+
+      return (
+        row.variantIsActive &&
+        row.variantStatus === "active" &&
+        publicProductStatuses.has(row.productStatus) &&
+        inStock &&
+        sizeMatches &&
+        purchaseTypeMatches
+      );
+    })
+    .map((row) => {
+      const isCylinder = isCylinderCandidate(row);
+      const purchaseType = getDeliveryCatalogPurchaseType(row);
+      const purchaseLabel = purchaseType === "exchange"
+        ? "exchange refill swap top up"
+        : "full new standard";
+      const haystackTokens = new Set(
+        normalizeText(
+        [
+          row.productTitle,
+          row.variantTitle,
+          row.shortDescription,
+          row.brandName,
+          row.categoryPath,
+          row.exchangeEmptyCylinderSize,
+          optionValuesText(row.variantOptionValues),
+          isCylinder ? purchaseLabel : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        )
+          .split(" ")
+          .map(normalizeDeliveryCatalogToken),
+      );
+      let score = search.terms.reduce(
+        (total, term) =>
+          total +
+          (haystackTokens.has(normalizeDeliveryCatalogToken(term)) ? 2 : 0),
+        0,
+      );
+
+      if (search.sizeKg && candidateHasSize(row, search.sizeKg)) {
+        score += 8;
+      }
+
+      if (
+        search.purchaseType &&
+        search.purchaseType === purchaseType
+      ) {
+        score += 6;
+      }
+
+      return { isCylinder, row, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((first, second) => {
+      if (second.score !== first.score) {
+        return second.score - first.score;
+      }
+
+      return Number(first.row.price) - Number(second.row.price);
+    })
+    .slice(0, 3)
+    .map(({ row }) => {
+      const title =
+        row.variantTitle && row.variantTitle !== row.productTitle
+          ? `${row.productTitle} - ${row.variantTitle}`
+          : row.productTitle;
+
+      return {
+        label: `${title.slice(0, 280)} - ${formatMoney(row.price)}`.slice(
+          0,
+          320,
+        ),
+        variantId: row.variantId,
+      };
+    });
+}
+
+function buildDeliveryProductChoiceReply({
+  choices,
+  quantity,
+}: {
+  choices: WhatsappDeliveryProductChoice[];
+  quantity: number;
+}) {
+  return [
+    "I need the exact item before I check delivery. Which one do you mean?",
+    ...choices.map((choice, index) => `${index + 1}. ${choice.label}`),
+    `Reply with ${choices.length === 1 ? "1" : `1-${choices.length}`}. I will check ${quantity} unit${quantity === 1 ? "" : "s"}.`,
+  ].join("\n");
 }
 
 async function answerProductSearch(query: string | null) {
@@ -1733,6 +2228,1087 @@ async function answerProductSearch(query: string | null) {
   ].join("\n");
 }
 
+type DeliveryInquiryContext = {
+  conversationId: string;
+  conversationState: WhatsappConversationState;
+  interpretation: MessageInterpretation;
+  message: string;
+  provider: WhatsappProvider;
+};
+
+function isDeliveryInquiryControlIntent(interpretation: MessageInterpretation) {
+  return (
+    interpretation.intent === "stop" ||
+    interpretation.intent === "cancel" ||
+    interpretation.intent === "human" ||
+    interpretation.intent === "invoice" ||
+    interpretation.intent === "payment_link" ||
+    interpretation.intent === "status" ||
+    (interpretation.intent === "support" &&
+      interpretation.supportTopic !== "unknown" &&
+      interpretation.supportTopic !== "delivery_areas" &&
+      interpretation.supportTopic !== "shipping_rates")
+  );
+}
+
+function isDeliveryDestinationChangeRequest(message: string) {
+  const text = normalizeText(message);
+
+  if (/\b(?:your|jurgens|business|company)\b.*\baddress\b/.test(text)) {
+    return false;
+  }
+
+  if (/^(?:do|can|could|where)\b.*\byou\b/.test(text)) {
+    return false;
+  }
+
+  return (
+    /\b(?:change|switch|update)\b.*\b(?:delivery\s+)?(?:address|destination|location|postcode|postal code|suburb)\b/.test(
+      text,
+    ) ||
+    /\b(?:address|destination|location|postcode|postal code|suburb)\b.*\b(?:change|switch|update)\b/.test(
+      text,
+    ) ||
+    /\b(?:use|try|my|have|provide|send)\b.*\b(?:another|different|new|other)\b.*\b(?:delivery\s+)?(?:address|destination|location|postcode|postal code|suburb)\b/.test(
+      text,
+    ) ||
+    /^(?:another|different|new|other)(?:\s+delivery)?\s+(?:address|destination|location|postcode|postal code|suburb)$/.test(
+      text,
+    ) ||
+    /\b(?:another|different|new|other)\s+delivery\s+(?:address|destination|location|postcode|postal code|suburb)\b/.test(
+      text,
+    )
+  );
+}
+
+async function respondToDeliveryInquiry({
+  context,
+  expectedProbeAt,
+  inquiry,
+  reply,
+}: {
+  context: DeliveryInquiryContext;
+  expectedProbeAt?: string;
+  inquiry: WhatsappDeliveryInquiry;
+  reply: string;
+}) {
+  const stateUpdated = await updateDeliveryInquiryState(
+    context.conversationId,
+    inquiry,
+    expectedProbeAt,
+  );
+  const currentReply = stateUpdated
+    ? reply.slice(0, 4000)
+    : "Your delivery details changed while I was checking, so I discarded the older courier result and kept your newer request.";
+
+  return respond({
+    conversationId: context.conversationId,
+    provider: context.provider,
+    reply: currentReply,
+    status: "support_answer",
+  });
+}
+
+function buildDeliveryAddressPrompt(missingFields?: string[]) {
+  return [
+    "This item uses courier delivery. I need the complete delivery address to check live courier availability.",
+    missingFields?.length
+      ? `Still needed: ${missingFields.join(", ")}.`
+      : null,
+    "Send it in this format:",
+    "Street address: 12 Main Street",
+    "Suburb: Denneburg",
+    "City: Paarl",
+    "Province: Western Cape",
+    "Postal code: 7646",
+    "You can send the fields over more than one message.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function appendDeliveryCustomerPrompt(current: string, message: string) {
+  return [current, message].filter(Boolean).join(" ").slice(0, 1500);
+}
+
+function createResolvedDeliveryInquiry({
+  expiresAt = null,
+  inquiry,
+  reply,
+}: {
+  expiresAt?: string | null;
+  inquiry: WhatsappDeliveryInquiry;
+  reply: string;
+}): WhatsappDeliveryInquiry {
+  const checkedAt = new Date().toISOString();
+  const safeReply = reply.slice(0, 4000);
+
+  return {
+    ...inquiry,
+    choices: [],
+    lastResult: {
+      checkedAt,
+      expiresAt,
+      reply: safeReply,
+    },
+    step: "resolved",
+    updatedAt: checkedAt,
+  };
+}
+
+function getDeliveryResultNextStep(
+  conversationState: WhatsappConversationState,
+  item: { productSlug: string; quantity: number; variantId: string },
+) {
+  const pendingCandidate = conversationState.pendingOrder?.candidate;
+  const matchesPendingOrder =
+    pendingCandidate?.variantId === item.variantId &&
+    pendingCandidate.quantity === item.quantity;
+
+  return matchesPendingOrder
+    ? "Reply YES if you want to continue with the pending order."
+    : `View the product or continue to checkout here: ${createStoreUrl(`/products/${item.productSlug}`)}`;
+}
+
+function getUnavailableDeliveryNextStep() {
+  return "Send a different product, quantity or destination and I will run a new check, or ask for a human.";
+}
+
+async function loadDeliveryInquiryItem(inquiry: WhatsappDeliveryInquiry) {
+  if (!inquiry.selectedVariantId) {
+    return null;
+  }
+
+  const cart = await validateCartLines(
+    {
+      items: [
+        {
+          exchangeEmptyConfirmed: true,
+          purchaseType: "standard",
+          quantity: inquiry.quantity,
+          variantId: inquiry.selectedVariantId,
+        },
+      ],
+    },
+    zarCurrencyContext,
+  );
+  const item = cart.items[0];
+
+  return item?.available ? item : null;
+}
+
+async function checkJurgensDeliveryInquiry({
+  context,
+  inquiry,
+}: {
+  context: DeliveryInquiryContext;
+  inquiry: WhatsappDeliveryInquiry;
+}) {
+  const item = await loadDeliveryInquiryItem(inquiry);
+
+  if (!item) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        choices: [],
+        selectedVariantId: null,
+        step: "awaiting_product",
+        updatedAt: new Date().toISOString(),
+      },
+      reply:
+        "That product is no longer available in the same form. Send the product name or cylinder size again and I will recheck it.",
+    });
+  }
+
+  const postalCode = inquiry.postalCode ?? inquiry.address?.postalCode ?? null;
+
+  if (!postalCode) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        step: "awaiting_postal_code",
+        updatedAt: new Date().toISOString(),
+      },
+      reply: `That item uses Jurgens Energy local delivery. Send the four-digit delivery postal code so I can check ${inquiry.quantity} x ${item.productTitle} accurately.`,
+    });
+  }
+
+  let availability: Awaited<
+    ReturnType<typeof checkJurgensDeliveryAvailability>
+  >;
+
+  try {
+    availability = await checkJurgensDeliveryAvailability({
+      declaredValue: item.lineTotalZar,
+      postalCode,
+    });
+  } catch {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        step: "awaiting_postal_code",
+        updatedAt: new Date().toISOString(),
+      },
+      reply:
+        "I could not read the Jurgens Energy delivery settings right now. That does not mean delivery is unavailable. Reply RETRY in a moment or ask for a human.",
+    });
+  }
+  const itemLabel = `${inquiry.quantity} x ${item.productTitle}${
+    item.variantTitle !== item.productTitle ? ` - ${item.variantTitle}` : ""
+  }`;
+  const nextStep = getDeliveryResultNextStep(
+    context.conversationState,
+    item,
+  );
+
+  if (availability.eligible) {
+    const reply = [
+      `Yes — ${itemLabel} can be delivered to postal code ${availability.postalCode} through ${availability.zone.name}.`,
+      `Delivery fee: ${formatMoney(availability.deliveryFee)}.`,
+      availability.zone.deliveryInformation?.slice(0, 500),
+      nextStep,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: createResolvedDeliveryInquiry({ inquiry, reply }),
+      reply,
+    });
+  }
+
+  if (availability.unavailableCode === "postal_code_unavailable") {
+    const reply = [
+      `No — Jurgens Energy local delivery for ${itemLabel} is not currently available to postal code ${availability.postalCode}.`,
+      "That answer applies to this specific product; courier-fulfilled products use a separate live courier check.",
+      getUnavailableDeliveryNextStep(),
+    ].join("\n");
+
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: createResolvedDeliveryInquiry({ inquiry, reply }),
+      reply,
+    });
+  }
+
+  if (availability.unavailableCode === "minimum_order_not_met") {
+    const reply = [
+      `Postal code ${availability.postalCode} is covered by ${availability.zone?.name ?? "a Jurgens Energy delivery zone"}, but ${itemLabel} does not meet that zone's minimum order yet.`,
+      availability.unavailableReason,
+      "Send a larger quantity or a different product and I will recalculate it, or ask for a human.",
+    ].join("\n");
+
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: createResolvedDeliveryInquiry({ inquiry, reply }),
+      reply,
+    });
+  }
+
+  return respondToDeliveryInquiry({
+    context,
+    inquiry: {
+      ...inquiry,
+      step: "awaiting_postal_code",
+      updatedAt: new Date().toISOString(),
+    },
+    reply:
+      "I could not confirm Jurgens Energy delivery right now because delivery quoting is not fully available. Reply RETRY in a moment or ask for a human; I will not guess about coverage.",
+  });
+}
+
+async function getBobGoCollectionProfile(sellerId: string) {
+  const [seller] = await db
+    .select({
+      addressLine1: sellerFulfillmentProfiles.addressLine1,
+      addressLine2: sellerFulfillmentProfiles.addressLine2,
+      city: sellerFulfillmentProfiles.city,
+      countryCode: sellerFulfillmentProfiles.countryCode,
+      displayName: sellers.displayName,
+      postalCode: sellerFulfillmentProfiles.postalCode,
+      province: sellerFulfillmentProfiles.province,
+      suburb: sellerFulfillmentProfiles.suburb,
+    })
+    .from(sellers)
+    .leftJoin(
+      sellerFulfillmentProfiles,
+      eq(sellerFulfillmentProfiles.sellerId, sellers.id),
+    )
+    .where(eq(sellers.id, sellerId))
+    .limit(1);
+
+  if (
+    !seller?.addressLine1 ||
+    !seller.city ||
+    !seller.postalCode ||
+    !seller.province ||
+    !seller.suburb
+  ) {
+    return null;
+  }
+
+  return {
+    addressLine1: seller.addressLine1,
+    addressLine2: seller.addressLine2,
+    city: seller.city,
+    countryCode: seller.countryCode ?? "ZA",
+    displayName: seller.displayName,
+    postalCode: seller.postalCode,
+    province: seller.province,
+    suburb: seller.suburb,
+  };
+}
+
+function isPositiveNumber(value: number | null): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+async function claimBobGoDeliveryProbe(
+  conversationId: string,
+  inquiry: WhatsappDeliveryInquiry,
+) {
+  const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+  const [claimed] = await db
+    .update(whatsappConversations)
+    .set({
+      state: drizzleSql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{deliveryInquiry}', ${JSON.stringify(inquiry)}::jsonb, true)`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(whatsappConversations.id, conversationId),
+        drizzleSql`COALESCE(${whatsappConversations.state} #>> '{deliveryInquiry,lastProbeAt}', '') < ${cutoff}`,
+      ),
+    )
+    .returning({ id: whatsappConversations.id });
+
+  return Boolean(claimed);
+}
+
+function bobGoProbeInputsChanged(
+  current: WhatsappDeliveryInquiry | undefined,
+  next: WhatsappDeliveryInquiry,
+) {
+  return (
+    current?.selectedVariantId !== next.selectedVariantId ||
+    current?.quantity !== next.quantity ||
+    !deliveryAddressDraftsEqual(current?.address, next.address)
+  );
+}
+
+async function checkBobGoDeliveryInquiry({
+  context,
+  inquiry,
+}: {
+  context: DeliveryInquiryContext;
+  inquiry: WhatsappDeliveryInquiry;
+}) {
+  const item = await loadDeliveryInquiryItem(inquiry);
+
+  if (!item) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        choices: [],
+        selectedVariantId: null,
+        step: "awaiting_product",
+        updatedAt: new Date().toISOString(),
+      },
+      reply:
+        "That product is no longer available in the same form. Send the product name again and I will recheck it.",
+    });
+  }
+
+  const address = getCompleteDeliveryAddress(inquiry.address);
+
+  if (!address) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        step: "awaiting_address",
+        updatedAt: new Date().toISOString(),
+      },
+      reply: buildDeliveryAddressPrompt(
+        getMissingDeliveryAddressFields(inquiry.address),
+      ),
+    });
+  }
+
+  const heightMm = item.heightMm;
+  const lengthMm = item.lengthMm;
+  const weightGrams = item.weightGrams;
+  const widthMm = item.widthMm;
+  const parcelComplete =
+    isPositiveNumber(heightMm) &&
+    isPositiveNumber(lengthMm) &&
+    isPositiveNumber(weightGrams) &&
+    isPositiveNumber(widthMm);
+
+  if (!item.sellerId || !parcelComplete) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        step: "awaiting_address",
+        updatedAt: new Date().toISOString(),
+      },
+      reply:
+        "I cannot confirm courier delivery for this item because its seller or parcel shipping details are incomplete. Ask for a human and the team can check it manually.",
+    });
+  }
+
+  const collection = await getBobGoCollectionProfile(item.sellerId);
+
+  if (!collection) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        step: "awaiting_address",
+        updatedAt: new Date().toISOString(),
+      },
+      reply:
+        "I cannot confirm courier delivery because the seller's collection address is not ready. Ask for a human and the team can check it manually.",
+    });
+  }
+
+  const previousProbeAt = inquiry.lastProbeAt
+    ? new Date(inquiry.lastProbeAt).getTime()
+    : 0;
+  const changedProbeInputs = bobGoProbeInputsChanged(
+    context.conversationState.deliveryInquiry,
+    inquiry,
+  );
+
+  if (
+    Number.isFinite(previousProbeAt) &&
+    Date.now() - previousProbeAt < 60 * 1000
+  ) {
+    if (changedProbeInputs) {
+      const deferredAt = new Date().toISOString();
+
+      await updateDeliveryInquiryState(context.conversationId, {
+        ...inquiry,
+        lastProbeAt: deferredAt,
+        lastResult: null,
+        step: "awaiting_address",
+        updatedAt: deferredAt,
+      });
+    }
+
+    return respond({
+      conversationId: context.conversationId,
+      provider: context.provider,
+      reply: changedProbeInputs
+        ? "I saved the changed item, quantity or address. Please wait a minute, then reply RETRY so I can request a fresh courier result for those new details."
+        : "I have already asked the courier for this address. Please wait a minute before retrying so we do not send duplicate rate requests.",
+      status: "support_answer",
+    });
+  }
+
+  const probeStartedAt = new Date().toISOString();
+  const probingInquiry: WhatsappDeliveryInquiry = {
+    ...inquiry,
+    lastProbeAt: probeStartedAt,
+    lastResult: null,
+    step: "awaiting_address",
+    updatedAt: probeStartedAt,
+  };
+
+  const probeClaimed = await claimBobGoDeliveryProbe(
+    context.conversationId,
+    probingInquiry,
+  );
+
+  if (!probeClaimed) {
+    const changedInputs = bobGoProbeInputsChanged(
+      context.conversationState.deliveryInquiry,
+      inquiry,
+    );
+
+    if (changedInputs) {
+      await updateDeliveryInquiryState(context.conversationId, {
+        ...inquiry,
+        lastProbeAt: probeStartedAt,
+        lastResult: null,
+        step: "awaiting_address",
+        updatedAt: probeStartedAt,
+      });
+    }
+
+    return respond({
+      conversationId: context.conversationId,
+      provider: context.provider,
+      reply: changedInputs
+        ? "I saved the changed item, quantity or address, but a courier check already ran within the last minute. Please wait a minute, then reply RETRY for the new details."
+        : "A courier check has already run for this conversation within the last minute. Please wait a minute, then reply RETRY.",
+      status: "support_answer",
+    });
+  }
+
+  try {
+    const result = await probeBobGoCheckoutRates({
+      collectionAddress: {
+        city: collection.city,
+        code: collection.postalCode,
+        company: collection.displayName,
+        country: collection.countryCode ?? "ZA",
+        local_area: collection.suburb,
+        street_address: [collection.addressLine1, collection.addressLine2]
+          .filter(Boolean)
+          .join(", "),
+        zone: collection.province,
+      },
+      declaredValue: item.lineTotalZar,
+      deliveryAddress: {
+        city: address.city,
+        code: address.postalCode,
+        country: address.countryCode,
+        local_area: address.suburb,
+        street_address: [address.addressLine1, address.addressLine2]
+          .filter(Boolean)
+          .join(", "),
+        zone: address.province,
+      },
+      handlingTime: 2,
+      items: [
+        {
+          description: `${item.productTitle} - ${item.variantTitle}`,
+          heightMm,
+          lengthMm,
+          price: item.unitPriceZar,
+          quantity: item.quantity,
+          weightGrams,
+          widthMm,
+        },
+      ],
+      sellerId: item.sellerId,
+    });
+    const itemLabel = `${item.quantity} x ${item.productTitle}${
+      item.variantTitle !== item.productTitle ? ` - ${item.variantTitle}` : ""
+    }`;
+    const nextStep = getDeliveryResultNextStep(
+      context.conversationState,
+      item,
+    );
+
+    if (result.mode !== "live") {
+      const reply = [
+        `I reached Bob Go's test environment for ${itemLabel} to ${address.suburb}, ${address.postalCode}.`,
+        "Test rates cannot confirm real courier availability, so I will not present them as a delivery promise.",
+        "Ask for a human to confirm delivery, or try again once the Bob Go integration is in live mode.",
+      ].join("\n");
+
+      return respondToDeliveryInquiry({
+        context,
+        expectedProbeAt: probeStartedAt,
+        inquiry: createResolvedDeliveryInquiry({
+          expiresAt: result.expiresAt.toISOString(),
+          inquiry: probingInquiry,
+          reply,
+        }),
+        reply,
+      });
+    }
+
+    if (result.rates.length === 0) {
+      const reply = [
+        `Bob Go returned no current courier options for ${itemLabel} to ${address.suburb}, ${address.postalCode}.`,
+        "That result applies to this exact item, quantity and address.",
+        getUnavailableDeliveryNextStep(),
+      ].join("\n");
+
+      return respondToDeliveryInquiry({
+        context,
+        expectedProbeAt: probeStartedAt,
+        inquiry: createResolvedDeliveryInquiry({
+          expiresAt: result.expiresAt.toISOString(),
+          inquiry: probingInquiry,
+          reply,
+        }),
+        reply,
+      });
+    }
+
+    const sortedRates = [...result.rates].sort(
+      (first, second) => first.customerAmount - second.customerAmount,
+    );
+    const reply = [
+      `Yes — Bob Go currently returns courier options for ${itemLabel} to ${address.suburb}, ${address.postalCode}:`,
+      ...sortedRates
+        .slice(0, 3)
+        .map((rate) => `- ${rate.serviceName}: ${formatMoney(rate.customerAmount)}`),
+      `These live estimates expire at ${new Intl.DateTimeFormat("en-ZA", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Africa/Johannesburg",
+      }).format(result.expiresAt)} and will be confirmed again at checkout.`,
+      nextStep,
+    ].join("\n");
+
+    return respondToDeliveryInquiry({
+      context,
+      expectedProbeAt: probeStartedAt,
+      inquiry: createResolvedDeliveryInquiry({
+        expiresAt: result.expiresAt.toISOString(),
+        inquiry: probingInquiry,
+        reply,
+      }),
+      reply,
+    });
+  } catch {
+    return respondToDeliveryInquiry({
+      context,
+      expectedProbeAt: probeStartedAt,
+      inquiry: probingInquiry,
+      reply:
+        "I could not confirm courier availability right now. That does not mean delivery is unavailable. Please reply RETRY after a minute, use the secure checkout, or ask for a human.",
+    });
+  }
+}
+
+async function continueDeliveryInquiryForSelectedProduct({
+  context,
+  inquiry,
+}: {
+  context: DeliveryInquiryContext;
+  inquiry: WhatsappDeliveryInquiry;
+}) {
+  const item = await loadDeliveryInquiryItem(inquiry);
+
+  if (!item) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        choices: [],
+        selectedVariantId: null,
+        step: "awaiting_product",
+        updatedAt: new Date().toISOString(),
+      },
+      reply:
+        "That selected product is no longer available. Send the product name or cylinder size again and I will show current options.",
+    });
+  }
+
+  if (item.quantity !== inquiry.quantity) {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: {
+        ...inquiry,
+        choices: [],
+        selectedVariantId: null,
+        step: "awaiting_product",
+        updatedAt: new Date().toISOString(),
+      },
+      reply: `Only ${item.maxQuantity} unit${item.maxQuantity === 1 ? " is" : "s are"} currently available. Send the product and a quantity up to ${item.maxQuantity} so I can check delivery accurately.`,
+    });
+  }
+
+  return item.fulfillmentMode === "piessang_fulfilled"
+    ? checkJurgensDeliveryInquiry({ context, inquiry })
+    : checkBobGoDeliveryInquiry({ context, inquiry });
+}
+
+async function handleDeliveryInquiryMessage(
+  context: DeliveryInquiryContext,
+): Promise<WhatsappAssistantResult | null> {
+  const existingInquiry = context.conversationState.deliveryInquiry;
+  const destinationResetRequested = Boolean(
+    existingInquiry && isDeliveryDestinationChangeRequest(context.message),
+  );
+  const isDeliveryQuestion =
+    destinationResetRequested ||
+    isDeliveryCoverageQuestion(context.message) ||
+    (context.interpretation.intent === "support" &&
+      (context.interpretation.supportTopic === "delivery_areas" ||
+        context.interpretation.supportTopic === "shipping_rates"));
+
+  if (!existingInquiry && !isDeliveryQuestion) {
+    return null;
+  }
+
+  const now = new Date().toISOString();
+  const normalizedMessage = normalizeText(context.message);
+  const isRetry = normalizedMessage === "retry";
+  const initialAddressMerge = mergeDeliveryAddressDraft({
+    current: existingInquiry?.address,
+    message: context.message,
+  });
+  const addressReplyExpected =
+    existingInquiry !== undefined &&
+    (existingInquiry.step === "awaiting_address" ||
+      existingInquiry.step === "resolved") &&
+    initialAddressMerge.matched &&
+    !isDeliveryQuestion;
+
+  if (
+    isDeliveryInquiryControlIntent(context.interpretation) &&
+    !addressReplyExpected &&
+    !(isDeliveryQuestion && context.interpretation.supportTopic === "location")
+  ) {
+    return null;
+  }
+
+  if (
+    context.interpretation.intent === "confirm" &&
+    context.conversationState.pendingOrder
+  ) {
+    return null;
+  }
+
+  const newDestinationHint = extractDeliveryDestinationHint(context.message);
+  const allowBarePostalCode = Boolean(existingInquiry);
+  const extractedPostalCode = extractSouthAfricanPostalCode(context.message, {
+    allowBare: allowBarePostalCode,
+  });
+  const destinationHintChanged = Boolean(
+    existingInquiry &&
+      newDestinationHint &&
+      normalizeText(newDestinationHint) !==
+        normalizeText(existingInquiry.destinationHint ?? ""),
+  );
+  const postalCodeChanged = Boolean(
+    existingInquiry &&
+      extractedPostalCode &&
+      extractedPostalCode !== existingInquiry.postalCode,
+  );
+  const baseAddress = destinationHintChanged || destinationResetRequested
+    ? undefined
+    : existingInquiry?.address;
+  const mergedAddress = mergeDeliveryAddressDraft({
+    current: baseAddress,
+    message: context.message,
+  });
+  const addressChanged =
+    mergedAddress.matched &&
+    !deliveryAddressDraftsEqual(baseAddress, mergedAddress.address);
+  const explicitQuantity = parseExplicitQuantity(context.message);
+  const quantity =
+    explicitQuantity ??
+    existingInquiry?.quantity ??
+    context.interpretation.quantity;
+  const quantityChanged = Boolean(
+    existingInquiry && quantity !== existingInquiry.quantity,
+  );
+  const destinationHint =
+    newDestinationHint ??
+    (destinationResetRequested || postalCodeChanged || addressChanged
+      ? null
+      : existingInquiry?.destinationHint ?? null);
+  const postalCode =
+    extractedPostalCode ??
+    mergedAddress.address?.postalCode ??
+    (destinationHintChanged || destinationResetRequested
+      ? null
+      : existingInquiry?.postalCode ?? null);
+  const deliveryInputChanged =
+    destinationResetRequested ||
+    destinationHintChanged ||
+    postalCodeChanged ||
+    addressChanged ||
+    quantityChanged;
+  let inquiry: WhatsappDeliveryInquiry = existingInquiry
+    ? {
+        ...existingInquiry,
+        address: mergedAddress.matched
+          ? mergedAddress.address
+          : destinationHintChanged || destinationResetRequested
+            ? undefined
+            : existingInquiry.address,
+        customerPrompt: appendDeliveryCustomerPrompt(
+          existingInquiry.customerPrompt,
+          context.message,
+        ),
+        destinationHint,
+        postalCode,
+        quantity,
+        ...(deliveryInputChanged ? { lastResult: null } : {}),
+        updatedAt: now,
+      }
+    : {
+        ...(mergedAddress.matched ? { address: mergedAddress.address } : {}),
+        choices: [],
+        customerPrompt: context.message.slice(0, 1500),
+        destinationHint,
+        lastProbeAt: null,
+        lastResult: null,
+        postalCode,
+        quantity,
+        selectedVariantId: null,
+        step: "awaiting_product",
+        updatedAt: now,
+      };
+
+  const explicitProductChange =
+    /\b(?:another|different|other)\s+(?:product|item|variant|cylinder|bottle|heater|stove)\b/.test(
+      normalizedMessage,
+    ) ||
+    /\b(?:change|switch)(?:\s+(?:the|to|my))?\s+(?:product|item|variant|cylinder|bottle|heater|stove)\b/.test(
+      normalizedMessage,
+    );
+  const productSearchContext = getDeliveryProductSearchContext({
+    interpretation: context.interpretation,
+    query: context.message,
+  });
+  const correctionNamesProduct =
+    productSearchContext.sizeKg !== null ||
+    productSearchContext.purchaseType !== null ||
+    /\b(product|item|variant|cylinder|bottle|heater|stove|cooker|regulator|accessory|gas|lpg)\b/.test(
+      normalizedMessage,
+    );
+  const changingProduct =
+    !destinationResetRequested &&
+    (explicitProductChange ||
+      (/\b(?:meant|use|prefer|want)\b/.test(normalizedMessage) &&
+        productSearchContext.hasProductSignal &&
+        (correctionNamesProduct ||
+          /\b(?:instead|rather)\b/.test(normalizedMessage))));
+  const explicitOrderRequest = /\b(order|buy|purchase|get|take)\b/.test(
+    normalizedMessage,
+  );
+  const genericOrderContinuation =
+    Boolean(existingInquiry) &&
+    !isDeliveryQuestion &&
+    (context.interpretation.intent === "confirm" ||
+      context.interpretation.intent === "repeat" ||
+      (context.interpretation.intent === "order" &&
+        !changingProduct &&
+        (Boolean(context.conversationState.partialOrder) ||
+          explicitOrderRequest ||
+          (productSearchContext.terms.length === 0 &&
+            productSearchContext.sizeKg === null))));
+
+  if (genericOrderContinuation) {
+    return null;
+  }
+
+  const expectsProduct =
+    !existingInquiry ||
+    existingInquiry.step === "awaiting_product" ||
+    existingInquiry.step === "awaiting_product_choice";
+  const shouldSearchForProduct =
+    !destinationResetRequested &&
+    (!addressReplyExpected || productSearchContext.hasProductSignal) &&
+    (expectsProduct ||
+      isDeliveryQuestion ||
+      changingProduct ||
+      context.interpretation.intent === "order" ||
+      context.interpretation.intent === "repeat" ||
+      context.interpretation.intent === "product_search");
+  const productSearchRequested =
+    shouldSearchForProduct && productSearchContext.hasProductSignal;
+  const productChoices = productSearchRequested
+    ? await findDeliveryProductChoices({
+        interpretation: context.interpretation,
+        query: context.message,
+      })
+    : [];
+  const referencesSameSelectedProduct = Boolean(
+    existingInquiry?.selectedVariantId &&
+      productChoices.length === 1 &&
+      productChoices[0]?.variantId === existingInquiry.selectedVariantId,
+  );
+  const productPivotRequested = Boolean(
+    existingInquiry?.selectedVariantId &&
+      (changingProduct ||
+        (productSearchRequested && !referencesSameSelectedProduct)),
+  );
+
+  if (existingInquiry?.step === "resolved") {
+    const resultStillFresh = existingInquiry.lastResult
+      ? !existingInquiry.lastResult.expiresAt ||
+        new Date(existingInquiry.lastResult.expiresAt).getTime() > Date.now()
+      : false;
+    const canReuseResult =
+      resultStillFresh &&
+      !isRetry &&
+      !deliveryInputChanged &&
+      !productPivotRequested &&
+      (!productSearchRequested || referencesSameSelectedProduct);
+
+    if (
+      canReuseResult &&
+      (isDeliveryQuestion ||
+        initialAddressMerge.matched ||
+        Boolean(extractedPostalCode))
+    ) {
+      return respond({
+        conversationId: context.conversationId,
+        provider: context.provider,
+        reply: existingInquiry.lastResult!.reply,
+        status: "support_answer",
+      });
+    }
+
+    const hasRelevantResolvedInput =
+      isDeliveryQuestion ||
+      isRetry ||
+      initialAddressMerge.matched ||
+      Boolean(extractedPostalCode) ||
+      explicitQuantity !== null ||
+      productSearchRequested ||
+      changingProduct;
+
+    if (!hasRelevantResolvedInput) {
+      return null;
+    }
+  }
+
+  if (productPivotRequested) {
+    inquiry = {
+      ...inquiry,
+      choices: productChoices,
+      lastResult: null,
+      selectedVariantId: null,
+      step:
+        productChoices.length > 0
+          ? "awaiting_product_choice"
+          : "awaiting_product",
+      updatedAt: now,
+    };
+
+    return respondToDeliveryInquiry({
+      context,
+      inquiry,
+      reply:
+        productChoices.length > 0
+          ? buildDeliveryProductChoiceReply({
+              choices: productChoices,
+              quantity: inquiry.quantity,
+            })
+          : 'I could not match that product. Send the exact product and quantity, for example "1 x 9kg exchange", and I will show the available choices.',
+    });
+  }
+
+  if (
+    !existingInquiry &&
+    context.conversationState.pendingOrder &&
+    !productSearchRequested
+  ) {
+    inquiry = {
+      ...inquiry,
+      quantity:
+        explicitQuantity ??
+        context.conversationState.pendingOrder.candidate.quantity,
+      selectedVariantId:
+        context.conversationState.pendingOrder.candidate.variantId,
+    };
+
+    return continueDeliveryInquiryForSelectedProduct({ context, inquiry });
+  }
+
+  if (inquiry.step === "awaiting_product_choice") {
+    const choiceIndex = parseDeliveryProductChoice(
+      context.message,
+      inquiry.choices.length,
+    );
+
+    if (choiceIndex !== null) {
+      inquiry = {
+        ...inquiry,
+        choices: [],
+        selectedVariantId: inquiry.choices[choiceIndex]!.variantId,
+        updatedAt: now,
+      };
+
+      return continueDeliveryInquiryForSelectedProduct({ context, inquiry });
+    }
+
+    if (!productSearchRequested) {
+      return respondToDeliveryInquiry({
+        context,
+        inquiry,
+        reply: buildDeliveryProductChoiceReply({
+          choices: inquiry.choices,
+          quantity: inquiry.quantity,
+        }),
+      });
+    }
+  }
+
+  if (
+    inquiry.step === "awaiting_product" ||
+    inquiry.step === "awaiting_product_choice"
+  ) {
+    if (productChoices.length === 0) {
+      return respondToDeliveryInquiry({
+        context,
+        inquiry: {
+          ...inquiry,
+          choices: [],
+          step: "awaiting_product",
+          updatedAt: now,
+        },
+        reply: [
+          "I need the exact product before I can check the correct delivery method.",
+          destinationHint ? `I have noted the destination as ${destinationHint}.` : null,
+          'Send the product and quantity, for example "1 x 9kg exchange" or "2 x gas heaters".',
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+    }
+
+    inquiry = {
+      ...inquiry,
+      choices: productChoices,
+      step: "awaiting_product_choice",
+      updatedAt: now,
+    };
+
+    return respondToDeliveryInquiry({
+      context,
+      inquiry,
+      reply: buildDeliveryProductChoiceReply({
+        choices: productChoices,
+        quantity: inquiry.quantity,
+      }),
+    });
+  }
+
+  if (inquiry.step === "awaiting_postal_code") {
+    if (!inquiry.postalCode) {
+      return respondToDeliveryInquiry({
+        context,
+        inquiry,
+        reply:
+          "Send the four-digit delivery postal code, for example 7646. A suburb name alone is not precise enough for the configured delivery zones.",
+      });
+    }
+
+    return continueDeliveryInquiryForSelectedProduct({ context, inquiry });
+  }
+
+  if (inquiry.step === "awaiting_address") {
+    const address = getCompleteDeliveryAddress(inquiry.address);
+
+    if (!address) {
+      return respondToDeliveryInquiry({
+        context,
+        inquiry,
+        reply: buildDeliveryAddressPrompt(
+          getMissingDeliveryAddressFields(inquiry.address),
+        ),
+      });
+    }
+
+    return continueDeliveryInquiryForSelectedProduct({ context, inquiry });
+  }
+
+  if (inquiry.step === "resolved" && inquiry.selectedVariantId) {
+    return continueDeliveryInquiryForSelectedProduct({ context, inquiry });
+  }
+
+  return null;
+}
+
 async function answerSupportQuestion({
   interpretation,
   phone,
@@ -1756,11 +3332,11 @@ async function answerSupportQuestion({
     case "business_info":
       return "Jurgens Energy supplies LPG cylinders, cylinder exchanges, and gas accessories through the online marketplace, with direct local delivery where configured and courier options for seller-fulfilled items.";
     case "contact":
-      return `You can contact Jurgens Energy at ${contactEmail}. Phone numbers listed on the store are ${contactPhoneNumbers.join(" and ")}.`;
+      return answerContactDetails();
     case "delivery_areas":
       return answerDeliveryAreas();
     case "location":
-      return "Jurgens Energy is based in South Africa. The storefront currently lists the public location as South Africa; ask for a human if you need a specific branch or collection address.";
+      return answerLocation();
     case "shipping_rates":
       return answerShippingRates();
     case "last_invoice":
@@ -1899,7 +3475,10 @@ export async function processWhatsappInboundMessage(
   let conversationState = updateRepeatedMessageState(conversation.state, input.body);
 
   if (shouldSkipAutomatedReply(conversationState)) {
-    await updateConversationState(conversation.id, conversationState);
+    await updateConversationModerationState(
+      conversation.id,
+      conversationState.moderation!,
+    );
     await updateConversationAfterMessage({
       conversationId: conversation.id,
       direction: "inbound",
@@ -1922,7 +3501,10 @@ export async function processWhatsappInboundMessage(
       check: moderationCheck,
       state: conversationState,
     });
-    await updateConversationState(conversation.id, conversationState);
+    await updateConversationModerationState(
+      conversation.id,
+      conversationState.moderation!,
+    );
     await updateConversationAfterMessage({
       conversationId: conversation.id,
       direction: "inbound",
@@ -1938,7 +3520,10 @@ export async function processWhatsappInboundMessage(
   }
 
   if (isGreetingMessage(input.body)) {
-    await updateConversationState(conversation.id, conversationState);
+    await updateConversationModerationState(
+      conversation.id,
+      conversationState.moderation!,
+    );
     await updateConversationAfterMessage({
       conversationId: conversation.id,
       direction: "inbound",
@@ -1953,7 +3538,38 @@ export async function processWhatsappInboundMessage(
     });
   }
 
-  await updateConversationState(conversation.id, conversationState);
+  await updateConversationModerationState(
+    conversation.id,
+    conversationState.moderation!,
+  );
+
+  if (
+    conversationState.deliveryInquiry ||
+    isDeliveryCoverageQuestion(input.body)
+  ) {
+    const fallbackInterpretation = mergeInterpretationWithPartialOrder({
+      interpretation: interpretMessage(input.body),
+      partialOrder: conversationState.partialOrder,
+    });
+
+    await updateConversationAfterMessage({
+      conversationId: conversation.id,
+      direction: "inbound",
+      intent: "delivery_inquiry",
+    });
+
+    const deliveryReply = await handleDeliveryInquiryMessage({
+      conversationId: conversation.id,
+      conversationState,
+      interpretation: fallbackInterpretation,
+      message: input.body,
+      provider: input.provider,
+    });
+
+    if (deliveryReply) {
+      return deliveryReply;
+    }
+  }
 
   const rawInterpretation = await interpretMessageWithAiFallback(input.body);
   const interpretation = mergeInterpretationWithPartialOrder({
@@ -2002,13 +3618,18 @@ export async function processWhatsappInboundMessage(
   }
 
   if (interpretation.intent === "cancel") {
+    const cancelledItem = conversationState.pendingOrder
+      ? "pending WhatsApp order"
+      : conversationState.deliveryInquiry
+        ? "delivery check"
+        : "pending request";
+
     await clearPendingOrder(conversation.id, conversationState);
 
     return respond({
       conversationId: conversation.id,
       provider: input.provider,
-      reply:
-        "No problem, I have cleared that pending WhatsApp order. Tell me what you need when you are ready.",
+      reply: `No problem, I have cleared that ${cancelledItem}. Tell me what you need when you are ready.`,
       status: "support_answer",
     });
   }
@@ -2112,6 +3733,18 @@ export async function processWhatsappInboundMessage(
     });
   }
 
+  const deliveryReply = await handleDeliveryInquiryMessage({
+    conversationId: conversation.id,
+    conversationState,
+    interpretation,
+    message: input.body,
+    provider: input.provider,
+  });
+
+  if (deliveryReply) {
+    return deliveryReply;
+  }
+
   if (
     interpretation.intent === "invoice" ||
     interpretation.intent === "product_search" ||
@@ -2128,7 +3761,10 @@ export async function processWhatsappInboundMessage(
       interpretation.supportTopic === "unknown"
     ) {
       conversationState = incrementUnknownConversationState(conversationState);
-      await updateConversationState(conversation.id, conversationState);
+      await updateConversationModerationState(
+        conversation.id,
+        conversationState.moderation!,
+      );
 
       if (conversationState.moderation?.mutedUntil) {
         reply = buildModerationReply(conversationState);
@@ -2154,14 +3790,17 @@ export async function processWhatsappInboundMessage(
   }
 
   if (interpretation.intent === "order" && !interpretation.purchaseType) {
-    await updateConversationState(conversation.id, {
+    const nextConversationState: WhatsappConversationState = {
       ...conversationState,
       partialOrder: buildPartialOrderState({
         interpretation,
         message: input.body,
         partialOrder: conversationState.partialOrder,
       }),
-    });
+    };
+    delete nextConversationState.deliveryInquiry;
+
+    await updateConversationState(conversation.id, nextConversationState);
 
     return respond({
       conversationId: conversation.id,
@@ -2185,16 +3824,21 @@ export async function processWhatsappInboundMessage(
       ? `I could not find an available ${interpretation.sizeKg}kg cylinder option yet. Reply with another size, like "9kg exchange", or ask for a human.`
       : `I can sort that. Reply with the size and type, for example "9kg exchange", "14kg exchange", or "9kg full".`;
 
-    if (!interpretation.sizeKg) {
-      await updateConversationState(conversation.id, {
-        ...conversationState,
+    const nextConversationState: WhatsappConversationState = {
+      ...conversationState,
+      ...(!interpretation.sizeKg
+        ? {
         partialOrder: buildPartialOrderState({
           interpretation,
           message: input.body,
           partialOrder: conversationState.partialOrder,
         }),
-      });
-    }
+          }
+        : {}),
+    };
+    delete nextConversationState.deliveryInquiry;
+
+    await updateConversationState(conversation.id, nextConversationState);
 
     return respond({
       conversationId: conversation.id,
@@ -2211,6 +3855,10 @@ export async function processWhatsappInboundMessage(
   });
 
   if (!snapshot) {
+    const nextConversationState = { ...conversationState };
+    delete nextConversationState.deliveryInquiry;
+    await updateConversationState(conversation.id, nextConversationState);
+
     return respond({
       conversationId: conversation.id,
       provider: input.provider,
@@ -2230,6 +3878,7 @@ export async function processWhatsappInboundMessage(
       }),
     },
   };
+  delete nextConversationState.deliveryInquiry;
   delete nextConversationState.partialOrder;
 
   await updateConversationState(conversation.id, nextConversationState);

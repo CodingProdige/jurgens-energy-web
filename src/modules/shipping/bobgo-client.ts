@@ -58,55 +58,20 @@ type ProviderCheckoutRate = Omit<
   "bufferAmount" | "customerAmount" | "marginAmount"
 >;
 
+export async function probeBobGoCheckoutRates(input: BobGoCheckoutRatesInput) {
+  const { config, expiresAt, normalizedRates } =
+    await requestBobGoCheckoutRates(input, { timeoutMs: 8_000 });
+
+  return {
+    expiresAt,
+    mode: config.mode,
+    rates: normalizedRates,
+  };
+}
+
 export async function getBobGoCheckoutRates(input: BobGoCheckoutRatesInput) {
-  const parsed = bobGoCheckoutRatesInputSchema.parse(input);
-  const config = await getBobGoIntegrationConfig();
-
-  if (!config.shippingEnabled) {
-    throw new Error("Shipping rates are disabled.");
-  }
-
-  if (!config.bobgoEnabled) {
-    throw new Error("Bob Go provider integration is disabled.");
-  }
-
-  if (config.bookingMode === "disabled") {
-    throw new Error("Bob Go booking mode is disabled.");
-  }
-
-  if (!config.apiKey) {
-    throw new Error("Bob Go API key is not configured.");
-  }
-
-  const payload = toBobGoCheckoutRatesPayload(parsed);
-  const response = await fetch(`${config.apiBaseUrl}/v2/rates-at-checkout`, {
-    body: JSON.stringify(payload),
-    cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-  });
-
-  const responseText = await response.text();
-  const providerPayload = parseJsonSafely(responseText);
-
-  if (!response.ok) {
-    throw new Error(
-      `Bob Go checkout rates request failed with status ${response.status}.`,
-    );
-  }
-
-  const normalizedRates = normalizeRates(providerPayload).map((rate) =>
-    applyShippingPricing({
-      bufferBps: config.shippingBufferBps,
-      marginBps: config.shippingMarginBps,
-      rate,
-    }),
-  );
-
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  const { config, expiresAt, normalizedRates, parsed, providerPayload } =
+    await requestBobGoCheckoutRates(input);
 
   let quoteRows: Array<{ id: string; providerRateId: string | null }> = [];
 
@@ -155,6 +120,88 @@ export async function getBobGoCheckoutRates(input: BobGoCheckoutRatesInput) {
   };
 }
 
+async function requestBobGoCheckoutRates(
+  input: BobGoCheckoutRatesInput,
+  { timeoutMs }: { timeoutMs?: number } = {},
+) {
+  const parsed = bobGoCheckoutRatesInputSchema.parse(input);
+  const config = await getBobGoIntegrationConfig();
+
+  if (!config.shippingEnabled) {
+    throw new Error("Shipping rates are disabled.");
+  }
+
+  if (!config.bobgoEnabled) {
+    throw new Error("Bob Go provider integration is disabled.");
+  }
+
+  if (config.bookingMode === "disabled") {
+    throw new Error("Bob Go booking mode is disabled.");
+  }
+
+  if (!config.apiKey) {
+    throw new Error("Bob Go API key is not configured.");
+  }
+
+  const payload = toBobGoCheckoutRatesPayload(parsed);
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
+  let response: Response;
+  let responseText: string;
+
+  try {
+    response = await fetch(`${config.apiBaseUrl}/v2/rates-at-checkout`, {
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+    responseText = await response.text();
+  } catch (error) {
+    if (controller?.signal.aborted) {
+      throw new Error("Bob Go rates request timed out.");
+    }
+
+    throw error;
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+
+  const providerPayload = parseJsonSafely(responseText);
+
+  if (!response.ok) {
+    throw new Error(
+      `Bob Go checkout rates request failed with status ${response.status}.`,
+    );
+  }
+
+  const normalizedRates = normalizeRates(providerPayload).map((rate) =>
+    applyShippingPricing({
+      bufferBps: config.shippingBufferBps,
+      marginBps: config.shippingMarginBps,
+      rate,
+    }),
+  );
+
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  return {
+    config,
+    expiresAt,
+    normalizedRates,
+    parsed,
+    providerPayload,
+  };
+}
+
 function toBobGoCheckoutRatesPayload(input: BobGoCheckoutRatesInput) {
   return {
     collection_address: input.collectionAddress,
@@ -176,7 +223,11 @@ function toBobGoCheckoutRatesPayload(input: BobGoCheckoutRatesInput) {
 function normalizeRates(payload: unknown): ProviderCheckoutRate[] {
   const rateValues = extractRateArray(payload);
 
-  return rateValues.reduce<ProviderCheckoutRate[]>((rates, rate, index) => {
+  if (!rateValues) {
+    throw new Error("Bob Go returned an unrecognized rates response.");
+  }
+
+  const rates = rateValues.reduce<ProviderCheckoutRate[]>((rates, rate, index) => {
     if (!isRecord(rate)) {
       return rates;
     }
@@ -190,39 +241,47 @@ function normalizeRates(payload: unknown): ProviderCheckoutRate[] {
       "total_amount",
     ]);
 
-    if (providerAmount === null) {
+    if (providerAmount === null || providerAmount < 0) {
       return rates;
     }
 
     rates.push({
       currency: "ZAR",
       providerAmount,
-      providerRateId:
+      providerRateId: (
         getStringValue(rate, [
           "id",
           "rate_id",
           "rateId",
           "service_id",
           "serviceId",
-        ]) ?? `bobgo-rate-${index + 1}`,
+        ]) ?? `bobgo-rate-${index + 1}`
+      ).slice(0, 240),
       serviceLevel: getStringValue(rate, [
         "service_level",
         "serviceLevel",
         "service_code",
         "serviceCode",
-      ]),
-      serviceName:
+      ])?.slice(0, 120) ?? null,
+      serviceName: (
         getStringValue(rate, [
           "service_name",
           "serviceName",
           "name",
           "courier",
           "description",
-        ]) ?? `Bob Go rate ${index + 1}`,
+        ]) ?? `Bob Go rate ${index + 1}`
+      ).slice(0, 120),
     });
 
     return rates;
   }, []);
+
+  if (rateValues.length > 0 && rates.length === 0) {
+    throw new Error("Bob Go returned rates in an unrecognized format.");
+  }
+
+  return rates;
 }
 
 function applyShippingPricing({
@@ -247,13 +306,13 @@ function applyShippingPricing({
   };
 }
 
-function extractRateArray(payload: unknown): unknown[] {
+function extractRateArray(payload: unknown): unknown[] | null {
   if (Array.isArray(payload)) {
     return payload;
   }
 
   if (!isRecord(payload)) {
-    return [];
+    return null;
   }
 
   for (const key of ["rates", "data", "shipping_rates", "shippingRates"]) {
@@ -266,13 +325,13 @@ function extractRateArray(payload: unknown): unknown[] {
     if (isRecord(value)) {
       const nestedRates = extractRateArray(value);
 
-      if (nestedRates.length > 0) {
+      if (nestedRates) {
         return nestedRates;
       }
     }
   }
 
-  return [];
+  return null;
 }
 
 function parseJsonSafely(value: string) {
@@ -292,7 +351,13 @@ function getNumberValue(record: Record<string, unknown>, keys: string[]) {
     }
 
     if (typeof value === "string") {
-      const normalized = Number(value.replace(/[^\d.-]/g, ""));
+      const numericText = value.replace(/[^\d.-]/g, "");
+
+      if (!/\d/.test(numericText)) {
+        continue;
+      }
+
+      const normalized = Number(numericText);
 
       if (Number.isFinite(normalized)) {
         return normalized;

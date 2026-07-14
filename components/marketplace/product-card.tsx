@@ -76,6 +76,11 @@ export function MarketplaceProductCard({
               {product.inStock ? "In stock" : "Backorder"}
             </Badge>
           </div>
+          {product.isOnSale ? (
+            <Badge className="absolute right-0 top-0 z-10 h-[15px] rounded-none bg-[#ff5a1f] px-1 text-[6.5px] font-black uppercase leading-none text-white shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]">
+              Sale
+            </Badge>
+          ) : null}
         </div>
 
         <div className="grid min-w-0 gap-0.5 px-1.5 pb-1.5 pt-1.5 sm:gap-1 sm:px-2.5 sm:pb-2.5 sm:pt-2">
@@ -86,7 +91,11 @@ export function MarketplaceProductCard({
             {product.brandName ?? detailLabel}
           </p>
           <div className="min-w-0 pr-8">
-            <ProductCardPrice label={product.priceLabel} />
+            <ProductCardPrice
+              compareAtLabel={product.compareAtPriceLabel}
+              discountLabel={product.discountLabel}
+              label={product.priceLabel}
+            />
           </div>
 
           <div className="flex min-w-0 flex-wrap gap-0.5 pr-8 sm:gap-1">
@@ -110,25 +119,51 @@ export function MarketplaceProductCard({
   );
 }
 
-function ProductCardPrice({ label }: { label: string }) {
+function ProductCardPrice({
+  compareAtLabel,
+  discountLabel,
+  label,
+}: {
+  compareAtLabel: string | null;
+  discountLabel: string | null;
+  label: string;
+}) {
   const fromPrefix = "From ";
+  const currentLabel = label.startsWith(fromPrefix)
+    ? label.slice(fromPrefix.length)
+    : label;
+  const priceRow = (
+    <span className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-1">
+      <span className="truncate text-[16px] font-black leading-none sm:text-[18px]">
+        {currentLabel}
+      </span>
+      {compareAtLabel ? (
+        <span className="text-[9px] font-bold leading-none text-slate-400 line-through dark:text-zinc-500 sm:text-[10px]">
+          {compareAtLabel}
+        </span>
+      ) : null}
+      {discountLabel ? (
+        <span className="rounded-sm bg-orange-50 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-[#ff5a1f] dark:bg-orange-500/10 sm:px-1.5 sm:text-[8px]">
+          {discountLabel}
+        </span>
+      ) : null}
+    </span>
+  );
 
   if (label.startsWith(fromPrefix)) {
     return (
-      <p className="mt-0.5 min-w-0 leading-none text-[#080808] dark:text-[#f7f7f2]">
+      <div className="mt-0.5 min-w-0 leading-none text-[#080808] dark:text-[#f7f7f2]">
         <span className="block text-[8px] font-black uppercase leading-none text-[#ff5a1f] sm:text-[10px]">
           From
         </span>
-        <span className="mt-0.5 block truncate text-[16px] font-black leading-none sm:text-[18px]">
-          {label.slice(fromPrefix.length)}
-        </span>
-      </p>
+        {priceRow}
+      </div>
     );
   }
 
   return (
-    <p className="mt-1 truncate text-[16px] font-black leading-none text-[#080808] dark:text-[#f7f7f2] sm:text-[18px]">
-      {label}
-    </p>
+    <div className="mt-1 min-w-0 text-[#080808] dark:text-[#f7f7f2]">
+      {priceRow}
+    </div>
   );
 }
