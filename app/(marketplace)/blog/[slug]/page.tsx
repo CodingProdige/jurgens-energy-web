@@ -93,17 +93,16 @@ export default async function BlogPostPage({
             </header>
 
             {post.coverImageUrl ? (
-              <figure className="mx-auto mt-8 overflow-hidden border-y border-[#ecece6] bg-[#f7f7f2] dark:border-white/10 dark:bg-[#1a1a1a] sm:mt-10 sm:rounded-lg sm:border">
-                <div className="relative aspect-[16/9] w-full">
-                  <Image
-                    alt={post.title}
-                    className="object-contain"
-                    fill
-                    priority
-                    sizes="(min-width: 1280px) 1040px, (min-width: 640px) calc(100vw - 5rem), calc(100vw - 2rem)"
-                    src={post.coverImageUrl}
-                  />
-                </div>
+              <figure className="mx-auto mt-8 w-full sm:mt-10">
+                <Image
+                  alt={post.title}
+                  className="h-auto w-full"
+                  height={post.coverImageHeight ?? 630}
+                  priority
+                  sizes="(min-width: 1280px) 1040px, (min-width: 640px) calc(100vw - 5rem), calc(100vw - 2rem)"
+                  src={post.coverImageUrl}
+                  width={post.coverImageWidth ?? 1120}
+                />
               </figure>
             ) : null}
 

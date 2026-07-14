@@ -39,6 +39,8 @@ export type PublicBlogPostSummary = {
 
 export type PublicBlogPostDetail = PublicBlogPostSummary & {
   content: string;
+  coverImageHeight: number | null;
+  coverImageWidth: number | null;
   seoDescription: string | null;
   seoTitle: string | null;
   updatedAt: Date;
@@ -96,8 +98,10 @@ async function getBlogPostRows({
       authorName: users.name,
       content: blogPosts.content,
       coverMediaId: blogPosts.coverMediaId,
+      coverHeight: media.height,
       coverRelativePath: media.relativePath,
       coverThumbnailRelativePath: media.thumbnailRelativePath,
+      coverWidth: media.width,
       createdAt: blogPosts.createdAt,
       excerpt: blogPosts.excerpt,
       id: blogPosts.id,
@@ -169,6 +173,11 @@ function toPublicBlogPostDetail(
   return {
     ...toPublicBlogPostSummary(row),
     content: row.content,
+    coverImageHeight: row.coverHeight,
+    coverImageUrl: row.coverRelativePath
+      ? getMediaPublicUrl(row.coverRelativePath)
+      : null,
+    coverImageWidth: row.coverWidth,
     seoDescription: row.seoDescription,
     seoTitle: row.seoTitle,
     updatedAt: row.updatedAt,
@@ -196,8 +205,10 @@ export async function getAdminBlogPostById(id: string) {
       authorName: users.name,
       content: blogPosts.content,
       coverMediaId: blogPosts.coverMediaId,
+      coverHeight: media.height,
       coverRelativePath: media.relativePath,
       coverThumbnailRelativePath: media.thumbnailRelativePath,
+      coverWidth: media.width,
       createdAt: blogPosts.createdAt,
       excerpt: blogPosts.excerpt,
       id: blogPosts.id,
@@ -243,8 +254,10 @@ export async function getPublishedBlogPostBySlug(slug: string) {
       authorName: users.name,
       content: blogPosts.content,
       coverMediaId: blogPosts.coverMediaId,
+      coverHeight: media.height,
       coverRelativePath: media.relativePath,
       coverThumbnailRelativePath: media.thumbnailRelativePath,
+      coverWidth: media.width,
       createdAt: blogPosts.createdAt,
       excerpt: blogPosts.excerpt,
       id: blogPosts.id,
