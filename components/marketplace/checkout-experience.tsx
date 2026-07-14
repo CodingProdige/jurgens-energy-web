@@ -30,6 +30,7 @@ import type {
   CheckoutDeliverySchedule,
   CheckoutQuoteResponse,
 } from "@/src/modules/checkout/contracts";
+import { POLICY_EFFECTIVE_DATE_ISO } from "@/src/modules/marketplace/policies/constants";
 
 const southAfricanProvinces = [
   "Eastern Cape",
@@ -118,6 +119,7 @@ export function CheckoutExperience({
   const [isLoadingCart, setIsLoadingCart] = useState(true);
   const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [hasAcceptedPolicies, setHasAcceptedPolicies] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -224,6 +226,7 @@ export function CheckoutExperience({
     customerComplete &&
     isAddressComplete(address) &&
     (!requiresJurgensSchedule || Boolean(jurgensDeliverySchedule)) &&
+    hasAcceptedPolicies &&
     !cartReviewRequired &&
     !isCreatingOrder;
 
@@ -321,6 +324,10 @@ export function CheckoutExperience({
             quoteId: selectedQuoteByGroup[group.groupKey],
           })),
           items: checkoutItems,
+          policyAcceptance: {
+            accepted: true,
+            version: POLICY_EFFECTIVE_DATE_ISO,
+          },
           ...(requiresJurgensSchedule && jurgensDeliverySchedule
             ? { jurgensDeliverySchedule }
             : {}),
@@ -770,6 +777,49 @@ export function CheckoutExperience({
             <span className="text-xl font-black tabular-nums">
               {formatZar(grandTotal)}
             </span>
+          </div>
+          <div className="mt-2 grid grid-cols-[1.1rem_minmax(0,1fr)] items-start gap-2.5 rounded-md border border-[#e4e4de] bg-[#f7f7f2] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035]">
+            <input
+              aria-required="true"
+              checked={hasAcceptedPolicies}
+              className="mt-0.5 size-4 accent-[#ff5a1f]"
+              id="checkout-policy-acceptance"
+              onChange={(event) => setHasAcceptedPolicies(event.target.checked)}
+              type="checkbox"
+            />
+            <label
+              className="text-[11px] leading-5 text-[#555550] dark:text-[#c8c8c0]"
+              htmlFor="checkout-policy-acceptance"
+            >
+              I agree to the{" "}
+              <Link
+                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                href="/terms-and-conditions"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Terms &amp; Conditions
+              </Link>{" "}
+              and acknowledge the{" "}
+              <Link
+                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                href="/privacy-policy"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Privacy Policy
+              </Link>{" "}
+              and{" "}
+              <Link
+                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                href="/returns-and-refunds"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Returns &amp; Refunds Policy
+              </Link>
+              .
+            </label>
           </div>
           <Button
             className="mt-2 h-12 rounded-md bg-[#ff5a1f] text-sm font-bold text-white hover:bg-[#e84c15]"

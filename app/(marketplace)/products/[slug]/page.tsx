@@ -94,7 +94,7 @@ export default async function ProductPage({
               <ChevronRightIcon className="size-3 shrink-0 sm:size-3.5" />
               <Link
                 className="shrink-0 transition hover:text-[#ff5a1f]"
-                href={`/categories/${product.category.slug}`}
+                href={`/categories/${product.category.path}`}
               >
                 {product.category.name}
               </Link>

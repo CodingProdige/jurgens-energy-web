@@ -240,7 +240,7 @@ export function ProductDetailExperience({
         {relatedProducts.length > 0 ? (
           <ProductRail
             href={
-              product.category ? `/categories/${product.category.slug}` : "/products"
+              product.category ? `/categories/${product.category.path}` : "/products"
             }
             products={relatedProducts}
             title="More in this category"

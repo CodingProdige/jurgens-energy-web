@@ -40,6 +40,38 @@ export type MarketplaceBrandSummary = {
   slug: string;
 };
 
+export type MarketplaceShopMenuBrand = {
+  id: string;
+  logoUrl: string | null;
+  name: string;
+  productCount: number;
+  slug: string;
+};
+
+export type MarketplaceShopMenuProduct = {
+  id: string;
+  imageUrl: string | null;
+  slug: string;
+  title: string;
+};
+
+export type MarketplaceShopMenuCategory = {
+  brands: MarketplaceShopMenuBrand[];
+  children: MarketplaceShopMenuCategory[];
+  firstProductImageUrl: string | null;
+  id: string;
+  name: string;
+  path: string;
+  productCount: number;
+  slug: string;
+};
+
+export type MarketplaceShopMenuData = {
+  categories: MarketplaceShopMenuCategory[];
+  exchangeableLpgProducts: MarketplaceShopMenuProduct[];
+  totalProductCount: number;
+};
+
 export type MarketplaceProductCard = {
   brandId: string | null;
   brandName: string | null;
@@ -96,7 +128,7 @@ export type MarketplaceProductDetail = MarketplaceProductCard & {
 
 export type MarketplaceSitemapEntries = {
   brands: Array<{ slug: string; updatedAt: Date }>;
-  categories: Array<{ slug: string; updatedAt: Date }>;
+  categories: Array<{ path: string; updatedAt: Date }>;
   products: Array<{ slug: string; updatedAt: Date }>;
 };
 
@@ -482,20 +514,30 @@ function getRecordOnSale(record: MarketplaceCatalogFilterRecord) {
 }
 
 function matchesCatalogRecord({
+  categoryPathByFilterValue,
   context,
   currencyContext,
   filters,
   omitFacet,
   record,
 }: {
+  categoryPathByFilterValue: ReadonlyMap<string, string>;
   context: MarketplaceCatalogPageContext;
   currencyContext: CurrencyContext;
   filters: MarketplaceCatalogFilters;
   omitFacet: MarketplaceCatalogOmittedFacet;
   record: MarketplaceCatalogFilterRecord;
 }) {
-  if (context.kind === "category" && record.row.categorySlug !== context.slug) {
-    return false;
+  const recordCategoryPath = record.row.categoryPath;
+
+  if (context.kind === "category") {
+    if (
+      !recordCategoryPath ||
+      (recordCategoryPath !== context.path &&
+        !recordCategoryPath.startsWith(`${context.path}/`))
+    ) {
+      return false;
+    }
   }
 
   if (context.kind === "brand" && record.row.brandSlug !== context.slug) {
@@ -521,9 +563,16 @@ function matchesCatalogRecord({
   if (
     omitFacet !== "category" &&
     context.kind !== "category" &&
-    filters.categorySlugs.length > 0 &&
-    (!record.row.categorySlug ||
-      !filters.categorySlugs.includes(record.row.categorySlug))
+    filters.categoryPaths.length > 0 &&
+    (!recordCategoryPath ||
+      !filters.categoryPaths.some((categoryPath) => {
+        const selectedCategoryPath = categoryPathByFilterValue.get(categoryPath);
+
+        return selectedCategoryPath
+          ? recordCategoryPath === selectedCategoryPath ||
+              recordCategoryPath.startsWith(`${selectedCategoryPath}/`)
+          : false;
+      }))
   ) {
     return false;
   }
@@ -614,6 +663,7 @@ function sortCatalogRecords(
 export async function getMarketplaceCatalogPage({
   accumulate = false,
   brandSlug,
+  categoryPath,
   categorySlug,
   currencyContext,
   filters,
@@ -621,6 +671,7 @@ export async function getMarketplaceCatalogPage({
 }: {
   accumulate?: boolean;
   brandSlug?: string;
+  categoryPath?: string;
   categorySlug?: string;
   currencyContext: CurrencyContext;
   filters: MarketplaceCatalogFilters;
@@ -631,26 +682,29 @@ export async function getMarketplaceCatalogPage({
     getMarketplaceCategories(),
     getMarketplaceBrands(),
   ]);
-  const lockedCategory = categorySlug
-    ? categoriesList.find((category) => category.slug === categorySlug) ?? null
-    : null;
+  const lockedCategory = categoryPath
+    ? categoriesList.find((category) => category.path === categoryPath) ?? null
+    : categorySlug
+      ? categoriesList.find((category) => category.slug === categorySlug) ?? null
+      : null;
   const lockedBrand = brandSlug
     ? brandsList.find((brand) => brand.slug === brandSlug) ?? null
     : null;
-  const context: MarketplaceCatalogPageContext | null = categorySlug
-    ? lockedCategory
-      ? {
-          kind: "category",
-          name: lockedCategory.name,
-          path: lockedCategory.path,
-          slug: lockedCategory.slug,
-        }
-      : null
-    : brandSlug
-      ? lockedBrand
-        ? { kind: "brand", name: lockedBrand.name, slug: lockedBrand.slug }
+  const context: MarketplaceCatalogPageContext | null =
+    categoryPath || categorySlug
+      ? lockedCategory
+        ? {
+            kind: "category",
+            name: lockedCategory.name,
+            path: lockedCategory.path,
+            slug: lockedCategory.slug,
+          }
         : null
-      : { kind: "all", name: "All Products", slug: null };
+      : brandSlug
+        ? lockedBrand
+          ? { kind: "brand", name: lockedBrand.name, slug: lockedBrand.slug }
+          : null
+        : { kind: "all", name: "All Products", slug: null };
 
   if (!context) {
     return {
@@ -737,11 +791,29 @@ export async function getMarketplaceCatalogPage({
       variants,
     };
   });
+  const categoryPathsBySlug = new Map<string, string[]>();
+
+  for (const category of categoriesList) {
+    const paths = categoryPathsBySlug.get(category.slug) ?? [];
+    paths.push(category.path);
+    categoryPathsBySlug.set(category.slug, paths);
+  }
+
+  const categoryPathByFilterValue = new Map(
+    categoriesList.map((category) => [category.path, category.path]),
+  );
+
+  for (const [slug, paths] of categoryPathsBySlug) {
+    if (paths.length === 1 && !categoryPathByFilterValue.has(slug)) {
+      categoryPathByFilterValue.set(slug, paths[0]);
+    }
+  }
   const matches = (
     record: MarketplaceCatalogFilterRecord,
     omitFacet: MarketplaceCatalogOmittedFacet = null,
   ) =>
     matchesCatalogRecord({
+      categoryPathByFilterValue,
       context,
       currencyContext,
       filters,
@@ -802,14 +874,16 @@ export async function getMarketplaceCatalogPage({
       categories: categoriesList
         .map((category) => ({
           count: categoryFacetRecords.filter(
-            (record) => record.row.categorySlug === category.slug,
+            (record) =>
+              record.row.categoryPath === category.path ||
+              record.row.categoryPath?.startsWith(`${category.path}/`),
           ).length,
           label: category.name,
-          value: category.slug,
+          value: category.path,
         }))
         .filter(
           (category) =>
-            category.count > 0 || filters.categorySlugs.includes(category.value),
+            category.count > 0 || filters.categoryPaths.includes(category.value),
         ),
       exchangeSupportedCount: records.filter(
         (record) => matches(record, "exchange") && getRecordExchangeSupported(record),
@@ -890,13 +964,236 @@ export async function getMarketplaceCategories(): Promise<
   });
 }
 
+export async function getMarketplaceShopMenuData(): Promise<MarketplaceShopMenuData> {
+  const [categoryRows, brandRows, productRows, exchangeableVariantRows] =
+    await Promise.all([
+      db
+        .select({
+          id: categories.id,
+          name: categories.name,
+          parentId: categories.parentId,
+          path: categories.path,
+          slug: categories.slug,
+          sortOrder: categories.sortOrder,
+        })
+        .from(categories)
+        .where(eq(categories.status, "active"))
+        .orderBy(asc(categories.sortOrder), asc(categories.path)),
+      db
+        .select({
+          id: brands.id,
+          logoRelativePath: media.relativePath,
+          logoThumbnailRelativePath: media.thumbnailRelativePath,
+          name: brands.name,
+          slug: brands.slug,
+        })
+        .from(brands)
+        .leftJoin(media, eq(media.id, brands.logoMediaId))
+        .where(eq(brands.status, "active"))
+        .orderBy(asc(brands.name)),
+      getPublicProductsBaseRows(),
+      db
+        .select({ productId: productVariants.productId })
+        .from(productVariants)
+        .where(
+          and(
+            eq(productVariants.isActive, true),
+            eq(productVariants.requiresExchangeEmpty, true),
+            eq(productVariants.status, "active"),
+          ),
+        ),
+    ]);
+  const coverByProductId = await getCoverUrlsByProductId(
+    productRows.map((row) => row.id),
+  );
+  const categoryById = new Map(categoryRows.map((row) => [row.id, row]));
+  const exchangeableProductIds = new Set(
+    exchangeableVariantRows.map((row) => row.productId),
+  );
+  const childRowsByParentId = new Map<string, typeof categoryRows>();
+  const brandById = new Map(brandRows.map((row) => [row.id, row]));
+  const categoryMetaById = new Map<
+    string,
+    {
+      brandProductCounts: Map<string, number>;
+      firstProductImageUrl: string | null;
+      productCount: number;
+    }
+  >();
+
+  for (const category of categoryRows) {
+    if (!category.parentId || !categoryById.has(category.parentId)) {
+      continue;
+    }
+
+    const siblings = childRowsByParentId.get(category.parentId) ?? [];
+    siblings.push(category);
+    childRowsByParentId.set(category.parentId, siblings);
+  }
+
+  for (const product of productRows) {
+    let category = product.categoryId
+      ? categoryById.get(product.categoryId)
+      : undefined;
+    const visitedCategoryIds = new Set<string>();
+
+    while (category && !visitedCategoryIds.has(category.id)) {
+      visitedCategoryIds.add(category.id);
+
+      const meta = categoryMetaById.get(category.id) ?? {
+        brandProductCounts: new Map<string, number>(),
+        firstProductImageUrl: null,
+        productCount: 0,
+      };
+
+      meta.productCount += 1;
+      meta.firstProductImageUrl ??= coverByProductId.get(product.id) ?? null;
+
+      if (product.brandId && brandById.has(product.brandId)) {
+        meta.brandProductCounts.set(
+          product.brandId,
+          (meta.brandProductCounts.get(product.brandId) ?? 0) + 1,
+        );
+      }
+
+      categoryMetaById.set(category.id, meta);
+      category = category.parentId
+        ? categoryById.get(category.parentId)
+        : undefined;
+    }
+  }
+
+  const compareCategories = (
+    first: (typeof categoryRows)[number],
+    second: (typeof categoryRows)[number],
+  ) =>
+    first.sortOrder - second.sortOrder ||
+    first.name.localeCompare(second.name) ||
+    first.path.localeCompare(second.path);
+  const compareMenuBrands = (
+    first: MarketplaceShopMenuBrand,
+    second: MarketplaceShopMenuBrand,
+  ) =>
+    second.productCount - first.productCount ||
+    first.name.localeCompare(second.name);
+  const toMenuBrand = (
+    brandId: string,
+    productCount: number,
+  ): MarketplaceShopMenuBrand | null => {
+    const brand = brandById.get(brandId);
+
+    if (!brand || productCount <= 0) {
+      return null;
+    }
+
+    return {
+      id: brand.id,
+      logoUrl: toMediaUrl(
+        brand.logoRelativePath,
+        brand.logoThumbnailRelativePath,
+      ),
+      name: brand.name,
+      productCount,
+      slug: brand.slug,
+    };
+  };
+  const toMenuCategory = (
+    category: (typeof categoryRows)[number],
+  ): MarketplaceShopMenuCategory => {
+    const meta = categoryMetaById.get(category.id) ?? {
+      brandProductCounts: new Map<string, number>(),
+      firstProductImageUrl: null,
+      productCount: 0,
+    };
+
+    const children = (childRowsByParentId.get(category.id) ?? [])
+      .sort(compareCategories)
+      .map(toMenuCategory);
+    const menuBrands = Array.from(meta.brandProductCounts.entries())
+      .map(([brandId, productCount]) => toMenuBrand(brandId, productCount))
+      .filter((brand): brand is MarketplaceShopMenuBrand => brand !== null)
+      .sort(compareMenuBrands);
+
+    return {
+      brands: menuBrands,
+      children,
+      firstProductImageUrl: meta.firstProductImageUrl,
+      id: category.id,
+      name: category.name,
+      path: category.path,
+      productCount: meta.productCount,
+      slug: category.slug,
+    };
+  };
+  const rootCategories = categoryRows
+    .filter(
+      (category) =>
+        !category.parentId || !categoryById.has(category.parentId),
+    )
+    .sort(compareCategories)
+    .map(toMenuCategory);
+  const lpgRootCategory =
+    rootCategories.find((category) =>
+      ["gas-cylinders", "lpg-cylinders"].includes(category.slug),
+    ) ??
+    rootCategories.find((category) => {
+      const text = `${category.name} ${category.slug}`.toLowerCase();
+
+      return text.includes("cylinder") && !text.includes("accessor");
+    });
+  const isInLpgCategory = (categoryId: string | null) => {
+    if (!lpgRootCategory || !categoryId) {
+      return false;
+    }
+
+    let category = categoryById.get(categoryId);
+    const visitedCategoryIds = new Set<string>();
+
+    while (category && !visitedCategoryIds.has(category.id)) {
+      if (category.id === lpgRootCategory.id) {
+        return true;
+      }
+
+      visitedCategoryIds.add(category.id);
+      category = category.parentId
+        ? categoryById.get(category.parentId)
+        : undefined;
+    }
+
+    return false;
+  };
+  const exchangeableLpgProducts = productRows
+    .filter((product) => {
+      const productText = `${product.title} ${product.categoryName ?? ""}`.toLowerCase();
+      const isCylinder = productText.includes("cylinder") || productText.includes("lpg");
+
+      return (
+        exchangeableProductIds.has(product.id) &&
+        isCylinder &&
+        (isInLpgCategory(product.categoryId) || !lpgRootCategory)
+      );
+    })
+    .map((product) => ({
+      id: product.id,
+      imageUrl: coverByProductId.get(product.id) ?? null,
+      slug: product.slug,
+      title: product.title,
+    }))
+    .sort((first, second) => first.title.localeCompare(second.title));
+  return {
+    categories: rootCategories,
+    exchangeableLpgProducts,
+    totalProductCount: productRows.length,
+  };
+}
+
 export async function getMarketplaceSitemapEntries(): Promise<MarketplaceSitemapEntries> {
   const [productRows, categoryRows, brandRows] = await Promise.all([
     getPublicProductsBaseRows(),
     db
       .select({
         id: categories.id,
-        slug: categories.slug,
+        path: categories.path,
         updatedAt: categories.updatedAt,
       })
       .from(categories)
@@ -950,13 +1247,13 @@ export async function getMarketplaceSitemapEntries(): Promise<MarketplaceSitemap
 
         return productUpdatedAt
           ? {
-              slug: category.slug,
+              path: category.path,
               updatedAt: latestDate(category.updatedAt, productUpdatedAt),
             }
           : null;
       })
       .filter(
-        (category): category is { slug: string; updatedAt: Date } =>
+        (category): category is { path: string; updatedAt: Date } =>
           Boolean(category),
       ),
     products: productRows.map((product) => ({

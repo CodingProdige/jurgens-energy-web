@@ -1591,8 +1591,14 @@ function getProductCollectionAutoAction({
   >["settings"];
 }): Pick<StorefrontButtonAction, "href" | "label"> {
   if (settings.productSource === "accessories") {
+    const accessoriesCategory = categories.find(
+      (category) => category.slug === "cylinder-accessories",
+    );
+
     return {
-      href: "/products?category=accessories",
+      href: accessoriesCategory
+        ? `/categories/${accessoriesCategory.path}`
+        : "/products",
       label: "View All Accessories",
     };
   }
@@ -1620,7 +1626,7 @@ function getProductCollectionAutoAction({
 
     if (selectedCategory) {
       return {
-        href: `/categories/${selectedCategory.slug}`,
+        href: `/categories/${selectedCategory.path}`,
         label: `View All ${selectedCategory.name}`,
       };
     }

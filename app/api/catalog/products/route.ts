@@ -9,6 +9,11 @@ import {
 } from "@/src/modules/marketplace/catalog-filters";
 
 const contextSlugSchema = z.string().regex(/^[a-z0-9-]+$/).max(160).optional();
+const contextCategoryPathSchema = z
+  .string()
+  .regex(/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/)
+  .max(760)
+  .optional();
 
 function toCatalogSearchParams(searchParams: URLSearchParams) {
   const result: MarketplaceCatalogSearchParams = {};
@@ -22,17 +27,17 @@ function toCatalogSearchParams(searchParams: URLSearchParams) {
 }
 
 export async function GET(request: NextRequest) {
-  const categorySlugResult = contextSlugSchema.safeParse(
-    request.nextUrl.searchParams.get("contextCategory") ?? undefined,
+  const categoryPathResult = contextCategoryPathSchema.safeParse(
+    request.nextUrl.searchParams.get("contextCategoryPath") ?? undefined,
   );
   const brandSlugResult = contextSlugSchema.safeParse(
     request.nextUrl.searchParams.get("contextBrand") ?? undefined,
   );
 
   if (
-    !categorySlugResult.success ||
+    !categoryPathResult.success ||
     !brandSlugResult.success ||
-    (categorySlugResult.data && brandSlugResult.data)
+    (categoryPathResult.data && brandSlugResult.data)
   ) {
     return Response.json(
       { error: "Invalid catalog context." },
@@ -46,12 +51,12 @@ export async function GET(request: NextRequest) {
   const filters = {
     ...parsedFilters,
     brandSlugs: brandSlugResult.data ? [] : parsedFilters.brandSlugs,
-    categorySlugs: categorySlugResult.data ? [] : parsedFilters.categorySlugs,
+    categoryPaths: categoryPathResult.data ? [] : parsedFilters.categoryPaths,
   };
   const currencyContext = await getCurrencyContext();
   const data = await getMarketplaceCatalogPage({
     brandSlug: brandSlugResult.data,
-    categorySlug: categorySlugResult.data,
+    categoryPath: categoryPathResult.data,
     currencyContext,
     filters,
   });

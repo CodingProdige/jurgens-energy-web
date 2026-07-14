@@ -42,6 +42,13 @@ export const orders = pgTable("orders", {
       suburb: string;
     }>()
     .notNull(),
+  policyAcceptanceSnapshot: jsonb("policy_acceptance_snapshot").$type<{
+    acceptedAt: string;
+    effectiveDate: string;
+    privacyPolicyPath: string;
+    returnsAndRefundsPath: string;
+    termsAndConditionsPath: string;
+  }>(),
   checkoutTokenHash: varchar("checkout_token_hash", { length: 64 }),
   currency: varchar("currency", { length: 3 }).notNull().default("ZAR"),
   status: orderStatus("status").notNull().default("pending"),

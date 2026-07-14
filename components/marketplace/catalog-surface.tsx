@@ -23,7 +23,7 @@ function getContextDescription(data: MarketplaceCatalogPageData) {
 
 function getBaseHref(data: MarketplaceCatalogPageData) {
   if (data.context?.kind === "category") {
-    return `/categories/${data.context.slug}`;
+    return `/categories/${data.context.path}`;
   }
 
   if (data.context?.kind === "brand") {

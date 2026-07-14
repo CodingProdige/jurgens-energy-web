@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { cartLineInputSchema } from "@/src/modules/cart/contracts";
 import { normalizePhoneNumber } from "@/src/modules/phone";
+import { POLICY_EFFECTIVE_DATE_ISO } from "@/src/modules/marketplace/policies/constants";
 
 export const checkoutCustomerSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -59,6 +60,10 @@ export const createCheckoutOrderRequestSchema = checkoutQuoteRequestSchema.exten
   customer: checkoutCustomerSchema,
   deliverySelections: z.array(checkoutDeliverySelectionSchema).min(1).max(20),
   jurgensDeliverySchedule: checkoutDeliveryScheduleSchema.optional(),
+  policyAcceptance: z.object({
+    accepted: z.literal(true),
+    version: z.literal(POLICY_EFFECTIVE_DATE_ISO),
+  }),
 });
 
 export type CheckoutCustomer = z.infer<typeof checkoutCustomerSchema>;

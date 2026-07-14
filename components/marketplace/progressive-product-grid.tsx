@@ -111,7 +111,7 @@ export function ProgressiveProductGrid({
     });
 
     if (context.kind === "category") {
-      searchParams.set("contextCategory", context.slug);
+      searchParams.set("contextCategoryPath", context.path);
     } else if (context.kind === "brand") {
       searchParams.set("contextBrand", context.slug);
     }

@@ -709,7 +709,7 @@ function CategoryCard({
         "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:-translate-y-0.5 hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
         className,
       )}
-      href={`/categories/${category.slug}`}
+      href={`/categories/${category.path}`}
     >
       <div className="relative aspect-square bg-[#f7f7f2] dark:bg-[#1a1a1a]">
         <StorefrontCollectionImage

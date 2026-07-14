@@ -73,7 +73,7 @@ function clearFacetFilters(filters: MarketplaceCatalogFilters) {
   return {
     ...filters,
     brandSlugs: [],
-    categorySlugs: [],
+    categoryPaths: [],
     exchangeSupported: false,
     inStock: false,
     maxPrice: null,
@@ -205,10 +205,10 @@ function FilterFields({
         <FilterSection title="Category">
           <FacetOptions
             onToggle={(value) =>
-              update({ categorySlugs: toggleValue(filters.categorySlugs, value) })
+              update({ categoryPaths: toggleValue(filters.categoryPaths, value) })
             }
             options={data.facets.categories}
-            selectedValues={filters.categorySlugs}
+            selectedValues={filters.categoryPaths}
           />
         </FilterSection>
       ) : null}
@@ -377,14 +377,14 @@ export function MarketplaceCatalogControls({
       remove: () => MarketplaceCatalogFilters;
     }> = [];
 
-    for (const value of filters.categorySlugs) {
+    for (const value of filters.categoryPaths) {
       const option = data.facets.categories.find((item) => item.value === value);
       chips.push({
         key: `category-${value}`,
         label: option?.label ?? value,
         remove: () => ({
           ...filters,
-          categorySlugs: filters.categorySlugs.filter((item) => item !== value),
+          categoryPaths: filters.categoryPaths.filter((item) => item !== value),
           page: 1,
         }),
       });

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { normalizePhoneNumber } from "@/src/modules/phone";
 
-function WhatsappIcon({ className }: { className?: string }) {
+export function MarketplaceWhatsAppIcon({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
@@ -29,14 +29,8 @@ function WhatsappIcon({ className }: { className?: string }) {
   );
 }
 
-export function MarketplaceWhatsAppButton({
-  enabled,
-  phoneNumber,
-}: {
-  enabled: boolean;
-  phoneNumber: string | null;
-}) {
-  if (!enabled || !phoneNumber) {
+export function createMarketplaceWhatsAppHref(phoneNumber: string | null) {
+  if (!phoneNumber) {
     return null;
   }
 
@@ -51,16 +45,36 @@ export function MarketplaceWhatsAppButton({
   const phoneDigits = normalizedPhone.replace(/\D/g, "");
   const text = encodeURIComponent("Hi Jurgens Energy, I need a gas topup.");
 
+  return phoneDigits ? `https://wa.me/${phoneDigits}?text=${text}` : null;
+}
+
+export function MarketplaceWhatsAppButton({
+  enabled,
+  phoneNumber,
+}: {
+  enabled: boolean;
+  phoneNumber: string | null;
+}) {
+  if (!enabled || !phoneNumber) {
+    return null;
+  }
+
+  const whatsappHref = createMarketplaceWhatsAppHref(phoneNumber);
+
+  if (!whatsappHref) {
+    return null;
+  }
+
   return (
     <Link
       aria-label="Order LPG gas on WhatsApp"
       className="group fixed bottom-5 right-5 z-[45] inline-flex h-14 items-center gap-2.5 overflow-hidden rounded-full bg-[#080808] px-5 text-sm font-normal uppercase text-white shadow-[0_14px_30px_rgba(8,8,8,0.24),0_0_16px_rgba(37,211,102,0.12)] ring-1 ring-[#25d366]/10 transition hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#25d366]/25 dark:ring-[#25d366]/15 max-[520px]:bottom-4 max-[520px]:right-4 max-[520px]:size-14 max-[520px]:justify-center max-[520px]:px-0"
-      href={`https://wa.me/${phoneDigits}?text=${text}`}
+      href={whatsappHref}
       rel="noreferrer"
       target="_blank"
     >
       <span className="marketplace-whatsapp-shimmer pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-      <WhatsappIcon className="relative z-10 size-6 text-[#25d366]" />
+      <MarketplaceWhatsAppIcon className="relative z-10 size-6 text-[#25d366]" />
       <span className="relative z-10 text-white max-[520px]:sr-only">
         Need gas?
       </span>

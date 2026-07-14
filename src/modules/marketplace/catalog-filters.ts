@@ -13,7 +13,7 @@ export type MarketplaceCatalogSort =
 
 export type MarketplaceCatalogFilters = {
   brandSlugs: string[];
-  categorySlugs: string[];
+  categoryPaths: string[];
   exchangeSupported: boolean;
   inStock: boolean;
   maxPrice: number | null;
@@ -30,6 +30,12 @@ export type MarketplaceCatalogSearchParams = Record<
 >;
 
 const slugSchema = z.string().trim().toLowerCase().regex(/^[a-z0-9-]+$/).max(160);
+const categoryPathSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/)
+  .max(760);
 const sortSchema = z.enum(marketplaceCatalogSortValues);
 
 function valuesFromParam(value: string | string[] | undefined) {
@@ -75,6 +81,18 @@ function parseSlugs(value: string | string[] | undefined) {
   ).slice(0, 30);
 }
 
+function parseCategoryPaths(value: string | string[] | undefined) {
+  return Array.from(
+    new Set(
+      valuesFromParam(value).flatMap((item) => {
+        const parsed = categoryPathSchema.safeParse(item);
+
+        return parsed.success ? [parsed.data] : [];
+      }),
+    ),
+  ).slice(0, 30);
+}
+
 export function parseMarketplaceCatalogFilters(
   searchParams: MarketplaceCatalogSearchParams,
 ): MarketplaceCatalogFilters {
@@ -85,7 +103,7 @@ export function parseMarketplaceCatalogFilters(
 
   return {
     brandSlugs: parseSlugs(searchParams.brand),
-    categorySlugs: parseSlugs(searchParams.category),
+    categoryPaths: parseCategoryPaths(searchParams.category),
     exchangeSupported: parseBoolean(searchParams.exchange),
     inStock: parseBoolean(searchParams.stock),
     maxPrice:
@@ -105,7 +123,7 @@ export function getMarketplaceCatalogActiveFilterCount(
 ) {
   return (
     filters.brandSlugs.length +
-    filters.categorySlugs.length +
+    filters.categoryPaths.length +
     Number(filters.exchangeSupported) +
     Number(filters.inStock) +
     Number(filters.onSale) +
@@ -122,8 +140,8 @@ export function createMarketplaceCatalogSearchParams(
     searchParams.set("q", filters.query);
   }
 
-  for (const categorySlug of filters.categorySlugs) {
-    searchParams.append("category", categorySlug);
+  for (const categoryPath of filters.categoryPaths) {
+    searchParams.append("category", categoryPath);
   }
 
   for (const brandSlug of filters.brandSlugs) {

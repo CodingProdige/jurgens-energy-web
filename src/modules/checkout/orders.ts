@@ -207,6 +207,13 @@ export async function createHostedCheckoutOrder(
         deliveryAddressSnapshot,
         grandTotal: grandTotal.toFixed(2),
         orderNumber,
+        policyAcceptanceSnapshot: {
+          acceptedAt: new Date().toISOString(),
+          effectiveDate: parsed.policyAcceptance.version,
+          privacyPolicyPath: "/privacy-policy",
+          returnsAndRefundsPath: "/returns-and-refunds",
+          termsAndConditionsPath: "/terms-and-conditions",
+        },
         shippingTotal: shippingTotal.toFixed(2),
         subtotal: subtotal.toFixed(2),
         userId: session?.user?.id || null,

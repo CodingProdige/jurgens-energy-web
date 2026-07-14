@@ -65,6 +65,8 @@ function createWhatsappUrl(phoneNumber: string | null) {
 export async function MarketplaceFooter() {
   const settings = await getMarketplaceSettings();
   const whatsappUrl = createWhatsappUrl(settings.whatsappBusinessPhoneNumber);
+  const primaryContactPhone =
+    settings.contactPhonePrimary ?? settings.whatsappBusinessPhoneNumber;
   const socialLinks = [
     settings.facebookUrl
       ? { href: settings.facebookUrl, icon: FacebookMark, label: "Facebook" }
@@ -80,11 +82,11 @@ export async function MarketplaceFooter() {
       : null,
   ].filter((item): item is NonNullable<typeof item> => Boolean(item));
   const contactLines = [
-    settings.contactPhonePrimary
+    primaryContactPhone
       ? {
-          href: `tel:${settings.contactPhonePrimary.replace(/[^\d+]/g, "")}`,
+          href: `tel:${primaryContactPhone.replace(/[^\d+]/g, "")}`,
           icon: PhoneIcon,
-          label: settings.contactPhonePrimary,
+          label: primaryContactPhone,
         }
       : null,
     settings.contactPhoneSecondary
@@ -176,7 +178,10 @@ export async function MarketplaceFooter() {
             links={[
               ["All Products", "/products"],
               ["Cylinder Exchange", "/products?exchange=1"],
-              ["Accessories", "/products?category=accessories"],
+              [
+                "Accessories",
+                "/categories/gas-cylinders/cylinder-accessories",
+              ],
               ["Deals", "/products?sale=1"],
               ["Brands", "/products"],
             ]}
@@ -186,7 +191,7 @@ export async function MarketplaceFooter() {
             links={[
               ["About Us", "/#about"],
               ["Safety", "/#delivery"],
-              ["Delivery", "/#delivery"],
+              ["Delivery", "/delivery-information"],
               ["FAQs", "/#exchange"],
               ["Contact Us", "/#contact"],
             ]}
@@ -195,9 +200,9 @@ export async function MarketplaceFooter() {
           <FooterColumn
             links={[
               ["My Orders", "/cart"],
-              ["Returns", "/#contact"],
-              ["Terms & Conditions", "/#contact"],
-              ["Privacy Policy", "/#contact"],
+              ["Returns", "/returns-and-refunds"],
+              ["Terms & Conditions", "/terms-and-conditions"],
+              ["Privacy Policy", "/privacy-policy"],
             ]}
             title="Help"
           />
@@ -252,7 +257,7 @@ export async function MarketplaceFooter() {
         </section>
 
         <div className="flex flex-col gap-3 px-4 pt-4 text-[12px] text-[#696963] dark:text-[#a8a89f] sm:flex-row sm:items-center sm:justify-between sm:px-0">
-          <p>© 2025 Jurgens Energy. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Jurgens Energy. All rights reserved.</p>
           <p className="font-semibold text-[#1a1a1a] dark:text-[#f7f7f2]">
             Designed with care in South Africa
           </p>

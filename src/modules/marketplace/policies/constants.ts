@@ -1,0 +1,2 @@
+export const POLICY_EFFECTIVE_DATE = "14 July 2026";
+export const POLICY_EFFECTIVE_DATE_ISO = "2026-07-14";

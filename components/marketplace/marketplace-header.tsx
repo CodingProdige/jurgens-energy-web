@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ChevronDownIcon } from "lucide-react";
 
 import { auth } from "@/auth";
 import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
@@ -11,7 +10,12 @@ import {
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
 import { MarketplaceCartLink } from "@/components/marketplace/marketplace-cart-link";
 import { MarketplaceHeaderShell } from "@/components/marketplace/marketplace-header-shell";
-import { MarketplaceMobileMenu } from "@/components/marketplace/marketplace-mobile-menu";
+import {
+  MarketplaceMobileMenu,
+  type MarketplaceNavItem,
+} from "@/components/marketplace/marketplace-mobile-menu";
+import { MarketplaceShopMenu } from "@/components/marketplace/marketplace-shop-menu";
+import { createMarketplaceWhatsAppHref } from "@/components/marketplace/marketplace-whatsapp-button";
 import { marketplaceTrustItems } from "@/components/marketplace/marketplace-trust-items";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -21,23 +25,60 @@ import {
   getNotificationCenter,
 } from "@/src/modules/notifications/in-app";
 import { getCurrencyPreference } from "@/src/modules/currency/server";
+import {
+  getMarketplaceShopMenuData,
+  type MarketplaceShopMenuCategory,
+} from "@/src/modules/marketplace/catalog";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 
-const navItems = [
-  ["Home", "/"],
-  ["Shop", "/products"],
-  ["Cylinder Exchange", "/products?exchange=1"],
-  ["Accessories", "/products?category=accessories"],
-  ["Delivery", "/#delivery"],
-  ["Blog", "/blog"],
-  ["About Us", "/#about"],
-  ["Contact", "/#contact"],
-] as const;
+function findAccessoriesCategory(
+  categories: MarketplaceShopMenuCategory[],
+): MarketplaceShopMenuCategory | null {
+  for (const category of categories) {
+    if (
+      category.name.toLowerCase().includes("accessor") ||
+      category.slug.toLowerCase().includes("accessor")
+    ) {
+      return category;
+    }
+
+    const childMatch = findAccessoriesCategory(category.children);
+
+    if (childMatch) {
+      return childMatch;
+    }
+  }
+
+  return null;
+}
 
 export async function MarketplaceHeader() {
-  const [session, currencyPreference] = await Promise.all([
-    auth(),
-    getCurrencyPreference(),
-  ]);
+  const [session, currencyPreference, shopMenuData, marketplaceSettings] =
+    await Promise.all([
+      auth(),
+      getCurrencyPreference(),
+      getMarketplaceShopMenuData(),
+      getMarketplaceSettings(),
+    ]);
+  const whatsappHref = marketplaceSettings.whatsappOrderingEnabled
+    ? createMarketplaceWhatsAppHref(
+        marketplaceSettings.whatsappBusinessPhoneNumber,
+      )
+    : null;
+  const accessoriesCategory = findAccessoriesCategory(shopMenuData.categories);
+  const accessoriesHref = accessoriesCategory
+    ? `/categories/${accessoriesCategory.path}`
+    : "/products";
+  const navItems: readonly MarketplaceNavItem[] = [
+    ["Home", "/"],
+    ["Shop", "/products"],
+    ["Cylinder Exchange", "/products?exchange=1"],
+    ["Accessories", accessoriesHref],
+    ["Delivery", "/#delivery"],
+    ["Blog", "/blog"],
+    ["About Us", "/#about"],
+    ["Contact", "/#contact"],
+  ];
   const accountUser: MarketplaceAccountSummary | null = session?.user
     ? {
         email: session.user.email,
@@ -84,8 +125,13 @@ export async function MarketplaceHeader() {
           </div>
         </div>
       </div>
-      <div className="mx-auto flex h-16 w-full items-center justify-between gap-2 overflow-hidden px-3 sm:h-[82px] sm:w-[min(1500px,calc(100%-1rem))] sm:gap-3 sm:px-6 lg:px-10">
-        <MarketplaceMobileMenu accountUser={accountUser} navItems={navItems} />
+      <div className="mx-auto flex h-16 w-full items-center justify-between gap-2 px-3 sm:h-[82px] sm:w-[min(1500px,calc(100%-1rem))] sm:gap-3 sm:px-6 lg:px-10">
+        <MarketplaceMobileMenu
+          accountUser={accountUser}
+          navItems={navItems}
+          shopMenuData={shopMenuData}
+          whatsappHref={whatsappHref}
+        />
 
         <Link
           aria-label="Jurgens Energy home"
@@ -97,23 +143,24 @@ export async function MarketplaceHeader() {
         </Link>
 
         <nav className="hidden min-w-0 flex-1 items-center justify-center gap-7 text-[12px] font-black uppercase text-[#080808] dark:text-[#f7f7f2] xl:flex 2xl:gap-8">
-          {navItems.map(([label, href], index) => (
-            <Link
-              className="group relative inline-flex h-[82px] items-center gap-1 transition hover:text-[#ff5a1f]"
-              href={href}
-              key={label}
-            >
-              <span>{label}</span>
-              {label === "Shop" ? <ChevronDownIcon className="size-3" /> : null}
-              <span
-                className={
-                  index === 0
-                    ? "absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f]"
-                    : "absolute inset-x-0 bottom-5 h-0.5 scale-x-0 rounded-full bg-[#ff5a1f] transition group-hover:scale-x-100"
-                }
+          {navItems.map(([label, href]) =>
+            label === "Shop" ? (
+              <MarketplaceShopMenu
+                data={shopMenuData}
+                key={label}
+                whatsappHref={whatsappHref}
               />
-            </Link>
-          ))}
+            ) : (
+              <Link
+                className="group relative inline-flex h-[82px] items-center gap-1 transition hover:text-[#ff5a1f]"
+                href={href}
+                key={label}
+              >
+                <span>{label}</span>
+                <span className="absolute inset-x-0 bottom-5 h-0.5 scale-x-0 rounded-full bg-[#ff5a1f] transition group-hover:scale-x-100" />
+              </Link>
+            ),
+          )}
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">

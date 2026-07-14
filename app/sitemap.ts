@@ -2,12 +2,16 @@ import type { MetadataRoute } from "next";
 
 import { getPublishedBlogPostSitemapEntries } from "@/src/modules/blog";
 import { getMarketplaceSitemapEntries } from "@/src/modules/marketplace/catalog";
+import { POLICY_EFFECTIVE_DATE_ISO } from "@/src/modules/marketplace/policies/constants";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 
 export const dynamic = "force-dynamic";
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
 type SitemapChangeFrequency = NonNullable<SitemapEntry["changeFrequency"]>;
+const policyEffectiveDate = new Date(
+  `${POLICY_EFFECTIVE_DATE_ISO}T00:00:00+02:00`,
+);
 
 function latestDate(dates: Array<Date | null | undefined>) {
   return dates.reduce<Date | null>((latest, date) => {
@@ -81,6 +85,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       path: "/blog",
       priority: 0.7,
     }),
+    sitemapEntry({
+      changeFrequency: "yearly",
+      lastModified: policyEffectiveDate,
+      path: "/privacy-policy",
+      priority: 0.4,
+    }),
+    sitemapEntry({
+      changeFrequency: "yearly",
+      lastModified: policyEffectiveDate,
+      path: "/terms-and-conditions",
+      priority: 0.4,
+    }),
+    sitemapEntry({
+      changeFrequency: "yearly",
+      lastModified: policyEffectiveDate,
+      path: "/returns-and-refunds",
+      priority: 0.4,
+    }),
+    sitemapEntry({
+      changeFrequency: "yearly",
+      lastModified: policyEffectiveDate,
+      path: "/delivery-information",
+      priority: 0.4,
+    }),
     ...catalogEntries.products.map((product) =>
       sitemapEntry({
         changeFrequency: "weekly",
@@ -93,7 +121,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       sitemapEntry({
         changeFrequency: "weekly",
         lastModified: category.updatedAt,
-        path: `/categories/${category.slug}`,
+        path: `/categories/${category.path}`,
         priority: 0.7,
       }),
     ),
