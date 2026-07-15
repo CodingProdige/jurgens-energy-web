@@ -10,6 +10,7 @@ import {
   LogOutIcon,
   MenuIcon,
   MessageCircleIcon,
+  PackageIcon,
   ShoppingCartIcon,
   UserIcon,
 } from "lucide-react";
@@ -345,6 +346,26 @@ export function MarketplaceMobileMenu({
             </nav>
 
             <div className="grid gap-2 border-t border-[#ecece6] pt-5 dark:border-white/10">
+              {accountUser ? (
+                <>
+                  <Link
+                    className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                    href="/account"
+                    onClick={closeMenu}
+                  >
+                    <UserIcon className="size-4" />
+                    My account
+                  </Link>
+                  <Link
+                    className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                    href="/account/orders"
+                    onClick={closeMenu}
+                  >
+                    <PackageIcon className="size-4" />
+                    My orders
+                  </Link>
+                </>
+              ) : null}
               <Link
                 className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
                 href={accountUser ? "/account/whatsapp" : "/sign-in"}

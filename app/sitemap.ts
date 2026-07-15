@@ -12,6 +12,8 @@ type SitemapChangeFrequency = NonNullable<SitemapEntry["changeFrequency"]>;
 const policyEffectiveDate = new Date(
   `${POLICY_EFFECTIVE_DATE_ISO}T00:00:00+02:00`,
 );
+// Keep this aligned with edits to the static About, Contact, FAQ, or Safety copy.
+const contentPageLastModified = new Date("2026-07-15T00:00:00+02:00");
 
 function latestDate(dates: Array<Date | null | undefined>) {
   return dates.reduce<Date | null>((latest, date) => {
@@ -84,6 +86,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: latestBlogDate ?? latestMarketplaceDate,
       path: "/blog",
       priority: 0.7,
+    }),
+    sitemapEntry({
+      changeFrequency: "weekly",
+      lastModified: latestBrandDate ?? latestMarketplaceDate,
+      path: "/brands",
+      priority: 0.7,
+    }),
+    sitemapEntry({
+      changeFrequency: "monthly",
+      lastModified: contentPageLastModified,
+      path: "/about",
+      priority: 0.6,
+    }),
+    sitemapEntry({
+      changeFrequency: "monthly",
+      lastModified: contentPageLastModified,
+      path: "/contact",
+      priority: 0.6,
+    }),
+    sitemapEntry({
+      changeFrequency: "monthly",
+      lastModified: contentPageLastModified,
+      path: "/faq",
+      priority: 0.6,
+    }),
+    sitemapEntry({
+      changeFrequency: "monthly",
+      lastModified: contentPageLastModified,
+      path: "/lpg-safety",
+      priority: 0.6,
     }),
     sitemapEntry({
       changeFrequency: "yearly",

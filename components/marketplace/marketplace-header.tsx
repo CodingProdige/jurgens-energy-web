@@ -74,10 +74,10 @@ export async function MarketplaceHeader() {
     ["Shop", "/products"],
     ["Cylinder Exchange", "/products?exchange=1"],
     ["Accessories", accessoriesHref],
-    ["Delivery", "/#delivery"],
+    ["Delivery", "/delivery-information"],
     ["Blog", "/blog"],
-    ["About Us", "/#about"],
-    ["Contact", "/#contact"],
+    ["About Us", "/about"],
+    ["Contact", "/contact"],
   ];
   const accountUser: MarketplaceAccountSummary | null = session?.user
     ? {

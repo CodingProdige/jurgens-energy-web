@@ -7,6 +7,7 @@ import {
   LayoutDashboardIcon,
   LogOutIcon,
   MessageCircleIcon,
+  PackageIcon,
   ShoppingCartIcon,
   UserIcon,
 } from "lucide-react";
@@ -123,6 +124,24 @@ export function MarketplaceAccountMenu({
         </div>
 
         <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="cursor-pointer gap-2 px-3 py-2"
+          render={
+            <Link href="/account">
+              <UserIcon className="size-4" />
+              My account
+            </Link>
+          }
+        />
+        <DropdownMenuItem
+          className="cursor-pointer gap-2 px-3 py-2"
+          render={
+            <Link href="/account/orders">
+              <PackageIcon className="size-4" />
+              My orders
+            </Link>
+          }
+        />
         <DropdownMenuItem
           className="cursor-pointer gap-2 px-3 py-2"
           render={

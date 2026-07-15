@@ -233,7 +233,7 @@ export function MarketplaceShopMenu({
         aria-controls="marketplace-shop-mega-menu"
         aria-expanded={open}
         aria-haspopup="true"
-        className="group relative inline-flex h-[82px] items-center gap-1 transition hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:text-[#ff5a1f]"
+        className="group relative inline-flex h-[82px] items-center gap-1 text-[12px] font-black uppercase leading-none text-[#ff5a1f] transition hover:text-[#e84c15] focus-visible:outline-none focus-visible:text-[#e84c15]"
         onClick={() => {
           if (open) {
             closeMenu();

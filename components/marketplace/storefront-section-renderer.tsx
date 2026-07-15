@@ -636,7 +636,7 @@ function BrandCollectionList({
     >
       {brands.length > 0 ? (
         brands.map((brand) => (
-          <BrandCard
+          <MarketplaceBrandCard
             brand={brand}
             className={
               isCarousel
@@ -732,7 +732,7 @@ function CategoryCard({
   );
 }
 
-function BrandCard({
+export function MarketplaceBrandCard({
   brand,
   className,
 }: {

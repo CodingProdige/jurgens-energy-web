@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
-import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
-import { MarketplaceHeader } from "@/components/marketplace/marketplace-header";
+import { AccountPageShell } from "@/src/modules/marketplace/account/components";
 import { getPrimaryWhatsappCustomerLinkForUser } from "@/src/modules/whatsapp-ordering/customer-links";
 import { WhatsappNumberForm } from "@/app/(marketplace)/account/whatsapp/whatsapp-number-form";
 
@@ -48,20 +46,18 @@ export default async function AccountWhatsappPage({
   const nextPath = getSafeNextPath(next);
 
   return (
-    <MarketplaceGate>
-      <div className="min-h-screen bg-[#f7f7f2] text-[#080808] dark:bg-[#080808] dark:text-[#f7f7f2]">
-        <MarketplaceHeader />
-        <main className="w-full overflow-x-clip bg-[#f7f7f2] pb-10 dark:bg-[#080808] sm:mx-auto sm:w-[min(1500px,calc(100%-1rem))]">
-          <div className="mx-auto grid w-full max-w-2xl gap-5 px-4 py-8 sm:px-6 lg:px-8">
-            <WhatsappNumberForm
-              currentPhone={whatsappLink?.phone ?? null}
-              error={getErrorMessage(error)}
-              nextPath={nextPath}
-            />
-          </div>
-        </main>
-        <MarketplaceFooter />
+    <AccountPageShell
+      active="whatsapp"
+      description="Connect the number you use for WhatsApp orders, delivery updates, invoices, and support."
+      title="WhatsApp number"
+    >
+      <div className="w-full max-w-2xl">
+        <WhatsappNumberForm
+          currentPhone={whatsappLink?.phone ?? null}
+          error={getErrorMessage(error)}
+          nextPath={nextPath}
+        />
       </div>
-    </MarketplaceGate>
+    </AccountPageShell>
   );
 }

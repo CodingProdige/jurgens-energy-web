@@ -36,9 +36,9 @@ export function WhatsappNumberForm({
         <span className="inline-flex size-10 items-center justify-center rounded-full bg-[#18a957]/10 text-[#18a957]">
           <MessageCircleIcon className="size-5" />
         </span>
-        <h1 className="mt-4 text-2xl font-black leading-tight">
+        <h2 className="mt-4 text-2xl font-black leading-tight">
           Link your WhatsApp number
-        </h1>
+        </h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-[#666660] dark:text-[#aaa9a1]">
           We use this to connect WhatsApp orders, delivery updates, invoices,
           and support conversations to your account.

@@ -165,7 +165,7 @@ export function PolicyPage({ document }: { document: PolicyDocument }) {
               </div>
               <Link
                 className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#ff5a1f] px-5 text-[12px] font-black uppercase tracking-[0.06em] text-white transition hover:bg-[#e94d15]"
-                href="#contact"
+                href="/contact"
               >
                 Contact us
                 <ArrowRightIcon className="size-4" />

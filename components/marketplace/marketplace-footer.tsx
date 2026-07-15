@@ -183,23 +183,23 @@ export async function MarketplaceFooter() {
                 "/categories/gas-cylinders/cylinder-accessories",
               ],
               ["Deals", "/products?sale=1"],
-              ["Brands", "/products"],
+              ["Brands", "/brands"],
             ]}
             title="Shop"
           />
           <FooterColumn
             links={[
-              ["About Us", "/#about"],
-              ["Safety", "/#delivery"],
+              ["About Us", "/about"],
+              ["Safety", "/lpg-safety"],
               ["Delivery", "/delivery-information"],
-              ["FAQs", "/#exchange"],
-              ["Contact Us", "/#contact"],
+              ["FAQs", "/faq"],
+              ["Contact Us", "/contact"],
             ]}
             title="Company"
           />
           <FooterColumn
             links={[
-              ["My Orders", "/cart"],
+              ["My Orders", "/account/orders"],
               ["Returns", "/returns-and-refunds"],
               ["Terms & Conditions", "/terms-and-conditions"],
               ["Privacy Policy", "/privacy-policy"],
