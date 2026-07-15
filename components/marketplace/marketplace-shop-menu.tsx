@@ -77,13 +77,13 @@ function ExchangeableProductCard({
       href={`/products/${product.slug}`}
       onClick={onNavigate}
     >
-      <span className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.08]">
+      <span className="relative grid h-14 w-16 shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.08]">
         {product.imageUrl ? (
           <Image
             alt=""
-            className="size-full object-contain p-1"
+            className="object-cover"
             fill
-            sizes="56px"
+            sizes="64px"
             src={product.imageUrl}
             unoptimized
           />

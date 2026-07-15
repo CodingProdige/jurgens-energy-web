@@ -24,7 +24,7 @@ export function AccountOverviewView({
     <>
       <section className="grid gap-4 sm:grid-cols-2">
         <Link
-          className="group grid min-w-0 gap-4 rounded-md bg-[#080808] p-5 text-white transition hover:bg-[#1a1a1a] dark:bg-[#f7f7f2] dark:text-[#080808] dark:hover:bg-white sm:p-6"
+          className="group grid min-w-0 gap-4 rounded-md border border-[#ff5a1f]/30 bg-[#fff6f1] p-5 text-[#080808] shadow-[0_10px_30px_rgba(255,90,31,0.08)] transition hover:border-[#ff5a1f]/60 hover:bg-white dark:border-[#ff5a1f]/35 dark:bg-[#1a120f] dark:text-[#f7f7f2] dark:hover:bg-[#241712] sm:p-6"
           href="/account/orders"
         >
           <div className="flex items-start justify-between gap-4">
@@ -36,7 +36,7 @@ export function AccountOverviewView({
           <div>
             <p className="text-3xl font-black tabular-nums">{orderCount}</p>
             <h2 className="mt-1 font-black">Order history</h2>
-            <p className="mt-1 text-xs leading-5 text-white/65 dark:text-[#666660]">
+            <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#d8c9c1]">
               View receipts, products, payment status, and delivery tracking.
             </p>
           </div>

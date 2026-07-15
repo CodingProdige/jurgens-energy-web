@@ -183,7 +183,7 @@ export function AccountPageShell({
                     className={cn(
                       "shrink-0 rounded-sm px-3 py-2 text-xs font-black uppercase tracking-wide transition",
                       active === link.id
-                        ? "bg-[#080808] text-white dark:bg-[#f7f7f2] dark:text-[#080808]"
+                        ? "bg-[#ff5a1f] text-white shadow-[0_8px_20px_rgba(255,90,31,0.22)] dark:bg-[#ff5a1f] dark:text-white"
                         : "text-[#696963] hover:bg-[#f7f7f2] hover:text-[#080808] dark:text-[#b8b8b0] dark:hover:bg-white/[0.06] dark:hover:text-white",
                     )}
                     href={link.href}
