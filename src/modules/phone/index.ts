@@ -295,6 +295,30 @@ export function getPhoneCountryOption(
 
 export function normalizeInternationalPhoneNumber(value: string) {
   const digits = value.trim().replace(/^00/, "").replace(/\D/g, "");
+
+  if (!digits) {
+    return null;
+  }
+
+  const countryRule = phoneCountryOptionsByCallingCode.find((option) =>
+    digits.startsWith(option.callingCode),
+  );
+
+  if (countryRule) {
+    const nationalNumber = stripNationalTrunkPrefix(
+      digits.slice(countryRule.callingCode.length),
+      countryRule,
+    );
+
+    if (!isValidNationalNumber(nationalNumber, countryRule)) {
+      return null;
+    }
+
+    const normalized = `+${countryRule.callingCode}${nationalNumber}`;
+
+    return e164Pattern.test(normalized) ? normalized : null;
+  }
+
   const normalized = `+${digits}`;
 
   return e164Pattern.test(normalized) ? normalized : null;
@@ -361,6 +385,23 @@ export function requireNormalizedPhoneNumber(
   }
 
   return normalized;
+}
+
+export function normalizeNationalPhoneInputValue(
+  value: string,
+  countryCode: PhoneCountryCode = defaultPhoneCountryCode,
+) {
+  const country = getPhoneCountryOption(countryCode);
+  const normalized = normalizePhoneNumber(value, {
+    defaultCountryCode: country.code,
+  });
+  const callingCodePrefix = `+${country.callingCode}`;
+
+  if (!normalized?.startsWith(callingCodePrefix)) {
+    return null;
+  }
+
+  return normalized.slice(callingCodePrefix.length);
 }
 
 export function getPhoneInputParts(

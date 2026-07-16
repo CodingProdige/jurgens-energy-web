@@ -1,11 +1,12 @@
 "use client";
 
-import type { ChangeEventHandler } from "react";
+import { useState, type ChangeEventHandler } from "react";
 
 import {
   defaultPhoneCountryCode,
   getPhoneInputParts,
   isPhoneCountryCode,
+  normalizeNationalPhoneInputValue,
   phoneCountryOptions,
   type PhoneCountryCode,
 } from "@/src/modules/phone";
@@ -51,7 +52,9 @@ export function CountryPhoneInput({
   const fieldId = id ?? name;
   const countryFieldName = `${name}CountryCode`;
   const parts = getPhoneInputParts(defaultValue, defaultCountryCode);
-  const selectedCountryCode = countryCode ?? parts.countryCode;
+  const [uncontrolledCountryCode, setUncontrolledCountryCode] =
+    useState<PhoneCountryCode>(parts.countryCode);
+  const selectedCountryCode = countryCode ?? uncontrolledCountryCode;
   const lockCountry = disabled || readOnly;
 
   return (
@@ -78,12 +81,13 @@ export function CountryPhoneInput({
         name={countryFieldName}
         onChange={(event) => {
           if (isPhoneCountryCode(event.target.value)) {
+            if (countryCode === undefined) {
+              setUncontrolledCountryCode(event.target.value);
+            }
             onCountryCodeChange?.(event.target.value);
           }
         }}
-        {...(countryCode === undefined
-          ? { defaultValue: parts.countryCode }
-          : { value: selectedCountryCode })}
+        value={selectedCountryCode}
       >
         {phoneCountryOptions.map((country) => (
           <option key={country.code} value={country.code}>
@@ -101,7 +105,21 @@ export function CountryPhoneInput({
         id={fieldId}
         inputMode="tel"
         name={name}
-        onChange={onChange}
+        onChange={(event) => {
+          const normalizedNationalNumber = normalizeNationalPhoneInputValue(
+            event.currentTarget.value,
+            selectedCountryCode,
+          );
+
+          if (
+            normalizedNationalNumber !== null &&
+            normalizedNationalNumber !== event.currentTarget.value
+          ) {
+            event.currentTarget.value = normalizedNationalNumber;
+          }
+
+          onChange?.(event);
+        }}
         placeholder={placeholder}
         readOnly={readOnly}
         required={required}
