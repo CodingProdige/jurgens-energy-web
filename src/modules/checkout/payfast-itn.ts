@@ -15,10 +15,10 @@ import {
 } from "@/src/db/schema";
 import { sendJurgensDeliveryStatusNotification } from "@/src/modules/orders/jurgens-delivery-notifications";
 import {
-  createPayFastParameterString,
-  createPayFastSignature,
+  createPayFastItnParameterString,
+  createPayFastItnSignature,
   type PayFastField,
-} from "@/src/modules/checkout/payfast";
+} from "@/src/modules/checkout/payfast-signature";
 import {
   completePayFastItnAuditEvent,
   createPayFastItnAuditEvent,
@@ -160,7 +160,7 @@ async function validateWithPayFast(
 ) {
   try {
     const response = await fetch(validationUrl, {
-      body: createPayFastParameterString(fields),
+      body: createPayFastItnParameterString(fields),
       cache: "no-store",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       method: "POST",
@@ -247,7 +247,7 @@ async function processPayFastItnFields({
   }
 
   onStage("signature");
-  const expectedSignature = createPayFastSignature(fields, config.passphrase);
+  const expectedSignature = createPayFastItnSignature(fields, config.passphrase);
 
   if (
     !timingSafeStringEqual(signature.toLowerCase(), expectedSignature.toLowerCase())

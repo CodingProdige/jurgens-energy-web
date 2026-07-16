@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/src/db";
@@ -6,39 +5,19 @@ import { orderItems, payments } from "@/src/db/schema";
 import { env } from "@/src/config/env";
 import { getCheckoutOrderWithToken } from "@/src/modules/checkout/orders";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
+import {
+  createPayFastSignature,
+  type PayFastField,
+} from "@/src/modules/checkout/payfast-signature";
 
-export type PayFastField = {
-  name: string;
-  value: string;
-};
-
-export function encodePayFastValue(value: string) {
-  return encodeURIComponent(value.trim()).replace(/%20/g, "+");
-}
-
-export function createPayFastParameterString(
-  fields: PayFastField[],
-  passphrase?: string | null,
-) {
-  const parameterString = fields
-    .filter((field) => field.name !== "signature" && field.value !== "")
-    .map((field) => `${field.name}=${encodePayFastValue(field.value)}`)
-    .join("&");
-
-  return passphrase
-    ? `${parameterString}&passphrase=${encodePayFastValue(passphrase)}`
-    : parameterString;
-}
-
-export function createPayFastSignature(
-  fields: PayFastField[],
-  passphrase?: string | null,
-) {
-  return crypto
-    .createHash("md5")
-    .update(createPayFastParameterString(fields, passphrase))
-    .digest("hex");
-}
+export {
+  createPayFastItnParameterString,
+  createPayFastItnSignature,
+  createPayFastParameterString,
+  createPayFastSignature,
+  encodePayFastValue,
+  type PayFastField,
+} from "@/src/modules/checkout/payfast-signature";
 
 function splitCustomerName(name: string) {
   const parts = name.trim().split(/\s+/);
