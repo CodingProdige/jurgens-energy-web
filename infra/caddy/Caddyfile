@@ -12,6 +12,8 @@ http://{$DOMAIN:localhost}, http://{$ADMIN_HOSTNAME:admin.localhost}, http://{$S
 	}
 
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy web:3000 {
+			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+		}
 	}
 }

@@ -13,6 +13,9 @@ import type {
 } from "@/src/modules/checkout/contracts";
 import { getLatestOwnedCheckoutAddress } from "@/src/modules/checkout/orders";
 import { getCheckoutAddressBook } from "@/src/modules/marketplace/account/addresses";
+import {
+  getPrimaryWhatsappCustomerLinkForUser,
+} from "@/src/modules/whatsapp-ordering/customer-links";
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -25,6 +28,7 @@ export default async function CheckoutPage() {
   const userId = session?.user?.id ?? null;
   let initialAddresses: CheckoutSavedAddress[] = [];
   let initialFallbackAddress: CheckoutAddressPrefill | null = null;
+  let initialPhone = "";
 
   if (userId) {
     const addressBook = await getCheckoutAddressBook(userId);
@@ -45,7 +49,13 @@ export default async function CheckoutPage() {
     }));
 
     if (initialAddresses.length === 0) {
-      initialFallbackAddress = await getLatestOwnedCheckoutAddress(userId);
+      const [fallbackAddress, whatsappLink] = await Promise.all([
+        getLatestOwnedCheckoutAddress(userId),
+        getPrimaryWhatsappCustomerLinkForUser(userId),
+      ]);
+
+      initialFallbackAddress = fallbackAddress;
+      initialPhone = whatsappLink?.phone ?? "";
     }
   }
 
@@ -75,6 +85,7 @@ export default async function CheckoutPage() {
               initialCustomer={{
                 email: session?.user?.email ?? "",
                 name: session?.user?.name ?? "",
+                phone: initialPhone,
               }}
               initialFallbackAddress={initialFallbackAddress}
               isSignedIn={Boolean(userId)}

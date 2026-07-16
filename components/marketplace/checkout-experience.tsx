@@ -185,7 +185,7 @@ export function CheckoutExperience({
   isSignedIn,
 }: {
   initialAddresses: CheckoutSavedAddress[];
-  initialCustomer: { email: string; name: string };
+  initialCustomer: { email: string; name: string; phone: string };
   initialFallbackAddress: CheckoutAddressPrefill | null;
   isSignedIn: boolean;
 }) {
@@ -195,7 +195,10 @@ export function CheckoutExperience({
     null;
   const initialDeliveryDetails = initialSavedAddress ?? initialFallbackAddress;
   const initialPhone = getPhoneInputParts(
-    initialDeliveryDetails?.recipientPhone ?? "",
+    initialSavedAddress?.recipientPhone ||
+      initialCustomer.phone ||
+      initialFallbackAddress?.recipientPhone ||
+      "",
     defaultPhoneCountryCode,
   );
   const [cartItems, setCartItems] = useState<LocalCartItem[]>([]);

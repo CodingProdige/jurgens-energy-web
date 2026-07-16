@@ -19,8 +19,16 @@ import {
   createPayFastSignature,
   type PayFastField,
 } from "@/src/modules/checkout/payfast";
+import {
+  completePayFastItnAuditEvent,
+  createPayFastItnAuditEvent,
+  type PayFastItnStage,
+  redactPayFastItnPayload,
+} from "@/src/modules/checkout/payfast-itn-audit";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
 import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
+
+const PAYFAST_VALIDATION_TIMEOUT_MS = 12_000;
 
 const trustedPayFastNetworks = [
   ["197.97.145.144", 28],
@@ -29,6 +37,67 @@ const trustedPayFastNetworks = [
   ["102.216.36.128", 28],
   ["144.126.193.139", 32],
 ] as const;
+
+export class PayFastItnError extends Error {
+  auditEventId: string | null;
+  readonly code: string;
+  readonly httpStatus: 400 | 503;
+  readonly stage: PayFastItnStage;
+
+  constructor({
+    auditEventId = null,
+    cause,
+    code,
+    httpStatus = 400,
+    message,
+    stage,
+  }: {
+    auditEventId?: string | null;
+    cause?: unknown;
+    code: string;
+    httpStatus?: 400 | 503;
+    message: string;
+    stage: PayFastItnStage;
+  }) {
+    super(message, { cause });
+    this.name = "PayFastItnError";
+    this.auditEventId = auditEventId;
+    this.code = code;
+    this.httpStatus = httpStatus;
+    this.stage = stage;
+  }
+}
+
+function rejectPayFastItn({
+  code,
+  httpStatus,
+  message,
+  stage,
+}: {
+  code: string;
+  httpStatus?: 400 | 503;
+  message: string;
+  stage: PayFastItnStage;
+}): never {
+  throw new PayFastItnError({ code, httpStatus, message, stage });
+}
+
+function normalizePayFastItnError(
+  error: unknown,
+  stage: PayFastItnStage,
+) {
+  if (error instanceof PayFastItnError) {
+    return error;
+  }
+
+  return new PayFastItnError({
+    cause: error,
+    code: "processing_failed",
+    httpStatus: 503,
+    message: "The PayFast notification could not be processed.",
+    stage,
+  });
+}
 
 function ipv4ToNumber(value: string) {
   const octets = value.split(".").map(Number);
@@ -89,14 +158,26 @@ async function validateWithPayFast(
   fields: PayFastField[],
   validationUrl: string,
 ) {
-  const response = await fetch(validationUrl, {
-    body: createPayFastParameterString(fields),
-    cache: "no-store",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    method: "POST",
-  });
+  try {
+    const response = await fetch(validationUrl, {
+      body: createPayFastParameterString(fields),
+      cache: "no-store",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      method: "POST",
+      signal: AbortSignal.timeout(PAYFAST_VALIDATION_TIMEOUT_MS),
+    });
+    const responseBody = await response.text();
 
-  return response.ok && (await response.text()).trim() === "VALID";
+    return response.ok && responseBody.trim() === "VALID";
+  } catch (error) {
+    throw new PayFastItnError({
+      cause: error,
+      code: "provider_validation_unavailable",
+      httpStatus: 503,
+      message: "PayFast validation is temporarily unavailable.",
+      stage: "provider_validation",
+    });
+  }
 }
 
 type ParcelSnapshotItem = {
@@ -119,47 +200,75 @@ function getParcelSnapshotItems(value: unknown): ParcelSnapshotItem[] {
   );
 }
 
-export async function processPayFastItn({
+async function processPayFastItnFields({
   clientIp,
-  formData,
+  fields,
+  onStage,
+  payload,
 }: {
   clientIp: string;
-  formData: FormData;
+  fields: PayFastField[];
+  onStage: (stage: PayFastItnStage) => void;
+  payload: Record<string, string>;
 }) {
-  const fields = formDataToFields(formData);
-  const payload = fieldsToRecord(fields);
   const signature = payload.signature;
   const paymentId = payload.m_payment_id;
+
+  onStage("configuration");
   const config = await getPayFastIntegrationConfig();
 
-  if (
-    !config.isConfigured ||
-    !config.merchantId ||
-    !signature ||
-    !paymentId
-  ) {
-    throw new Error("The PayFast notification is missing required fields.");
+  if (!config.isConfigured || !config.merchantId) {
+    rejectPayFastItn({
+      code: "integration_not_configured",
+      httpStatus: 503,
+      message: "The PayFast integration is not configured.",
+      stage: "configuration",
+    });
   }
 
+  if (!signature || !paymentId) {
+    rejectPayFastItn({
+      code: "missing_required_fields",
+      message: "The PayFast notification is missing required fields.",
+      stage: "configuration",
+    });
+  }
+
+  onStage("source_ip");
   if (
     process.env.NODE_ENV === "production" &&
     !isTrustedPayFastIp(clientIp)
   ) {
-    throw new Error("The PayFast notification source is not trusted.");
+    rejectPayFastItn({
+      code: "untrusted_source",
+      message: "The PayFast notification source is not trusted.",
+      stage: "source_ip",
+    });
   }
 
+  onStage("signature");
   const expectedSignature = createPayFastSignature(fields, config.passphrase);
 
   if (
     !timingSafeStringEqual(signature.toLowerCase(), expectedSignature.toLowerCase())
   ) {
-    throw new Error("The PayFast notification signature is invalid.");
+    rejectPayFastItn({
+      code: "invalid_signature",
+      message: "The PayFast notification signature is invalid.",
+      stage: "signature",
+    });
   }
 
+  onStage("merchant");
   if (payload.merchant_id !== config.merchantId) {
-    throw new Error("The PayFast merchant identifier does not match.");
+    rejectPayFastItn({
+      code: "merchant_mismatch",
+      message: "The PayFast merchant identifier does not match.",
+      stage: "merchant",
+    });
   }
 
+  onStage("payment_reference");
   const [paymentRow] = await db
     .select({
       amount: payments.amount,
@@ -178,9 +287,14 @@ export async function processPayFastItn({
     .limit(1);
 
   if (!paymentRow) {
-    throw new Error("The PayFast payment reference was not found.");
+    rejectPayFastItn({
+      code: "payment_not_found",
+      message: "The PayFast payment reference was not found.",
+      stage: "payment_reference",
+    });
   }
 
+  onStage("amount");
   const receivedAmount = Number(payload.amount_gross);
   const expectedAmount = Number(paymentRow.amount);
   const currentOrderAmount = Number(paymentRow.orderAmount);
@@ -192,25 +306,36 @@ export async function processPayFastItn({
     Math.abs(receivedAmount - expectedAmount) > 0.01 ||
     Math.abs(expectedAmount - currentOrderAmount) > 0.01
   ) {
-    throw new Error("The PayFast payment amount does not match the order.");
+    rejectPayFastItn({
+      code: "amount_mismatch",
+      message: "The PayFast payment amount does not match the order.",
+      stage: "amount",
+    });
   }
 
+  onStage("provider_validation");
   if (!(await validateWithPayFast(fields, config.validationUrl))) {
-    throw new Error("PayFast could not validate the notification data.");
+    rejectPayFastItn({
+      code: "provider_validation_rejected",
+      message: "PayFast could not validate the notification data.",
+      stage: "provider_validation",
+    });
   }
 
   const providerStatus = payload.payment_status?.toUpperCase() ?? "UNKNOWN";
   const providerPaymentId = payload.pf_payment_id || null;
+  const redactedPayload = redactPayFastItnPayload(payload);
   const now = new Date();
 
   if (providerStatus !== "COMPLETE") {
+    onStage("payment_update");
     await db.transaction(async (tx) => {
       const [updatedPayment] = await tx
         .update(payments)
         .set({
           providerPaymentId,
           providerStatus,
-          rawPayload: payload,
+          rawPayload: redactedPayload,
           status: providerStatus === "FAILED" ? "failed" : "pending",
           updatedAt: now,
         })
@@ -252,6 +377,7 @@ export async function processPayFastItn({
     return { completed: false, orderId: paymentRow.orderId, providerStatus };
   }
 
+  onStage("capture");
   const completion = await db.transaction(async (tx) => {
     const [capturedPayment] = await tx
       .update(payments)
@@ -259,7 +385,7 @@ export async function processPayFastItn({
         completedAt: now,
         providerPaymentId,
         providerStatus,
-        rawPayload: payload,
+        rawPayload: redactedPayload,
         status: "captured",
         updatedAt: now,
       })
@@ -359,10 +485,113 @@ export async function processPayFastItn({
     }).catch(() => null);
   }
 
+  onStage("completed");
   return {
     completed: true,
     newlyCompleted: completion.newlyCompleted,
     orderId: paymentRow.orderId,
     providerStatus,
   };
+}
+
+export async function processPayFastItn({
+  cfConnectingIp,
+  clientIp,
+  formData,
+  xForwardedFor,
+}: {
+  cfConnectingIp?: string | null;
+  clientIp: string;
+  formData: FormData;
+  xForwardedFor?: string | null;
+}) {
+  const fields = formDataToFields(formData);
+  const payload = fieldsToRecord(fields);
+  let stage: PayFastItnStage = "received";
+  let auditEventId: string;
+
+  try {
+    auditEventId = await createPayFastItnAuditEvent({
+      cfConnectingIp,
+      payload,
+      sourceIp: clientIp,
+      xForwardedFor,
+    });
+  } catch (error) {
+    console.error("[payfast-itn] audit event could not be persisted", {
+      error: error instanceof Error ? error.message : "unknown_error",
+      sourceIp: clientIp,
+    });
+
+    throw new PayFastItnError({
+      cause: error,
+      code: "audit_unavailable",
+      httpStatus: 503,
+      message: "The PayFast notification could not be recorded.",
+      stage,
+    });
+  }
+
+  try {
+    const result = await processPayFastItnFields({
+      clientIp,
+      fields,
+      onStage: (nextStage) => {
+        stage = nextStage;
+      },
+      payload,
+    });
+
+    try {
+      await completePayFastItnAuditEvent({
+        eventId: auditEventId,
+        stage: "completed",
+        status: "processed",
+      });
+    } catch (error) {
+      console.error("[payfast-itn] processed audit event could not be finalized", {
+        auditEventId,
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+
+    console.info("[payfast-itn] notification processed", {
+      auditEventId,
+      completed: result.completed,
+      orderId: result.orderId,
+      providerStatus: result.providerStatus,
+    });
+
+    return { ...result, auditEventId };
+  } catch (error) {
+    const normalizedError = normalizePayFastItnError(error, stage);
+    normalizedError.auditEventId = auditEventId;
+
+    try {
+      await completePayFastItnAuditEvent({
+        errorCode: normalizedError.code,
+        errorMessage: normalizedError.message,
+        eventId: auditEventId,
+        stage: normalizedError.stage,
+        status: "rejected",
+      });
+    } catch (auditError) {
+      console.error("[payfast-itn] rejected audit event could not be finalized", {
+        auditEventId,
+        error:
+          auditError instanceof Error ? auditError.message : "unknown_error",
+      });
+    }
+
+    console.warn("[payfast-itn] notification rejected", {
+      auditEventId,
+      code: normalizedError.code,
+      paymentReference: payload.m_payment_id ?? null,
+      providerPaymentId: payload.pf_payment_id ?? null,
+      sourceIp: clientIp,
+      stage: normalizedError.stage,
+    });
+
+    throw normalizedError;
+  }
 }

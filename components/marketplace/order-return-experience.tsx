@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
+  Clock3Icon,
   DownloadIcon,
   LoaderCircleIcon,
   ReceiptTextIcon,
@@ -51,6 +52,8 @@ export function OrderReturnExperience({
 }) {
   const [order, setOrder] = useState(initialOrder);
   const [pollError, setPollError] = useState(false);
+  const [confirmationDelayed, setConfirmationDelayed] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const cleanedOrderIdRef = useRef<string | null>(null);
   const isPaid = order.status === "paid" || order.status === "fulfilled";
   const isFailed = order.status === "cancelled" || order.paymentStatus === "failed";
@@ -77,6 +80,16 @@ export function OrderReturnExperience({
     }
   }, [order.orderId, token]);
 
+  const refreshOrderManually = useCallback(async () => {
+    setIsRefreshing(true);
+
+    try {
+      await refreshOrder();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshOrder]);
+
   useEffect(() => {
     if (isFailed || (isPaid && invoiceReady)) {
       return;
@@ -89,6 +102,10 @@ export function OrderReturnExperience({
 
       if (attempt >= 30) {
         window.clearInterval(intervalId);
+
+        if (!isPaid && !isFailed) {
+          setConfirmationDelayed(true);
+        }
       }
     }, 2000);
 
@@ -116,6 +133,10 @@ export function OrderReturnExperience({
         <span className="mx-auto grid size-16 place-items-center rounded-full bg-red-500/10 text-red-600 dark:text-red-300">
           <AlertCircleIcon className="size-8" />
         </span>
+      ) : confirmationDelayed ? (
+        <span className="mx-auto grid size-16 place-items-center rounded-full bg-amber-500/12 text-amber-700 dark:text-amber-300">
+          <Clock3Icon className="size-8" />
+        </span>
       ) : (
         <span className="mx-auto grid size-16 place-items-center rounded-full bg-[#ff5a1f]/10 text-[#ff5a1f]">
           <LoaderCircleIcon className="size-8 animate-spin" />
@@ -127,15 +148,45 @@ export function OrderReturnExperience({
           ? "Payment confirmed"
           : isFailed
             ? "Payment was not completed"
-            : "Confirming your payment"}
+            : confirmationDelayed
+              ? "Payment confirmation is delayed"
+              : "Confirming your payment"}
       </h1>
       <p className="mt-2 text-sm leading-6 text-[#666660] dark:text-[#aaa9a1]">
         {isPaid
           ? `Order ${order.orderNumber} is paid. Only the purchased products were removed from your cart.`
           : isFailed
             ? "Your products are still in the cart and can be checked out again."
-            : "PayFast is sending the secure payment confirmation. This usually takes a few seconds."}
+            : confirmationDelayed
+              ? `Order ${order.orderNumber} is still awaiting confirmation from PayFast. Do not pay again while this payment is being checked.`
+              : "PayFast is sending the secure payment confirmation. This usually takes a few seconds."}
       </p>
+
+      {confirmationDelayed && !isPaid && !isFailed ? (
+        <div className="mx-auto mt-5 max-w-lg rounded-md border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 text-left">
+          <p className="text-xs font-black text-amber-900 dark:text-amber-200">
+            Your order remains safely pending
+          </p>
+          <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
+            Refresh the status below. If it remains pending for more than a few
+            minutes, you can check it in{" "}
+            <Link
+              className="font-bold text-amber-800 underline underline-offset-2 dark:text-amber-300"
+              href={`/account/orders/${order.orderId}`}
+            >
+              My orders
+            </Link>{" "}
+            or{" "}
+            <Link
+              className="font-bold text-amber-800 underline underline-offset-2 dark:text-amber-300"
+              href="/contact"
+            >
+              contact support
+            </Link>
+            .
+          </p>
+        </div>
+      ) : null}
 
       <div className="mx-auto mt-7 max-w-lg border-y border-[#e8e8e2] py-4 text-left dark:border-white/10">
         <div className="flex items-center justify-between gap-4 text-sm">
@@ -206,12 +257,15 @@ export function OrderReturnExperience({
         {!isPaid && !isFailed ? (
           <Button
             className="h-10 rounded-md"
-            onClick={() => void refreshOrder()}
+            disabled={isRefreshing}
+            onClick={() => void refreshOrderManually()}
             type="button"
             variant="outline"
           >
-            <RefreshCwIcon className="size-4" />
-            Refresh status
+            <RefreshCwIcon
+              className={`size-4 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            {isRefreshing ? "Refreshing status" : "Refresh status"}
           </Button>
         ) : null}
         <Link

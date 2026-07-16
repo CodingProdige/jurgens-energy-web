@@ -19,6 +19,25 @@ Uploaded media and generated files stay outside the repo under
 `/mnt/c/JurgensEnergy/storage/...`. PostgreSQL, Redis, Caddy, and Cloudflare Tunnel
 state stay in Docker named volumes. A deploy should not delete live data.
 
+## Reverse Proxy Trust Boundary
+
+The public site reaches Caddy through Cloudflare Tunnel. Caddy normalizes the
+upstream `X-Forwarded-For` value from Cloudflare's `CF-Connecting-IP` header so
+the application receives the original client address. The Caddy host ports are
+bound to loopback only; `cloudflared` reaches `caddy:80` directly over the
+private Compose network.
+
+Do not publish the Caddy ports on a public host interface while trusting
+`CF-Connecting-IP`. A direct caller could otherwise forge that header and
+impersonate another source address.
+
+PayFast callback processing writes one row per parseable request to
+`payfast_itn_events`. The row records the resolved proxy addresses, validation
+stage, outcome, and an allow-listed diagnostic payload. Signatures and customer
+contact fields are deliberately excluded. Application logs include the audit
+event ID so a provider response can be matched to the database record without
+logging credentials or the complete callback body.
+
 ## Server Environment File
 
 The GitHub runner checks out the repo into its own work directory, so do not

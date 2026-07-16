@@ -1,4 +1,7 @@
-import { processPayFastItn } from "@/src/modules/checkout/payfast-itn";
+import {
+  PayFastItnError,
+  processPayFastItn,
+} from "@/src/modules/checkout/payfast-itn";
 import { getClientIp } from "@/src/modules/security/rate-limit";
 
 export const runtime = "nodejs";
@@ -14,20 +17,34 @@ export async function POST(request: Request) {
 
   try {
     const result = await processPayFastItn({
+      cfConnectingIp: request.headers.get("cf-connecting-ip"),
       clientIp: await getClientIp(),
       formData,
+      xForwardedFor: request.headers.get("x-forwarded-for"),
     });
 
     return Response.json({ ok: true, ...result });
   } catch (error) {
+    const payFastError =
+      error instanceof PayFastItnError
+        ? error
+        : new PayFastItnError({
+            cause: error,
+            code: "processing_failed",
+            httpStatus: 503,
+            message: "The PayFast notification could not be processed.",
+            stage: "received",
+          });
+
     return Response.json(
       {
         ok: false,
-        error: "invalid_payfast_notification",
-        message:
-          error instanceof Error ? error.message : "The notification was rejected.",
+        auditEventId: payFastError.auditEventId,
+        error: payFastError.code,
+        message: payFastError.message,
+        stage: payFastError.stage,
       },
-      { status: 400 },
+      { status: payFastError.httpStatus },
     );
   }
 }
