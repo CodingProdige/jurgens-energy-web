@@ -14,8 +14,22 @@ const envSchema = z.object({
     .string()
     .url()
     .default("https://waba-v2.360dialog.io"),
+  WHATSAPP_INVOICE_TEMPLATE_LANGUAGE: z
+    .string()
+    .trim()
+    .regex(/^[a-z]{2,3}(?:_[A-Z]{2})?$/)
+    .default("en"),
+  WHATSAPP_INVOICE_TEMPLATE_NAME: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]+$/)
+    .default("customer_invoice_issued"),
   REDIS_URL: z.string().min(1).default("redis://localhost:6380"),
   MEDIA_ROOT: z.string().min(1).default("./storage/jurgens-energy/media"),
+  INVOICE_ROOT: z
+    .string()
+    .min(1)
+    .default("./storage/jurgens-energy/invoices"),
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().min(1).default("gpt-5.6-luna"),
   OPENAI_REASONING_EFFORT: z
@@ -41,8 +55,13 @@ export const env = envSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL,
   DIALOGUE_API_KEY: process.env.DIALOGUE_API_KEY,
   DIALOGUE_MESSAGE_URL: process.env.DIALOGUE_MESSAGE_URL,
+  WHATSAPP_INVOICE_TEMPLATE_LANGUAGE:
+    process.env.WHATSAPP_INVOICE_TEMPLATE_LANGUAGE,
+  WHATSAPP_INVOICE_TEMPLATE_NAME:
+    process.env.WHATSAPP_INVOICE_TEMPLATE_NAME,
   REDIS_URL: process.env.REDIS_URL,
   MEDIA_ROOT: process.env.MEDIA_ROOT,
+  INVOICE_ROOT: process.env.INVOICE_ROOT,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   OPENAI_MODEL: process.env.OPENAI_MODEL,
   OPENAI_REASONING_EFFORT: process.env.OPENAI_REASONING_EFFORT,

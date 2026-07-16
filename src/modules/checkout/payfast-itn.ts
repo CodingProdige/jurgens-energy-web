@@ -20,8 +20,7 @@ import {
   type PayFastField,
 } from "@/src/modules/checkout/payfast";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
-import { sendNotificationEmail } from "@/src/modules/notifications/templates";
-import { sendWhatsappPaymentConfirmationForOrder } from "@/src/modules/whatsapp-ordering/service";
+import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
 
 const trustedPayFastNetworks = [
   ["197.97.145.144", 28],
@@ -165,6 +164,7 @@ export async function processPayFastItn({
     .select({
       amount: payments.amount,
       id: payments.id,
+      orderAmount: orders.grandTotal,
       orderId: payments.orderId,
       orderNumber: orders.orderNumber,
       orderStatus: orders.status,
@@ -183,11 +183,14 @@ export async function processPayFastItn({
 
   const receivedAmount = Number(payload.amount_gross);
   const expectedAmount = Number(paymentRow.amount);
+  const currentOrderAmount = Number(paymentRow.orderAmount);
 
   if (
     !Number.isFinite(receivedAmount) ||
     !Number.isFinite(expectedAmount) ||
-    Math.abs(receivedAmount - expectedAmount) > 0.01
+    !Number.isFinite(currentOrderAmount) ||
+    Math.abs(receivedAmount - expectedAmount) > 0.01 ||
+    Math.abs(expectedAmount - currentOrderAmount) > 0.01
   ) {
     throw new Error("The PayFast payment amount does not match the order.");
   }
@@ -202,7 +205,7 @@ export async function processPayFastItn({
 
   if (providerStatus !== "COMPLETE") {
     await db.transaction(async (tx) => {
-      await tx
+      const [updatedPayment] = await tx
         .update(payments)
         .set({
           providerPaymentId,
@@ -211,13 +214,38 @@ export async function processPayFastItn({
           status: providerStatus === "FAILED" ? "failed" : "pending",
           updatedAt: now,
         })
-        .where(eq(payments.id, paymentRow.id));
+        .where(
+          and(
+            eq(payments.id, paymentRow.id),
+            eq(payments.status, "pending"),
+          ),
+        )
+        .returning({ id: payments.id });
 
-      if (providerStatus === "FAILED") {
-        await tx
-          .update(orders)
-          .set({ status: "cancelled", updatedAt: now })
-          .where(and(eq(orders.id, paymentRow.orderId), eq(orders.status, "pending")));
+      if (providerStatus === "FAILED" && updatedPayment) {
+        const [otherPendingAttempt] = await tx
+          .select({ id: payments.id })
+          .from(payments)
+          .where(
+            and(
+              eq(payments.orderId, paymentRow.orderId),
+              eq(payments.provider, "payfast"),
+              eq(payments.status, "pending"),
+            ),
+          )
+          .limit(1);
+
+        if (!otherPendingAttempt) {
+          await tx
+            .update(orders)
+            .set({ status: "cancelled", updatedAt: now })
+            .where(
+              and(
+                eq(orders.id, paymentRow.orderId),
+                eq(orders.status, "pending"),
+              ),
+            );
+        }
       }
     });
 
@@ -323,19 +351,9 @@ export async function processPayFastItn({
     return { newlyCompleted: true };
   });
 
+  await ensureInvoiceForPaidOrder(paymentRow.orderId).catch(() => null);
+
   if (completion.newlyCompleted) {
-    await sendNotificationEmail({
-      data: {
-        customer_name: paymentRow.customerName,
-        order_number: paymentRow.orderNumber,
-        order_total: `R ${Number(paymentRow.amount).toFixed(2)}`,
-      },
-      recipientEmail: paymentRow.customerEmail,
-      templateKey: "customer_order_paid",
-    }).catch(() => null);
-    await sendWhatsappPaymentConfirmationForOrder(paymentRow.orderId).catch(
-      () => null,
-    );
     await sendJurgensDeliveryStatusNotification({
       orderId: paymentRow.orderId,
     }).catch(() => null);

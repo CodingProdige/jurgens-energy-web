@@ -16,7 +16,10 @@ import {
   type NotificationTemplateStatus,
   users,
 } from "@/src/db/schema";
-import { sendEmail } from "@/src/modules/email/sendgrid";
+import {
+  sendEmail,
+  type SendEmailAttachment,
+} from "@/src/modules/email/sendgrid";
 import { sendPushNotificationToUser } from "@/src/modules/notifications/push";
 
 export type AdminNotificationDeliveryPolicy = {
@@ -929,11 +932,13 @@ export async function restoreNotificationTemplateVersion({
 }
 
 export async function sendNotificationEmail({
+  attachments,
   data,
   recipientEmail,
   recipientUserId,
   templateKey,
 }: {
+  attachments?: SendEmailAttachment[];
   data: Record<string, string | number | boolean | null | undefined>;
   recipientEmail: string;
   recipientUserId?: string;
@@ -964,13 +969,23 @@ export async function sendNotificationEmail({
   const globalData = await getNotificationGlobalVariableData();
   const renderData = { ...globalData, ...data };
   const subject = renderTemplate(template.subject, renderData);
-  const htmlBody = renderTemplate(template.htmlBody, renderData);
+  const htmlBody = renderTemplate(
+    template.htmlBody,
+    escapeHtmlTemplateData(renderData),
+  );
   const textBody = renderTemplate(template.textBody, renderData);
 
   const [delivery] = await db
     .insert(notificationDeliveries)
     .values({
-      metadata: JSON.stringify({ data: renderData }),
+      metadata: JSON.stringify({
+        attachments: attachments?.map(({ disposition, filename, type }) => ({
+          disposition: disposition ?? "attachment",
+          filename,
+          type: type ?? "application/octet-stream",
+        })),
+        data: renderData,
+      }),
       recipientEmail: normalizedEmail,
       recipientUserId,
       status: "queued",
@@ -980,6 +995,7 @@ export async function sendNotificationEmail({
     .returning({ id: notificationDeliveries.id });
 
   const result = await sendEmail({
+    attachments,
     content: [
       { type: "text/plain", value: textBody },
       { type: "text/html", value: htmlBody },
@@ -1006,18 +1022,35 @@ export async function sendNotificationEmail({
       })
       .where(eq(notificationDeliveries.id, delivery.id));
 
-    return { delivered: true } as const;
+    return {
+      delivered: true,
+      outcomeUnknown: false,
+      providerMessageId: result.providerMessageId,
+      providerStatus: result.providerStatus,
+    } as const;
   }
+
+  const outcomeUnknown = result.outcomeUnknown === true;
+  const failureReason = outcomeUnknown
+    ? ("verification_required" as const)
+    : result.reason;
 
   await db
     .update(notificationDeliveries)
     .set({
-      errorMessage: result.reason,
+      errorMessage: failureReason,
+      providerMessageId: result.providerMessageId,
       status: "failed",
     })
     .where(eq(notificationDeliveries.id, delivery.id));
 
-  return { delivered: false, reason: result.reason } as const;
+  return {
+    delivered: false,
+    outcomeUnknown,
+    providerMessageId: result.providerMessageId,
+    providerStatus: result.providerStatus,
+    reason: failureReason,
+  } as const;
 }
 
 export async function sendNotificationTemplateTest({
@@ -1049,7 +1082,10 @@ export async function sendNotificationTemplateTest({
   );
   const renderData = { ...globalData, ...data };
   const renderedSubject = `[Test] ${renderTemplate(subject, renderData)}`;
-  const renderedHtmlBody = renderTemplate(htmlBody, renderData);
+  const renderedHtmlBody = renderTemplate(
+    htmlBody,
+    escapeHtmlTemplateData(renderData),
+  );
   const renderedTextBody = renderTemplate(textBody, renderData);
 
   const [delivery] = await db
@@ -1098,10 +1134,13 @@ export async function sendNotificationTemplateTest({
     return { ok: true, message: `Test email sent to ${normalizedEmail}.` };
   }
 
+  const outcomeUnknown = result.outcomeUnknown === true;
+
   await db
     .update(notificationDeliveries)
     .set({
-      errorMessage: result.reason,
+      errorMessage: outcomeUnknown ? "verification_required" : result.reason,
+      providerMessageId: result.providerMessageId,
       status: "failed",
     })
     .where(eq(notificationDeliveries.id, delivery.id));
@@ -1111,6 +1150,8 @@ export async function sendNotificationTemplateTest({
     message:
       result.reason === "not_configured"
         ? "SendGrid is not configured yet."
+        : outcomeUnknown
+          ? "SendGrid may have accepted the test email. Verify the provider outcome before retrying."
         : "The test email could not be sent.",
   };
 }
@@ -1500,6 +1541,24 @@ function renderTemplate(
 
     return value == null ? "" : String(value);
   });
+}
+
+function escapeHtmlTemplateData(
+  data: Record<string, string | number | boolean | null | undefined>,
+) {
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [
+      key,
+      value == null
+        ? value
+        : String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;"),
+    ]),
+  );
 }
 
 function sampleVariableValue(variable: string) {

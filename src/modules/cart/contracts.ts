@@ -47,6 +47,7 @@ export type ValidatedCartItem = {
   sellerName: string | null;
   shipsAlone: boolean;
   sku: string;
+  taxRateBps: number;
   unitPriceLabel: string;
   unitPriceZar: number;
   variantId: string;

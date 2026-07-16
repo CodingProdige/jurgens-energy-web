@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
 import { DashboardCompactMetrics, type DashboardMetricDefinition } from "@/components/dashboard/dashboard-compact-metrics";
@@ -218,9 +219,12 @@ export default async function AdminOrdersPage() {
                   <TableRow className={dashboardTableRowClass} key={order.id}>
                     <TableCell className={dashboardTableCellClass}>
                       <div className="min-w-0 space-y-1">
-                        <p className={dashboardTablePrimaryTextClass}>
-                          #{shortId(order.id)}
-                        </p>
+                        <Link
+                          className={`${dashboardTablePrimaryTextClass} transition hover:text-[#ff5a1f]`}
+                          href={`/orders/${order.id}`}
+                        >
+                          {order.orderNumber ?? `#${shortId(order.id)}`}
+                        </Link>
                         <Badge className={cn("rounded-md border-0 capitalize", statusClass(order.status))}>
                           {order.status}
                         </Badge>

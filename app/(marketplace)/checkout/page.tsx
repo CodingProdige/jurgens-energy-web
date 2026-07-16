@@ -7,6 +7,12 @@ import { CheckoutExperience } from "@/components/marketplace/checkout-experience
 import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { MarketplaceHeader } from "@/components/marketplace/marketplace-header";
+import type {
+  CheckoutAddressPrefill,
+  CheckoutSavedAddress,
+} from "@/src/modules/checkout/contracts";
+import { getLatestOwnedCheckoutAddress } from "@/src/modules/checkout/orders";
+import { getCheckoutAddressBook } from "@/src/modules/marketplace/account/addresses";
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -16,6 +22,32 @@ export const metadata: Metadata = {
 
 export default async function CheckoutPage() {
   const session = await auth();
+  const userId = session?.user?.id ?? null;
+  let initialAddresses: CheckoutSavedAddress[] = [];
+  let initialFallbackAddress: CheckoutAddressPrefill | null = null;
+
+  if (userId) {
+    const addressBook = await getCheckoutAddressBook(userId);
+
+    initialAddresses = addressBook.addresses.map((address) => ({
+      addressLine1: address.addressLine1,
+      addressLine2: address.addressLine2 ?? "",
+      city: address.city,
+      countryCode: address.countryCode,
+      id: address.id,
+      isDefault: address.isDefault,
+      label: address.label,
+      postalCode: address.postalCode,
+      province: address.province,
+      recipientName: address.recipientName,
+      recipientPhone: address.recipientPhone,
+      suburb: address.suburb,
+    }));
+
+    if (initialAddresses.length === 0) {
+      initialFallbackAddress = await getLatestOwnedCheckoutAddress(userId);
+    }
+  }
 
   return (
     <MarketplaceGate>
@@ -39,10 +71,13 @@ export default async function CheckoutPage() {
               </h1>
             </header>
             <CheckoutExperience
+              initialAddresses={initialAddresses}
               initialCustomer={{
                 email: session?.user?.email ?? "",
                 name: session?.user?.name ?? "",
               }}
+              initialFallbackAddress={initialFallbackAddress}
+              isSignedIn={Boolean(userId)}
             />
           </div>
         </main>

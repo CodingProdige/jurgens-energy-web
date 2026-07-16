@@ -75,6 +75,7 @@ import {
   type AdminSettingsState,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
 import type { JurgensDeliveryZone } from "@/src/modules/shipping/jurgens-delivery";
+import { getJurgensImplicitFreeDeliveryThreshold } from "@/src/modules/shipping/jurgens-delivery-pricing";
 import type {
   AdminMediaAsset,
   getAdminMediaLibrary,
@@ -2582,6 +2583,10 @@ function JurgensDeliveryZoneDialog({
                   </h4>
                   <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
                     Match the direct-delivery subtotal to a local delivery price.
+                    The “Up to” amount is exclusive. If the final payable tier
+                    has a cap and no later tier, Jurgens delivery is free from
+                    that zone-specific cap upward. Leave it blank to keep
+                    charging the last tier with no upper limit.
                   </p>
                 </div>
                 <Button
@@ -2773,17 +2778,31 @@ function toRatePayload(rates: JurgensDeliveryRateDraft[]) {
 }
 
 function summarizeJurgensDeliveryRates(zone: JurgensDeliveryZone) {
-  const firstRate = zone.rates[0];
-
-  if (!firstRate) {
+  if (zone.rates.length === 0) {
     return "no price tiers";
   }
 
-  if (firstRate.price === 0) {
-    return `free from ${formatZar(firstRate.fromAmount)}`;
+  const summaries = zone.rates.map((rate) => {
+    const price = rate.price === 0 ? "free delivery" : formatZar(rate.price);
+    const range = rate.upToAmount === null
+      ? `from ${formatZar(rate.fromAmount)} with no upper limit`
+      : `from ${formatZar(rate.fromAmount)} to below ${formatZar(rate.upToAmount)}`;
+
+    return `${price} ${range}`;
+  });
+  const freeDeliveryThreshold = getJurgensImplicitFreeDeliveryThreshold(
+    zone.rates,
+  );
+
+  if (freeDeliveryThreshold !== null) {
+    summaries.push(`free delivery from ${formatZar(freeDeliveryThreshold)}`);
   }
 
-  return `${formatZar(firstRate.price)} from ${formatZar(firstRate.fromAmount)}`;
+  if (summaries.length <= 2) {
+    return summaries.join(" · ");
+  }
+
+  return `${zone.rates.length} price tiers · ${summaries[0]} · ${summaries.at(-1)}`;
 }
 
 function formatZar(value: number) {

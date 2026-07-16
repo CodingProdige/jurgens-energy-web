@@ -1,5 +1,6 @@
 services:
   web:
+    restart: unless-stopped
     build:
       context: .
     depends_on:
@@ -19,6 +20,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-jurgens_energy}:${POSTGRES_PASSWORD:-jurgens_energy}@postgres:5432/${POSTGRES_DB:-jurgens_energy}
       REDIS_URL: redis://redis:6379
       MEDIA_ROOT: /data/media
+      INVOICE_ROOT: /data/invoices
     volumes:
       - ${MEDIA_STORAGE_PATH:-./storage/jurgens-energy/media}:/data/media
       - ${INVOICE_STORAGE_PATH:-./storage/jurgens-energy/invoices}:/data/invoices

@@ -4,7 +4,9 @@ import Link from "next/link";
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
+  DownloadIcon,
   LoaderCircleIcon,
+  ReceiptTextIcon,
   RefreshCwIcon,
   ShoppingBagIcon,
 } from "lucide-react";
@@ -18,6 +20,11 @@ export type CheckoutOrderSummary = {
   customerEmail: string;
   grandTotal: number;
   items: Array<{ quantity: number; title: string; variantId: string }>;
+  invoice: {
+    id: string;
+    invoiceNumber: string;
+    renderStatus: "failed" | "pending" | "ready";
+  } | null;
   orderId: string;
   orderNumber: string;
   paymentStatus: string;
@@ -47,6 +54,7 @@ export function OrderReturnExperience({
   const cleanedOrderIdRef = useRef<string | null>(null);
   const isPaid = order.status === "paid" || order.status === "fulfilled";
   const isFailed = order.status === "cancelled" || order.paymentStatus === "failed";
+  const invoiceReady = order.invoice?.renderStatus === "ready";
 
   const refreshOrder = useCallback(async () => {
     try {
@@ -70,7 +78,7 @@ export function OrderReturnExperience({
   }, [order.orderId, token]);
 
   useEffect(() => {
-    if (isPaid || isFailed) {
+    if (isFailed || (isPaid && invoiceReady)) {
       return;
     }
 
@@ -85,7 +93,7 @@ export function OrderReturnExperience({
     }, 2000);
 
     return () => window.clearInterval(intervalId);
-  }, [isFailed, isPaid, refreshOrder]);
+  }, [invoiceReady, isFailed, isPaid, refreshOrder]);
 
   useEffect(() => {
     if (
@@ -153,9 +161,44 @@ export function OrderReturnExperience({
         </div>
       </div>
 
-      {pollError && !isPaid && !isFailed ? (
+      {isPaid ? (
+        <div className="mx-auto mt-5 flex max-w-lg items-center gap-3 rounded-md border border-[#e2e2dc] bg-[#f7f7f2] px-3 py-3 text-left dark:border-white/10 dark:bg-white/[0.035]">
+          <span className="grid size-10 shrink-0 place-items-center rounded-md bg-[#ff5a1f]/10 text-[#ff5a1f]">
+            {invoiceReady ? (
+              <ReceiptTextIcon className="size-5" />
+            ) : (
+              <LoaderCircleIcon className="size-5 animate-spin" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black">
+              {invoiceReady && order.invoice
+                ? `VAT invoice ${order.invoice.invoiceNumber}`
+                : "Preparing your VAT invoice"}
+            </p>
+            <p className="mt-1 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
+              {invoiceReady
+                ? "A copy is also sent to your checkout email and WhatsApp number when those channels are configured."
+                : "This page updates automatically when the secure PDF is ready."}
+            </p>
+          </div>
+          {invoiceReady && order.invoice ? (
+            <a
+              className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-[#ff5a1f] px-3 text-xs font-black text-white transition hover:bg-[#e84c15]"
+              href={`/api/invoices/${order.invoice.id}/pdf?checkoutToken=${encodeURIComponent(token)}`}
+            >
+              <DownloadIcon className="size-3.5" />
+              PDF
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
+      {pollError && !isFailed && !invoiceReady ? (
         <p className="mt-4 text-xs text-red-600 dark:text-red-300">
-          The latest status could not be loaded. Your order remains safely recorded.
+          {isPaid
+            ? "The invoice status could not be refreshed. Your paid order remains safely recorded and the worker will continue preparing it."
+            : "The latest status could not be loaded. Your order remains safely recorded."}
         </p>
       ) : null}
 

@@ -79,6 +79,10 @@ function formatDate(value: string) {
 }
 
 function formatWindow(row: Pick<AdminScheduledOrderRow, "windowEnd" | "windowLabel" | "windowStart">) {
+  if (!row.windowEnd || !row.windowLabel || !row.windowStart) {
+    return "No specific time requested";
+  }
+
   return `${row.windowLabel} (${row.windowStart}-${row.windowEnd})`;
 }
 

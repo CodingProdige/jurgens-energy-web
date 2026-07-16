@@ -49,6 +49,7 @@ export type CustomerOrderSummary = {
 };
 
 export type CustomerOrderDetail = {
+  canRetryPayment: boolean;
   createdAt: Date;
   currency: string;
   customer: {
@@ -90,7 +91,7 @@ export type CustomerOrderDetail = {
     deliveryInstructions: string | null;
     scheduledDate: string;
     status: string;
-    windowLabel: string;
+    windowLabel: string | null;
   }>;
   shipments: Array<{
     deliveredAt: Date | null;
@@ -424,7 +425,29 @@ export const getCustomerOrderDetail = cache(
       eventsByShipmentId.set(event.shipmentId, current);
     }
 
+    const latestPayFastPayment = paymentRows.find(
+      (payment) => payment.provider === "payfast",
+    );
+    const hasPendingPayFastPayment = paymentRows.some(
+      (payment) =>
+        payment.provider === "payfast" && payment.status === "pending",
+    );
+    const hasCompletedPayFastPayment = paymentRows.some(
+      (payment) =>
+        payment.provider === "payfast" &&
+        ["authorized", "captured", "refunded"].includes(payment.status),
+    );
+    const canRetryPayment =
+      !hasCompletedPayFastPayment &&
+      ((order.status === "pending" &&
+        (hasPendingPayFastPayment ||
+          !latestPayFastPayment ||
+          latestPayFastPayment.status === "failed")) ||
+        (order.status === "cancelled" &&
+          latestPayFastPayment?.status === "failed"));
+
     return {
+      canRetryPayment,
       createdAt: order.createdAt,
       currency: order.currency,
       customer: {

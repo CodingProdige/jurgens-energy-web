@@ -42,6 +42,18 @@ export const orders = pgTable("orders", {
       suburb: string;
     }>()
     .notNull(),
+  billingDetailsSnapshot: jsonb("billing_details_snapshot").$type<{
+    addressLine1: string;
+    addressLine2: string | null;
+    businessName: string | null;
+    city: string;
+    countryCode: string;
+    name: string;
+    postalCode: string;
+    province: string;
+    suburb: string | null;
+    vatRegistrationNumber: string | null;
+  }>(),
   policyAcceptanceSnapshot: jsonb("policy_acceptance_snapshot").$type<{
     acceptedAt: string;
     effectiveDate: string;
@@ -78,6 +90,8 @@ export const orderItems = pgTable("order_items", {
   title: text("title").notNull(),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  skuSnapshot: varchar("sku_snapshot", { length: 120 }),
+  taxRateBps: integer("tax_rate_bps").notNull().default(1500),
   deliveryMethodSnapshot: varchar("delivery_method_snapshot", { length: 32 }),
   deliveryLabelSnapshot: text("delivery_label_snapshot"),
   purchaseType: varchar("purchase_type", { length: 32 })

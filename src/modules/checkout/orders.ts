@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { db } from "@/src/db";
 import {
   jurgensDeliverySchedules,
+  invoices,
   orderItems,
   orders,
   payments,
@@ -13,6 +14,9 @@ import {
 import { validateCartLines } from "@/src/modules/cart/server";
 import {
   createCheckoutOrderRequestSchema,
+  type CheckoutAddressPrefill,
+  type CheckoutDeliveryAddress,
+  type CheckoutCustomer,
   type CreateCheckoutOrderRequest,
 } from "@/src/modules/checkout/contracts";
 import {
@@ -21,7 +25,15 @@ import {
 } from "@/src/modules/checkout/delivery";
 import type { CurrencyContext } from "@/src/modules/currency";
 import { validateJurgensDeliveryScheduleSelection } from "@/src/modules/delivery-scheduling/jurgens";
+import {
+  createCustomerAddress,
+  CustomerAddressNotFoundError,
+  getCheckoutAddressBook,
+  markCustomerAddressUsed,
+  updateCustomerAddress,
+} from "@/src/modules/marketplace/account/addresses";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
+import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
 import {
   linkWhatsappNumberToUser,
   WhatsappNumberLinkedToAnotherUserError,
@@ -52,11 +64,8 @@ function createOrderNumber() {
 
 function quoteGroupKey(quote: {
   provider: "manual" | "bobgo" | "piessang_local";
-  sellerId: string | null;
 }) {
-  return quote.provider === "piessang_local"
-    ? "jurgens"
-    : `seller:${quote.sellerId ?? "missing"}`;
+  return quote.provider === "piessang_local" ? "jurgens" : "courier";
 }
 
 function getJurgensZoneId(providerPayload: unknown) {
@@ -67,6 +76,112 @@ function getJurgensZoneId(providerPayload: unknown) {
   const value = (providerPayload as { zoneId?: unknown }).zoneId;
 
   return typeof value === "string" ? value : null;
+}
+
+function toCheckoutDeliveryAddress(address: {
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  countryCode: string;
+  postalCode: string;
+  province: string;
+  suburb: string;
+}): CheckoutDeliveryAddress {
+  return {
+    addressLine1: address.addressLine1,
+    addressLine2: address.addressLine2 ?? "",
+    city: address.city,
+    countryCode: address.countryCode,
+    postalCode: address.postalCode,
+    province: address.province,
+    suburb: address.suburb,
+  };
+}
+
+async function resolveCheckoutAddressBookSelection({
+  input,
+  userId,
+}: {
+  input: CreateCheckoutOrderRequest;
+  userId: string | null;
+}): Promise<{
+  customer: CheckoutCustomer;
+  deliveryAddress: CheckoutDeliveryAddress;
+}> {
+  const intent = input.addressBookIntent;
+
+  if (intent.kind === "none") {
+    return {
+      customer: input.customer,
+      deliveryAddress: input.deliveryAddress,
+    };
+  }
+
+  if (!userId) {
+    throw new Error("Sign in before using or saving a delivery address.");
+  }
+
+  if (intent.kind === "save_new") {
+    return {
+      customer: input.customer,
+      deliveryAddress: input.deliveryAddress,
+    };
+  }
+
+  const addressBook = await getCheckoutAddressBook(userId);
+  const selectedAddress = addressBook.addresses.find(
+    (address) => address.id === intent.addressId,
+  );
+
+  if (!selectedAddress) {
+    throw new CustomerAddressNotFoundError();
+  }
+
+  if (intent.kind === "update_existing") {
+    return {
+      customer: input.customer,
+      deliveryAddress: input.deliveryAddress,
+    };
+  }
+
+  return {
+    customer: {
+      ...input.customer,
+      name: selectedAddress.recipientName,
+      phone: selectedAddress.recipientPhone,
+    },
+    deliveryAddress: toCheckoutDeliveryAddress(selectedAddress),
+  };
+}
+
+export async function getLatestOwnedCheckoutAddress(
+  userId: string,
+): Promise<CheckoutAddressPrefill | null> {
+  const [order] = await db
+    .select({
+      customerName: orders.customerName,
+      customerPhone: orders.customerPhone,
+      deliveryAddressSnapshot: orders.deliveryAddressSnapshot,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.userId, userId),
+        inArray(orders.status, ["paid", "fulfilled"]),
+      ),
+    )
+    .orderBy(desc(orders.createdAt))
+    .limit(1);
+
+  if (!order) {
+    return null;
+  }
+
+  return {
+    ...toCheckoutDeliveryAddress(order.deliveryAddressSnapshot),
+    recipientName: order.customerName,
+    recipientPhone: order.customerPhone,
+  };
 }
 
 export async function createHostedCheckoutOrder(
@@ -109,7 +224,16 @@ export async function createHostedCheckoutOrder(
     );
   }
 
-  const fingerprint = createCheckoutFingerprint(parsed);
+  const userId = session?.user?.id ?? null;
+  const checkoutDetails = await resolveCheckoutAddressBookSelection({
+    input: parsed,
+    userId,
+  });
+
+  const fingerprint = createCheckoutFingerprint({
+    deliveryAddress: checkoutDetails.deliveryAddress,
+    items: parsed.items,
+  });
   const selectionByGroup = new Map(
     parsed.deliverySelections.map((selection) => [selection.groupKey, selection]),
   );
@@ -160,8 +284,8 @@ export async function createHostedCheckoutOrder(
   }
 
   const jurgensQuote = quoteByGroup.get("jurgens");
-  const requiresJurgensSchedule = expectedGroupKeys.includes("jurgens");
-  const scheduleSelection = requiresJurgensSchedule
+  const hasJurgensDelivery = expectedGroupKeys.includes("jurgens");
+  const scheduleSelection = parsed.jurgensDeliverySchedule
     ? await validateJurgensDeliveryScheduleSelection(
         parsed.jurgensDeliverySchedule,
       )
@@ -171,7 +295,13 @@ export async function createHostedCheckoutOrder(
     throw new Error(scheduleSelection.message);
   }
 
-  if (requiresJurgensSchedule && jurgensQuote?.provider !== "piessang_local") {
+  if (scheduleSelection && !hasJurgensDelivery) {
+    throw new Error(
+      "Jurgens Energy delivery can only be scheduled for Jurgens-fulfilled products.",
+    );
+  }
+
+  if (scheduleSelection && jurgensQuote?.provider !== "piessang_local") {
     throw new Error("Choose a valid Jurgens delivery option before scheduling.");
   }
 
@@ -186,24 +316,87 @@ export async function createHostedCheckoutOrder(
   const checkoutTokenHash = hashCheckoutToken(checkoutToken);
   const orderNumber = createOrderNumber();
   const deliveryAddressSnapshot = {
-    addressLine1: parsed.deliveryAddress.addressLine1,
-    addressLine2: parsed.deliveryAddress.addressLine2 || null,
-    city: parsed.deliveryAddress.city,
-    countryCode: parsed.deliveryAddress.countryCode.toUpperCase(),
-    postalCode: parsed.deliveryAddress.postalCode,
-    province: parsed.deliveryAddress.province,
-    suburb: parsed.deliveryAddress.suburb,
+    addressLine1: checkoutDetails.deliveryAddress.addressLine1,
+    addressLine2: checkoutDetails.deliveryAddress.addressLine2 || null,
+    city: checkoutDetails.deliveryAddress.city,
+    countryCode: checkoutDetails.deliveryAddress.countryCode.toUpperCase(),
+    postalCode: checkoutDetails.deliveryAddress.postalCode,
+    province: checkoutDetails.deliveryAddress.province,
+    suburb: checkoutDetails.deliveryAddress.suburb,
+  };
+  const billingAddress = parsed.billingDetails?.sameAsDelivery
+    ? deliveryAddressSnapshot
+    : parsed.billingDetails?.address
+      ? {
+          addressLine1: parsed.billingDetails.address.addressLine1,
+          addressLine2: parsed.billingDetails.address.addressLine2 || null,
+          city: parsed.billingDetails.address.city,
+          countryCode: parsed.billingDetails.address.countryCode.toUpperCase(),
+          postalCode: parsed.billingDetails.address.postalCode,
+          province: parsed.billingDetails.address.province,
+          suburb: parsed.billingDetails.address.suburb || null,
+        }
+      : deliveryAddressSnapshot;
+  const billingDetailsSnapshot = {
+    ...billingAddress,
+    businessName: parsed.billingDetails?.businessName?.trim() || null,
+    name: parsed.billingDetails?.name.trim() || checkoutDetails.customer.name,
+    suburb: billingAddress.suburb || null,
+    vatRegistrationNumber:
+      parsed.billingDetails?.vatRegistrationNumber?.trim() || null,
   };
 
   const created = await db.transaction(async (tx) => {
+    if (userId) {
+      const addressInput = {
+        ...checkoutDetails.deliveryAddress,
+        isDefault:
+          parsed.addressBookIntent.kind === "save_new" ||
+          parsed.addressBookIntent.kind === "update_existing"
+            ? parsed.addressBookIntent.isDefault
+            : false,
+        label:
+          parsed.addressBookIntent.kind === "save_new" ||
+          parsed.addressBookIntent.kind === "update_existing"
+            ? parsed.addressBookIntent.label
+            : "Delivery address",
+        recipientName: checkoutDetails.customer.name,
+        recipientPhone: checkoutDetails.customer.phone,
+      };
+
+      if (parsed.addressBookIntent.kind === "use_saved") {
+        await markCustomerAddressUsed(
+          userId,
+          parsed.addressBookIntent.addressId,
+          tx,
+        );
+      } else if (parsed.addressBookIntent.kind === "save_new") {
+        const savedAddress = await createCustomerAddress(
+          userId,
+          addressInput,
+          tx,
+        );
+        await markCustomerAddressUsed(userId, savedAddress.id, tx);
+      } else if (parsed.addressBookIntent.kind === "update_existing") {
+        const savedAddress = await updateCustomerAddress(
+          userId,
+          parsed.addressBookIntent.addressId,
+          addressInput,
+          tx,
+        );
+        await markCustomerAddressUsed(userId, savedAddress.id, tx);
+      }
+    }
+
     const [order] = await tx
       .insert(orders)
       .values({
+        billingDetailsSnapshot,
         checkoutTokenHash,
         currency: "ZAR",
-        customerEmail: parsed.customer.email.toLowerCase(),
-        customerName: parsed.customer.name,
-        customerPhone: parsed.customer.phone,
+        customerEmail: checkoutDetails.customer.email.toLowerCase(),
+        customerName: checkoutDetails.customer.name,
+        customerPhone: checkoutDetails.customer.phone,
         deliveryAddressSnapshot,
         grandTotal: grandTotal.toFixed(2),
         orderNumber,
@@ -216,7 +409,7 @@ export async function createHostedCheckoutOrder(
         },
         shippingTotal: shippingTotal.toFixed(2),
         subtotal: subtotal.toFixed(2),
-        userId: session?.user?.id || null,
+        userId,
       })
       .returning({ id: orders.id, orderNumber: orders.orderNumber });
 
@@ -240,6 +433,8 @@ export async function createHostedCheckoutOrder(
           purchaseType: item.purchaseType,
           quantity: item.quantity,
           sellerId: item.sellerId,
+          skuSnapshot: item.sku,
+          taxRateBps: item.taxRateBps,
           title: `${item.productTitle} - ${item.variantTitle}`,
           unitPrice: item.unitPriceZar.toFixed(2),
           variantId: item.variantId,
@@ -247,15 +442,12 @@ export async function createHostedCheckoutOrder(
       }),
     );
 
-    if (requiresJurgensSchedule && scheduleSelection?.ok && jurgensQuote) {
+    if (scheduleSelection?.ok && jurgensQuote) {
       await tx.insert(jurgensDeliverySchedules).values({
         deliveryInstructions: scheduleSelection.selection.deliveryInstructions,
         orderId: order.id,
         quoteId: jurgensQuote.id,
         scheduledDate: scheduleSelection.selection.date,
-        windowEnd: scheduleSelection.selection.windowEnd,
-        windowLabel: scheduleSelection.selection.windowLabel,
-        windowStart: scheduleSelection.selection.windowStart,
         zoneId: getJurgensZoneId(jurgensQuote.providerPayload),
       });
     }
@@ -274,13 +466,13 @@ export async function createHostedCheckoutOrder(
       .set({ orderId: order.id, status: "selected" })
       .where(inArray(shippingRateQuotes.id, quoteIds));
 
-    if (session?.user?.id) {
+    if (userId) {
       try {
         await linkWhatsappNumberToUser({
           database: tx,
-          phone: parsed.customer.phone,
+          phone: checkoutDetails.customer.phone,
           source: "checkout",
-          userId: session.user.id,
+          userId,
           verified: false,
         });
       } catch (error) {
@@ -338,14 +530,19 @@ export async function getCheckoutOrderSummary(orderId: string, token: string) {
     return null;
   }
 
-  const [paymentRows, itemRows] = await Promise.all([
+  if (order.status === "paid" || order.status === "fulfilled") {
+    await ensureInvoiceForPaidOrder(order.id).catch(() => null);
+  }
+
+  const [paymentRows, itemRows, invoiceRows] = await Promise.all([
     db
       .select({
         providerStatus: payments.providerStatus,
         status: payments.status,
       })
       .from(payments)
-      .where(eq(payments.orderId, order.id)),
+      .where(eq(payments.orderId, order.id))
+      .orderBy(desc(payments.createdAt)),
     db
       .select({
         quantity: orderItems.quantity,
@@ -354,12 +551,22 @@ export async function getCheckoutOrderSummary(orderId: string, token: string) {
       })
       .from(orderItems)
       .where(eq(orderItems.orderId, order.id)),
+    db
+      .select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        renderStatus: invoices.renderStatus,
+      })
+      .from(invoices)
+      .where(eq(invoices.orderId, order.id))
+      .limit(1),
   ]);
 
   return {
     createdAt: order.createdAt.toISOString(),
     customerEmail: order.customerEmail,
     grandTotal: Number(order.grandTotal),
+    invoice: invoiceRows[0] ?? null,
     items: itemRows,
     orderId: order.id,
     orderNumber: order.orderNumber,

@@ -8,9 +8,11 @@ import {
   ChevronRightIcon,
   LayoutDashboardIcon,
   LogOutIcon,
+  MapPinIcon,
   MenuIcon,
   MessageCircleIcon,
   PackageIcon,
+  ReceiptTextIcon,
   ShoppingCartIcon,
   UserIcon,
 } from "lucide-react";
@@ -363,6 +365,22 @@ export function MarketplaceMobileMenu({
                   >
                     <PackageIcon className="size-4" />
                     My orders
+                  </Link>
+                  <Link
+                    className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                    href="/account/addresses"
+                    onClick={closeMenu}
+                  >
+                    <MapPinIcon className="size-4" />
+                    My addresses
+                  </Link>
+                  <Link
+                    className="flex h-10 items-center gap-3 rounded-md px-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                    href="/account/invoices"
+                    onClick={closeMenu}
+                  >
+                    <ReceiptTextIcon className="size-4" />
+                    My invoices
                   </Link>
                 </>
               ) : null}

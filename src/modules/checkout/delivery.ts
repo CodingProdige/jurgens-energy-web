@@ -1,8 +1,6 @@
 import crypto from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
 
-import { db } from "@/src/db";
-import { sellerFulfillmentProfiles, sellers } from "@/src/db/schema";
+import { getBusinessCollectionAddress } from "@/src/modules/business-information";
 import type { CartLineInput } from "@/src/modules/cart/contracts";
 import { validateCartLines } from "@/src/modules/cart/server";
 import {
@@ -13,7 +11,7 @@ import {
   type CheckoutQuoteResponse,
 } from "@/src/modules/checkout/contracts";
 import type { CurrencyContext } from "@/src/modules/currency";
-import { getJurgensDeliveryScheduleOptions } from "@/src/modules/delivery-scheduling/jurgens";
+import { getJurgensDeliveryScheduleAvailability } from "@/src/modules/delivery-scheduling/jurgens";
 import { getBobGoCheckoutRates } from "@/src/modules/shipping/bobgo-client";
 import { getJurgensDeliveryCheckoutRates } from "@/src/modules/shipping/jurgens-delivery";
 
@@ -71,7 +69,7 @@ function toProviderAddress(address: CheckoutDeliveryAddress) {
     city: normalized.city,
     code: normalized.postalCode,
     country: normalized.countryCode,
-    local_area: normalized.suburb,
+    local_area: normalized.suburb || normalized.city,
     street_address: [normalized.addressLine1, normalized.addressLine2]
       .filter(Boolean)
       .join(", "),
@@ -81,11 +79,10 @@ function toProviderAddress(address: CheckoutDeliveryAddress) {
 
 function getGroupKey(item: {
   fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
-  sellerId: string | null;
 }) {
   return item.fulfillmentMode === "piessang_fulfilled"
     ? "jurgens"
-    : `seller:${item.sellerId ?? "missing"}`;
+    : "courier";
 }
 
 export async function getCheckoutDeliveryQuotes(
@@ -128,39 +125,9 @@ export async function getCheckoutDeliveryQuotes(
     itemsByGroup.set(groupKey, groupItems);
   }
 
-  const sellerIds = Array.from(
-    new Set(
-      cart.items
-        .filter((item) => item.fulfillmentMode === "seller_fulfilled")
-        .map((item) => item.sellerId)
-        .filter((sellerId): sellerId is string => Boolean(sellerId)),
-    ),
-  );
-  const sellerRows =
-    sellerIds.length > 0
-      ? await db
-          .select({
-            addressLine1: sellerFulfillmentProfiles.addressLine1,
-            addressLine2: sellerFulfillmentProfiles.addressLine2,
-            city: sellerFulfillmentProfiles.city,
-            collectionInstructions:
-              sellerFulfillmentProfiles.collectionInstructions,
-            countryCode: sellerFulfillmentProfiles.countryCode,
-            displayName: sellers.displayName,
-            isVerified: sellerFulfillmentProfiles.isVerified,
-            postalCode: sellerFulfillmentProfiles.postalCode,
-            province: sellerFulfillmentProfiles.province,
-            sellerId: sellers.id,
-            suburb: sellerFulfillmentProfiles.suburb,
-          })
-          .from(sellers)
-          .leftJoin(
-            sellerFulfillmentProfiles,
-            eq(sellerFulfillmentProfiles.sellerId, sellers.id),
-          )
-          .where(inArray(sellers.id, sellerIds))
-      : [];
-  const sellerById = new Map(sellerRows.map((seller) => [seller.sellerId, seller]));
+  const businessCollectionAddress = itemsByGroup.has("courier")
+    ? await getBusinessCollectionAddress()
+    : null;
   const groups: CheckoutDeliveryGroup[] = [];
   const expiryTimes: number[] = [];
 
@@ -185,6 +152,9 @@ export async function getCheckoutDeliveryQuotes(
           })),
           sellerId: null,
         });
+        const scheduleAvailability = result.eligible
+          ? await getJurgensDeliveryScheduleAvailability()
+          : null;
 
         if (result.expiresAt) {
           expiryTimes.push(new Date(result.expiresAt).getTime());
@@ -207,10 +177,14 @@ export async function getCheckoutDeliveryQuotes(
                 ]
               : [],
           ),
-          scheduling: result.eligible
+          scheduling: scheduleAvailability
             ? {
-                options: await getJurgensDeliveryScheduleOptions(),
-                required: true,
+                cutoffTime: scheduleAvailability.cutoffTime,
+                cutoffTimeZone: scheduleAvailability.cutoffTimeZone,
+                nextPolicyChangeAt:
+                  scheduleAvailability.nextPolicyChangeAt,
+                options: scheduleAvailability.options,
+                required: false,
               }
             : null,
           sellerId: null,
@@ -233,28 +207,17 @@ export async function getCheckoutDeliveryQuotes(
       continue;
     }
 
-    const sellerId = groupItems[0]?.sellerId ?? null;
-    const seller = sellerId ? sellerById.get(sellerId) : null;
-    const label = seller?.displayName
-      ? `Courier delivery from ${seller.displayName}`
-      : "Courier delivery";
+    const label = "Courier delivery";
 
-    if (
-      !seller ||
-      !seller.addressLine1 ||
-      !seller.city ||
-      !seller.postalCode ||
-      !seller.province ||
-      !seller.suburb
-    ) {
+    if (!businessCollectionAddress) {
       groups.push({
         groupKey,
         label,
         options: [],
         scheduling: null,
-        sellerId,
+        sellerId: null,
         unavailableReason:
-          "The seller collection address is not ready for courier quoting.",
+          "The Jurgens Energy courier collection address is not configured yet.",
       });
       continue;
     }
@@ -273,7 +236,7 @@ export async function getCheckoutDeliveryQuotes(
         label,
         options: [],
         scheduling: null,
-        sellerId,
+        sellerId: null,
         unavailableReason:
           "A selected product is missing parcel measurements required for courier delivery.",
       });
@@ -284,15 +247,19 @@ export async function getCheckoutDeliveryQuotes(
       const result = await getBobGoCheckoutRates({
         checkoutFingerprint: fingerprint,
         collectionAddress: {
-          city: seller.city,
-          code: seller.postalCode,
-          company: seller.displayName,
-          country: seller.countryCode ?? "ZA",
-          local_area: seller.suburb,
-          street_address: [seller.addressLine1, seller.addressLine2]
+          city: businessCollectionAddress.city,
+          code: businessCollectionAddress.postalCode,
+          company: businessCollectionAddress.company,
+          country: businessCollectionAddress.countryCode,
+          local_area:
+            businessCollectionAddress.suburb || businessCollectionAddress.city,
+          street_address: [
+            businessCollectionAddress.addressLine1,
+            businessCollectionAddress.addressLine2,
+          ]
             .filter(Boolean)
             .join(", "),
-          zone: seller.province,
+          zone: businessCollectionAddress.province,
         },
         declaredValue: groupItems.reduce(
           (total, item) => total + item.lineTotalZar,
@@ -309,7 +276,7 @@ export async function getCheckoutDeliveryQuotes(
           weightGrams: item.weightGrams!,
           widthMm: item.widthMm!,
         })),
-        sellerId,
+        sellerId: null,
       });
 
       expiryTimes.push(new Date(result.expiresAt).getTime());
@@ -332,7 +299,7 @@ export async function getCheckoutDeliveryQuotes(
               : [],
           )
           .sort((first, second) => first.amountZar - second.amountZar),
-        sellerId,
+        sellerId: null,
         unavailableReason:
           result.rates.length > 0
             ? null
@@ -345,7 +312,7 @@ export async function getCheckoutDeliveryQuotes(
         label,
         options: [],
         scheduling: null,
-        sellerId,
+        sellerId: null,
         unavailableReason:
           error instanceof Error ? error.message : "Courier delivery is unavailable.",
       });
@@ -364,7 +331,6 @@ export async function getCheckoutDeliveryQuotes(
 
 export function getCheckoutDeliveryGroupKey(item: {
   fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
-  sellerId: string | null;
 }) {
   return getGroupKey(item);
 }

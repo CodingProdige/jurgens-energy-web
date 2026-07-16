@@ -28,6 +28,7 @@ DATABASE_URL=postgres://jurgens_energy:replace-with-your-local-database-password
 
 REDIS_URL=redis://localhost:6380
 MEDIA_ROOT=./storage/jurgens-energy/media
+INVOICE_ROOT=./storage/jurgens-energy/invoices
 MEDIA_STORAGE_PATH=./storage/jurgens-energy/media
 INVOICE_STORAGE_PATH=./storage/jurgens-energy/invoices
 EXPORT_STORAGE_PATH=./storage/jurgens-energy/exports
@@ -51,6 +52,10 @@ WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
 WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
 
 WHATSAPP_AUTOMATION_SECRET=replace-with-a-long-random-secret
+DIALOGUE_API_KEY=replace-with-360dialog-api-key
+DIALOGUE_MESSAGE_URL=https://waba-v2.360dialog.io
+WHATSAPP_INVOICE_TEMPLATE_NAME=customer_invoice_issued
+WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en
 ```
 
 ## Self-Hosted Values
@@ -76,6 +81,7 @@ DATABASE_URL=postgres://jurgens_energy:replace-with-a-strong-database-password@l
 
 REDIS_URL=redis://localhost:6380
 MEDIA_ROOT=/data/media
+INVOICE_ROOT=/data/invoices
 MEDIA_STORAGE_PATH=/Users/dillonjurgens/JurgensEnergy/storage/media
 INVOICE_STORAGE_PATH=/Users/dillonjurgens/JurgensEnergy/storage/invoices
 EXPORT_STORAGE_PATH=/Users/dillonjurgens/JurgensEnergy/storage/exports
@@ -99,6 +105,10 @@ WEB_PUSH_PRIVATE_KEY=replace-with-vapid-private-key
 WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
 
 WHATSAPP_AUTOMATION_SECRET=replace-with-a-long-random-secret
+DIALOGUE_API_KEY=replace-with-360dialog-api-key
+DIALOGUE_MESSAGE_URL=https://waba-v2.360dialog.io
+WHATSAPP_INVOICE_TEMPLATE_NAME=customer_invoice_issued
+WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en
 
 CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 ```
@@ -135,6 +145,51 @@ APP_URL=https://your-tunnel.trycloudflare.com
 `/api/whatsapp/follow-ups`. Call it with `POST` and either
 `Authorization: Bearer <secret>` or `x-whatsapp-automation-secret: <secret>`.
 
+Invoice WhatsApp delivery uses an approved 360dialog template rather than a
+free-form message, so it also works outside WhatsApp's 24-hour service window.
+The template named by `WHATSAPP_INVOICE_TEMPLATE_NAME` must contain a document
+header and five body placeholders in this exact order: customer name, order
+number, invoice number, invoice total, and secure invoice download URL. The
+default template name is `customer_invoice_issued` and the default language is
+`en`; both values must match the approved template in WhatsApp Manager.
+A suitable body is: `Hi {{1}}, thank you for order {{2}}. Your paid tax invoice
+{{3}} for {{4}} is attached. Secure download: {{5}}`. `APP_URL` must be publicly
+reachable so WhatsApp can retrieve the token-protected PDF used by the document
+header.
+
+Credit-note WhatsApp delivery uses a second approved document template named
+`customer_credit_note_issued`. Its document header receives the generated
+credit-note PDF, and its seven body placeholders must appear in this exact
+order:
+
+1. Customer name
+2. Order number
+3. Original invoice number
+4. Credit-note number
+5. Credited total
+6. Credit reason
+7. Secure credit-note download URL
+
+A suitable body is: `Hi {{1}}, credit note {{4}} has been issued for order
+{{2}} against invoice {{3}}. Total credited: {{5}}. Reason: {{6}}. Secure
+download: {{7}}`.
+
+The credit-note template name is fixed by the application. It uses the same
+`WHATSAPP_INVOICE_TEMPLATE_LANGUAGE` value as invoice delivery, so that value
+must match the approved language for both templates. `DIALOGUE_API_KEY` and
+`DIALOGUE_MESSAGE_URL` configure 360dialog for both document types. `APP_URL`
+must be publicly reachable so 360dialog can fetch each token-protected PDF.
+Credit-note email uses the seeded active notification template
+`customer_credit_note_issued`; SendGrid configuration is shared with invoice
+email.
+
+PayFast refund credentials are not environment variables. Configure the live
+eight-digit merchant ID and live passphrase under **Admin → Settings → Platform
+→ PayFast payments**; secrets are encrypted in PostgreSQL. PayFast's Refunds API
+is not used in sandbox mode. Submitted, verification-required, and externally
+completed bank-payout refunds are reconciled by GET-only checks in the document
+worker, which starts with the Next.js server.
+
 `SENDGRID_FROM_EMAIL` must be a sender identity verified in SendGrid. If either SendGrid value is missing in local development, password reset requests keep showing the dev reset link instead of sending email.
 
 `SENDGRID_WEBHOOK_PUBLIC_KEY` is the Verification key shown by SendGrid when Signed Event Webhook is enabled. Use the endpoint `https://jurgensenergy.com/api/webhooks/sendgrid/events` in SendGrid.
@@ -164,10 +219,20 @@ Use the OAuth client ID as `AUTH_GOOGLE_ID` and the client secret as `AUTH_GOOGL
 
 ## Storage Paths
 
-`MEDIA_ROOT` is the path inside the running app/container where uploaded media is written. For Docker self-hosting, keep it as:
+`MEDIA_ROOT` and `INVOICE_ROOT` are private paths inside the running
+app/container where uploaded media and generated invoices and credit notes are
+written. For Docker self-hosting, keep them as:
 
 ```env
 MEDIA_ROOT=/data/media
+INVOICE_ROOT=/data/invoices
 ```
 
-`MEDIA_STORAGE_PATH`, `INVOICE_STORAGE_PATH`, `EXPORT_STORAGE_PATH`, and `BACKUP_STORAGE_PATH` are host-machine paths mounted into Docker. Local development can use the default `./storage/...` folders. Production/self-hosting should point these at a durable folder outside the repo so app deploys do not touch uploaded files.
+`MEDIA_STORAGE_PATH`, `INVOICE_STORAGE_PATH`, `EXPORT_STORAGE_PATH`, and
+`BACKUP_STORAGE_PATH` are host-machine paths mounted into Docker.
+`INVOICE_STORAGE_PATH` is mounted at `INVOICE_ROOT`; invoices and credit notes
+must be served only through authenticated or token-protected application routes
+and never through Caddy's public media mount. Local development can use the
+default `./storage/...` folders. Production/self-hosting should point these at a
+durable folder outside the repo so app deploys do not touch generated
+documents.

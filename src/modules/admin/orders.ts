@@ -39,6 +39,7 @@ export type AdminOrderRow = {
   id: string;
   itemCount: number;
   itemTitles: string[];
+  orderNumber: string;
   payments: AdminOrderPayment[];
   shippingTotal: string;
   shipments: AdminOrderShipmentSummary[];
@@ -75,6 +76,7 @@ export async function getAdminOrders(): Promise<AdminOrdersData> {
       customerName: users.name,
       grandTotal: orders.grandTotal,
       id: orders.id,
+      orderNumber: orders.orderNumber,
       shippingTotal: orders.shippingTotal,
       status: orders.status,
       subtotal: orders.subtotal,

@@ -37,7 +37,13 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return Response.json(
-      { error: "invalid_checkout", issues: parsed.error.issues },
+      {
+        error: "invalid_checkout",
+        issues: parsed.error.issues,
+        message:
+          parsed.error.issues[0]?.message ??
+          "Review the checkout details and try again.",
+      },
       { status: 400 },
     );
   }

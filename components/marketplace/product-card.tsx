@@ -1,14 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  FlameIcon,
-  RefreshCcwIcon,
-  TruckIcon,
-} from "lucide-react";
+import { FlameIcon, RefreshCcwIcon } from "lucide-react";
 
+import { MarketplaceProductFulfillmentBadge } from "@/components/marketplace/product-fulfillment-badge";
 import { ProductCardQuickAddButton } from "@/components/marketplace/product-card-quick-add-button";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import type { MarketplaceProductCard as MarketplaceProductCardData } from "@/src/modules/marketplace/catalog";
 
 export function MarketplaceProductCard({
@@ -17,12 +13,6 @@ export function MarketplaceProductCard({
   product: MarketplaceProductCardData;
 }) {
   const productHref = `/products/${product.slug}`;
-  const deliveryLabel =
-    product.fulfillmentMode === "piessang_fulfilled" ? "Local" : "Courier";
-  const deliveryBadgeClass =
-    product.fulfillmentMode === "piessang_fulfilled"
-      ? "bg-emerald-500 text-white"
-      : "bg-[#1a1a1a] text-white dark:bg-[#f7f7f2] dark:text-[#080808]";
   const detailLabel = product.category?.name ?? product.brandName ?? "Jurgens Energy";
 
   return (
@@ -50,15 +40,9 @@ export function MarketplaceProductCard({
           )}
 
           <div className="absolute left-0 top-0 z-10 flex max-w-[78%] flex-col items-start gap-px">
-            <Badge
-              className={cn(
-                "inline-flex h-[15px] max-w-full items-center gap-0.5 rounded-none px-1 text-[6.5px] font-black uppercase leading-none shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]",
-                deliveryBadgeClass,
-              )}
-            >
-              <TruckIcon className="size-2.5 shrink-0 sm:size-3" />
-              <span className="truncate">{deliveryLabel}</span>
-            </Badge>
+            <MarketplaceProductFulfillmentBadge
+              fulfillmentMode={product.fulfillmentMode}
+            />
             {product.hasExchangeOption ? (
               <Badge className="inline-flex h-[15px] max-w-full items-center gap-0.5 rounded-none bg-[#ffb000] px-1 text-[6.5px] font-black uppercase leading-none text-[#080808] shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]">
                 <RefreshCcwIcon className="size-2.5 shrink-0 sm:size-3" />

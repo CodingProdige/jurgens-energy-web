@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import { orderItems, payments } from "@/src/db/schema";
@@ -66,9 +66,20 @@ export async function getHostedPayFastForm(orderId: string, token: string) {
 
   const [paymentRows, itemCountRows] = await Promise.all([
     db
-      .select({ id: payments.id, status: payments.status })
+      .select({
+        amount: payments.amount,
+        id: payments.id,
+        status: payments.status,
+      })
       .from(payments)
-      .where(eq(payments.orderId, order.id))
+      .where(
+        and(
+          eq(payments.orderId, order.id),
+          eq(payments.provider, "payfast"),
+          eq(payments.status, "pending"),
+        ),
+      )
+      .orderBy(desc(payments.createdAt))
       .limit(1),
     db
       .select({ count: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int` })
@@ -77,7 +88,15 @@ export async function getHostedPayFastForm(orderId: string, token: string) {
   ]);
   const payment = paymentRows[0];
 
-  if (!payment || payment.status !== "pending" || Number(order.grandTotal) < 5) {
+  const currentOrderAmount = Number(order.grandTotal);
+
+  if (
+    !payment ||
+    payment.status !== "pending" ||
+    !Number.isFinite(currentOrderAmount) ||
+    currentOrderAmount < 5 ||
+    Math.abs(Number(payment.amount) - currentOrderAmount) > 0.01
+  ) {
     return null;
   }
 
@@ -104,7 +123,7 @@ export async function getHostedPayFastForm(orderId: string, token: string) {
     { name: "email_address", value: order.customerEmail },
     { name: "cell_number", value: order.customerPhone },
     { name: "m_payment_id", value: payment.id },
-    { name: "amount", value: Number(order.grandTotal).toFixed(2) },
+    { name: "amount", value: currentOrderAmount.toFixed(2) },
     { name: "item_name", value: `Jurgens Energy ${order.orderNumber}`.slice(0, 100) },
     {
       name: "item_description",

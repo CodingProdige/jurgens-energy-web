@@ -92,6 +92,7 @@ export async function validateCartLines(
       shipsAlone: productVariants.shipsAlone,
       sku: productVariants.sku,
       stockOnHand: productVariants.stockOnHand,
+      taxRateBps: productVariants.taxRateBps,
       variantId: productVariants.id,
       variantIsActive: productVariants.isActive,
       variantStatus: productVariants.status,
@@ -170,9 +171,11 @@ export async function validateCartLines(
     const displayLineTotal = roundMoney(
       convertFromZar(lineTotalZar, currencyContext),
     );
-    const purchaseType = row.requiresExchangeEmpty ? "exchange" : "standard";
+    const requiresExchangeEmpty =
+      row.requiresExchangeEmpty || /\bexchange\b/i.test(row.variantTitle);
+    const purchaseType = requiresExchangeEmpty ? "exchange" : "standard";
     const exchangeConfirmationMissing =
-      row.requiresExchangeEmpty && !requested.exchangeEmptyConfirmed;
+      requiresExchangeEmpty && !requested.exchangeEmptyConfirmed;
 
     return [
       {
@@ -215,6 +218,7 @@ export async function validateCartLines(
         sellerName: row.sellerName,
         shipsAlone: row.shipsAlone,
         sku: row.sku,
+        taxRateBps: row.taxRateBps,
         unitPriceLabel: formatFromZar(unitPriceZar, currencyContext),
         unitPriceZar,
         variantId: row.variantId,

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRightIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { z } from "zod";
 
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
@@ -17,7 +18,12 @@ import {
   type MarketplaceProductCard,
   type MarketplaceProductDetail,
 } from "@/src/modules/marketplace/catalog";
+import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+
+const productSearchParamsSchema = z.object({
+  variant: z.string().uuid().optional(),
+});
 
 export async function generateMetadata({
   params,
@@ -36,6 +42,9 @@ export async function generateMetadata({
   }
 
   return {
+    alternates: {
+      canonical: createMarketplaceCanonicalUrl(`/products/${product.slug}`),
+    },
     title: product.title,
     description:
       product.shortDescription ??
@@ -50,10 +59,15 @@ export async function generateMetadata({
 
 export default async function ProductPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ variant?: string | string[] }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const currencyContext = await getCurrencyContext();
   const product = await getMarketplaceProductBySlug(slug, currencyContext);
 
@@ -73,6 +87,16 @@ export default async function ProductPage({
     .filter((item) => isRelatedProduct(product, item))
     .slice(0, 12);
   const productView = toProductDetailView(product);
+  const parsedSearchParams =
+    productSearchParamsSchema.safeParse(resolvedSearchParams);
+  const requestedVariantId = parsedSearchParams.success
+    ? parsedSearchParams.data.variant
+    : undefined;
+  const initialVariantId = product.variants.some(
+    (variant) => variant.id === requestedVariantId,
+  )
+    ? requestedVariantId
+    : undefined;
 
   return (
     <MarketplaceGate>
@@ -109,6 +133,7 @@ export default async function ProductPage({
         <ProductDetailExperience
           catalogProducts={catalog.products}
           currencyContext={currencyContext}
+          initialVariantId={initialVariantId}
           jurgensDeliveryCutoffTime={settings.jurgensDeliveryCutoffTime}
           product={productView}
           relatedProducts={moreInCategoryProducts}

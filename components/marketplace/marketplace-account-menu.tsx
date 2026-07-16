@@ -6,8 +6,10 @@ import { signOut } from "next-auth/react";
 import {
   LayoutDashboardIcon,
   LogOutIcon,
+  MapPinIcon,
   MessageCircleIcon,
   PackageIcon,
+  ReceiptTextIcon,
   ShoppingCartIcon,
   UserIcon,
 } from "lucide-react";
@@ -139,6 +141,24 @@ export function MarketplaceAccountMenu({
             <Link href="/account/orders">
               <PackageIcon className="size-4" />
               My orders
+            </Link>
+          }
+        />
+        <DropdownMenuItem
+          className="cursor-pointer gap-2 px-3 py-2"
+          render={
+            <Link href="/account/addresses">
+              <MapPinIcon className="size-4" />
+              My addresses
+            </Link>
+          }
+        />
+        <DropdownMenuItem
+          className="cursor-pointer gap-2 px-3 py-2"
+          render={
+            <Link href="/account/invoices">
+              <ReceiptTextIcon className="size-4" />
+              My invoices
             </Link>
           }
         />

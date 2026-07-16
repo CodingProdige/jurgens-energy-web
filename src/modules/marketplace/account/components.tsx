@@ -26,6 +26,7 @@ import type {
   CustomerOrderDetail,
   CustomerOrderSummary,
 } from "@/src/modules/marketplace/account/data";
+import { RetryPaymentButton } from "@/src/modules/marketplace/account/retry-payment-button";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-ZA", {
   dateStyle: "medium",
@@ -139,7 +140,7 @@ export function AccountPageShell({
   description,
   title,
 }: {
-  active: "orders" | "overview" | "whatsapp";
+  active: "addresses" | "invoices" | "orders" | "overview" | "whatsapp";
   children: ReactNode;
   description: string;
   title: string;
@@ -147,6 +148,16 @@ export function AccountPageShell({
   const links = [
     { href: "/account", id: "overview" as const, label: "Overview" },
     { href: "/account/orders", id: "orders" as const, label: "Orders" },
+    {
+      href: "/account/invoices",
+      id: "invoices" as const,
+      label: "Invoices",
+    },
+    {
+      href: "/account/addresses",
+      id: "addresses" as const,
+      label: "Addresses",
+    },
     {
       href: "/account/whatsapp",
       id: "whatsapp" as const,
@@ -464,7 +475,7 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
               {order.schedules.map((schedule) => (
                 <div
                   className="grid gap-3 rounded-md border border-[#deded7] p-4 dark:border-white/10 sm:grid-cols-[auto_minmax(0,1fr)]"
-                  key={`${schedule.scheduledDate}-${schedule.windowLabel}`}
+                  key={`${schedule.scheduledDate}-${schedule.windowLabel ?? "date-only"}`}
                 >
                   <span className="grid size-10 place-items-center rounded-full bg-[#ff5a1f]/10 text-[#ff5a1f]">
                     <CalendarDaysIcon className="size-5" />
@@ -484,8 +495,8 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
                     <p className="mt-1 text-sm text-[#666660] dark:text-[#aaa9a1]">
                       {dateFormatter.format(
                         new Date(`${schedule.scheduledDate}T12:00:00+02:00`),
-                      )}{" "}
-                      · {schedule.windowLabel}
+                      )}
+                      {schedule.windowLabel ? ` · ${schedule.windowLabel}` : null}
                     </p>
                     {schedule.deliveryInstructions ? (
                       <p className="mt-2 text-xs leading-5 text-[#777770] dark:text-[#92928c]">
@@ -531,7 +542,7 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
                   <br />
                 </>
               ) : null}
-              {address.suburb}, {address.city}
+              {[address.suburb, address.city].filter(Boolean).join(", ")}
               <br />
               {address.province}, {address.postalCode}
               <br />
@@ -553,7 +564,7 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
           </DetailPanel>
 
           <DetailPanel icon={<CheckCircle2Icon className="size-4" />} title="Payment">
-            <div className="px-4 py-4 sm:px-5">
+            <div className="grid gap-4 px-4 py-4 sm:px-5">
               {latestPayment ? (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -581,6 +592,15 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
                   No payment has been recorded yet.
                 </p>
               )}
+              {order.canRetryPayment ? (
+                <div className="grid gap-3 border-t border-[#e8e8e2] pt-4 dark:border-white/10">
+                  <p className="text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
+                    This order is still awaiting payment. Reopen the secure
+                    PayFast checkout without creating a duplicate order.
+                  </p>
+                  <RetryPaymentButton orderId={order.id} />
+                </div>
+              ) : null}
             </div>
           </DetailPanel>
 

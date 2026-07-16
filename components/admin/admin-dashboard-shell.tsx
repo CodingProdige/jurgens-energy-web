@@ -45,6 +45,11 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
         href: "/orders/scheduled",
         capability: "admin.orders.view",
       },
+      {
+        label: "Invoices",
+        href: "/orders/invoices",
+        capability: "admin.orders.view",
+      },
     ],
   },
   {
@@ -125,9 +130,19 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
   },
   {
     label: "Settings",
-    href: "/settings/platform",
     icon: SettingsIcon,
-    capability: "admin.settings.view",
+    children: [
+      {
+        label: "Platform",
+        href: "/settings/platform",
+        capability: "admin.settings.view",
+      },
+      {
+        label: "Business information",
+        href: "/settings/business",
+        capability: "admin.settings.view",
+      },
+    ],
   },
 ];
 

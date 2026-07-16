@@ -25,9 +25,9 @@ export type AdminScheduledOrderRow = {
   shipmentStatus: string | null;
   status: JurgensDeliveryScheduleStatus;
   updatedAt: Date;
-  windowEnd: string;
-  windowLabel: string;
-  windowStart: string;
+  windowEnd: string | null;
+  windowLabel: string | null;
+  windowStart: string | null;
   zoneName: string | null;
 };
 

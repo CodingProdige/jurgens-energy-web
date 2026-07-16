@@ -8,6 +8,7 @@ import {
   shippingRateQuotes,
 } from "@/src/db/schema";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import { getJurgensImplicitFreeDeliveryThreshold } from "@/src/modules/shipping/jurgens-delivery-pricing";
 
 const addressSchema = z.object({
   code: z.string().trim().min(1),
@@ -259,7 +260,7 @@ export async function checkJurgensDeliveryAvailability(
 
   return {
     currency: "ZAR",
-    deliveryFee: roundMoney(evaluation.rate.price),
+    deliveryFee: roundMoney(evaluation.deliveryFee),
     eligible: true,
     mode: "jurgens_delivery",
     postalCode: evaluation.postalCode,
@@ -302,22 +303,27 @@ export async function getJurgensDeliveryCheckoutRates(
   const postalCode = evaluation.postalCode;
 
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-  const providerRateId = `jurgens-${matchingZone.id}-${matchingRate.id}`;
+  const rateReference = matchingRate
+    ? matchingRate.id
+    : `zone-cap-free-${evaluation.freeDeliveryThreshold?.toFixed(2).replace(".", "-")}`;
+  const providerRateId = `jurgens-${matchingZone.id}-${rateReference}`;
   const providerPayload = {
     deliveryInformation: matchingZone.deliveryInformation,
     deliveryMethod: "jurgens_energy_delivery",
+    freeDeliveryThreshold: evaluation.freeDeliveryThreshold,
     postalCode,
-    rateId: matchingRate.id,
+    pricingRule: evaluation.pricingRule,
+    rateId: matchingRate?.id ?? null,
     zoneId: matchingZone.id,
     zoneName: matchingZone.name,
   };
   const rate = {
     bufferAmount: 0,
     currency: "ZAR" as const,
-    customerAmount: roundMoney(matchingRate.price),
+    customerAmount: roundMoney(evaluation.deliveryFee),
     deliveryInformation: matchingZone.deliveryInformation,
     marginAmount: 0,
-    providerAmount: roundMoney(matchingRate.price),
+    providerAmount: roundMoney(evaluation.deliveryFee),
     providerRateId,
     serviceLevel: "local_delivery",
     serviceName: `Jurgens Energy delivery - ${matchingZone.name}`,
@@ -361,9 +367,12 @@ export async function getJurgensDeliveryCheckoutRates(
 
 type JurgensDeliveryAvailabilityEvaluation =
   | {
+      deliveryFee: number;
       eligible: true;
+      freeDeliveryThreshold: number | null;
       postalCode: string;
-      rate: JurgensDeliveryZoneRate;
+      pricingRule: "configured_rate" | "zone_cap_free";
+      rate: JurgensDeliveryZoneRate | null;
       zone: JurgensDeliveryZone;
     }
   | {
@@ -426,27 +435,45 @@ async function evaluateJurgensDeliveryAvailability({
     };
   }
 
-  const matchingRate = matchingZone.rates.find((rate) =>
+  const configuredRate = matchingZone.rates.find((rate) =>
     subtotalMatchesRate(subtotal, rate),
   );
+  const freeDeliveryThreshold = configuredRate
+    ? null
+    : getZoneCapFreeDeliveryThreshold(subtotal, matchingZone);
 
-  if (!matchingRate) {
+  if (!configuredRate && freeDeliveryThreshold === null) {
     return {
       eligible: false,
       postalCode,
       unavailableCode: "rate_not_configured",
-      unavailableReason:
-        "No Jurgens Energy delivery price is configured for this order value.",
+      unavailableReason: `Your address is within the Jurgens Energy delivery area, but no delivery price is available for an order total of R ${formatMoney(subtotal)}.`,
       zone: matchingZone,
     };
   }
 
   return {
+    deliveryFee: configuredRate?.price ?? 0,
     eligible: true,
+    freeDeliveryThreshold,
     postalCode,
-    rate: matchingRate,
+    pricingRule: configuredRate ? "configured_rate" : "zone_cap_free",
+    rate: configuredRate ?? null,
     zone: matchingZone,
   };
+}
+
+function getZoneCapFreeDeliveryThreshold(
+  subtotal: number,
+  zone: JurgensDeliveryZone,
+): number | null {
+  const terminalCap = getJurgensImplicitFreeDeliveryThreshold(zone.rates);
+
+  if (terminalCap === null || subtotal < terminalCap) {
+    return null;
+  }
+
+  return terminalCap;
 }
 
 function normalizeRates(rates: UpsertJurgensDeliveryZoneInput["rates"]) {

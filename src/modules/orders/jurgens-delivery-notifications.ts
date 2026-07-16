@@ -32,7 +32,7 @@ type DeliveryNotificationContext = {
   deliveryDate: string;
   orderNumber: string;
   ratingUrl: string | null;
-  scheduledWindow: string;
+  scheduledWindow: string | null;
   status: JurgensDeliveryScheduleStatus;
 };
 
@@ -45,15 +45,15 @@ function getStatusMessage({
   status,
 }: DeliveryNotificationContext) {
   if (status === "scheduled") {
-    return `Your Jurgens Energy delivery for order ${orderNumber} is scheduled for ${deliveryDate}, ${scheduledWindow}.`;
+    return `Your Jurgens Energy delivery for order ${orderNumber} is scheduled for ${deliveryDate}${scheduledWindow ? ` during ${scheduledWindow}` : ""}.`;
   }
 
   if (status === "preparing") {
-    return `We are preparing your Jurgens Energy delivery for order ${orderNumber}. Your selected window is ${deliveryDate}, ${scheduledWindow}.`;
+    return `We are preparing your Jurgens Energy delivery for order ${orderNumber}. Your requested delivery date is ${deliveryDate}${scheduledWindow ? ` during ${scheduledWindow}` : ""}.`;
   }
 
   if (status === "out_for_delivery") {
-    return `Your Jurgens Energy order ${orderNumber} is out for delivery. Please keep your phone nearby during ${scheduledWindow}.`;
+    return `Your Jurgens Energy order ${orderNumber} is out for delivery. Please keep your phone nearby${scheduledWindow ? ` during ${scheduledWindow}` : ""}.`;
   }
 
   if (status === "completed") {
@@ -69,7 +69,7 @@ function getStatusMessage({
   }
 
   if (status === "rescheduled") {
-    return `Your Jurgens Energy delivery for order ${orderNumber} has been rescheduled for ${deliveryDate}, ${scheduledWindow}.`;
+    return `Your Jurgens Energy delivery for order ${orderNumber} has been rescheduled for ${deliveryDate}${scheduledWindow ? ` during ${scheduledWindow}` : ""}.`;
   }
 
   return `Your Jurgens Energy delivery for order ${orderNumber} has been cancelled. Contact us if you need help.`;
@@ -145,7 +145,7 @@ export async function sendJurgensDeliveryStatusNotification({
         delivery_status: statusLabels[row.status],
         order_number: row.orderNumber,
         rating_link: ratingLink,
-        scheduled_window: scheduledWindow,
+        scheduled_window: scheduledWindow ?? "No specific time requested",
         status_message: statusMessage,
       },
       recipientEmail: row.customerEmail,

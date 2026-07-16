@@ -319,9 +319,9 @@ export const jurgensDeliverySchedules = pgTable(
       .notNull()
       .default("scheduled"),
     scheduledDate: varchar("scheduled_date", { length: 10 }).notNull(),
-    windowStart: varchar("window_start", { length: 5 }).notNull(),
-    windowEnd: varchar("window_end", { length: 5 }).notNull(),
-    windowLabel: varchar("window_label", { length: 80 }).notNull(),
+    windowStart: varchar("window_start", { length: 5 }),
+    windowEnd: varchar("window_end", { length: 5 }),
+    windowLabel: varchar("window_label", { length: 80 }),
     deliveryInstructions: text("delivery_instructions"),
     lastNotifiedStatus: varchar("last_notified_status", { length: 32 }),
     lastNotifiedAt: timestamp("last_notified_at", { mode: "date" }),

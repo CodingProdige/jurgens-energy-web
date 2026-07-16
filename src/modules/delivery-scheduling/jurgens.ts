@@ -3,41 +3,85 @@ import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 const johannesburgTimeZone = "Africa/Johannesburg";
 const scheduleHorizonDays = 14;
 
-const defaultWindows = [
-  { label: "Morning", start: "09:00", end: "12:00" },
-  { label: "Afternoon", start: "12:00", end: "16:00" },
-  { label: "Late afternoon", start: "16:00", end: "18:00" },
-] as const;
-
 export type JurgensDeliveryScheduleOption = {
   date: string;
   dateLabel: string;
   isSameDay: boolean;
-  value: string;
-  windowEnd: string;
-  windowLabel: string;
-  windowStart: string;
 };
 
 export type JurgensDeliveryScheduleSelection = {
   date: string;
   deliveryInstructions?: string | null;
-  windowEnd: string;
-  windowLabel: string;
-  windowStart: string;
 };
+
+export type JurgensDeliveryScheduleAvailability = {
+  cutoffTime: string;
+  cutoffTimeZone: typeof johannesburgTimeZone;
+  nextPolicyChangeAt: string | null;
+  options: JurgensDeliveryScheduleOption[];
+};
+
+export async function getJurgensDeliveryScheduleAvailability({
+  now = new Date(),
+}: {
+  now?: Date;
+} = {}): Promise<JurgensDeliveryScheduleAvailability> {
+  const settings = await getMarketplaceSettings();
+
+  return buildJurgensDeliveryScheduleAvailability({
+    cutoffTime: settings.jurgensDeliveryCutoffTime,
+    now,
+  });
+}
 
 export async function getJurgensDeliveryScheduleOptions({
   now = new Date(),
 }: {
   now?: Date;
 } = {}) {
-  const settings = await getMarketplaceSettings();
+  const availability = await getJurgensDeliveryScheduleAvailability({ now });
 
-  return buildJurgensDeliveryScheduleOptions({
-    cutoffTime: settings.jurgensDeliveryCutoffTime,
-    now,
-  });
+  return availability.options;
+}
+
+export function buildJurgensDeliveryScheduleAvailability({
+  cutoffTime,
+  now = new Date(),
+}: {
+  cutoffTime: string;
+  now?: Date;
+}): JurgensDeliveryScheduleAvailability {
+  const normalizedCutoffTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(cutoffTime)
+    ? cutoffTime
+    : "14:00";
+  const localNow = getJohannesburgNowParts(now);
+  const today = localNow.date;
+  const sameDayAllowed =
+    timeToMinutes(`${pad2(localNow.hour)}:${pad2(localNow.minute)}`) <
+    timeToMinutes(normalizedCutoffTime);
+  const firstOffset = sameDayAllowed ? 0 : 1;
+  const options: JurgensDeliveryScheduleOption[] = [];
+
+  for (let index = 0; index < scheduleHorizonDays; index += 1) {
+    const dayOffset = firstOffset + index;
+    const date = addDays(today, dayOffset);
+    const isSameDay = dayOffset === 0;
+
+    options.push({
+      date,
+      dateLabel: getDateLabel(date, today, dayOffset),
+      isSameDay,
+    });
+  }
+
+  return {
+    cutoffTime: normalizedCutoffTime,
+    cutoffTimeZone: johannesburgTimeZone,
+    nextPolicyChangeAt: sameDayAllowed
+      ? new Date(`${today}T${normalizedCutoffTime}:00+02:00`).toISOString()
+      : null,
+    options,
+  };
 }
 
 export function buildJurgensDeliveryScheduleOptions({
@@ -47,37 +91,7 @@ export function buildJurgensDeliveryScheduleOptions({
   cutoffTime: string;
   now?: Date;
 }): JurgensDeliveryScheduleOption[] {
-  const localNow = getJohannesburgNowParts(now);
-  const today = localNow.date;
-  const sameDayAllowed =
-    timeToMinutes(`${pad2(localNow.hour)}:${pad2(localNow.minute)}`) <
-    timeToMinutes(cutoffTime);
-  const firstOffset = sameDayAllowed ? 0 : 1;
-  const options: JurgensDeliveryScheduleOption[] = [];
-
-  for (let dayOffset = firstOffset; dayOffset < scheduleHorizonDays; dayOffset += 1) {
-    const date = addDays(today, dayOffset);
-    const isSameDay = dayOffset === 0;
-
-    for (const window of defaultWindows) {
-      options.push({
-        date,
-        dateLabel: getDateLabel(date, today, dayOffset),
-        isSameDay,
-        value: createScheduleOptionValue({
-          date,
-          windowEnd: window.end,
-          windowLabel: window.label,
-          windowStart: window.start,
-        }),
-        windowEnd: window.end,
-        windowLabel: window.label,
-        windowStart: window.start,
-      });
-    }
-  }
-
-  return options;
+  return buildJurgensDeliveryScheduleAvailability({ cutoffTime, now }).options;
 }
 
 export async function validateJurgensDeliveryScheduleSelection(
@@ -86,24 +100,18 @@ export async function validateJurgensDeliveryScheduleSelection(
   if (!selection) {
     return {
       ok: false,
-      message: "Choose a delivery date and time window for Jurgens delivery.",
+      message: "Choose a valid date for Jurgens Energy delivery.",
     } as const;
   }
 
   const options = await getJurgensDeliveryScheduleOptions();
-  const match = options.find(
-    (option) =>
-      option.date === selection.date &&
-      option.windowStart === selection.windowStart &&
-      option.windowEnd === selection.windowEnd &&
-      option.windowLabel === selection.windowLabel,
-  );
+  const match = options.find((option) => option.date === selection.date);
 
   if (!match) {
     return {
       ok: false,
       message:
-        "That Jurgens delivery slot is no longer available. Choose a new delivery window.",
+        "That Jurgens Energy delivery date is no longer available. Choose another date.",
     } as const;
   }
 
@@ -112,32 +120,8 @@ export async function validateJurgensDeliveryScheduleSelection(
     selection: {
       date: match.date,
       deliveryInstructions: selection.deliveryInstructions?.trim() || null,
-      windowEnd: match.windowEnd,
-      windowLabel: match.windowLabel,
-      windowStart: match.windowStart,
     },
   } as const;
-}
-
-export function createScheduleOptionValue(
-  selection: Omit<JurgensDeliveryScheduleSelection, "deliveryInstructions">,
-) {
-  return [
-    selection.date,
-    selection.windowStart,
-    selection.windowEnd,
-    selection.windowLabel,
-  ].join("|");
-}
-
-export function parseScheduleOptionValue(value: string) {
-  const [date, windowStart, windowEnd, windowLabel] = value.split("|");
-
-  if (!date || !windowStart || !windowEnd || !windowLabel) {
-    return null;
-  }
-
-  return { date, windowEnd, windowLabel, windowStart };
 }
 
 export function formatScheduleDate(date: string) {
@@ -152,10 +136,14 @@ export function formatScheduleWindow({
   windowLabel,
   windowStart,
 }: {
-  windowEnd: string;
-  windowLabel: string;
-  windowStart: string;
+  windowEnd: string | null;
+  windowLabel: string | null;
+  windowStart: string | null;
 }) {
+  if (!windowEnd || !windowLabel || !windowStart) {
+    return null;
+  }
+
   return `${windowLabel} (${windowStart}-${windowEnd})`;
 }
 
@@ -179,8 +167,8 @@ function getJohannesburgNowParts(now: Date) {
 }
 
 function addDays(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00+02:00`);
-  value.setUTCDate(value.getUTCDate() + days);
+  const [year, month, day] = date.split("-").map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day + days));
 
   return value.toISOString().slice(0, 10);
 }

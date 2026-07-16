@@ -75,6 +75,7 @@ export const productVariants = pgTable(
     title: varchar("title", { length: 180 }).notNull(),
     optionValues: jsonb("option_values").$type<string[]>().notNull().default([]),
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+    taxRateBps: integer("tax_rate_bps").notNull().default(1500),
     compareAtPrice: numeric("compare_at_price", { precision: 12, scale: 2 }),
     stockOnHand: integer("stock_on_hand").notNull().default(0),
     lowStockAlert: integer("low_stock_alert").notNull().default(5),

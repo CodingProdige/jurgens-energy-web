@@ -54,6 +54,7 @@ export type MarketplaceProductDetailView = Omit<
 type ProductDetailExperienceProps = {
   catalogProducts: MarketplaceProductCardData[];
   currencyContext: CurrencyContext;
+  initialVariantId?: string;
   jurgensDeliveryCutoffTime: string;
   product: MarketplaceProductDetailView;
   relatedProducts: MarketplaceProductCardData[];
@@ -105,6 +106,7 @@ function useDeliveryClock(enabled: boolean) {
 export function ProductDetailExperience({
   catalogProducts,
   currencyContext,
+  initialVariantId,
   jurgensDeliveryCutoffTime,
   product,
   relatedProducts,
@@ -116,7 +118,11 @@ export function ProductDetailExperience({
       ),
     [product.variants],
   );
-  const defaultVariantId = sortedVariants[0]?.id ?? product.variants[0]?.id ?? "";
+  const defaultVariantId =
+    product.variants.find((variant) => variant.id === initialVariantId)?.id ??
+    sortedVariants[0]?.id ??
+    product.variants[0]?.id ??
+    "";
   const [selectedVariantId, setSelectedVariantId] = useState(defaultVariantId);
   const selectedVariant =
     product.variants.find((variant) => variant.id === selectedVariantId) ??
@@ -144,6 +150,10 @@ export function ProductDetailExperience({
   const deliveryClock = useDeliveryClock(
     product.fulfillmentMode === "piessang_fulfilled",
   );
+
+  useEffect(() => {
+    setSelectedVariantId(defaultVariantId);
+  }, [defaultVariantId, product.id]);
 
   useEffect(() => {
     const productsById = new Map(
@@ -551,7 +561,7 @@ function ProductBuyBox({
   setQuantity: (quantity: number) => void;
   setSelectedVariantId: (variantId: string) => void;
 }) {
-  const hasExchangeRequirement = Boolean(selectedVariant?.requiresExchangeEmpty);
+  const hasExchangeRequirement = isExchangeVariant(selectedVariant);
   const [exchangeConfirmed, setExchangeConfirmed] = useState(false);
   const [added, setAdded] = useState(false);
   const [isOptionsDialogOpen, setIsOptionsDialogOpen] = useState(false);
@@ -1384,7 +1394,7 @@ function VariantOptionCard({
           <TopVariantBadge
             className={cn(
               "h-4 text-[7px]",
-              variant.requiresExchangeEmpty && "bottom-0 top-auto",
+              isExchangeVariant(variant) && "bottom-0 top-auto",
             )}
           />
         ) : null}
@@ -1401,7 +1411,7 @@ function VariantOptionCard({
             <PackageCheckIcon className="size-5" />
           </span>
         )}
-        {variant.requiresExchangeEmpty ? (
+        {isExchangeVariant(variant) ? (
           <Badge className="absolute left-0 top-0 h-5 rounded-none bg-[#ff5a1f] px-1.5 text-[8px] font-black uppercase leading-none text-white shadow-sm">
             Exchange
           </Badge>
@@ -1937,7 +1947,15 @@ function getExchangeEmptySize(
 ) {
   return (
     variant?.exchangeEmptyCylinderSize?.trim() ||
-    getSizeLabel(variant?.title ?? product.title)
+    getSizeLabel(variant?.title ?? "") ||
+    getSizeLabel(product.title)
+  );
+}
+
+function isExchangeVariant(variant: MarketplaceVariant | null) {
+  return Boolean(
+    variant &&
+      (variant.requiresExchangeEmpty || /\bexchange\b/i.test(variant.title)),
   );
 }
 
