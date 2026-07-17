@@ -132,7 +132,9 @@ function SecretTextInput({
   id,
   minLength,
   name,
+  onValueChange,
   placeholder,
+  value,
 }: {
   className?: string;
   defaultValue?: string | null;
@@ -140,15 +142,20 @@ function SecretTextInput({
   id: string;
   minLength?: number;
   name: string;
+  onValueChange?: (value: string) => void;
   placeholder: string;
+  value?: string;
 }) {
   const [isVisible, setIsVisible] = useState(false);
-  const [inputValue, setInputValue] = useState(defaultValue ?? "");
+  const [internalValue, setInternalValue] = useState(defaultValue ?? "");
+  const inputValue = value ?? internalValue;
   const Icon = isVisible ? EyeOffIcon : EyeIcon;
 
   useEffect(() => {
-    setInputValue(defaultValue ?? "");
-  }, [defaultValue]);
+    if (typeof value === "undefined") {
+      setInternalValue(defaultValue ?? "");
+    }
+  }, [defaultValue, value]);
 
   return (
     <div className="relative">
@@ -161,7 +168,14 @@ function SecretTextInput({
         type={isVisible ? "text" : "password"}
         autoComplete="off"
         value={inputValue}
-        onChange={(event) => setInputValue(event.target.value)}
+        onChange={(event) => {
+          if (onValueChange) {
+            onValueChange(event.target.value);
+            return;
+          }
+
+          setInternalValue(event.target.value);
+        }}
         minLength={minLength}
         placeholder={placeholder}
         className={cn(icon === "key" ? "pl-10 pr-12" : "pr-12", className)}
@@ -1424,6 +1438,7 @@ function PayFastCredentialPanel({
 
 type WhatsappOrderingSettingsFormProps = {
   hasWhatsappApiKey: boolean;
+  hasWhatsappWebhookSigningSecret: boolean;
   hasWhatsappWebhookVerifyToken: boolean;
   whatsappApiKey: string | null;
   whatsappBusinessPhoneNumber: string | null;
@@ -1444,6 +1459,7 @@ type WhatsappOrderingSettingsFormProps = {
 
 export function WhatsappOrderingSettingsForm({
   hasWhatsappApiKey,
+  hasWhatsappWebhookSigningSecret,
   hasWhatsappWebhookVerifyToken,
   whatsappApiKey,
   whatsappBusinessPhoneNumber,
@@ -1472,7 +1488,11 @@ export function WhatsappOrderingSettingsForm({
   const [quietHoursEnabledValue, setQuietHoursEnabledValue] = useState(
     whatsappFollowUpQuietHoursEnabled,
   );
-  const [copied, setCopied] = useState(false);
+  const [webhookUrlCopied, setWebhookUrlCopied] = useState(false);
+  const [webhookSigningSecretCopied, setWebhookSigningSecretCopied] =
+    useState(false);
+  const [webhookSigningSecretValue, setWebhookSigningSecretValue] =
+    useState("");
   const [state, formAction, isPending] = useActionState(
     updateWhatsappOrderingSettings,
     initialState,
@@ -1481,12 +1501,43 @@ export function WhatsappOrderingSettingsForm({
   async function copyWebhookUrl() {
     try {
       await navigator.clipboard.writeText(whatsappWebhookUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      setWebhookUrlCopied(true);
+      window.setTimeout(() => setWebhookUrlCopied(false), 1800);
     } catch {
-      setCopied(false);
+      setWebhookUrlCopied(false);
     }
   }
+
+  function generateWebhookSigningSecret() {
+    const bytes = window.crypto.getRandomValues(new Uint8Array(32));
+    const secret = Array.from(bytes, (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+
+    setWebhookSigningSecretValue(secret);
+    setWebhookSigningSecretCopied(false);
+  }
+
+  async function copyWebhookSigningSecret() {
+    if (!webhookSigningSecretValue) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(webhookSigningSecretValue);
+      setWebhookSigningSecretCopied(true);
+      window.setTimeout(() => setWebhookSigningSecretCopied(false), 1800);
+    } catch {
+      setWebhookSigningSecretCopied(false);
+    }
+  }
+
+  useEffect(() => {
+    if (state.ok) {
+      setWebhookSigningSecretValue("");
+      setWebhookSigningSecretCopied(false);
+    }
+  }, [state.ok]);
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -1650,12 +1701,105 @@ export function WhatsappOrderingSettingsForm({
                 className="h-10 shrink-0 gap-2"
               >
                 <ClipboardIcon className="size-4" />
-                {copied ? "Copied" : "Copy"}
+                {webhookUrlCopied ? "Copied" : "Copy"}
               </Button>
             </div>
             <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
               For local testing, set APP_URL to your tunnel URL before starting
               the dev server, then paste the generated URL into 360dialog.
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-3 border-t border-zinc-200 pt-5 dark:border-white/10">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor="webhookSigningSecret">
+                Inbound POST signing secret
+              </Label>
+              {hasWhatsappWebhookSigningSecret ? (
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  Configured
+                </Badge>
+              ) : null}
+            </div>
+            <SecretTextInput
+              id="webhookSigningSecret"
+              name="webhookSigningSecret"
+              icon="key"
+              minLength={16}
+              value={webhookSigningSecretValue}
+              onValueChange={(value) => {
+                setWebhookSigningSecretValue(value);
+                setWebhookSigningSecretCopied(false);
+              }}
+              placeholder={
+                hasWhatsappWebhookSigningSecret
+                  ? "Saved - leave blank to keep current secret"
+                  : "Generate or paste a secret"
+              }
+            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={generateWebhookSigningSecret}
+                className="h-10 gap-2"
+              >
+                <RotateCcwIcon className="size-4" />
+                {hasWhatsappWebhookSigningSecret
+                  ? "Generate replacement"
+                  : "Generate secret"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!webhookSigningSecretValue}
+                onClick={copyWebhookSigningSecret}
+                className="h-10 gap-2"
+              >
+                <ClipboardIcon className="size-4" />
+                {webhookSigningSecretCopied ? "Copied" : "Copy secret"}
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              {hasWhatsappWebhookSigningSecret ? (
+                <>
+                  <p className="font-semibold">Rotating the saved secret</p>
+                  <p className="mt-1">
+                    Generate and copy the replacement, update
+                    <code className="mx-1 break-all font-mono">
+                      x-whatsapp-webhook-secret
+                    </code>
+                    under 360dialog&apos;s Channel Webhook headers, then save this
+                    form immediately. A brief callback interruption is possible
+                    while both sides change.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold">Set up the header before saving</p>
+                  <ol className="mt-1 list-decimal space-y-1 pl-4">
+                    <li>Generate and copy the secret above.</li>
+                    <li>
+                      In 360dialog, open WhatsApp Channel → Channel Webhook →
+                      Headers and add
+                      <code className="mx-1 break-all font-mono">
+                        x-whatsapp-webhook-secret
+                      </code>
+                      with the copied secret as its value.
+                    </li>
+                    <li>
+                      Confirm the emailed code, test the webhook, then return
+                      here and save. Saving first will reject unsigned callbacks.
+                    </li>
+                  </ol>
+                </>
+              )}
+            </div>
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              This value is generated by Jurgens Energy, not provided by
+              360dialog. It is encrypted at rest. Leaving the field blank keeps
+              the configured value.
             </p>
           </div>
         </div>

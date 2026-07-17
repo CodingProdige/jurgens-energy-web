@@ -555,6 +555,19 @@ const whatsappSettingsSchema = z.object({
     )
     .refine((value) => !value || value.length <= 500, "API URL is too long."),
   provider: z.literal("360dialog"),
+  webhookSigningSecret: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => value || undefined)
+    .refine(
+      (value) => !value || value.length >= 16,
+      "Webhook signing secret must be at least 16 characters.",
+    )
+    .refine(
+      (value) => !value || value.length <= 255,
+      "Webhook signing secret is too long.",
+    ),
   webhookVerifyToken: z
     .string()
     .trim()
@@ -590,6 +603,9 @@ export async function updateWhatsappOrderingSettings(
     followUpsEnabled: formData.get("followUpsEnabled") === "on",
     messageUrl: String(formData.get("messageUrl") ?? ""),
     provider: String(formData.get("provider") ?? "360dialog"),
+    webhookSigningSecret: String(
+      formData.get("webhookSigningSecret") ?? "",
+    ),
     webhookVerifyToken: String(formData.get("webhookVerifyToken") ?? ""),
   });
 

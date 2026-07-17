@@ -39,11 +39,13 @@ const envSchema = z.object({
   SENDGRID_FROM_EMAIL: z.email().optional(),
   SENDGRID_FROM_NAME: z.string().min(1).default("Jurgens Energy"),
   SENDGRID_WEBHOOK_PUBLIC_KEY: z.string().min(1).optional(),
+  TWILIO_AUTH_TOKEN: z.string().min(1).optional(),
   WEB_PUSH_PRIVATE_KEY: z.string().min(1).optional(),
   WEB_PUSH_PUBLIC_KEY: z.string().min(1).optional(),
   WEB_PUSH_SUBJECT: z.string().min(1).default("mailto:no-reply@jurgensenergy.com"),
   WHATSAPP_ORDERING_PHONE_NUMBER: z.string().min(1).optional(),
   WHATSAPP_AUTOMATION_SECRET: z.string().min(16).optional(),
+  WHATSAPP_WEBHOOK_SIGNING_SECRET: z.string().min(16).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
 });
 
@@ -69,6 +71,7 @@ export const env = envSchema.parse({
   SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL,
   SENDGRID_FROM_NAME: process.env.SENDGRID_FROM_NAME,
   SENDGRID_WEBHOOK_PUBLIC_KEY: process.env.SENDGRID_WEBHOOK_PUBLIC_KEY,
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
   WEB_PUSH_PRIVATE_KEY: process.env.WEB_PUSH_PRIVATE_KEY,
   WEB_PUSH_PUBLIC_KEY:
     process.env.WEB_PUSH_PUBLIC_KEY ??
@@ -76,5 +79,7 @@ export const env = envSchema.parse({
   WEB_PUSH_SUBJECT: process.env.WEB_PUSH_SUBJECT,
   WHATSAPP_ORDERING_PHONE_NUMBER: process.env.WHATSAPP_ORDERING_PHONE_NUMBER,
   WHATSAPP_AUTOMATION_SECRET: process.env.WHATSAPP_AUTOMATION_SECRET,
+  WHATSAPP_WEBHOOK_SIGNING_SECRET:
+    process.env.WHATSAPP_WEBHOOK_SIGNING_SECRET,
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
 });

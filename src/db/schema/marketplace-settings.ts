@@ -139,6 +139,9 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   whatsappWebhookVerifyTokenEncrypted: text(
     "whatsapp_webhook_verify_token_encrypted",
   ),
+  whatsappWebhookSigningSecretEncrypted: text(
+    "whatsapp_webhook_signing_secret_encrypted",
+  ),
   whatsappFollowUpsEnabled: boolean("whatsapp_follow_ups_enabled")
     .notNull()
     .default(true),

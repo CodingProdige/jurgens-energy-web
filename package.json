@@ -15,6 +15,7 @@
     "selfhost:logs": "docker compose -p jurgens_energy_selfhost --profile tunnel logs -f web caddy postgres redis cloudflared",
     "selfhost:status": "docker compose -p jurgens_energy_selfhost --profile tunnel ps",
     "test:payfast": "node --experimental-strip-types --test scripts/payfast-signature.test.mjs",
+    "test:whatsapp": "node --experimental-strip-types --test scripts/whatsapp-customer-name.test.mjs scripts/whatsapp-conversation-memory.test.mjs scripts/whatsapp-webhook-security.test.mjs src/modules/whatsapp-ordering/orchestrator.test.mjs",
     "tunnel:cloudflare": "node scripts/start-cloudflare-tunnel.mjs",
     "tunnel:cloudflare:docker": "node scripts/start-cloudflare-tunnel.mjs --docker",
     "build": "next build",

@@ -253,6 +253,7 @@ export type MarketplaceSettings = {
   hasStripeSandboxWebhookSecret: boolean;
   videoCompressionCrf: number;
   hasWhatsappApiKey: boolean;
+  hasWhatsappWebhookSigningSecret: boolean;
   hasWhatsappWebhookVerifyToken: boolean;
   whatsappBusinessPhoneNumber: string | null;
   whatsappFollowUpDefaultMessage: string;
@@ -371,6 +372,9 @@ const defaultSettings: MarketplaceSettings = {
   hasStripeSandboxWebhookSecret: false,
   videoCompressionCrf: 28,
   hasWhatsappApiKey: Boolean(env.DIALOGUE_API_KEY),
+  hasWhatsappWebhookSigningSecret: Boolean(
+    env.WHATSAPP_WEBHOOK_SIGNING_SECRET,
+  ),
   hasWhatsappWebhookVerifyToken: Boolean(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
   whatsappBusinessPhoneNumber: env.WHATSAPP_ORDERING_PHONE_NUMBER ?? null,
   whatsappFollowUpDefaultMessage: defaultWhatsappFollowUpMessages.default,
@@ -501,6 +505,8 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       whatsappProvider: marketplaceSettings.whatsappProvider,
       whatsappWebhookVerifyTokenEncrypted:
         marketplaceSettings.whatsappWebhookVerifyTokenEncrypted,
+      whatsappWebhookSigningSecretEncrypted:
+        marketplaceSettings.whatsappWebhookSigningSecretEncrypted,
     })
     .from(marketplaceSettings)
     .where(eq(marketplaceSettings.id, 1))
@@ -576,6 +582,10 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     ),
     hasWhatsappApiKey: Boolean(
       settings.whatsappApiKeyEncrypted ?? env.DIALOGUE_API_KEY,
+    ),
+    hasWhatsappWebhookSigningSecret: Boolean(
+      settings.whatsappWebhookSigningSecretEncrypted ??
+        env.WHATSAPP_WEBHOOK_SIGNING_SECRET,
     ),
     hasWhatsappWebhookVerifyToken: Boolean(
       settings.whatsappWebhookVerifyTokenEncrypted ??
@@ -891,6 +901,7 @@ export async function updateMarketplaceWhatsappSettings({
   followUpsEnabled,
   messageUrl,
   provider,
+  webhookSigningSecret,
   webhookVerifyToken,
 }: {
   apiKey?: string;
@@ -907,6 +918,7 @@ export async function updateMarketplaceWhatsappSettings({
   followUpsEnabled: boolean;
   messageUrl?: string;
   provider: "360dialog";
+  webhookSigningSecret?: string;
   webhookVerifyToken?: string;
 }) {
   const existing = await getRawMarketplaceSettings();
@@ -921,6 +933,13 @@ export async function updateMarketplaceWhatsappSettings({
       : (existing?.whatsappWebhookVerifyTokenEncrypted ??
         (env.WHATSAPP_WEBHOOK_VERIFY_TOKEN
           ? encryptSecret(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN)
+          : null));
+  const nextWebhookSigningSecret =
+    webhookSigningSecret && webhookSigningSecret.length > 0
+      ? encryptSecret(webhookSigningSecret)
+      : (existing?.whatsappWebhookSigningSecretEncrypted ??
+        (env.WHATSAPP_WEBHOOK_SIGNING_SECRET
+          ? encryptSecret(env.WHATSAPP_WEBHOOK_SIGNING_SECRET)
           : null));
 
   if (enabled && !businessPhoneNumber) {
@@ -959,6 +978,7 @@ export async function updateMarketplaceWhatsappSettings({
       whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
       whatsappOrderingEnabled: enabled,
       whatsappProvider: provider,
+      whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
       whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
       updatedAt: new Date(),
     })
@@ -983,6 +1003,7 @@ export async function updateMarketplaceWhatsappSettings({
         whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
         whatsappOrderingEnabled: enabled,
         whatsappProvider: provider,
+        whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
         whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
         updatedAt: new Date(),
       },
@@ -1124,6 +1145,11 @@ export async function getWhatsappIntegrationConfig() {
   const webhookVerifyToken = encryptedVerifyToken
     ? decryptOptionalSecret(encryptedVerifyToken)
     : (env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ?? null);
+  const encryptedSigningSecret =
+    rawSettings?.whatsappWebhookSigningSecretEncrypted;
+  const webhookSigningSecret = encryptedSigningSecret
+    ? decryptOptionalSecret(encryptedSigningSecret)
+    : (env.WHATSAPP_WEBHOOK_SIGNING_SECRET ?? null);
   const businessPhoneNumber =
     settings.whatsappBusinessPhoneNumber ??
     env.WHATSAPP_ORDERING_PHONE_NUMBER ??
@@ -1142,6 +1168,7 @@ export async function getWhatsappIntegrationConfig() {
     messageUrl,
     provider: settings.whatsappProvider,
     webhookUrl: getWhatsappWebhookUrl(),
+    webhookSigningSecret,
     webhookVerifyToken,
     whatsappOrderingEnabled: settings.whatsappOrderingEnabled,
   };
@@ -1235,6 +1262,8 @@ async function getRawMarketplaceSettings() {
       whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
       whatsappWebhookVerifyTokenEncrypted:
         marketplaceSettings.whatsappWebhookVerifyTokenEncrypted,
+      whatsappWebhookSigningSecretEncrypted:
+        marketplaceSettings.whatsappWebhookSigningSecretEncrypted,
     })
     .from(marketplaceSettings)
     .where(eq(marketplaceSettings.id, 1))

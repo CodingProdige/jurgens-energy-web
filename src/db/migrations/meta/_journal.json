@@ -421,6 +421,13 @@
       "when": 1784541600000,
       "tag": "0059_payfast_itn_events",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1784628000000,
+      "tag": "0060_whatsapp_webhook_signing_secret",
+      "breakpoints": true
     }
   ]
 }

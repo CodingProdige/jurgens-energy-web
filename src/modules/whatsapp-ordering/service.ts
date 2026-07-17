@@ -22,13 +22,52 @@ import {
 } from "@/src/db/schema";
 import { env } from "@/src/config/env";
 import { validateCartLines } from "@/src/modules/cart/server";
+import { getBusinessInformation } from "@/src/modules/business-information";
 import { formatFromZar } from "@/src/modules/currency";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
-import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import {
+  getMarketplaceSettings,
+  getOpenAiIntegrationConfig,
+} from "@/src/modules/marketplace/settings";
+import {
+  deliveryInformation,
+  privacyPolicy,
+  returnsAndRefundsPolicy,
+  termsAndConditions,
+  type PolicyDocument,
+} from "@/src/modules/marketplace/policies/documents";
 import { probeBobGoCheckoutRates } from "@/src/modules/shipping/bobgo-client";
-import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
-import { send360DialogTextMessage } from "@/src/modules/whatsapp-ordering/360dialog";
-import { interpretWhatsappMessageWithAi } from "@/src/modules/whatsapp-ordering/ai";
+import {
+  checkJurgensDeliveryAvailability,
+  getJurgensDeliveryZones,
+} from "@/src/modules/shipping/jurgens-delivery";
+import {
+  send360DialogTextMessage,
+  type WhatsappMediaMessageAttachment,
+} from "@/src/modules/whatsapp-ordering/360dialog";
+import {
+  answerWhatsappQuestionWithAi,
+  interpretWhatsappMessageWithAi,
+  validateWhatsappAgentReply,
+  type WhatsappConversationTurn,
+} from "@/src/modules/whatsapp-ordering/ai";
+import {
+  runJurgensWhatsappAgentTurn,
+  type WhatsappAgentAdapterResult,
+  type WhatsappAgentOrderProposal,
+} from "@/src/modules/whatsapp-ordering/agent-integration";
+import {
+  buildWhatsappModelMemory,
+  classifyWhatsappConfirmation,
+  normalizeWhatsappRollingMemory,
+  updateWhatsappRollingMemory,
+  type WhatsappPendingAction,
+  type WhatsappRollingMemory,
+} from "@/src/modules/whatsapp-ordering/conversation-memory";
+import {
+  resolveWhatsappCustomerContext,
+  sanitizeWhatsappDisplayName,
+} from "@/src/modules/whatsapp-ordering/customer-context";
 import {
   linkWhatsappNumberToUser,
   normalizeWhatsappAccountPhone,
@@ -85,6 +124,7 @@ export type WhatsappInboundMessage = {
 export type WhatsappAssistantResult = {
   conversationId: string | null;
   draftUrl: string | null;
+  media?: WhatsappAssistantMedia[];
   reply: string;
   skipReply?: boolean;
   status:
@@ -99,6 +139,21 @@ export type WhatsappAssistantResult = {
     | "opted_out"
     | "support_answer";
 };
+
+export type WhatsappAssistantMedia = WhatsappMediaMessageAttachment & {
+  assetId: string;
+  caption?: string | null;
+};
+
+type WhatsappReplyContent = {
+  grounded?: boolean;
+  media: WhatsappAssistantMedia[];
+  reply: string;
+};
+
+function textReply(reply: string): WhatsappReplyContent {
+  return { media: [], reply };
+}
 
 export type WhatsappDraftCartPayload = {
   cartItem: LocalCartInput;
@@ -152,6 +207,7 @@ type VariantSnapshot = {
   exchangeConfirmationText: string | null;
   exchangeRequiredEmptyCylinderSize: string | null;
   imageUrl: string | null;
+  mediaId: string | null;
   priceLabel: string;
   productId: string;
   productTitle: string;
@@ -190,6 +246,8 @@ type WhatsappConversationState = {
     sizeKg: number | null;
     updatedAt: string;
   };
+  memory?: WhatsappRollingMemory;
+  providerProfileName?: string;
 };
 
 function hashToken(token: string) {
@@ -207,6 +265,31 @@ function toMediaUrl(
   const path = thumbnailRelativePath ?? relativePath;
 
   return path ? getMediaPublicUrl(path) : null;
+}
+
+function createWhatsappProductMediaUrl(mediaId: string) {
+  return createStoreUrl(`/api/whatsapp/product-media/${mediaId}`);
+}
+
+function createWhatsappProductImage({
+  mediaId,
+  title,
+}: {
+  mediaId: string | null;
+  title: string;
+}): WhatsappAssistantMedia | null {
+  if (!mediaId) {
+    return null;
+  }
+
+  return {
+    assetId: mediaId,
+    caption: title,
+    fileName: `${title.slice(0, 120)}.jpg`,
+    mimeType: "image/jpeg",
+    type: "image",
+    url: createWhatsappProductMediaUrl(mediaId),
+  };
 }
 
 function normalizeWhatsappPhone(value: string) {
@@ -499,11 +582,20 @@ function interpretMessage(message: string): MessageInterpretation {
     return createInterpretation({ intent: "stop", quantity, sizeKg });
   }
 
-  if (/^(\s*)?(yes|yep|yeah|correct|confirm|confirmed|go ahead|send (it|link)|send the link|pay now)(\s*)?$/.test(text)) {
+  if (requiresHumanHandover(text, quantity)) {
+    return createInterpretation({
+      intent: "human",
+      quantity,
+      query: message,
+      sizeKg,
+    });
+  }
+
+  if (/^(\s*)?(yes|yes please|yep|yeah|correct|confirm|confirmed|go ahead|send (it|link)|send the link|pay now|ja|ja asseblief|bevestig|gaan voort|stuur (dit|die link))(\s*)?$/.test(text)) {
     return createInterpretation({ intent: "confirm", quantity, sizeKg });
   }
 
-  if (/^(\s*)?(no|nope|cancel|wrong|never mind|nevermind)(\s*)?$/.test(text)) {
+  if (/^(\s*)?(no|nope|cancel|wrong|never mind|nevermind|nee|nee dankie|kanselleer|los dit|verkeerd)(\s*)?$/.test(text)) {
     return createInterpretation({ intent: "cancel", quantity, sizeKg });
   }
 
@@ -601,7 +693,7 @@ function interpretMessage(message: string): MessageInterpretation {
       text,
     );
   const wantsRepeat =
-    /(\bagain\b|\bsame\b|\banother\b|\blast\b|\busual\b|\btop ?up\b|\btopup\b)/.test(
+    /(\bagain\b|\bsame\b|\banother\b|\blast\b|\busual\b)/.test(
       text,
     );
   const purchaseType: WhatsappPurchaseType | null = wantsExchange
@@ -635,8 +727,37 @@ function interpretMessage(message: string): MessageInterpretation {
   });
 }
 
+function requiresHumanHandover(normalizedMessage: string, quantity: number) {
+  const safetyOrTechnicalConcern =
+    /\b(?:gas\s+leak|leaking\s+gas|smell(?:s|ing)?\s+(?:of\s+)?gas|hissing|gas\s+fire|cylinder\s+(?:is\s+)?damaged|emergency|unsafe|how\s+(?:do\s+i|to)\s+(?:install|connect|repair|fix)|faulty\s+(?:cylinder|regulator|valve))\b/.test(
+      normalizedMessage,
+    );
+  const complaintOrPaymentDispute =
+    /\b(?:complaint|refund|money\s+back|chargeback|charged\s+(?:twice|double)|payment\s+dispute|wrong\s+charge|unacceptable)\b/.test(
+      normalizedMessage,
+    );
+  const commercialRequest =
+    /\b(?:bulk|wholesale|commercial|restaurant|business\s+(?:order|quote)|formal\s+quote|quotation)\b/.test(
+      normalizedMessage,
+    );
+
+  return (
+    safetyOrTechnicalConcern ||
+    complaintOrPaymentDispute ||
+    commercialRequest ||
+    quantity >= 6
+  );
+}
+
 async function interpretMessageWithAiFallback(
   message: string,
+  {
+    recentTurns = [],
+    workflowSummary = null,
+  }: {
+    recentTurns?: WhatsappConversationTurn[];
+    workflowSummary?: string | null;
+  } = {},
 ): Promise<MessageInterpretation> {
   const fallback = interpretMessage(message);
 
@@ -647,6 +768,8 @@ async function interpretMessageWithAiFallback(
   const aiInterpretation = await interpretWhatsappMessageWithAi({
     fallback,
     message,
+    recentTurns,
+    workflowSummary,
   });
 
   return aiInterpretation ?? fallback;
@@ -778,6 +901,18 @@ function getConversationState(value: unknown): WhatsappConversationState {
       ? state.moderation
       : undefined;
   const nextState: WhatsappConversationState = {};
+  const providerProfileName = sanitizeWhatsappDisplayName(
+    state.providerProfileName,
+  );
+  const memory = normalizeWhatsappRollingMemory(state.memory);
+
+  if (providerProfileName) {
+    nextState.providerProfileName = providerProfileName;
+  }
+
+  if (memory.summary || memory.facts.length > 0) {
+    nextState.memory = memory;
+  }
 
   if (deliveryInquiry) {
     nextState.deliveryInquiry = deliveryInquiry;
@@ -1001,6 +1136,32 @@ async function clearPendingOrder(
   await updateConversationState(conversationId, nextState);
 
   return nextState;
+}
+
+async function claimPendingOrderForCheckout({
+  conversationId,
+  pendingOrder,
+}: {
+  conversationId: string;
+  pendingOrder: NonNullable<WhatsappConversationState["pendingOrder"]>;
+}) {
+  const [claimed] = await db
+    .update(whatsappConversations)
+    .set({
+      state: drizzleSql`COALESCE(${whatsappConversations.state}, '{}'::jsonb) - 'pendingOrder' - 'partialOrder' - 'deliveryInquiry'`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(whatsappConversations.id, conversationId),
+        drizzleSql`${whatsappConversations.state} #>> '{pendingOrder,candidate,variantId}' = ${pendingOrder.candidate.variantId}`,
+        drizzleSql`${whatsappConversations.state} #>> '{pendingOrder,candidate,purchaseType}' = ${pendingOrder.candidate.purchaseType}`,
+        drizzleSql`${whatsappConversations.state} #>> '{pendingOrder,candidate,quantity}' = ${String(pendingOrder.candidate.quantity)}`,
+      ),
+    )
+    .returning({ state: whatsappConversations.state });
+
+  return claimed ? getConversationState(claimed.state) : null;
 }
 
 async function recordWhatsappMessage({
@@ -1281,6 +1442,7 @@ async function getVariantSnapshot({
       exchangeAcceptedReturnBrands: productVariants.exchangeAcceptedReturnBrands,
       exchangeConfirmationText: productVariants.exchangeConfirmationText,
       exchangeEmptyCylinderSize: productVariants.exchangeEmptyCylinderSize,
+      mediaId: media.id,
       mediaRelativePath: media.relativePath,
       mediaThumbnailRelativePath: media.thumbnailRelativePath,
       price: productVariants.price,
@@ -1297,7 +1459,10 @@ async function getVariantSnapshot({
     .from(productVariants)
     .innerJoin(products, eq(products.id, productVariants.productId))
     .leftJoin(brands, eq(brands.id, products.brandId))
-    .leftJoin(media, eq(media.id, productVariants.mediaId))
+    .leftJoin(
+      media,
+      and(eq(media.id, productVariants.mediaId), eq(media.isPublic, true)),
+    )
     .where(eq(productVariants.id, variantId))
     .limit(1);
 
@@ -1311,21 +1476,26 @@ async function getVariantSnapshot({
   }
 
   let imageUrl = toMediaUrl(row.mediaRelativePath, row.mediaThumbnailRelativePath);
+  let imageMediaId = row.mediaId;
 
   if (!imageUrl) {
     const [cover] = await db
       .select({
+        id: media.id,
         relativePath: media.relativePath,
         thumbnailRelativePath: media.thumbnailRelativePath,
       })
       .from(productMedia)
       .innerJoin(media, eq(media.id, productMedia.mediaId))
-      .where(eq(productMedia.productId, row.productId))
+      .where(
+        and(eq(productMedia.productId, row.productId), eq(media.isPublic, true)),
+      )
       .orderBy(desc(productMedia.isCover), asc(productMedia.sortOrder))
       .limit(1);
 
     imageUrl =
       cover ? toMediaUrl(cover.relativePath, cover.thumbnailRelativePath) : null;
+    imageMediaId = cover?.id ?? null;
   }
 
   const actualPurchaseType: WhatsappPurchaseType = row.requiresExchangeEmpty
@@ -1344,6 +1514,7 @@ async function getVariantSnapshot({
     exchangeConfirmationText: row.exchangeConfirmationText,
     exchangeRequiredEmptyCylinderSize: row.exchangeEmptyCylinderSize,
     imageUrl,
+    mediaId: imageMediaId,
     priceLabel: formatFromZar(safeUnitPriceZar, zarCurrencyContext),
     productId: row.productId,
     productTitle: row.productTitle,
@@ -1359,6 +1530,20 @@ async function getVariantSnapshot({
     variantId: row.variantId,
     variantTitle: row.variantTitle,
   };
+}
+
+async function findProductCoverMediaId(productId: string) {
+  const [cover] = await db
+    .select({ id: media.id })
+    .from(productMedia)
+    .innerJoin(media, eq(media.id, productMedia.mediaId))
+    .where(
+      and(eq(productMedia.productId, productId), eq(media.isPublic, true)),
+    )
+    .orderBy(desc(productMedia.isCover), asc(productMedia.sortOrder))
+    .limit(1);
+
+  return cover?.id ?? null;
 }
 
 function buildDraftReply({
@@ -1387,23 +1572,20 @@ function buildOrderConfirmationReply({
 }) {
   const typeLabel =
     snapshot.purchaseType === "exchange"
-      ? "Exchange - you hand over an acceptable empty cylinder on delivery"
-      : "Full/new cylinder - no empty cylinder return";
+      ? "This is an exchange, so please have an acceptable empty cylinder ready to hand over on delivery."
+      : "This is a full/new cylinder, so there is no empty-cylinder handover.";
   const intro =
     interpretation.intent === "repeat"
-      ? "I found your previous order. Please confirm before I send a payment link:"
-      : "Please confirm this before I send a payment link:";
-  const imageLine = snapshot.imageUrl ? `\nProduct image: ${snapshot.imageUrl}` : "";
+      ? "I found your previous order — is this what you want again?"
+      : "Perfect — here is what I have for you:";
 
   return [
     intro,
     `${snapshot.quantity} x ${snapshot.title}`,
-    `Type: ${typeLabel}`,
-    `Unit price: ${snapshot.priceLabel}`,
-    `Product subtotal: ${snapshot.totalLabel}`,
-    "Delivery is calculated on the secure checkout step from your address.",
-    `${imageLine}`,
-    `Reply YES to confirm, or tell me what to change. The secure review/payment link will expire in ${checkoutLinkExpiryLabel}.`,
+    typeLabel,
+    `${snapshot.priceLabel} each, ${snapshot.totalLabel} product subtotal.`,
+    "I will calculate delivery from your address on the secure checkout step.",
+    `Reply YES and I will send the secure review/payment link, or tell me what to change. The link will expire in ${checkoutLinkExpiryLabel}.`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -1515,19 +1697,57 @@ async function buildGreetingReply(state: WhatsappConversationState) {
 async function respond({
   conversationId,
   draftUrl = null,
+  media: outboundMedia = [],
   provider,
   reply,
   status,
 }: {
   conversationId: string | null;
   draftUrl?: string | null;
+  media?: WhatsappAssistantMedia[];
   provider: WhatsappProvider;
   reply: string;
   status: WhatsappAssistantResult["status"];
 }) {
+  let finalReply = reply.trim();
+
   if (conversationId) {
+    const [[conversationRow], customerContext] = await Promise.all([
+      db
+        .select({
+          lastOutboundAt: whatsappConversations.lastOutboundAt,
+        })
+        .from(whatsappConversations)
+        .where(eq(whatsappConversations.id, conversationId))
+        .limit(1),
+      resolveWhatsappCustomerContext({ conversationId }),
+    ]);
+
+    if (
+      customerContext.firstName &&
+      (customerContext.outboundCount === 0 ||
+        !conversationRow?.lastOutboundAt ||
+        Date.now() - conversationRow.lastOutboundAt.getTime() > 4 * 60 * 60 * 1000 ||
+        /^(?:hi|hello|hey)\b/i.test(finalReply))
+    ) {
+      finalReply = addCustomerFirstName(
+        finalReply,
+        customerContext.firstName,
+      );
+    }
+
+    for (const attachment of outboundMedia) {
+      await recordWhatsappMessage({
+        body: attachment.caption?.trim() || attachment.fileName || "Product image",
+        conversationId,
+        direction: "outbound",
+        payload: { attachment },
+        provider,
+      });
+    }
+
     await recordWhatsappMessage({
-      body: reply,
+      body: finalReply,
       conversationId,
       direction: "outbound",
       provider,
@@ -1542,9 +1762,36 @@ async function respond({
   return {
     conversationId,
     draftUrl,
-    reply,
+    ...(outboundMedia.length > 0 ? { media: outboundMedia } : {}),
+    reply: finalReply,
     status,
   };
+}
+
+function addCustomerFirstName(reply: string, firstName: string) {
+  if (new RegExp(`\\b${escapeRegExp(firstName)}\\b`, "i").test(reply)) {
+    return reply;
+  }
+
+  const greetingMatch = reply.match(/^(hi|hello|hey)\b[\s,!.-]*/i);
+
+  if (greetingMatch) {
+    return `${greetingMatch[1]} ${firstName}, ${reply.slice(greetingMatch[0].length)}`.trim();
+  }
+
+  const shouldKeepInitialCapital =
+    /^(?:I\b|Jurgens\b|PayFast\b|WhatsApp\b|South Africa\b|https?:\/\/)/.test(
+      reply,
+    );
+  const namedReply = shouldKeepInitialCapital
+    ? reply
+    : `${reply.charAt(0).toLowerCase()}${reply.slice(1)}`;
+
+  return `${firstName}, ${namedReply}`;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function createStoreUrl(path: string) {
@@ -1720,13 +1967,21 @@ async function answerShippingRates() {
 }
 
 async function answerContactDetails() {
-  const settings = await getMarketplaceSettings();
+  const [settings, business] = await Promise.all([
+    getMarketplaceSettings(),
+    getBusinessInformation(),
+  ]);
   const phoneNumbers = [
     settings.contactPhonePrimary,
     settings.contactPhoneSecondary,
+    !settings.contactPhonePrimary && !settings.contactPhoneSecondary
+      ? business.invoicePhone
+      : null,
   ].filter(Boolean);
   const details = [
-    settings.contactEmail ? `Email: ${settings.contactEmail}` : null,
+    settings.contactEmail || business.invoiceEmail
+      ? `Email: ${settings.contactEmail || business.invoiceEmail}`
+      : null,
     phoneNumbers.length > 0 ? `Phone: ${phoneNumbers.join(" / ")}` : null,
     settings.contactAddress ? `Address: ${settings.contactAddress}` : null,
     `Website: ${createStoreUrl("/")}`,
@@ -1738,10 +1993,25 @@ async function answerContactDetails() {
 }
 
 async function answerLocation() {
-  const settings = await getMarketplaceSettings();
+  const [settings, business] = await Promise.all([
+    getMarketplaceSettings(),
+    getBusinessInformation(),
+  ]);
+  const registeredAddress = [
+    business.addressLine1,
+    business.addressLine2,
+    business.suburb,
+    business.city,
+    business.province,
+    business.postalCode,
+    business.countryCode,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const publicAddress = settings.contactAddress || registeredAddress;
 
-  return settings.contactAddress
-    ? `Jurgens Energy is located at ${settings.contactAddress}.`
+  return publicAddress
+    ? `Jurgens Energy is located at ${publicAddress}.`
     : "Jurgens Energy is based in South Africa. Ask for a human if you need a specific branch or collection address.";
 }
 
@@ -2124,11 +2394,16 @@ function buildDeliveryProductChoiceReply({
   ].join("\n");
 }
 
-async function answerProductSearch(query: string | null) {
+async function answerProductSearch(
+  query: string | null,
+): Promise<WhatsappReplyContent> {
   const terms = searchTerms(query);
 
   if (terms.length === 0) {
-    return `Tell me what product you are looking for, for example "do you have 9kg LPG cylinders?" or "do you sell gas stoves?".`;
+    return {
+      media: [],
+      reply: `Tell me what product you are looking for, for example "do you have 9kg LPG cylinders?" or "do you sell gas stoves?".`,
+    };
   }
 
   const rows = await db
@@ -2136,8 +2411,7 @@ async function answerProductSearch(query: string | null) {
       brandName: brands.name,
       categoryPath: categories.path,
       continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
-      mediaRelativePath: media.relativePath,
-      mediaThumbnailRelativePath: media.thumbnailRelativePath,
+      mediaId: media.id,
       price: productVariants.price,
       productId: products.id,
       productSlug: products.slug,
@@ -2153,7 +2427,10 @@ async function answerProductSearch(query: string | null) {
     .innerJoin(products, eq(products.id, productVariants.productId))
     .leftJoin(brands, eq(brands.id, products.brandId))
     .leftJoin(categories, eq(categories.id, products.categoryId))
-    .leftJoin(media, eq(media.id, productVariants.mediaId));
+    .leftJoin(
+      media,
+      and(eq(media.id, productVariants.mediaId), eq(media.isPublic, true)),
+    );
 
   const matches = rows
     .filter(
@@ -2202,30 +2479,45 @@ async function answerProductSearch(query: string | null) {
     .slice(0, 3);
 
   if (topMatches.length === 0) {
-    return `I could not find a matching product for "${query}". Try another product name, or ask for a human and we can check manually.`;
+    return {
+      media: [],
+      reply: `I could not find a matching product for "${query}". Try another product name, or ask for a human and we can check manually.`,
+    };
   }
 
-  return [
+  const productImages = (
+    await Promise.all(
+      topMatches.map(async ({ row }) => {
+        const mediaId =
+          row.mediaId ?? (await findProductCoverMediaId(row.productId));
+
+        return createWhatsappProductImage({
+          mediaId,
+          title: row.productTitle,
+        });
+      }),
+    )
+  ).filter((attachment): attachment is WhatsappAssistantMedia => Boolean(attachment));
+
+  return {
+    media: productImages,
+    reply: [
     "I found these matching products:",
     ...topMatches.map(({ row }, index) => {
       const inStock = row.continueSellingOutOfStock || row.stockOnHand > 0;
-      const imageUrl = toMediaUrl(
-        row.mediaRelativePath,
-        row.mediaThumbnailRelativePath,
-      );
 
       return [
         `${index + 1}. ${row.productTitle} - ${formatMoney(row.price)} - ${
           inStock ? "in stock" : "currently out of stock"
         }`,
         createStoreUrl(`/products/${row.productSlug}`),
-        imageUrl ? `Image: ${imageUrl}` : null,
       ]
         .filter(Boolean)
         .join("\n");
     }),
     "Reply with the product, quantity, and whether it is exchange or full/new if you want me to help build the order.",
-  ].join("\n");
+    ].join("\n"),
+  };
 }
 
 type DeliveryInquiryContext = {
@@ -2365,9 +2657,18 @@ function getDeliveryResultNextStep(
     pendingCandidate?.variantId === item.variantId &&
     pendingCandidate.quantity === item.quantity;
 
-  return matchesPendingOrder
-    ? "Reply YES if you want to continue with the pending order."
-    : `View the product or continue to checkout here: ${createStoreUrl(`/products/${item.productSlug}`)}`;
+  if (!matchesPendingOrder) {
+    return `View the product or continue to checkout here: ${createStoreUrl(`/products/${item.productSlug}`)}`;
+  }
+
+  return [
+    pendingCandidate.purchaseType === "exchange"
+      ? "This is an exchange, so please have an acceptable empty cylinder ready to hand over on delivery."
+      : null,
+    "Reply YES to confirm this order and I will send the secure checkout link.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function getUnavailableDeliveryNextStep() {
@@ -2395,6 +2696,40 @@ async function loadDeliveryInquiryItem(inquiry: WhatsappDeliveryInquiry) {
   const item = cart.items[0];
 
   return item?.available ? item : null;
+}
+
+async function attachPendingOrderToDeliveryContext({
+  context,
+  inquiry,
+}: {
+  context: DeliveryInquiryContext;
+  inquiry: WhatsappDeliveryInquiry;
+}) {
+  const item = await loadDeliveryInquiryItem(inquiry);
+
+  if (!item) {
+    return context;
+  }
+
+  const nextState: WhatsappConversationState = {
+    ...context.conversationState,
+    pendingOrder: {
+      candidate: {
+        exchangeEmptyConfirmed: item.purchaseType === "exchange",
+        intent: "delivery_inquiry_order",
+        productId: item.productId,
+        purchaseType: item.purchaseType,
+        quantity: item.quantity,
+        variantId: item.variantId,
+      },
+      customerPrompt: inquiry.customerPrompt,
+    },
+  };
+  delete nextState.partialOrder;
+
+  await updateConversationState(context.conversationId, nextState);
+
+  return { ...context, conversationState: nextState };
 }
 
 async function checkJurgensDeliveryInquiry({
@@ -3073,9 +3408,16 @@ async function handleDeliveryInquiryMessage(
   const explicitOrderRequest = /\b(order|buy|purchase|get|take)\b/.test(
     normalizedMessage,
   );
+  const deliveryWorkflowNeedsProduct = Boolean(
+    existingInquiry &&
+      (existingInquiry.step === "awaiting_product" ||
+        existingInquiry.step === "awaiting_product_choice") &&
+      productSearchContext.hasProductSignal,
+  );
   const genericOrderContinuation =
     Boolean(existingInquiry) &&
     !isDeliveryQuestion &&
+    !deliveryWorkflowNeedsProduct &&
     (context.interpretation.intent === "confirm" ||
       context.interpretation.intent === "repeat" ||
       (context.interpretation.intent === "order" &&
@@ -3217,8 +3559,15 @@ async function handleDeliveryInquiryMessage(
         selectedVariantId: inquiry.choices[choiceIndex]!.variantId,
         updatedAt: now,
       };
+      const pendingContext = await attachPendingOrderToDeliveryContext({
+        context,
+        inquiry,
+      });
 
-      return continueDeliveryInquiryForSelectedProduct({ context, inquiry });
+      return continueDeliveryInquiryForSelectedProduct({
+        context: pendingContext,
+        inquiry,
+      });
     }
 
     if (!productSearchRequested) {
@@ -3238,6 +3587,11 @@ async function handleDeliveryInquiryMessage(
     inquiry.step === "awaiting_product_choice"
   ) {
     if (productChoices.length === 0) {
+      const partialOrder = context.conversationState.partialOrder;
+      const needsOnlyCylinderSize = Boolean(
+        partialOrder?.purchaseType && !partialOrder.sizeKg,
+      );
+
       return respondToDeliveryInquiry({
         context,
         inquiry: {
@@ -3246,13 +3600,39 @@ async function handleDeliveryInquiryMessage(
           step: "awaiting_product",
           updatedAt: now,
         },
-        reply: [
-          "I need the exact product before I can check the correct delivery method.",
-          destinationHint ? `I have noted the destination as ${destinationHint}.` : null,
-          'Send the product and quantity, for example "1 x 9kg exchange" or "2 x gas heaters".',
-        ]
-          .filter(Boolean)
-          .join("\n"),
+        reply: needsOnlyCylinderSize
+          ? [
+              destinationHint
+                ? `I have ${destinationHint} noted for delivery.`
+                : "I have the delivery question noted.",
+              partialOrder?.purchaseType === "exchange"
+                ? "I also remember that this is a refill/exchange. What size is the empty cylinder you are handing over, for example 9kg or 14kg?"
+                : "What cylinder size do you need, for example 9kg or 14kg?",
+            ].join("\n")
+          : [
+              destinationHint
+                ? `I have ${destinationHint} noted.`
+                : "I have the delivery question noted.",
+              "The delivery method depends on the exact item. What product and quantity do you need?",
+            ].join("\n"),
+      });
+    }
+
+    if (productChoices.length === 1) {
+      inquiry = {
+        ...inquiry,
+        choices: [],
+        selectedVariantId: productChoices[0]!.variantId,
+        updatedAt: now,
+      };
+      const pendingContext = await attachPendingOrderToDeliveryContext({
+        context,
+        inquiry,
+      });
+
+      return continueDeliveryInquiryForSelectedProduct({
+        context: pendingContext,
+        inquiry,
       });
     }
 
@@ -3309,17 +3689,163 @@ async function handleDeliveryInquiryMessage(
   return null;
 }
 
+async function getWhatsappKnowledgeFacts(question: string) {
+  const [settings, business, zones, catalogRows] = await Promise.all([
+    getMarketplaceSettings(),
+    getBusinessInformation(),
+    getJurgensDeliveryZones({ activeOnly: true }),
+    db
+      .select({
+        brandName: brands.name,
+        categoryPath: categories.path,
+        continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
+        fulfillmentMode: products.fulfillmentMode,
+        price: productVariants.price,
+        productSlug: products.slug,
+        productTitle: products.title,
+        requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
+        shortDescription: products.shortDescription,
+        stockOnHand: productVariants.stockOnHand,
+        variantTitle: productVariants.title,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .leftJoin(brands, eq(brands.id, products.brandId))
+      .leftJoin(categories, eq(categories.id, products.categoryId))
+      .where(
+        and(
+          eq(productVariants.isActive, true),
+          eq(productVariants.status, "active"),
+          or(eq(products.status, "active"), eq(products.status, "live")),
+        ),
+      )
+      .orderBy(asc(products.title), asc(productVariants.price))
+      .limit(28),
+  ]);
+  const publicName =
+    business.tradingName.trim() || business.legalName.trim() || "Jurgens Energy";
+  const registeredAddress = [
+    business.addressLine1,
+    business.addressLine2,
+    business.suburb,
+    business.city,
+    business.province,
+    business.postalCode,
+    business.countryCode,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const facts = [
+    `${publicName} supplies LPG cylinders, eligible cylinder exchanges, and gas-related products through its online store.`,
+    business.legalName.trim() && business.legalName.trim() !== publicName
+      ? `${publicName} is the trading name of ${business.legalName.trim()}.`
+      : null,
+    business.companyRegistrationNumber?.trim()
+      ? `Company registration number: ${business.companyRegistrationNumber.trim()}.`
+      : null,
+    business.vatRegistrationNumber.trim()
+      ? `VAT registration number: ${business.vatRegistrationNumber.trim()}.`
+      : null,
+    settings.contactEmail ? `Customer support email: ${settings.contactEmail}.` : null,
+    settings.contactPhonePrimary
+      ? `Primary customer support phone: ${settings.contactPhonePrimary}.`
+      : null,
+    settings.contactPhoneSecondary
+      ? `Secondary customer support phone: ${settings.contactPhoneSecondary}.`
+      : null,
+    settings.contactAddress
+      ? `Public contact address: ${settings.contactAddress}.`
+      : registeredAddress
+        ? `Registered business address: ${registeredAddress}.`
+        : null,
+    `Online store: ${createStoreUrl("/")}`,
+    `All products: ${createStoreUrl("/products")}`,
+    `Delivery information: ${createStoreUrl("/delivery-information")}`,
+    `Frequently asked questions: ${createStoreUrl("/faq")}`,
+    `Returns and refunds policy: ${createStoreUrl("/returns-and-refunds")}`,
+    ...getRelevantPolicyFacts(question),
+    ...zones.map((zone) => {
+      const rates = zone.rates
+        .map(
+          (rate) =>
+            `${formatMoney(rate.price)} from ${formatMoney(rate.fromAmount)}${rate.upToAmount === null ? " upward" : ` to ${formatMoney(rate.upToAmount)}`}`,
+        )
+        .join("; ");
+
+      return `Active Jurgens Energy delivery zone ${zone.name}: postal codes ${zone.postalCodes.join(", ")}; minimum order ${formatMoney(zone.minimumOrderAmount)}; rates ${rates || "not listed"}${zone.deliveryInformation ? `; ${zone.deliveryInformation}` : ""}.`;
+    }),
+    ...catalogRows.map((row) => {
+      const variantLabel =
+        row.variantTitle && row.variantTitle !== row.productTitle
+          ? `, variant ${row.variantTitle}`
+          : "";
+      const stock =
+        row.continueSellingOutOfStock || row.stockOnHand > 0
+          ? "currently available to order"
+          : "currently out of stock";
+      const fulfillment =
+        row.fulfillmentMode === "piessang_fulfilled"
+          ? "Jurgens Energy local fulfilment"
+          : "courier fulfilment";
+
+      return `${row.brandName ? `${row.brandName} ` : ""}${row.productTitle}${variantLabel}: ${formatMoney(row.price)}, ${stock}, ${fulfillment}${row.requiresExchangeEmpty ? ", exchange requires an eligible empty cylinder handover" : ""}${row.categoryPath ? `, category ${row.categoryPath}` : ""}. ${row.shortDescription?.slice(0, 220) ?? ""} Product page: ${createStoreUrl(`/products/${row.productSlug}`)}`;
+    }),
+  ].filter((fact): fact is string => Boolean(fact));
+
+  return facts.slice(0, 40);
+}
+
+function getRelevantPolicyFacts(question: string) {
+  const normalizedQuestion = normalizeText(question);
+  const relevantDocuments: PolicyDocument[] = [];
+
+  if (/\b(?:deliver|delivery|shipping|courier|handover|exchange)\b/.test(normalizedQuestion)) {
+    relevantDocuments.push(deliveryInformation);
+  }
+
+  if (/\b(?:return|refund|cancel|cancellation|damaged|defective)\b/.test(normalizedQuestion)) {
+    relevantDocuments.push(returnsAndRefundsPolicy);
+  }
+
+  if (/\b(?:privacy|personal information|data|popia)\b/.test(normalizedQuestion)) {
+    relevantDocuments.push(privacyPolicy);
+  }
+
+  if (/\b(?:terms|condition|legal|agreement)\b/.test(normalizedQuestion)) {
+    relevantDocuments.push(termsAndConditions);
+  }
+
+  return relevantDocuments.flatMap((document) => [
+    `${document.title}: ${document.description}`,
+    ...document.sections.slice(0, 10).map((section) =>
+      [
+        `${document.shortTitle} — ${section.title}:`,
+        ...section.paragraphs,
+        ...(section.bullets ?? []),
+        section.note,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 900),
+    ),
+  ]);
+}
+
 async function answerSupportQuestion({
   interpretation,
   phone,
+  question,
+  recentTurns,
   userId,
 }: {
   interpretation: MessageInterpretation;
   phone: string;
+  question: string;
+  recentTurns: WhatsappConversationTurn[];
   userId: string | null;
-}) {
+}): Promise<WhatsappReplyContent> {
   if (interpretation.intent === "invoice") {
-    return answerLastInvoice({ phone, userId });
+    return textReply(await answerLastInvoice({ phone, userId }));
   }
 
   if (interpretation.intent === "product_search") {
@@ -3328,22 +3854,46 @@ async function answerSupportQuestion({
 
   switch (interpretation.supportTopic) {
     case "account_setup":
-      return `You can create a Jurgens Energy marketplace account here: ${createStoreUrl("/register")}. If you already have one, sign in here: ${createStoreUrl("/sign-in")}.`;
+      return textReply(`You can create a Jurgens Energy marketplace account here: ${createStoreUrl("/register")}. If you already have one, sign in here: ${createStoreUrl("/sign-in")}.`);
     case "business_info":
-      return "Jurgens Energy supplies LPG cylinders, cylinder exchanges, and gas accessories through the online marketplace, with direct local delivery where configured and courier options for seller-fulfilled items.";
+      {
+        const answer = await answerWhatsappQuestionWithAi({
+          knowledgeFacts: await getWhatsappKnowledgeFacts(question),
+          question,
+          recentTurns,
+        });
+
+        return answer
+          ? { grounded: true, media: [], reply: answer }
+          : textReply(
+              "Jurgens Energy supplies LPG cylinders, eligible cylinder exchanges, and gas-related products through the online store, with local or courier fulfilment depending on the product and destination.",
+            );
+      }
     case "contact":
-      return answerContactDetails();
+      return textReply(await answerContactDetails());
     case "delivery_areas":
-      return answerDeliveryAreas();
+      return textReply(await answerDeliveryAreas());
     case "location":
-      return answerLocation();
+      return textReply(await answerLocation());
     case "shipping_rates":
-      return answerShippingRates();
+      return textReply(await answerShippingRates());
     case "last_invoice":
-      return answerLastInvoice({ phone, userId });
+      return textReply(await answerLastInvoice({ phone, userId }));
     case "unknown":
     default:
-      return "I can help with that. Are you looking to place a gas order, check delivery, find a product, or speak to the Jurgens Energy team?";
+      {
+        const answer = await answerWhatsappQuestionWithAi({
+          knowledgeFacts: await getWhatsappKnowledgeFacts(question),
+          question,
+          recentTurns,
+        });
+
+        return answer
+          ? { grounded: true, media: [], reply: answer }
+          : textReply(
+              "I do not have enough verified information to answer that confidently. Would you like a Jurgens Energy team member to help?",
+            );
+      }
   }
 }
 
@@ -3429,6 +3979,716 @@ async function renewLatestWhatsappDraft({
   };
 }
 
+type WhatsappAgentRuntime = {
+  authoritativeStatus: WhatsappAssistantResult["status"];
+  conversationState: WhatsappConversationState;
+  draftUrl: string | null;
+  fallbackReply: string | null;
+  media: WhatsappAssistantMedia[];
+};
+
+function createWhatsappAgentAdapterResult({
+  data = null,
+  facts,
+  status,
+}: WhatsappAgentAdapterResult): WhatsappAgentAdapterResult {
+  return {
+    data,
+    facts: facts.map((fact) => fact.trim()).filter(Boolean).slice(0, 40),
+    status,
+  };
+}
+
+function getPendingWhatsappAction(
+  state: WhatsappConversationState,
+): WhatsappPendingAction | null {
+  return state.pendingOrder ? "confirm_order" : null;
+}
+
+function withWhatsappMemory({
+  facts,
+  state,
+  summary,
+}: {
+  facts?: string[];
+  state: WhatsappConversationState;
+  summary?: string;
+}): WhatsappConversationState {
+  return {
+    ...state,
+    memory: updateWhatsappRollingMemory({
+      current: state.memory,
+      summary,
+      verifiedFacts: facts,
+    }),
+  };
+}
+
+async function checkDeliveryAreaForAgent(
+  destinationOrPostalCode: string,
+): Promise<WhatsappAgentAdapterResult> {
+  const zones = await getJurgensDeliveryZones({ activeOnly: true });
+  const postalCode = extractSouthAfricanPostalCode(destinationOrPostalCode);
+  const normalizedDestination = normalizeText(destinationOrPostalCode)
+    .replace(/\b(?:do|does|you|deliver|delivery|to|in|at|near|please|check)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const destinationTokens = normalizedDestination
+    .split(" ")
+    .filter((token) => token.length >= 3);
+  const matchingZones = zones.filter((zone) => {
+    if (postalCode && zone.postalCodes.includes(postalCode)) {
+      return true;
+    }
+
+    if (destinationTokens.length === 0) {
+      return false;
+    }
+
+    const searchableZone = normalizeText(
+      [zone.name, zone.deliveryInformation].filter(Boolean).join(" "),
+    );
+
+    return destinationTokens.every((token) => searchableZone.includes(token));
+  });
+
+  if (matchingZones.length === 0) {
+    return createWhatsappAgentAdapterResult({
+      data: { localDeliveryMatch: false },
+      facts: [
+        `No configured Jurgens Energy local-delivery zone match was verified for "${destinationOrPostalCode.trim()}".`,
+        "A missing local-zone match does not rule out courier fulfilment. A live courier quote requires the exact product and complete checkout address.",
+      ],
+      status: "not_verified",
+    });
+  }
+
+  const facts = matchingZones.flatMap((zone) => {
+    const rates = zone.rates.map((rate) =>
+      `${formatMoney(rate.price)} from order value ${formatMoney(rate.fromAmount)}${
+        rate.upToAmount === null
+          ? " upward"
+          : ` through ${formatMoney(rate.upToAmount)}`
+      }`,
+    );
+
+    return [
+      `Jurgens Energy local delivery is configured for the supplied destination in the active zone "${zone.name}".`,
+      zone.deliveryInformation
+        ? `Zone delivery information: ${zone.deliveryInformation}`
+        : null,
+      rates.length > 0
+        ? `Configured zone price tiers: ${rates.join("; ")}. The applicable tier depends on the eligible Jurgens-fulfilled product subtotal.`
+        : "No local-delivery price tier is currently listed for this zone.",
+      "The exact delivery option and fee must still be confirmed from the selected product and checkout address.",
+    ].filter((fact): fact is string => Boolean(fact));
+  });
+
+  return createWhatsappAgentAdapterResult({
+    data: {
+      localDeliveryMatch: true,
+      zoneNames: matchingZones.map((zone) => zone.name),
+    },
+    facts,
+    status: "matched",
+  });
+}
+
+async function proposeWhatsappOrderForAgent({
+  conversationId,
+  currentMessage,
+  proposal,
+  runtime,
+  phone,
+}: {
+  conversationId: string;
+  currentMessage: string;
+  phone: string;
+  proposal: WhatsappAgentOrderProposal;
+  runtime: WhatsappAgentRuntime;
+}): Promise<WhatsappAgentAdapterResult> {
+  const interpretation: MessageInterpretation = {
+    intent: proposal.repeatLastOrder ? "repeat" : "order",
+    purchaseType: proposal.purchaseType,
+    query: null,
+    quantity: proposal.quantity,
+    sizeKg: proposal.sizeKg,
+    supportTopic: null,
+  };
+
+  if (!proposal.purchaseType) {
+    const nextState = withWhatsappMemory({
+      facts: [
+        `The customer requested ${proposal.quantity} cylinder${proposal.quantity === 1 ? "" : "s"}${proposal.sizeKg ? ` of ${proposal.sizeKg}kg` : ""}, but has not specified exchange or full/new.`,
+      ],
+      state: {
+        ...runtime.conversationState,
+        partialOrder: buildPartialOrderState({
+          interpretation,
+          message: currentMessage,
+          partialOrder: runtime.conversationState.partialOrder,
+        }),
+      },
+      summary: "The customer is choosing between an exchange and a full/new cylinder.",
+    });
+    delete nextState.deliveryInquiry;
+    runtime.conversationState = nextState;
+    runtime.authoritativeStatus = "ask_for_size";
+    runtime.fallbackReply =
+      "Got it. Should that be an exchange where you hand over an empty cylinder, or a full/new cylinder with no empty return?";
+    await updateConversationState(conversationId, nextState);
+
+    return createWhatsappAgentAdapterResult({
+      data: { missing: "purchase_type" },
+      facts: [
+        "The order cannot be priced until the customer chooses exchange or full/new.",
+        "Exchange means the customer hands over an acceptable empty cylinder on delivery. Full/new means no empty-cylinder handover.",
+      ],
+      status: "needs_purchase_type",
+    });
+  }
+
+  const candidate = proposal.repeatLastOrder
+    ? await findLastOrderCandidate({
+        phone,
+        purchaseType: proposal.purchaseType,
+        sizeKg: proposal.sizeKg,
+      })
+    : await findCatalogCandidate({
+        purchaseType: proposal.purchaseType,
+        quantity: proposal.quantity,
+        sizeKg: proposal.sizeKg,
+      });
+
+  if (!candidate) {
+    const nextState = withWhatsappMemory({
+      facts: [
+        `The customer requested ${proposal.quantity} x ${proposal.sizeKg ? `${proposal.sizeKg}kg ` : ""}${proposal.purchaseType === "exchange" ? "exchange" : "full/new"} cylinder.`,
+      ],
+      state: {
+        ...runtime.conversationState,
+        ...(!proposal.sizeKg
+          ? {
+              partialOrder: buildPartialOrderState({
+                interpretation,
+                message: currentMessage,
+                partialOrder: runtime.conversationState.partialOrder,
+              }),
+            }
+          : {}),
+      },
+      summary: "A cylinder request is active but still needs a matching live catalogue option.",
+    });
+    delete nextState.deliveryInquiry;
+    runtime.conversationState = nextState;
+    runtime.authoritativeStatus = proposal.sizeKg ? "no_match" : "ask_for_size";
+    runtime.fallbackReply = proposal.sizeKg
+      ? `I could not find an available ${proposal.sizeKg}kg ${proposal.purchaseType === "exchange" ? "exchange" : "full/new"} cylinder right now. Tell me another size, or ask for a team member.`
+      : `What size ${proposal.purchaseType === "exchange" ? "cylinder are you exchanging" : "full/new cylinder do you need"}?`;
+    await updateConversationState(conversationId, nextState);
+
+    return createWhatsappAgentAdapterResult({
+      data: { missing: proposal.sizeKg ? null : "size_kg" },
+      facts: proposal.sizeKg
+        ? [
+            `No currently available ${proposal.sizeKg}kg ${proposal.purchaseType === "exchange" ? "exchange" : "full/new"} cylinder option matched the live catalogue.`,
+          ]
+        : [
+            "The cylinder size is still required before a live catalogue option can be selected.",
+            "Common examples are 9kg, 14kg, 19kg and 48kg, but availability must come from the live catalogue.",
+          ],
+      status: proposal.sizeKg ? "no_match" : "needs_size",
+    });
+  }
+
+  const snapshot = await getVariantSnapshot({
+    purchaseType: candidate.purchaseType,
+    quantity: candidate.quantity,
+    variantId: candidate.variantId,
+  });
+
+  if (!snapshot) {
+    runtime.authoritativeStatus = "no_match";
+    runtime.fallbackReply =
+      "That product changed before I could prepare the offer. Please send the cylinder size and type again, for example '9kg exchange'.";
+
+    return createWhatsappAgentAdapterResult({
+      facts: [
+        "The selected product changed or became unavailable before the offer could be prepared. No order or payment link was created.",
+      ],
+      status: "product_changed",
+    });
+  }
+
+  const offerFacts = [
+    `Offer: ${snapshot.quantity} x ${snapshot.title}.`,
+    `Type: ${snapshot.purchaseType === "exchange" ? "Exchange — an acceptable empty cylinder must be handed over on delivery" : "Full/new cylinder — no empty-cylinder handover"}.`,
+    `Unit price: ${snapshot.priceLabel}.`,
+    `Product subtotal: ${snapshot.totalLabel}.`,
+    "Delivery is calculated from the selected product and address during secure checkout.",
+    "The customer must explicitly confirm this exact offer before a secure checkout link can be created. Ask them to reply YES or JA to confirm, or state what should change.",
+  ];
+  const nextState = withWhatsappMemory({
+    facts: offerFacts.slice(0, 4),
+    state: {
+      ...runtime.conversationState,
+      pendingOrder: {
+        candidate,
+        customerPrompt: buildOrderCustomerPrompt({
+          message: currentMessage,
+          partialOrder: runtime.conversationState.partialOrder,
+        }),
+      },
+    },
+    summary: `The customer is reviewing ${snapshot.quantity} x ${snapshot.title} (${snapshot.purchaseType === "exchange" ? "exchange" : "full/new"}).`,
+  });
+  delete nextState.deliveryInquiry;
+  delete nextState.partialOrder;
+  runtime.conversationState = nextState;
+  runtime.authoritativeStatus = "draft_confirmation";
+  runtime.fallbackReply = buildOrderConfirmationReply({
+    interpretation,
+    snapshot,
+  });
+  await updateConversationState(conversationId, nextState);
+
+  const productImage = createWhatsappProductImage({
+    mediaId: snapshot.mediaId,
+    title: snapshot.title,
+  });
+
+  if (productImage) {
+    runtime.media.push(productImage);
+  }
+
+  return createWhatsappAgentAdapterResult({
+    data: {
+      purchaseType: snapshot.purchaseType,
+      quantity: snapshot.quantity,
+      status: "awaiting_confirmation",
+    },
+    facts: offerFacts,
+    status: "awaiting_confirmation",
+  });
+}
+
+async function confirmWhatsappOrderForAgent({
+  conversationId,
+  currentMessage,
+  phone,
+  runtime,
+  userId,
+}: {
+  conversationId: string;
+  currentMessage: string;
+  phone: string;
+  runtime: WhatsappAgentRuntime;
+  userId: string | null;
+}): Promise<WhatsappAgentAdapterResult> {
+  const pendingOrder = runtime.conversationState.pendingOrder;
+
+  if (!pendingOrder) {
+    runtime.authoritativeStatus = "ask_for_size";
+    runtime.fallbackReply =
+      "I do not have an order waiting for confirmation yet. Tell me what you need, for example '9kg exchange'.";
+
+    return createWhatsappAgentAdapterResult({
+      facts: [
+        "There is no persisted WhatsApp order offer waiting for confirmation, so no checkout link was created.",
+      ],
+      status: "no_pending_offer",
+    });
+  }
+
+  const claimedState = await claimPendingOrderForCheckout({
+    conversationId,
+    pendingOrder,
+  });
+
+  if (!claimedState) {
+    runtime.authoritativeStatus = "support_answer";
+    runtime.fallbackReply =
+      "That confirmation has already been processed or is no longer waiting. If you did not receive the checkout link, ask me to resend it.";
+
+    return createWhatsappAgentAdapterResult({
+      facts: [
+        "The pending offer could not be claimed because it was already processed or no longer exists. No additional checkout link was created.",
+      ],
+      status: "already_processed",
+    });
+  }
+
+  runtime.conversationState = claimedState;
+
+  const snapshot = await getVariantSnapshot({
+    purchaseType: pendingOrder.candidate.purchaseType,
+    quantity: pendingOrder.candidate.quantity,
+    variantId: pendingOrder.candidate.variantId,
+  });
+
+  if (!snapshot) {
+    runtime.authoritativeStatus = "no_match";
+    runtime.fallbackReply =
+      "That product changed before checkout could be prepared. Please send the cylinder size and type again.";
+
+    return createWhatsappAgentAdapterResult({
+      facts: [
+        "The product changed or became unavailable before checkout creation. The pending offer was cleared and no checkout link was created.",
+      ],
+      status: "product_changed",
+    });
+  }
+
+  const draft = await createWhatsappOrderDraft({
+    candidate: pendingOrder.candidate,
+    conversationId,
+    customerPrompt: pendingOrder.customerPrompt || currentMessage,
+    phone,
+    userId,
+  });
+  let nextState = runtime.conversationState;
+  const checkoutFacts = [
+    `Secure checkout prepared for ${snapshot.quantity} x ${snapshot.title} (${snapshot.purchaseType === "exchange" ? "exchange" : "full/new"}).`,
+    `Product subtotal: ${snapshot.totalLabel}.`,
+    `Secure review and payment link: ${draft.draftUrl}`,
+    `The checkout link expires in ${checkoutLinkExpiryLabel}.`,
+  ];
+  nextState = withWhatsappMemory({
+    facts: checkoutFacts,
+    state: nextState,
+    summary: "The confirmed WhatsApp offer now has a secure checkout link.",
+  });
+  runtime.conversationState = nextState;
+  runtime.authoritativeStatus = "draft_created";
+  runtime.draftUrl = draft.draftUrl;
+  runtime.fallbackReply = buildDraftReply({
+    draftUrl: draft.draftUrl,
+    interpretation: createInterpretation({
+      intent: pendingOrder.candidate.intent === "repeat" ? "repeat" : "order",
+      purchaseType: snapshot.purchaseType,
+      quantity: snapshot.quantity,
+    }),
+    snapshot,
+  });
+  await updateConversationState(conversationId, nextState);
+
+  return createWhatsappAgentAdapterResult({
+    data: { checkoutUrl: draft.draftUrl, status: "created" },
+    facts: checkoutFacts,
+    status: "created",
+  });
+}
+
+async function tryProcessWhatsappMessageWithAgent({
+  conversationId,
+  conversationState,
+  currentMessage,
+  interpretation,
+  modelMemory,
+  phone,
+  provider,
+  userId,
+}: {
+  conversationId: string;
+  conversationState: WhatsappConversationState;
+  currentMessage: string;
+  interpretation: MessageInterpretation;
+  modelMemory: ReturnType<typeof buildWhatsappModelMemory>;
+  phone: string;
+  provider: WhatsappProvider;
+  userId: string | null;
+}): Promise<WhatsappAssistantResult | null> {
+  const openAiConfig = await getOpenAiIntegrationConfig();
+
+  if (!openAiConfig.isConfigured || !openAiConfig.apiKey) {
+    return null;
+  }
+
+  const runtime: WhatsappAgentRuntime = {
+    authoritativeStatus: "support_answer",
+    conversationState,
+    draftUrl: null,
+    fallbackReply: null,
+    media: [],
+  };
+  const pendingAction = getPendingWhatsappAction(conversationState);
+  const confirmation = classifyWhatsappConfirmation({
+    message: currentMessage,
+    pendingAction,
+  });
+  const currentMessagePostalCode = extractSouthAfricanPostalCode(
+    currentMessage,
+    { allowBare: true },
+  );
+  const deterministicIntent = interpretMessage(currentMessage).intent;
+  const isOrderRequest =
+    interpretation.intent === "order" ||
+    interpretation.intent === "repeat" ||
+    deterministicIntent === "order" ||
+    deterministicIntent === "repeat";
+  const adapters = {
+    cancelPendingRequest: async () => {
+      const cancelledItem = runtime.conversationState.pendingOrder
+        ? "pending WhatsApp order"
+        : runtime.conversationState.deliveryInquiry
+          ? "delivery check"
+          : "pending request";
+      runtime.conversationState = withWhatsappMemory({
+        facts: [`The customer cancelled the ${cancelledItem}.`],
+        state: await clearPendingOrder(
+          conversationId,
+          runtime.conversationState,
+        ),
+        summary: "There is no pending WhatsApp order or delivery request.",
+      });
+      await updateConversationState(conversationId, runtime.conversationState);
+      runtime.fallbackReply = `No problem, I have cleared that ${cancelledItem}. Tell me what you need when you are ready.`;
+
+      return createWhatsappAgentAdapterResult({
+        facts: [`The ${cancelledItem} was cleared successfully.`],
+        status: "cancelled",
+      });
+    },
+    checkDeliveryArea: (destinationOrPostalCode: string) =>
+      checkDeliveryAreaForAgent(
+        currentMessagePostalCode ?? destinationOrPostalCode,
+      ),
+    confirmOrderAndCreateCheckout: () =>
+      confirmWhatsappOrderForAgent({
+        conversationId,
+        currentMessage,
+        phone,
+        runtime,
+        userId,
+      }),
+    getBusinessInformation: async (question: string) =>
+      createWhatsappAgentAdapterResult({
+        facts: await getWhatsappKnowledgeFacts(question),
+        status: "verified",
+      }),
+    getLatestInvoice: async () => {
+      const answer = await answerLastInvoice({ phone, userId });
+
+      return createWhatsappAgentAdapterResult({
+        facts: [answer],
+        status: "verified",
+      });
+    },
+    getOrderStatus: async () => {
+      const answer = await answerOrderStatus({ phone, userId });
+
+      return createWhatsappAgentAdapterResult({
+        facts: [answer],
+        status: "verified",
+      });
+    },
+    proposeOrder: (proposal: WhatsappAgentOrderProposal) =>
+      proposeWhatsappOrderForAgent({
+        conversationId,
+        currentMessage,
+        phone,
+        proposal,
+        runtime,
+      }),
+    renewPaymentLink: async () => {
+      const replacementDraft = await renewLatestWhatsappDraft({
+        conversationId,
+        customerPrompt: currentMessage,
+        phone,
+        userId,
+      });
+
+      if (!replacementDraft) {
+        runtime.authoritativeStatus = "no_match";
+        runtime.fallbackReply =
+          "I could not find a recent unpaid WhatsApp checkout link to renew. Tell me what you need and I will build a fresh order.";
+
+        return createWhatsappAgentAdapterResult({
+          facts: [
+            "No recent eligible unpaid WhatsApp checkout draft was found, so no replacement payment link was created.",
+          ],
+          status: "not_found",
+        });
+      }
+
+      runtime.draftUrl = replacementDraft.draftUrl;
+      runtime.authoritativeStatus = "draft_created";
+      runtime.fallbackReply = `Here is a fresh secure review and payment link for ${replacementDraft.snapshot.quantity} x ${replacementDraft.snapshot.title}. It expires in ${checkoutLinkExpiryLabel}: ${replacementDraft.draftUrl}`;
+      const facts = [
+        `Replacement secure checkout prepared for ${replacementDraft.snapshot.quantity} x ${replacementDraft.snapshot.title}.`,
+        `Product subtotal: ${replacementDraft.snapshot.totalLabel}.`,
+        `Secure review and payment link: ${replacementDraft.draftUrl}`,
+        `The checkout link expires in ${checkoutLinkExpiryLabel}.`,
+      ];
+      runtime.conversationState = withWhatsappMemory({
+        facts,
+        state: runtime.conversationState,
+        summary: "The customer has a refreshed secure WhatsApp checkout link.",
+      });
+      await updateConversationState(conversationId, runtime.conversationState);
+
+      return createWhatsappAgentAdapterResult({
+        data: { checkoutUrl: replacementDraft.draftUrl },
+        facts,
+        status: "created",
+      });
+    },
+    requestHumanHandover: async (reason: string) => {
+      const isSafetyConcern =
+        /\b(?:gas\s+leak|leaking\s+gas|smell(?:s|ing)?\s+(?:of\s+)?gas|hissing|gas\s+fire|cylinder\s+(?:is\s+)?damaged|emergency|unsafe|faulty\s+(?:cylinder|regulator|valve))\b/.test(
+          normalizeText(currentMessage),
+        );
+      const nextState: WhatsappConversationState = {
+        ...runtime.conversationState,
+        moderation: {
+          ...runtime.conversationState.moderation,
+          automationPausedAt: new Date().toISOString(),
+          automationPausedBy: "system",
+          lastFlagReason: reason.slice(0, 200),
+          lastFlaggedAt: new Date().toISOString(),
+        },
+      };
+      runtime.conversationState = nextState;
+      runtime.authoritativeStatus = "human_handoff";
+      runtime.fallbackReply = isSafetyConcern
+        ? "This needs urgent human help, so I have paused automated replies and passed it to the Jurgens Energy team. If there may be an immediate LPG danger, move away from the hazard and contact local emergency services rather than troubleshooting it here."
+        : "This needs a Jurgens Energy team member to assist properly. I have paused automated replies and passed the conversation to the team.";
+      await updateConversationState(conversationId, nextState);
+
+      return createWhatsappAgentAdapterResult({
+        facts: [
+          "Automated replies are now paused for this conversation and it has been handed to the Jurgens Energy team.",
+          ...(isSafetyConcern
+            ? [
+                "For a possible immediate LPG danger, the customer should move away from the hazard and contact local emergency services rather than troubleshoot it in chat.",
+              ]
+            : []),
+          "A staff reply time has not been promised.",
+        ],
+        status: "handed_over",
+      });
+    },
+    searchProducts: async (query: string) => {
+      const answer = await answerProductSearch(query);
+      runtime.media.push(...answer.media);
+
+      return createWhatsappAgentAdapterResult({
+        facts: [answer.reply],
+        status: "verified",
+      });
+    },
+    stopWhatsappAutomation: async () => {
+      await db
+        .update(whatsappConversations)
+        .set({ state: {}, status: "closed", updatedAt: new Date() })
+        .where(eq(whatsappConversations.id, conversationId));
+      runtime.conversationState = {};
+      runtime.authoritativeStatus = "opted_out";
+      runtime.fallbackReply =
+        "No problem. I have stopped the automated WhatsApp conversation. You can start a new one whenever you need us.";
+
+      return createWhatsappAgentAdapterResult({
+        facts: [
+          "The automated WhatsApp ordering conversation was stopped and closed successfully. The customer can start a new conversation later.",
+        ],
+        status: "stopped",
+      });
+    },
+  } satisfies Parameters<typeof runJurgensWhatsappAgentTurn>[0]["adapters"];
+  const workflowContext = [
+    modelMemory.rollingMemory.summary,
+    ...modelMemory.rollingMemory.facts,
+    modelMemory.workflowSummary,
+    currentMessagePostalCode
+      ? 'The current customer message contains a server-detected postal code. Call check_delivery_area with the value "current message postal code"; the application will use the protected value without exposing it to the model.'
+      : null,
+    `Deterministic fallback intent: ${interpretation.intent}. This is advisory only and never authorizes a write.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const agentResult = await runJurgensWhatsappAgentTurn({
+    adapters,
+    authorizeWrite: ({ toolName }) => {
+      switch (toolName) {
+        case "propose_order":
+          return isOrderRequest;
+        case "confirm_order_and_create_checkout":
+          return confirmation === "confirmed";
+        case "cancel_pending_request":
+          return (
+            confirmation === "declined" ||
+            deterministicIntent === "cancel" ||
+            interpretation.intent === "cancel"
+          );
+        case "renew_payment_link":
+          return (
+            deterministicIntent === "payment_link" ||
+            interpretation.intent === "payment_link"
+          );
+        case "request_human_handover":
+          return (
+            deterministicIntent === "human" || interpretation.intent === "human"
+          );
+        case "stop_whatsapp_automation":
+          return deterministicIntent === "stop" || interpretation.intent === "stop";
+        default:
+          return false;
+      }
+    },
+    config: {
+      apiKey: openAiConfig.apiKey,
+      model: openAiConfig.model,
+      reasoningEffort: openAiConfig.reasoningEffort,
+    },
+    currentMessage: modelMemory.currentInbound,
+    recentTurns: modelMemory.recentTurns,
+    validateReply: (reply, facts) => {
+      const replyIsGrounded = validateWhatsappAgentReply({
+        authoritativeFacts: facts,
+        customerMessage: modelMemory.currentInbound,
+        reply,
+      });
+      const includesRequiredCheckoutLink =
+        runtime.authoritativeStatus !== "draft_created" ||
+        !runtime.draftUrl ||
+        reply.includes(runtime.draftUrl);
+
+      return replyIsGrounded && includesRequiredCheckoutLink;
+    },
+    workflowContext,
+  });
+
+  if (!agentResult) {
+    return runtime.fallbackReply
+      ? respond({
+          conversationId,
+          draftUrl: runtime.draftUrl,
+          media: runtime.media,
+          provider,
+          reply: runtime.fallbackReply,
+          status: runtime.authoritativeStatus,
+        })
+      : null;
+  }
+
+  if (runtime.authoritativeStatus !== "opted_out") {
+    runtime.conversationState = withWhatsappMemory({
+      facts: agentResult.authoritativeFacts,
+      state: runtime.conversationState,
+    });
+    await updateConversationState(conversationId, runtime.conversationState);
+  }
+
+  return respond({
+    conversationId,
+    draftUrl: runtime.draftUrl,
+    media: runtime.media,
+    provider,
+    reply: agentResult.reply,
+    status: runtime.authoritativeStatus,
+  });
+}
+
 export async function processWhatsappInboundMessage(
   input: WhatsappInboundMessage,
 ): Promise<WhatsappAssistantResult> {
@@ -3472,7 +4732,24 @@ export async function processWhatsappInboundMessage(
     };
   }
 
-  let conversationState = updateRepeatedMessageState(conversation.state, input.body);
+  const providerProfileName = sanitizeWhatsappDisplayName(input.profileName);
+  let baseConversationState = conversation.state;
+
+  if (
+    providerProfileName &&
+    providerProfileName !== conversation.state.providerProfileName
+  ) {
+    baseConversationState = {
+      ...conversation.state,
+      providerProfileName,
+    };
+    await updateConversationState(conversation.id, baseConversationState);
+  }
+
+  let conversationState = updateRepeatedMessageState(
+    baseConversationState,
+    input.body,
+  );
 
   if (shouldSkipAutomatedReply(conversationState)) {
     await updateConversationModerationState(
@@ -3543,15 +4820,84 @@ export async function processWhatsappInboundMessage(
     conversationState.moderation!,
   );
 
+  const customerContext = await resolveWhatsappCustomerContext({
+    conversationId: conversation.id,
+    providerProfileName,
+  });
+  const recentTurns = customerContext.messages.map((message) => ({
+    body: message.body,
+    direction:
+      message.direction === "assistant"
+        ? ("outbound" as const)
+        : ("inbound" as const),
+  }));
+  const modelMemory = buildWhatsappModelMemory({
+    currentInbound: input.body,
+    knownNames: [customerContext.displayName, customerContext.firstName],
+    recentTurns,
+    rollingMemory: conversationState.memory,
+    workflowState: conversationState,
+  });
+  const ruleBasedInterpretation = mergeInterpretationWithPartialOrder({
+    interpretation: interpretMessage(input.body),
+    partialOrder: conversationState.partialOrder,
+  });
+  const confirmationSemantics = classifyWhatsappConfirmation({
+    message: input.body,
+    pendingAction: getPendingWhatsappAction(conversationState),
+  });
+  const deterministicInterpretation: MessageInterpretation = {
+    ...ruleBasedInterpretation,
+    intent:
+      confirmationSemantics === "confirmed"
+        ? "confirm"
+        : confirmationSemantics === "declined"
+          ? "cancel"
+          : ruleBasedInterpretation.intent,
+  };
+
+  // Active address/quote collection remains deterministic. All other turns
+  // may be phrased naturally by the agent, while every business read or write
+  // still goes through an authorised application tool.
+  if (!conversationState.deliveryInquiry) {
+    const agentReply = await tryProcessWhatsappMessageWithAgent({
+      conversationId: conversation.id,
+      conversationState,
+      currentMessage: input.body,
+      interpretation: deterministicInterpretation,
+      modelMemory,
+      phone,
+      provider: input.provider,
+      userId: link.userId,
+    });
+
+    if (agentReply) {
+      await updateConversationAfterMessage({
+        conversationId: conversation.id,
+        direction: "inbound",
+        intent: `agent_${deterministicInterpretation.intent}`,
+      });
+
+      return agentReply;
+    }
+  }
+
+  const priorTurns: WhatsappConversationTurn[] = modelMemory.recentTurns;
+  const rawInterpretation = conversationState.deliveryInquiry
+    ? await interpretMessageWithAiFallback(input.body, {
+        recentTurns: priorTurns,
+        workflowSummary: modelMemory.workflowSummary,
+      })
+    : deterministicInterpretation;
+  const interpretation = mergeInterpretationWithPartialOrder({
+    interpretation: rawInterpretation,
+    partialOrder: conversationState.partialOrder,
+  });
+
   if (
     conversationState.deliveryInquiry ||
     isDeliveryCoverageQuestion(input.body)
   ) {
-    const fallbackInterpretation = mergeInterpretationWithPartialOrder({
-      interpretation: interpretMessage(input.body),
-      partialOrder: conversationState.partialOrder,
-    });
-
     await updateConversationAfterMessage({
       conversationId: conversation.id,
       direction: "inbound",
@@ -3561,7 +4907,7 @@ export async function processWhatsappInboundMessage(
     const deliveryReply = await handleDeliveryInquiryMessage({
       conversationId: conversation.id,
       conversationState,
-      interpretation: fallbackInterpretation,
+      interpretation,
       message: input.body,
       provider: input.provider,
     });
@@ -3571,11 +4917,6 @@ export async function processWhatsappInboundMessage(
     }
   }
 
-  const rawInterpretation = await interpretMessageWithAiFallback(input.body);
-  const interpretation = mergeInterpretationWithPartialOrder({
-    interpretation: rawInterpretation,
-    partialOrder: conversationState.partialOrder,
-  });
   const lastOrderCandidate =
     interpretation.intent === "repeat"
       ? await findLastOrderCandidate({
@@ -3636,6 +4977,21 @@ export async function processWhatsappInboundMessage(
 
   if (interpretation.intent === "confirm" && conversationState.pendingOrder) {
     const pendingOrder = conversationState.pendingOrder;
+    const claimedState = await claimPendingOrderForCheckout({
+      conversationId: conversation.id,
+      pendingOrder,
+    });
+
+    if (!claimedState) {
+      return respond({
+        conversationId: conversation.id,
+        provider: input.provider,
+        reply:
+          "That confirmation has already been processed or is no longer waiting. If you did not receive the checkout link, ask me to resend it.",
+        status: "support_answer",
+      });
+    }
+
     const snapshot = await getVariantSnapshot({
       purchaseType: pendingOrder.candidate.purchaseType,
       quantity: pendingOrder.candidate.quantity,
@@ -3643,8 +4999,6 @@ export async function processWhatsappInboundMessage(
     });
 
     if (!snapshot) {
-      await clearPendingOrder(conversation.id, conversationState);
-
       return respond({
         conversationId: conversation.id,
         provider: input.provider,
@@ -3661,8 +5015,6 @@ export async function processWhatsappInboundMessage(
       phone,
       userId: link.userId,
     });
-
-    await clearPendingOrder(conversation.id, conversationState);
 
     return respond({
       conversationId: conversation.id,
@@ -3715,11 +5067,24 @@ export async function processWhatsappInboundMessage(
   }
 
   if (interpretation.intent === "human") {
+    const now = new Date().toISOString();
+    const nextState: WhatsappConversationState = {
+      ...conversationState,
+      moderation: {
+        ...conversationState.moderation,
+        automationPausedAt: now,
+        automationPausedBy: "system",
+        lastFlagReason: input.body.slice(0, 200),
+        lastFlaggedAt: now,
+      },
+    };
+    await updateConversationState(conversation.id, nextState);
+
     return respond({
       conversationId: conversation.id,
       provider: input.provider,
       reply:
-        "Got you. A Jurgens Energy team member can jump in here. For a gas topup, you can also say something like '9kg exchange' or 'same as last time'.",
+        "This needs a Jurgens Energy team member to assist properly. I have paused the automated replies and passed the conversation to the team.",
       status: "human_handoff",
     });
   }
@@ -3750,15 +5115,19 @@ export async function processWhatsappInboundMessage(
     interpretation.intent === "product_search" ||
     interpretation.intent === "support"
   ) {
-    let reply = await answerSupportQuestion({
+    const answer = await answerSupportQuestion({
       interpretation,
       phone,
+      question: input.body,
+      recentTurns: priorTurns,
       userId: link.userId,
     });
+    let reply = answer.reply;
 
     if (
       interpretation.intent === "support" &&
-      interpretation.supportTopic === "unknown"
+      interpretation.supportTopic === "unknown" &&
+      !answer.grounded
     ) {
       conversationState = incrementUnknownConversationState(conversationState);
       await updateConversationModerationState(
@@ -3773,6 +5142,7 @@ export async function processWhatsappInboundMessage(
 
     return respond({
       conversationId: conversation.id,
+      media: answer.media,
       provider: input.provider,
       reply,
       status: "support_answer",
@@ -3822,17 +5192,19 @@ export async function processWhatsappInboundMessage(
   if (!candidate) {
     const reply = interpretation.sizeKg
       ? `I could not find an available ${interpretation.sizeKg}kg cylinder option yet. Reply with another size, like "9kg exchange", or ask for a human.`
-      : `I can sort that. Reply with the size and type, for example "9kg exchange", "14kg exchange", or "9kg full".`;
+      : interpretation.purchaseType === "exchange"
+        ? "Absolutely. What size cylinder are you exchanging—for example 9kg, 14kg, 19kg, or 48kg?"
+        : "Sure. What size full/new cylinder do you need—for example 9kg, 14kg, 19kg, or 48kg?";
 
     const nextConversationState: WhatsappConversationState = {
       ...conversationState,
       ...(!interpretation.sizeKg
         ? {
-        partialOrder: buildPartialOrderState({
-          interpretation,
-          message: input.body,
-          partialOrder: conversationState.partialOrder,
-        }),
+            partialOrder: buildPartialOrderState({
+              interpretation,
+              message: input.body,
+              partialOrder: conversationState.partialOrder,
+            }),
           }
         : {}),
     };
@@ -3887,10 +5259,15 @@ export async function processWhatsappInboundMessage(
     interpretation,
     snapshot,
   });
+  const productImage = createWhatsappProductImage({
+    mediaId: snapshot.mediaId,
+    title: snapshot.title,
+  });
 
   return respond({
     conversationId: conversation.id,
     draftUrl: null,
+    media: productImage ? [productImage] : [],
     provider: input.provider,
     reply,
     status: "draft_confirmation",

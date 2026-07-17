@@ -358,6 +358,9 @@ function SettingsSection({
       >
         <WhatsappOrderingSettingsForm
           hasWhatsappApiKey={settings.hasWhatsappApiKey}
+          hasWhatsappWebhookSigningSecret={
+            settings.hasWhatsappWebhookSigningSecret
+          }
           hasWhatsappWebhookVerifyToken={
             settings.hasWhatsappWebhookVerifyToken
           }

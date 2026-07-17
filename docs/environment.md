@@ -54,6 +54,9 @@ WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
 WHATSAPP_AUTOMATION_SECRET=replace-with-a-long-random-secret
 DIALOGUE_API_KEY=replace-with-360dialog-api-key
 DIALOGUE_MESSAGE_URL=https://waba-v2.360dialog.io
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=replace-with-provider-verification-token
+WHATSAPP_WEBHOOK_SIGNING_SECRET=replace-with-a-separate-long-random-post-secret
+TWILIO_AUTH_TOKEN=replace-only-when-legacy-twilio-webhooks-are-enabled
 WHATSAPP_INVOICE_TEMPLATE_NAME=customer_invoice_issued
 WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en
 ```
@@ -107,6 +110,9 @@ WEB_PUSH_SUBJECT=mailto:no-reply@jurgensenergy.com
 WHATSAPP_AUTOMATION_SECRET=replace-with-a-long-random-secret
 DIALOGUE_API_KEY=replace-with-360dialog-api-key
 DIALOGUE_MESSAGE_URL=https://waba-v2.360dialog.io
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=replace-with-provider-verification-token
+WHATSAPP_WEBHOOK_SIGNING_SECRET=replace-with-a-separate-long-random-post-secret
+TWILIO_AUTH_TOKEN=replace-only-when-legacy-twilio-webhooks-are-enabled
 WHATSAPP_INVOICE_TEMPLATE_NAME=customer_invoice_issued
 WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en
 
@@ -144,6 +150,33 @@ APP_URL=https://your-tunnel.trycloudflare.com
 `WHATSAPP_AUTOMATION_SECRET` protects the scheduled follow-up runner at
 `/api/whatsapp/follow-ups`. Call it with `POST` and either
 `Authorization: Bearer <secret>` or `x-whatsapp-automation-secret: <secret>`.
+
+`WHATSAPP_WEBHOOK_VERIFY_TOKEN` (or the encrypted value saved under **Admin →
+Settings → Platform → WhatsApp ordering**) remains dedicated to the provider's
+GET verification handshake. It is deliberately not reused to authenticate
+inbound message POSTs.
+
+The encrypted **Inbound POST signing secret** under **Admin → Settings →
+Platform → WhatsApp ordering** protects inbound 360dialog POSTs. The settings
+page can generate the value; it does not come from 360dialog. In the 360dialog
+Hub, open **WhatsApp Channel → Channel Webhook → Headers** and add
+`x-whatsapp-webhook-secret` with exactly that value. Confirm and test the
+provider header before saving the secret in Jurgens Energy, otherwise unsigned
+callbacks will be rejected. `WHATSAPP_WEBHOOK_SIGNING_SECRET` remains available
+as an environment fallback when no encrypted admin value is saved.
+
+If neither source is configured, the endpoint temporarily accepts unsigned
+360dialog requests for backwards compatibility and writes a configuration
+warning to the server log.
+
+Legacy Twilio form webhooks are verified with `X-Twilio-Signature` when
+`TWILIO_AUTH_TOKEN` is present. Twilio requests remain in the same logged
+compatibility mode only when neither POST verification secret is configured;
+once 360dialog verification is enabled, form webhooks without a Twilio token
+fail closed rather than providing a content-type bypass.
+The webhook requires the provider message identifier (`messages[].id` for
+360dialog or `MessageSid` for Twilio), and the database uniqueness constraint on
+that identifier makes provider retries idempotent.
 
 Invoice WhatsApp delivery uses an approved 360dialog template rather than a
 free-form message, so it also works outside WhatsApp's 24-hour service window.
