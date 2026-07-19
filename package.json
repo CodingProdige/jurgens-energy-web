@@ -16,6 +16,7 @@
     "selfhost:status": "docker compose -p jurgens_energy_selfhost --profile tunnel ps",
     "test:payfast": "node --experimental-strip-types --test scripts/payfast-signature.test.mjs",
     "test:analytics": "node --experimental-strip-types --test scripts/google-consent.test.mjs scripts/campaign-attribution.test.mjs",
+    "test:google-feeds": "node --experimental-strip-types --test scripts/google-feed-utils.test.mjs",
     "test:product-costs": "node --experimental-strip-types --test scripts/product-cost-price.test.mjs",
     "test:seo": "node --experimental-strip-types --test scripts/static-page-seo.test.mjs scripts/storefront-legacy-defaults.test.mjs",
     "test:whatsapp": "node --experimental-strip-types --test scripts/whatsapp-contextual-product-request.test.mjs scripts/whatsapp-customer-name.test.mjs scripts/whatsapp-conversation-memory.test.mjs scripts/whatsapp-webhook-security.test.mjs src/modules/whatsapp-ordering/orchestrator.test.mjs",

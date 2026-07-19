@@ -49,6 +49,7 @@ export default async function EditAdminProductPage({
   return (
     <ProductCreateWizard
       data={data}
+      enableGoogleCommerceSettings
       enablePrivateCostPricing
       initialPrivateCosts={initialPrivateCosts}
       initialProduct={initialProduct}

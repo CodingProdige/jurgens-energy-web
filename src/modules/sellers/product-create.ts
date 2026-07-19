@@ -45,6 +45,11 @@ export type SellerParcelPreset = {
   widthMm: number;
 };
 
+export type GoogleFulfillmentChannel =
+  | "local_lpg"
+  | "national_courier"
+  | "excluded";
+
 export type SellerCreateProductData = {
   brandRequests: SellerProductBrandRequest[];
   brands: SellerProductBrand[];
@@ -65,12 +70,15 @@ export type SellerEditableProductData = {
   exchangeEmptyCylinderSize: string;
   exchangeRequiresEmpty: boolean;
   fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  googleFulfillmentChannel: GoogleFulfillmentChannel;
+  googleReturnPolicyLabel: string;
   hasVariants: boolean;
   heightMm: string;
   id: string;
   lengthMm: string;
   longDescription: string;
   mediaIds: string[];
+  manufacturerMpn: string;
   optionSchema: Array<{
     name: string;
     values: string[];
@@ -99,12 +107,15 @@ export type SellerEditableProductData = {
     exchangeConfirmationText: string;
     exchangeEmptyCylinderSize: string;
     exchangeRequiresEmpty: boolean;
+    googleFulfillmentChannel: GoogleFulfillmentChannel;
+    googleReturnPolicyLabel: string;
     heightMm: string;
     id: string;
     imageId: string | null;
     isFragile: boolean;
     lengthMm: string;
     lowStockAlert: string;
+    manufacturerMpn: string;
     notes: string;
     optionValues: string[];
     parcelPresetId: string | null;
@@ -220,12 +231,15 @@ export async function getSellerEditableProductData({
         exchangeConfirmationText: productVariants.exchangeConfirmationText,
         exchangeEmptyCylinderSize: productVariants.exchangeEmptyCylinderSize,
         exchangeRequiresEmpty: productVariants.requiresExchangeEmpty,
+        googleFulfillmentChannel: productVariants.googleFulfillmentChannel,
+        googleReturnPolicyLabel: productVariants.googleReturnPolicyLabel,
         heightMm: productVariants.heightMm,
         id: productVariants.id,
         imageId: productVariants.mediaId,
         isFragile: productVariants.isFragile,
         lengthMm: productVariants.lengthMm,
         lowStockAlert: productVariants.lowStockAlert,
+        manufacturerMpn: productVariants.manufacturerMpn,
         notes: productVariants.notes,
         optionValues: productVariants.optionValues,
         parcelPresetId: productVariants.parcelPresetId,
@@ -281,12 +295,19 @@ export async function getSellerEditableProductData({
     exchangeEmptyCylinderSize: firstVariant?.exchangeEmptyCylinderSize ?? "",
     exchangeRequiresEmpty: firstVariant?.exchangeRequiresEmpty ?? false,
     fulfillmentMode: product.fulfillmentMode,
+    googleFulfillmentChannel:
+      firstVariant?.googleFulfillmentChannel ??
+      (product.fulfillmentMode === "seller_fulfilled"
+        ? "national_courier"
+        : "local_lpg"),
+    googleReturnPolicyLabel: firstVariant?.googleReturnPolicyLabel ?? "",
     hasVariants,
     heightMm: formatEditableMetric(firstVariant?.heightMm ?? null),
     id: product.id,
     lengthMm: formatEditableMetric(firstVariant?.lengthMm ?? null),
     longDescription: product.fullDescription ?? "",
     mediaIds: mediaRows.map((row) => row.mediaId),
+    manufacturerMpn: firstVariant?.manufacturerMpn ?? "",
     optionSchema,
     parcelPresetId: firstVariant?.parcelPresetId ?? null,
     price: firstVariant?.price ?? "",
@@ -303,12 +324,15 @@ export async function getSellerEditableProductData({
       exchangeConfirmationText: variant.exchangeConfirmationText ?? "",
       exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize ?? "",
       exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
+      googleFulfillmentChannel: variant.googleFulfillmentChannel,
+      googleReturnPolicyLabel: variant.googleReturnPolicyLabel ?? "",
       heightMm: formatEditableMetric(variant.heightMm),
       id: variant.id,
       imageId: variant.imageId,
       isFragile: variant.isFragile,
       lengthMm: formatEditableMetric(variant.lengthMm),
       lowStockAlert: String(variant.lowStockAlert),
+      manufacturerMpn: variant.manufacturerMpn ?? "",
       notes: variant.notes ?? "",
       optionValues: variant.optionValues,
       parcelPresetId: variant.parcelPresetId,

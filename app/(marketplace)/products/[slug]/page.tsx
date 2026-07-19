@@ -113,7 +113,7 @@ export default async function ProductPage({
     <MarketplaceGate>
       <MarketplaceJsonLd
         data={[
-          createProductStructuredData(product),
+          createProductStructuredData(product, initialVariantId),
           createBreadcrumbStructuredData([
             { name: "Home", path: "/" },
             { name: "Shop", path: "/products" },

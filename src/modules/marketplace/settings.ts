@@ -201,6 +201,9 @@ export type MarketplaceSettings = {
   googleAdsConversionId: string | null;
   googleAdsConversionLabel: string | null;
   googleAnalyticsMeasurementId: string | null;
+  googleLocalInventoryCustomerAccessible: boolean;
+  googleLocalInventoryEnabled: boolean;
+  googleLocalInventoryStoreCode: string | null;
   googleMerchantCenterId: string | null;
   googleReviewUrl: string | null;
   googleSiteVerificationToken: string | null;
@@ -317,6 +320,9 @@ const defaultSettings: MarketplaceSettings = {
   googleAdsConversionId: null,
   googleAdsConversionLabel: null,
   googleAnalyticsMeasurementId: null,
+  googleLocalInventoryCustomerAccessible: false,
+  googleLocalInventoryEnabled: false,
+  googleLocalInventoryStoreCode: null,
   googleMerchantCenterId: null,
   googleReviewUrl: null,
   googleSiteVerificationToken: null,
@@ -408,6 +414,12 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
       googleAdsConversionLabel: marketplaceSettings.googleAdsConversionLabel,
       googleAnalyticsMeasurementId:
         marketplaceSettings.googleAnalyticsMeasurementId,
+      googleLocalInventoryCustomerAccessible:
+        marketplaceSettings.googleLocalInventoryCustomerAccessible,
+      googleLocalInventoryEnabled:
+        marketplaceSettings.googleLocalInventoryEnabled,
+      googleLocalInventoryStoreCode:
+        marketplaceSettings.googleLocalInventoryStoreCode,
       googleMerchantCenterId: marketplaceSettings.googleMerchantCenterId,
       googleReviewUrl: marketplaceSettings.googleReviewUrl,
       googleSiteVerificationToken:
@@ -1481,6 +1493,9 @@ export async function updateMarketplaceGoogleMarketingSettings({
   googleAdsConversionId,
   googleAdsConversionLabel,
   googleAnalyticsMeasurementId,
+  googleLocalInventoryCustomerAccessible,
+  googleLocalInventoryEnabled,
+  googleLocalInventoryStoreCode,
   googleMerchantCenterId,
   googleSiteVerificationToken,
   googleTagManagerId,
@@ -1488,6 +1503,9 @@ export async function updateMarketplaceGoogleMarketingSettings({
   googleAdsConversionId?: string;
   googleAdsConversionLabel?: string;
   googleAnalyticsMeasurementId?: string;
+  googleLocalInventoryCustomerAccessible: boolean;
+  googleLocalInventoryEnabled: boolean;
+  googleLocalInventoryStoreCode?: string;
   googleMerchantCenterId?: string;
   googleSiteVerificationToken?: string;
   googleTagManagerId?: string;
@@ -1499,6 +1517,9 @@ export async function updateMarketplaceGoogleMarketingSettings({
       googleAdsConversionId: googleAdsConversionId || null,
       googleAdsConversionLabel: googleAdsConversionLabel || null,
       googleAnalyticsMeasurementId: googleAnalyticsMeasurementId || null,
+      googleLocalInventoryCustomerAccessible,
+      googleLocalInventoryEnabled,
+      googleLocalInventoryStoreCode: googleLocalInventoryStoreCode || null,
       googleMerchantCenterId: googleMerchantCenterId || null,
       googleSiteVerificationToken: googleSiteVerificationToken || null,
       googleTagManagerId: googleTagManagerId || null,
@@ -1510,6 +1531,9 @@ export async function updateMarketplaceGoogleMarketingSettings({
         googleAdsConversionId: googleAdsConversionId || null,
         googleAdsConversionLabel: googleAdsConversionLabel || null,
         googleAnalyticsMeasurementId: googleAnalyticsMeasurementId || null,
+        googleLocalInventoryCustomerAccessible,
+        googleLocalInventoryEnabled,
+        googleLocalInventoryStoreCode: googleLocalInventoryStoreCode || null,
         googleMerchantCenterId: googleMerchantCenterId || null,
         googleSiteVerificationToken: googleSiteVerificationToken || null,
         googleTagManagerId: googleTagManagerId || null,
@@ -1517,7 +1541,7 @@ export async function updateMarketplaceGoogleMarketingSettings({
       },
     });
 
-  return { ok: true, message: "Google tag settings saved." };
+  return { ok: true, message: "Google and Merchant Center settings saved." };
 }
 
 export async function updateMarketplaceOpenAiSettings({

@@ -36,7 +36,7 @@ const localDeliveryFaqItems = [
   {
     question: "How do I confirm whether Jurgens Energy delivers to my address?",
     answer:
-      "Enter the complete delivery address and postal code during checkout. The live checkout checks the active delivery zones, the order value and the products in the cart before presenting an available delivery option.",
+      "Jurgens Energy local delivery is available only to addresses whose postal codes fall within a supported active local zone shown on this page. Enter the complete address and postal code during checkout; checkout is the final confirmation of availability and cost before payment.",
   },
   {
     question: "Can I exchange an empty LPG cylinder during delivery?",
@@ -85,7 +85,7 @@ export async function LocalDeliveryPage() {
 
       <ContentHero
         breadcrumbLabel="LPG delivery"
-        description="Order eligible LPG cylinders and gas products online, confirm coverage from your exact address, and see the available delivery price before paying."
+        description="Order eligible LPG cylinders and gas products only within the supported local postal-code zones shown below. Checkout confirms availability and the applicable delivery cost before payment."
         eyebrow="Local LPG delivery"
         icon={TruckIcon}
         title="LPG delivered with the right handover."
@@ -94,7 +94,7 @@ export async function LocalDeliveryPage() {
       <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-7 sm:py-12 lg:px-10 lg:py-16">
         <section className="grid gap-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-start lg:gap-14">
           <ContentSectionHeading
-            description="The areas below come from the currently active Jurgens Energy delivery zones. Checkout remains the final availability check because the product, address, order value and route conditions all matter."
+            description="The areas and postal codes below are the currently supported Jurgens Energy local delivery zones. Local delivery is not available to every South African address, and checkout remains the final confirmation because the product, exact address, order value and route conditions all matter."
             eyebrow="Current coverage"
             title="Check the local delivery areas."
           />
@@ -109,8 +109,10 @@ export async function LocalDeliveryPage() {
             <div className="rounded-xl border border-[#deded7] bg-white p-6 dark:border-white/10 dark:bg-[#141414]">
               <p className="text-sm font-bold">Coverage is being updated.</p>
               <p className="mt-2 text-[13px] leading-6 text-[#66665f] dark:text-[#bdbdb5]">
-                Enter your address during checkout or contact the team before
-                ordering so current delivery availability can be confirmed.
+                No local postal-code coverage is currently published. Enter
+                your address during checkout or contact the team before
+                ordering; do not assume local delivery is available until it is
+                confirmed.
               </p>
             </div>
           )}
@@ -130,11 +132,14 @@ export async function LocalDeliveryPage() {
             <NumberedStep number="02" title="Enter the address">
               Add the street, city, province and postal code. A suburb can be
               added when it helps the delivery team, but it is not required for
-              the zone check.
+              the zone check. The postal code must fall within a supported
+              active local zone.
             </NumberedStep>
             <NumberedStep number="03" title="Review the live quote">
               Checkout separates Jurgens Energy delivery from any courier rate
-              and clearly shows when an applicable local tier is free.
+              and confirms the available option and cost before payment. An
+              address outside the supported local postal codes will not receive
+              a Jurgens Energy local-delivery option.
             </NumberedStep>
             <NumberedStep number="04" title="Complete the handover">
               Keep an eligible empty cylinder ready for exchange orders and make
@@ -145,7 +150,7 @@ export async function LocalDeliveryPage() {
 
         <section className="mt-14 sm:mt-20">
           <ContentSectionHeading
-            description="These products are currently marked for Jurgens Energy fulfilment. Final stock, address coverage and the applicable delivery tier are confirmed during checkout."
+            description="These products are currently marked for Jurgens Energy fulfilment, but that does not make every address serviceable. Final stock, supported postal-code coverage and the applicable delivery cost are confirmed during checkout."
             eyebrow="Available for local fulfilment"
             title="Shop LPG for local delivery."
           />

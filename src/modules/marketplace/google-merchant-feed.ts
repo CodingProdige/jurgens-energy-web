@@ -10,6 +10,10 @@ import {
   products,
 } from "@/src/db/schema";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
+import {
+  getGoogleMerchantDestinationControls,
+  type GoogleMerchantDestination,
+} from "@/src/modules/marketplace/google-feed-utils";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 
 const publicProductStatuses = ["live", "active"] as const;
@@ -33,16 +37,21 @@ export type GoogleMerchantFeedItem = {
   brand: string;
   canonicalLink: string;
   description: string;
+  excludedDestinations: GoogleMerchantDestination[];
   gtin: string | null;
   id: string;
   imageLink: string;
   itemGroupId: string | null;
   itemGroupTitle: string | null;
+  identifierExists: boolean;
+  includedDestinations: GoogleMerchantDestination[];
   link: string;
-  mpn: string;
+  mpn: string | null;
   price: string;
   productType: string | null;
+  returnPolicyLabel: string | null;
   salePrice: string | null;
+  shippingLabel: "local_lpg" | "national_courier";
   title: string;
   variantOptions: GoogleMerchantVariantOption[];
 };
@@ -55,12 +64,16 @@ export async function getGoogleMerchantFeedItems() {
       compareAtPrice: productVariants.compareAtPrice,
       continueSellingOutOfStock:
         productVariants.continueSellingOutOfStock,
+      googleFulfillmentChannel: productVariants.googleFulfillmentChannel,
+      googleReturnPolicyLabel: productVariants.googleReturnPolicyLabel,
+      manufacturerMpn: productVariants.manufacturerMpn,
       optionSchema: products.optionSchema,
       optionValues: productVariants.optionValues,
       price: productVariants.price,
       productBarcode: products.barcode,
       productDescription: products.description,
       productFullDescription: products.fullDescription,
+      productFulfillmentMode: products.fulfillmentMode,
       productId: products.id,
       productShortDescription: products.shortDescription,
       productSlug: products.slug,
@@ -70,7 +83,6 @@ export async function getGoogleMerchantFeedItems() {
       variantBarcode: productVariants.barcode,
       variantId: productVariants.id,
       variantMediaId: productVariants.mediaId,
-      variantSku: productVariants.sku,
       variantTitle: productVariants.title,
     })
     .from(productVariants)
@@ -93,7 +105,11 @@ export async function getGoogleMerchantFeedItems() {
   const eligibleRows = variantRows.filter((row) => {
     const price = Number(row.price);
 
-    return Number.isFinite(price) && price > 0;
+    return (
+      row.googleFulfillmentChannel !== "excluded" &&
+      Number.isFinite(price) &&
+      price > 0
+    );
   });
   const productIds = uniqueStrings(eligibleRows.map((row) => row.productId));
   const variantMediaIds = uniqueStrings(
@@ -200,7 +216,18 @@ export async function getGoogleMerchantFeedItems() {
     const title = isExchangeOffer
       ? `${baseTitle} - Empty cylinder required`
       : baseTitle;
-    const gtin = getValidGtin(row.variantBarcode ?? row.productBarcode);
+    const gtin =
+      getValidGtin(row.variantBarcode) ?? getValidGtin(row.productBarcode);
+    const mpn =
+      firstCleanProductText([row.manufacturerMpn])?.slice(0, 70) ?? null;
+    const returnPolicyLabel =
+      firstCleanProductText([row.googleReturnPolicyLabel])?.slice(0, 100) ??
+      null;
+    const shippingLabel = getGoogleShippingLabel(
+      row.googleFulfillmentChannel,
+      row.productFulfillmentMode,
+    );
+    const destinations = getGoogleMerchantDestinationControls(shippingLabel);
 
     return [
       {
@@ -219,6 +246,7 @@ export async function getGoogleMerchantFeedItems() {
         ).slice(0, 70),
         canonicalLink,
         description: description.slice(0, googleFeedDescriptionLimit),
+        excludedDestinations: destinations.excluded,
         gtin,
         id: row.variantId,
         imageLink,
@@ -226,13 +254,17 @@ export async function getGoogleMerchantFeedItems() {
         itemGroupTitle: shouldGroupVariants
           ? cleanProductText(row.productTitle).slice(0, googleFeedTitleLimit)
           : null,
+        identifierExists: Boolean(gtin || mpn),
+        includedDestinations: destinations.included,
         link: link.toString(),
-        mpn: cleanProductText(row.variantSku).slice(0, 70),
+        mpn,
         price: formatGooglePrice(isOnSale ? compareAtPrice : currentPrice),
         productType: row.categoryPath
           ? cleanProductText(row.categoryPath).slice(0, 750)
           : null,
+        returnPolicyLabel,
         salePrice: isOnSale ? formatGooglePrice(currentPrice) : null,
+        shippingLabel,
         title: title.slice(0, googleFeedTitleLimit),
         variantOptions: shouldGroupVariants ? variantOptions : [],
       },
@@ -278,8 +310,25 @@ function renderGoogleMerchantFeedItem(item: GoogleMerchantFeedItem) {
       ? [`      <g:sale_price>${escapeXml(item.salePrice)}</g:sale_price>`]
       : []),
     `      <g:brand>${escapeXml(item.brand)}</g:brand>`,
-    `      <g:mpn>${escapeXml(item.mpn)}</g:mpn>`,
+    ...(item.mpn ? [`      <g:mpn>${escapeXml(item.mpn)}</g:mpn>`] : []),
     ...(item.gtin ? [`      <g:gtin>${item.gtin}</g:gtin>`] : []),
+    ...(!item.identifierExists
+      ? ["      <g:identifier_exists>no</g:identifier_exists>"]
+      : []),
+    ...item.includedDestinations.map(
+      (destination) =>
+        `      <g:included_destination>${destination}</g:included_destination>`,
+    ),
+    ...item.excludedDestinations.map(
+      (destination) =>
+        `      <g:excluded_destination>${destination}</g:excluded_destination>`,
+    ),
+    `      <g:shipping_label>${escapeXml(item.shippingLabel)}</g:shipping_label>`,
+    ...(item.returnPolicyLabel
+      ? [
+          `      <g:return_policy_label>${escapeXml(item.returnPolicyLabel)}</g:return_policy_label>`,
+        ]
+      : []),
     ...(item.productType
       ? [`      <g:product_type>${escapeXml(item.productType)}</g:product_type>`]
       : []),
@@ -320,6 +369,19 @@ function getIsExchangeOffer(row: {
   variantTitle: string;
 }) {
   return row.requiresExchangeEmpty || /\bexchange\b/i.test(row.variantTitle);
+}
+
+function getGoogleShippingLabel(
+  channel: "local_lpg" | "national_courier" | "excluded" | null,
+  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled",
+) {
+  if (channel === "local_lpg" || channel === "national_courier") {
+    return channel;
+  }
+
+  return fulfillmentMode === "piessang_fulfilled"
+    ? ("local_lpg" as const)
+    : ("national_courier" as const);
 }
 
 function formatGooglePrice(value: number) {

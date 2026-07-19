@@ -733,6 +733,9 @@ type GoogleMarketingSettingsFormProps = {
   googleAdsConversionId: string | null;
   googleAdsConversionLabel: string | null;
   googleAnalyticsMeasurementId: string | null;
+  googleLocalInventoryCustomerAccessible: boolean;
+  googleLocalInventoryEnabled: boolean;
+  googleLocalInventoryStoreCode: string | null;
   googleMerchantCenterId: string | null;
   googleSiteVerificationToken: string | null;
   googleTagManagerId: string | null;
@@ -742,10 +745,19 @@ export function GoogleMarketingSettingsForm({
   googleAdsConversionId,
   googleAdsConversionLabel,
   googleAnalyticsMeasurementId,
+  googleLocalInventoryCustomerAccessible,
+  googleLocalInventoryEnabled,
+  googleLocalInventoryStoreCode,
   googleMerchantCenterId,
   googleSiteVerificationToken,
   googleTagManagerId,
 }: GoogleMarketingSettingsFormProps) {
+  const [localInventoryEnabled, setLocalInventoryEnabled] = useState(
+    googleLocalInventoryEnabled,
+  );
+  const [customerAccessible, setCustomerAccessible] = useState(
+    googleLocalInventoryCustomerAccessible,
+  );
   const [state, formAction, isPending] = useActionState(
     updateGoogleMarketingSettings,
     initialState,
@@ -869,6 +881,92 @@ export function GoogleMarketingSettingsForm({
         </div>
       </div>
 
+      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+            <MapPinIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Google local inventory
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Use this only after the physical location is linked to Merchant
+              Center and customers can visit it to view and purchase products.
+              A service address or delivery depot alone is not eligible.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="googleLocalInventoryStoreCode">
+              Google Business Profile store code
+            </Label>
+            <Input
+              autoComplete="off"
+              defaultValue={googleLocalInventoryStoreCode ?? ""}
+              id="googleLocalInventoryStoreCode"
+              name="googleLocalInventoryStoreCode"
+              placeholder="PAARL-01"
+            />
+            <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+              Must exactly match the store code in the linked Google Business
+              Profile location.
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+              <Checkbox
+                checked={customerAccessible}
+                name="googleLocalInventoryCustomerAccessible"
+                onCheckedChange={(checked) =>
+                  setCustomerAccessible(checked === true)
+                }
+              />
+              <span className="grid gap-1">
+                <span className="font-semibold text-zinc-950 dark:text-white">
+                  Customers can visit this store
+                </span>
+                <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  I confirm this is a real customer-accessible retail location,
+                  not only a delivery or collection address.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+              <Checkbox
+                checked={localInventoryEnabled}
+                name="googleLocalInventoryEnabled"
+                onCheckedChange={(checked) =>
+                  setLocalInventoryEnabled(checked === true)
+                }
+              />
+              <span className="grid gap-1">
+                <span className="font-semibold text-zinc-950 dark:text-white">
+                  Enable local inventory feed
+                </span>
+                <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  Publishes only variants marked Local LPG to the configured
+                  store code. Disabled until both safeguards above are valid.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="grid gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-black/20 dark:text-zinc-300">
+          <span>
+            Primary product feed: <code>/feeds/google-merchant.xml</code>
+          </span>
+          <span>
+            Local inventory feed: <code>/feeds/google-local-inventory.xml</code>
+          </span>
+        </div>
+      </div>
+
       {state.message ? (
         <p
           className={
@@ -883,7 +981,7 @@ export function GoogleMarketingSettingsForm({
 
       <Button type="submit" disabled={isPending} className="w-fit gap-2">
         <SaveIcon className="size-4" />
-        {isPending ? "Saving..." : "Save Google tags"}
+        {isPending ? "Saving..." : "Save Google settings"}
       </Button>
     </form>
   );

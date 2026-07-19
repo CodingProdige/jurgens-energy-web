@@ -79,9 +79,9 @@ const settingSections = [
   },
   {
     key: "google-tags",
-    title: "Google tags",
+    title: "Google & Merchant Center",
     description:
-      "Manage Google Tag Manager, GA4, Ads, Merchant Center, and Search Console verification.",
+      "Manage Google measurement, Merchant Center IDs, and guarded local-inventory feeds.",
     icon: BarChart3Icon,
   },
   {
@@ -397,13 +397,20 @@ function SettingsSection({
   if (section === "google-tags") {
     return (
       <DashboardPanel
-        title="Google tags"
-        description="Manage consent-aware Google measurement, verified purchase conversions, Merchant Center and Search Console values for the public marketplace."
+        title="Google & Merchant Center"
+        description="Manage consent-aware Google measurement, verified purchase conversions, Merchant Center identifiers, and guarded local-inventory publishing."
       >
         <GoogleMarketingSettingsForm
           googleAdsConversionId={settings.googleAdsConversionId}
           googleAdsConversionLabel={settings.googleAdsConversionLabel}
           googleAnalyticsMeasurementId={settings.googleAnalyticsMeasurementId}
+          googleLocalInventoryCustomerAccessible={
+            settings.googleLocalInventoryCustomerAccessible
+          }
+          googleLocalInventoryEnabled={settings.googleLocalInventoryEnabled}
+          googleLocalInventoryStoreCode={
+            settings.googleLocalInventoryStoreCode
+          }
           googleMerchantCenterId={settings.googleMerchantCenterId}
           googleSiteVerificationToken={settings.googleSiteVerificationToken}
           googleTagManagerId={settings.googleTagManagerId}

@@ -99,6 +99,7 @@ export type MarketplaceProductOptionSchema = {
 };
 
 export type MarketplaceVariant = {
+  barcode: string | null;
   compareAtPrice: string | null;
   exchangeAcceptedReturnBrands: string[];
   exchangeConfirmationText: string | null;
@@ -1335,6 +1336,7 @@ export async function getMarketplaceProductBySlug(
   const [variantRows, mediaRows] = await Promise.all([
     db
       .select({
+        barcode: productVariants.barcode,
         compareAtPrice: productVariants.compareAtPrice,
         continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
         exchangeAcceptedReturnBrands:
@@ -1421,6 +1423,7 @@ export async function getMarketplaceProductBySlug(
     ]),
   );
   const variants = activeVariantRows.map((variant): MarketplaceVariant => ({
+    barcode: variant.barcode,
     compareAtPrice: variant.compareAtPrice,
     exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands ?? [],
     exchangeConfirmationText: variant.exchangeConfirmationText,

@@ -69,6 +69,7 @@ export function createMarketplaceBusinessStructuredData({
 
 export function createProductStructuredData(
   product: MarketplaceProductDetail,
+  selectedVariantId?: string,
 ): StructuredDataValue {
   const productUrl = createMarketplaceCanonicalUrl(`/products/${product.slug}`);
   const availableVariants = product.variants.filter((variant) =>
@@ -84,18 +85,22 @@ export function createProductStructuredData(
   const images = product.imageUrls
     .map(toAbsoluteUrl)
     .filter((value): value is string => Boolean(value));
-  const offer =
-    availableVariants.length === 1
+  const selectedVariant = selectedVariantId
+    ? availableVariants.find((variant) => variant.id === selectedVariantId)
+    : undefined;
+  const exactVariant = selectedVariant ??
+    (availableVariants.length === 1 ? availableVariants[0] : undefined);
+  const offer = exactVariant
       ? {
           "@type": "Offer",
-          availability: availableVariants[0]!.inStock
+          availability: exactVariant.inStock
             ? "https://schema.org/InStock"
             : "https://schema.org/OutOfStock",
           itemCondition: "https://schema.org/NewCondition",
-          price: availableVariants[0]!.price,
+          price: exactVariant.price,
           priceCurrency: "ZAR",
           seller: { "@id": `${createMarketplaceCanonicalUrl("/")}#organization` },
-          url: `${productUrl}?variant=${encodeURIComponent(availableVariants[0]!.id)}`,
+          url: `${productUrl}?variant=${encodeURIComponent(exactVariant.id)}`,
         }
       : prices.length > 0
         ? {
@@ -116,14 +121,32 @@ export function createProductStructuredData(
       ? { "@type": "Brand", name: product.brandName }
       : undefined,
     category: product.category?.name,
-    description,
-    gtin: product.barcode || undefined,
-    image: images.length > 0 ? images : undefined,
-    name: product.title,
+    description:
+      exactVariant?.requiresExchangeEmpty
+        ? `${description} Exchange price requires a compatible empty cylinder to be handed over at delivery.`
+        : description,
+    gtin:
+      normalizeGtin(exactVariant?.barcode) ??
+      normalizeGtin(product.barcode) ??
+      undefined,
+    image:
+      exactVariant?.imageUrl
+        ? [toAbsoluteUrl(exactVariant.imageUrl), ...images].filter(
+            (value, index, values): value is string =>
+              Boolean(value) && values.indexOf(value) === index,
+          )
+        : images.length > 0
+          ? images
+          : undefined,
+    name:
+      exactVariant && exactVariant.title !== product.title
+        ? `${product.title} - ${exactVariant.title}`
+        : product.title,
     offers: offer,
-    sku:
-      availableVariants.length === 1 ? availableVariants[0]!.sku : undefined,
-    url: productUrl,
+    sku: exactVariant?.sku,
+    url: exactVariant
+      ? `${productUrl}?variant=${encodeURIComponent(exactVariant.id)}`
+      : productUrl,
   };
 }
 
@@ -247,4 +270,25 @@ function stripMarkup(value: string | null | undefined) {
     .trim();
 
   return stripped || null;
+}
+
+function normalizeGtin(value: string | null | undefined) {
+  const digits = value?.replace(/\D/g, "") ?? "";
+
+  if (![8, 12, 13, 14].includes(digits.length)) {
+    return null;
+  }
+
+  const checkDigit = Number(digits.at(-1));
+  let sum = 0;
+
+  for (
+    let index = digits.length - 2, position = 0;
+    index >= 0;
+    index--, position++
+  ) {
+    sum += Number(digits[index]) * (position % 2 === 0 ? 3 : 1);
+  }
+
+  return (10 - (sum % 10)) % 10 === checkDigit ? digits : null;
 }

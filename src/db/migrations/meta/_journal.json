@@ -449,6 +449,20 @@
       "when": 1784887200000,
       "tag": "0063_product_variant_cost_price",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1784973600000,
+      "tag": "0064_product_variant_google_commerce",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1785060000000,
+      "tag": "0065_google_local_inventory_settings",
+      "breakpoints": true
     }
   ]
 }

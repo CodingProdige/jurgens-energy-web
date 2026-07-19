@@ -44,6 +44,11 @@ const importedMediaSchema = z.object({
     .max(10),
 });
 const variantStatusSchema = z.enum(["active", "draft", "sold_out", "unavailable"]);
+const googleFulfillmentChannelSchema = z.enum([
+  "local_lpg",
+  "national_courier",
+  "excluded",
+]);
 const productPublishStatusSchema = z.enum(["active", "draft"]);
 const productOptionSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -61,10 +66,13 @@ const productDraftVariantSchema = z.object({
   exchangeConfirmationText: z.string().trim().max(240).optional(),
   exchangeEmptyCylinderSize: z.string().trim().max(80).optional(),
   exchangeRequiresEmpty: z.boolean().default(false),
+  googleFulfillmentChannel: googleFulfillmentChannelSchema.optional(),
+  googleReturnPolicyLabel: z.string().trim().max(100).optional(),
   heightMm: z.string().trim().max(40).optional(),
   imageId: z.string().uuid().nullable().optional(),
   lengthMm: z.string().trim().max(40).optional(),
   lowStockAlert: z.string().trim().max(20).optional(),
+  manufacturerMpn: z.string().trim().max(70).optional(),
   notes: z.string().trim().max(500).optional(),
   optionValues: z.array(z.string().trim().min(1).max(120)).max(20),
   parcelPresetId: z.string().uuid().nullable().optional(),
@@ -91,11 +99,14 @@ const productDraftSchema = z.object({
   exchangeEmptyCylinderSize: z.string().trim().max(80).optional(),
   exchangeRequiresEmpty: z.boolean().default(false),
   fulfillmentMode: fulfillmentModeSchema,
+  googleFulfillmentChannel: googleFulfillmentChannelSchema.optional(),
+  googleReturnPolicyLabel: z.string().trim().max(100).optional(),
   hasVariants: z.boolean().default(false),
   heightMm: z.string().trim().max(40).optional(),
   lengthMm: z.string().trim().max(40).optional(),
   longDescription: z.string().max(12000).optional(),
   mediaIds: z.array(z.string().uuid()).max(10).default([]),
+  manufacturerMpn: z.string().trim().max(70).optional(),
   optionSchema: z.array(productOptionSchema).max(20).default([]),
   parcelPresetId: z.string().uuid().nullable().optional(),
   price: z.string().trim().max(40).optional(),
@@ -201,25 +212,37 @@ function getExchangeConfirmationText({
 
 function buildVariantRows(
   input: ParsedProductDraftInput,
-  existingCosts: Array<{ costPrice: string | null; sku: string }> = [],
+  existingVariants: Array<{
+    costPrice: string | null;
+    googleFulfillmentChannel: "excluded" | "local_lpg" | "national_courier";
+    googleReturnPolicyLabel: string | null;
+    manufacturerMpn: string | null;
+    sku: string;
+  }> = [],
 ) {
-  const existingCostBySku = new Map(
-    existingCosts.map((variant) => [variant.sku.toLowerCase(), variant.costPrice]),
+  const existingVariantBySku = new Map(
+    existingVariants.map((variant) => [variant.sku.toLowerCase(), variant]),
   );
+  const existingSingleVariant =
+    existingVariants.length === 1 ? existingVariants[0] : null;
   const existingSingleVariantCost =
-    existingCosts.length === 1 ? existingCosts[0]?.costPrice ?? null : null;
+    existingSingleVariant?.costPrice ?? null;
+  const defaultGoogleFulfillmentChannel =
+    input.fulfillmentMode === "seller_fulfilled"
+      ? ("national_courier" as const)
+      : ("local_lpg" as const);
 
   if (input.hasVariants) {
     return input.variants.map((variant) => {
       const sku = variant.sku.trim();
+      const existingVariant = existingVariantBySku.get(sku.toLowerCase());
 
       return {
         barcode: variant.barcode?.trim() || null,
         compareAtPrice: parseOptionalMoney(variant.compareAtPrice),
         continueSellingOutOfStock: variant.continueSellingOutOfStock,
         costPrice: resolveOptionalCostPriceForSave({
-          existingCostPrice:
-            existingCostBySku.get(sku.toLowerCase()) ?? null,
+          existingCostPrice: existingVariant?.costPrice ?? null,
           input: variant.costPrice,
         }),
         exchangeAcceptedReturnBrands: variant.exchangeRequiresEmpty
@@ -234,6 +257,14 @@ function buildVariantRows(
           ? variant.exchangeEmptyCylinderSize?.trim() || null
           : null,
         exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
+        googleFulfillmentChannel:
+          variant.googleFulfillmentChannel ??
+          existingVariant?.googleFulfillmentChannel ??
+          defaultGoogleFulfillmentChannel,
+        googleReturnPolicyLabel:
+          variant.googleReturnPolicyLabel === undefined
+            ? existingVariant?.googleReturnPolicyLabel ?? null
+            : variant.googleReturnPolicyLabel || null,
         heightMm:
           parseOptionalMetric(variant.heightMm) ??
           parseOptionalMetric(input.heightMm),
@@ -243,6 +274,10 @@ function buildVariantRows(
           parseOptionalMetric(variant.lengthMm) ??
           parseOptionalMetric(input.lengthMm),
         lowStockAlert: parseStock(variant.lowStockAlert || "5"),
+        manufacturerMpn:
+          variant.manufacturerMpn === undefined
+            ? existingVariant?.manufacturerMpn ?? null
+            : variant.manufacturerMpn || null,
         notes: variant.notes?.trim() || null,
         optionValues: variant.optionValues,
         parcelPresetId: variant.parcelPresetId ?? input.parcelPresetId ?? null,
@@ -262,6 +297,8 @@ function buildVariantRows(
   }
 
   const sku = input.sku.trim();
+  const existingVariant =
+    existingVariantBySku.get(sku.toLowerCase()) ?? existingSingleVariant;
 
   return [
     {
@@ -270,7 +307,7 @@ function buildVariantRows(
       continueSellingOutOfStock: input.continueSellingOutOfStock,
       costPrice: resolveOptionalCostPriceForSave({
         existingCostPrice:
-          existingCostBySku.get(sku.toLowerCase()) ?? existingSingleVariantCost,
+          existingVariant?.costPrice ?? existingSingleVariantCost,
         input: input.costPrice,
       }),
       exchangeAcceptedReturnBrands: input.exchangeRequiresEmpty
@@ -285,11 +322,23 @@ function buildVariantRows(
         ? input.exchangeEmptyCylinderSize?.trim() || null
         : null,
       exchangeRequiresEmpty: input.exchangeRequiresEmpty,
+      googleFulfillmentChannel:
+        input.googleFulfillmentChannel ??
+        existingVariant?.googleFulfillmentChannel ??
+        defaultGoogleFulfillmentChannel,
+      googleReturnPolicyLabel:
+        input.googleReturnPolicyLabel === undefined
+          ? existingVariant?.googleReturnPolicyLabel ?? null
+          : input.googleReturnPolicyLabel || null,
       heightMm: parseOptionalMetric(input.heightMm),
       imageId: input.mediaIds[0] ?? null,
       isActive: true,
       lengthMm: parseOptionalMetric(input.lengthMm),
       lowStockAlert: 5,
+      manufacturerMpn:
+        input.manufacturerMpn === undefined
+          ? existingVariant?.manufacturerMpn ?? null
+          : input.manufacturerMpn || null,
       notes: null,
       optionValues: [],
       parcelPresetId: input.parcelPresetId ?? null,
@@ -556,7 +605,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
   }
 
   const draft = parsed.data;
-  const [existingProduct, existingVariantCosts] = draft.productId
+  const [existingProduct, existingVariants] = draft.productId
     ? await Promise.all([
         db
           .select({
@@ -570,6 +619,10 @@ export async function saveProductDraft(input: ProductDraftInput) {
         db
           .select({
             costPrice: productVariants.costPrice,
+            googleFulfillmentChannel:
+              productVariants.googleFulfillmentChannel,
+            googleReturnPolicyLabel: productVariants.googleReturnPolicyLabel,
+            manufacturerMpn: productVariants.manufacturerMpn,
             sku: productVariants.sku,
           })
           .from(productVariants)
@@ -594,7 +647,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
     };
   }
 
-  const variantRows = buildVariantRows(draft, existingVariantCosts);
+  const variantRows = buildVariantRows(draft, existingVariants);
 
   if (variantRows.length === 0) {
     return {
@@ -798,11 +851,14 @@ export async function saveProductDraft(input: ProductDraftInput) {
         exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands,
         exchangeConfirmationText: variant.exchangeConfirmationText,
         exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
+        googleFulfillmentChannel: variant.googleFulfillmentChannel,
+        googleReturnPolicyLabel: variant.googleReturnPolicyLabel,
         requiresExchangeEmpty: variant.exchangeRequiresEmpty,
         heightMm: variant.heightMm,
         isActive: variant.isActive,
         lengthMm: variant.lengthMm,
         lowStockAlert: variant.lowStockAlert,
+        manufacturerMpn: variant.manufacturerMpn,
         mediaId: variant.imageId,
         notes: variant.notes,
         optionValues: variant.optionValues,

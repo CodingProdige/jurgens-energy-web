@@ -38,6 +38,12 @@ export const productFulfillmentMode = pgEnum("product_fulfillment_mode", [
   "piessang_fulfilled",
 ]);
 
+export const googleFulfillmentChannel = pgEnum("google_fulfillment_channel", [
+  "local_lpg",
+  "national_courier",
+  "excluded",
+]);
+
 export const products = pgTable("products", {
   id: uuid("id").defaultRandom().primaryKey(),
   sellerId: uuid("seller_id").references(() => sellers.id, {
@@ -78,6 +84,15 @@ export const productVariants = pgTable(
     optionValues: jsonb("option_values").$type<string[]>().notNull().default([]),
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
     costPrice: numeric("cost_price", { precision: 12, scale: 2 }),
+    googleFulfillmentChannel: googleFulfillmentChannel(
+      "google_fulfillment_channel",
+    )
+      .notNull()
+      .default("local_lpg"),
+    manufacturerMpn: varchar("manufacturer_mpn", { length: 70 }),
+    googleReturnPolicyLabel: varchar("google_return_policy_label", {
+      length: 100,
+    }),
     taxRateBps: integer("tax_rate_bps").notNull().default(1500),
     compareAtPrice: numeric("compare_at_price", { precision: 12, scale: 2 }),
     stockOnHand: integer("stock_on_hand").notNull().default(0),
@@ -138,6 +153,9 @@ export const productVariants = pgTable(
       "product_variants_cost_price_non_negative_check",
       sql`${variant.costPrice} is null or ${variant.costPrice} >= 0`,
     ),
+    googleFulfillmentChannelIdx: index(
+      "product_variants_google_fulfillment_channel_idx",
+    ).on(variant.googleFulfillmentChannel),
     mediaIdx: index("product_variants_media_id_idx").on(variant.mediaId),
     parcelPresetIdx: index("product_variants_parcel_preset_id_idx").on(
       variant.parcelPresetId,

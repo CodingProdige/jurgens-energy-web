@@ -89,6 +89,7 @@ import {
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import { getVariantProfitability } from "@/src/modules/products/cost-price";
 import type {
+  GoogleFulfillmentChannel,
   SellerCreateProductData,
   SellerEditableProductData,
   SellerProductCategory,
@@ -110,12 +111,15 @@ type GeneratedVariant = {
   exchangeConfirmationText: string;
   exchangeEmptyCylinderSize: string;
   exchangeRequiresEmpty: boolean;
+  googleFulfillmentChannel: GoogleFulfillmentChannel;
+  googleReturnPolicyLabel: string;
   heightMm: string;
   id: string;
   imageId: string | null;
   isFragile?: boolean;
   lengthMm: string;
   lowStockAlert: string;
+  manufacturerMpn: string;
   notes: string;
   optionValues: string[];
   parcelPresetId: string | null;
@@ -251,6 +255,45 @@ const productPublishStatusOptions = Object.entries(
     (typeof productPublishStatusConfig)[ProductPublishStatus],
   ]
 >;
+const googleFulfillmentChannelConfig: Record<
+  GoogleFulfillmentChannel,
+  { description: string; label: string }
+> = {
+  excluded: {
+    description:
+      "Keep this variant out of Google product listings while leaving the storefront offer unchanged.",
+    label: "Excluded from Google",
+  },
+  local_lpg: {
+    description:
+      "Use Jurgens Energy's postcode-limited local delivery coverage for this offer.",
+    label: "Local LPG delivery",
+  },
+  national_courier: {
+    description:
+      "Use only when this exact variant can genuinely be couriered to supported destinations nationwide.",
+    label: "National courier",
+  },
+};
+const googleFulfillmentChannelOptions = Object.entries(
+  googleFulfillmentChannelConfig,
+) as Array<
+  [
+    GoogleFulfillmentChannel,
+    (typeof googleFulfillmentChannelConfig)[GoogleFulfillmentChannel],
+  ]
+>;
+const googleFulfillmentChannelBadgeClass: Record<
+  GoogleFulfillmentChannel,
+  string
+> = {
+  excluded:
+    "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-zinc-300",
+  local_lpg:
+    "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-200",
+  national_courier:
+    "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200",
+};
 
 function getInitialProductPublishStatus(
   status?: SellerEditableProductData["status"],
@@ -1181,6 +1224,104 @@ function ExchangeRulesFields({
   );
 }
 
+function GoogleCommerceFields({
+  disabled,
+  fulfillmentChannel,
+  manufacturerMpn,
+  onFulfillmentChannelChange,
+  onManufacturerMpnChange,
+  onReturnPolicyLabelChange,
+  returnPolicyLabel,
+}: {
+  disabled: boolean;
+  fulfillmentChannel: GoogleFulfillmentChannel;
+  manufacturerMpn: string;
+  onFulfillmentChannelChange: (value: GoogleFulfillmentChannel) => void;
+  onManufacturerMpnChange: (value: string) => void;
+  onReturnPolicyLabelChange: (value: string) => void;
+  returnPolicyLabel: string;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-950 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100">
+        These controls are internal and are never shown to storefront
+        customers. They determine how this exact sellable offer can be
+        represented to Google.
+      </div>
+      <label className="grid gap-1.5">
+        <FieldLabel info="Classify the fulfilment Google may advertise for this exact variant. Excluded removes only the Google offer; it does not hide the variant from your storefront.">
+          Google fulfilment channel
+        </FieldLabel>
+        <Select
+          disabled={disabled}
+          onValueChange={(value) =>
+            onFulfillmentChannelChange(value as GoogleFulfillmentChannel)
+          }
+          value={fulfillmentChannel}
+        >
+          <SelectTrigger className={fieldClass}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className={selectContentClass}>
+            {googleFulfillmentChannelOptions.map(([value, config]) => (
+              <SelectItem
+                key={value}
+                className={selectItemClass}
+                value={value}
+              >
+                {config.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+          {googleFulfillmentChannelConfig[fulfillmentChannel].description}
+        </span>
+      </label>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="grid gap-1.5">
+          <FieldLabel info="Optional genuine manufacturer part number for this exact variant. Leave blank when the manufacturer has not supplied one.">
+            Manufacturer MPN (optional)
+          </FieldLabel>
+          <Input
+            className={fieldClass}
+            disabled={disabled}
+            maxLength={70}
+            onChange={(event) =>
+              onManufacturerMpnChange(event.target.value)
+            }
+            placeholder="Genuine manufacturer part number"
+            value={manufacturerMpn}
+          />
+          <span className="text-xs leading-5 text-amber-700 dark:text-amber-300">
+            Your internal SKU is not an MPN. Enter only a genuine number
+            supplied by the manufacturer, or leave this blank.
+          </span>
+        </label>
+        <label className="grid gap-1.5">
+          <FieldLabel info="Optional Merchant Center return-policy label for this exact offer. It must exactly match a configured label in Merchant Center.">
+            Return-policy label (optional)
+          </FieldLabel>
+          <Input
+            className={fieldClass}
+            disabled={disabled}
+            maxLength={100}
+            onChange={(event) =>
+              onReturnPolicyLabelChange(event.target.value)
+            }
+            placeholder="Leave blank to use the default policy"
+            value={returnPolicyLabel}
+          />
+          <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Leave blank to use the default Google return policy. Do not invent
+            a label that is not configured in Merchant Center.
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function SkuStatusIcon({ status }: { status: SkuStatus }) {
   if (status === "available") {
     return <CheckCircleIcon className="size-4 text-emerald-600" />;
@@ -1466,11 +1607,13 @@ function MediaTile({
 
 export function ProductCreateWizard({
   data,
+  enableGoogleCommerceSettings = false,
   enablePrivateCostPricing = false,
   initialProduct,
   initialPrivateCosts,
 }: {
   data: SellerCreateProductData;
+  enableGoogleCommerceSettings?: boolean;
   enablePrivateCostPricing?: boolean;
   initialProduct?: SellerEditableProductData | null;
   initialPrivateCosts?: {
@@ -1558,6 +1701,19 @@ export function ProductCreateWizard({
     );
   const [exchangeConfirmationText, setExchangeConfirmationText] = useState(
     initialProduct?.exchangeConfirmationText ?? "",
+  );
+  const [googleFulfillmentChannel, setGoogleFulfillmentChannel] =
+    useState<GoogleFulfillmentChannel>(
+      initialProduct?.googleFulfillmentChannel ??
+        (initialProduct?.fulfillmentMode === "piessang_fulfilled"
+          ? "local_lpg"
+          : "national_courier"),
+    );
+  const [manufacturerMpn, setManufacturerMpn] = useState(
+    initialProduct?.manufacturerMpn ?? "",
+  );
+  const [googleReturnPolicyLabel, setGoogleReturnPolicyLabel] = useState(
+    initialProduct?.googleReturnPolicyLabel ?? "",
   );
   const [hasVariants, setHasVariants] = useState(initialProduct?.hasVariants ?? false);
   const [variantOptions, setVariantOptions] =
@@ -2525,11 +2681,14 @@ export function ProductCreateWizard({
         exchangeConfirmationText: "",
         exchangeEmptyCylinderSize: "",
         exchangeRequiresEmpty: false,
+        googleFulfillmentChannel,
+        googleReturnPolicyLabel: "",
         heightMm,
         id: makeId("variant"),
         imageId: selectedMediaIds[0] ?? null,
         lengthMm,
         lowStockAlert: "5",
+        manufacturerMpn: "",
         notes: "",
         optionValues,
         parcelPresetId,
@@ -2621,6 +2780,13 @@ export function ProductCreateWizard({
       exchangeEmptyCylinderSize,
       exchangeRequiresEmpty,
       fulfillmentMode,
+      ...(enableGoogleCommerceSettings
+        ? {
+            googleFulfillmentChannel,
+            googleReturnPolicyLabel,
+            manufacturerMpn,
+          }
+        : {}),
       hasVariants,
       heightMm,
       lengthMm,
@@ -2653,6 +2819,15 @@ export function ProductCreateWizard({
             exchangeConfirmationText: variant.exchangeConfirmationText,
             exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
             exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
+            ...(enableGoogleCommerceSettings
+              ? {
+                  googleFulfillmentChannel:
+                    variant.googleFulfillmentChannel,
+                  googleReturnPolicyLabel:
+                    variant.googleReturnPolicyLabel,
+                  manufacturerMpn: variant.manufacturerMpn,
+                }
+              : {}),
             heightMm: variant.heightMm,
             imageId: variant.imageId,
             lengthMm: variant.lengthMm,
@@ -3794,6 +3969,37 @@ export function ProductCreateWizard({
               </button>
             </div>
           </Panel>
+
+          {enableGoogleCommerceSettings ? (
+            <Panel
+              title="Google Commerce"
+              description={
+                hasVariants
+                  ? "Google settings are offer-level. Open each generated variant to classify its fulfilment and optional identifiers."
+                  : "Configure the internal Google listing data for this single sellable offer."
+              }
+            >
+              {hasVariants ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm leading-6 text-blue-950 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100">
+                  Use the pencil action on each generated variant, then edit its{" "}
+                  <span className="font-semibold">Google Commerce</span>
+                  {" "}settings. You can also bulk-set the fulfilment channel
+                  below. Offer-level controls avoid applying one delivery claim
+                  or manufacturer identifier to every variant.
+                </div>
+              ) : (
+                <GoogleCommerceFields
+                  disabled={fullListingControlsDisabled}
+                  fulfillmentChannel={googleFulfillmentChannel}
+                  manufacturerMpn={manufacturerMpn}
+                  onFulfillmentChannelChange={setGoogleFulfillmentChannel}
+                  onManufacturerMpnChange={setManufacturerMpn}
+                  onReturnPolicyLabelChange={setGoogleReturnPolicyLabel}
+                  returnPolicyLabel={googleReturnPolicyLabel}
+                />
+              )}
+            </Panel>
+          ) : null}
         </div>
       </div>
 
@@ -4131,6 +4337,26 @@ export function ProductCreateWizard({
                             ))}
                           </div>
                         ) : null}
+                        {enableGoogleCommerceSettings ? (
+                          <div className="border-t border-slate-200 py-1 dark:border-white/10">
+                            {googleFulfillmentChannelOptions.map(
+                              ([channel, config]) => (
+                                <button
+                                  key={channel}
+                                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                                  onClick={() =>
+                                    updateBulkVariants({
+                                      googleFulfillmentChannel: channel,
+                                    })
+                                  }
+                                  type="button"
+                                >
+                                  Set Google: {config.label}
+                                </button>
+                              ),
+                            )}
+                          </div>
+                        ) : null}
                         <div className="border-t border-slate-200 py-1 dark:border-white/10">
                           {Object.entries(variantStatusConfig).map(
                             ([status, config]) => (
@@ -4305,6 +4531,20 @@ export function ProductCreateWizard({
                                       {variant.exchangeEmptyCylinderSize
                                         ? ` ${variant.exchangeEmptyCylinderSize}`
                                         : ""}
+                                    </Badge>
+                                  ) : null}
+                                  {enableGoogleCommerceSettings ? (
+                                    <Badge
+                                      className={cn(
+                                        "rounded-md px-2 py-0.5 text-[11px] font-semibold",
+                                        googleFulfillmentChannelBadgeClass[
+                                          variant.googleFulfillmentChannel
+                                        ],
+                                      )}
+                                    >
+                                      Google: {googleFulfillmentChannelConfig[
+                                        variant.googleFulfillmentChannel
+                                      ].label}
                                     </Badge>
                                   ) : null}
                                 </div>
@@ -5283,6 +5523,39 @@ export function ProductCreateWizard({
                     </label>
                   </div>
                 </section>
+
+                {enableGoogleCommerceSettings ? (
+                  <section className="grid gap-3">
+                    <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                      Google Commerce
+                    </h3>
+                    <GoogleCommerceFields
+                      disabled={fullListingControlsDisabled}
+                      fulfillmentChannel={
+                        activeExpandedVariant.googleFulfillmentChannel
+                      }
+                      manufacturerMpn={activeExpandedVariant.manufacturerMpn}
+                      onFulfillmentChannelChange={(value) =>
+                        updateGeneratedVariant(activeExpandedVariant.id, {
+                          googleFulfillmentChannel: value,
+                        })
+                      }
+                      onManufacturerMpnChange={(value) =>
+                        updateGeneratedVariant(activeExpandedVariant.id, {
+                          manufacturerMpn: value,
+                        })
+                      }
+                      onReturnPolicyLabelChange={(value) =>
+                        updateGeneratedVariant(activeExpandedVariant.id, {
+                          googleReturnPolicyLabel: value,
+                        })
+                      }
+                      returnPolicyLabel={
+                        activeExpandedVariant.googleReturnPolicyLabel
+                      }
+                    />
+                  </section>
+                ) : null}
 
                 <section className="grid gap-3">
                   <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">

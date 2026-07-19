@@ -305,7 +305,7 @@ export const termsAndConditions: PolicyDocument = {
 
 export const returnsAndRefundsPolicy: PolicyDocument = {
   description:
-    "A practical guide to cancellations, damaged or defective products, change-of-mind requests, cylinder exchanges, return costs, and refunds.",
+    "Our South African returns policy for new and unused goods, defects, exchanges, by-arrangement handovers, return costs, and refunds.",
   eyebrow: "Order resolutions",
   kind: "returns",
   shortTitle: "Returns & Refunds",
@@ -315,8 +315,8 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       id: "start-a-request",
       title: "1. Start with a return request",
       paragraphs: [
-        "Contact us before returning any item. Include your order number, the affected product, the reason for the request, and photographs where an item is damaged, incorrect, or defective. We will confirm the next step, return reference, collection method, or inspection arrangements.",
-        "Do not send LPG, a filled cylinder, or another hazardous item through an ordinary parcel or postal service. Keep the item in a safe, ventilated location and wait for an approved collection or handover plan.",
+        "This policy applies to orders delivered in South Africa. Contact us before returning any item and include your order number, the affected product, the reason for the request, and photographs where an item is damaged, incorrect, or defective. We will confirm the next step, return reference, collection method, or inspection arrangements.",
+        "Do not send LPG, a filled cylinder, or another hazardous item through an ordinary parcel or postal service. Keep the item in a safe, ventilated location and wait for a pre-authorized collection or return-handover plan.",
       ],
     },
     {
@@ -329,18 +329,19 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
     },
     {
       id: "online-cooling-off",
-      title: "3. Online cooling-off rights",
+      title: "3. Seven-day returns for new and unused goods",
       paragraphs: [
-        "Where section 44 of the Electronic Communications and Transactions Act applies, a consumer may cancel an eligible online transaction without reason or penalty within seven days after receiving the goods. The consumer may be responsible only for the direct cost of returning the goods, and an amount already paid must be refunded within the period required by law.",
-        "Statutory exclusions and product-safety rules may affect how a return can be made. Contact us within the seven-day period and keep the item unused, complete, and safely stored while we confirm the correct return method. This policy does not limit any additional cooling-off right arising from direct marketing or another applicable law.",
+        "Where lawful and applicable, we accept a request to return or exchange a non-defective product that remains new and unused when the request is made within seven calendar days after the customer receives it. This includes eligible online cooling-off cancellations under section 44 of the Electronic Communications and Transactions Act.",
+        "For a non-defective return or exchange, keep the product unused, undamaged, complete, safely stored, and in its original resaleable packaging where reasonably applicable. Statutory exclusions and product-safety rules may affect the available return method, but they do not remove rights relating to an incorrect, unsafe, or defective product.",
+        "Contact us within the seven-day period so that we can authorize the return handover or collection. A customer exercising an eligible cooling-off right may be responsible only for the direct return cost permitted by law. This policy does not limit a longer or additional right provided by applicable law.",
       ],
     },
     {
       id: "unwanted-products",
-      title: "4. Other change-of-mind requests",
+      title: "4. Requests outside the seven-day window",
       paragraphs: [
-        "Outside a statutory return right, we may consider a prompt request to return an unwanted non-gas accessory if it is unused, undamaged, complete, and in its original resaleable packaging. Acceptance is assessed case by case and must be confirmed before the item is sent back.",
-        "A reasonable direct return or restoration cost may apply where permitted by law. We ordinarily cannot accept a discretionary change-of-mind return for gas that has been used or released, an item that has been installed or altered, a product missing parts, or an item that cannot safely or lawfully be restocked. Your rights for an incorrect, unsafe, or defective product remain unaffected.",
+        "Outside the seven-day return window or another statutory return right, we may consider a request to return or exchange an unwanted product that is still new, unused, undamaged, complete, and in its original resaleable packaging. Any discretionary acceptance must be confirmed before the item is handed over.",
+        "We ordinarily cannot accept a discretionary change-of-mind return for gas that has been used or released, an item that has been installed or altered, a product missing parts, or an item that cannot safely or lawfully be restocked. Your rights for an incorrect, unsafe, or defective product remain unaffected.",
       ],
     },
     {
@@ -370,10 +371,11 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
     },
     {
       id: "return-condition",
-      title: "8. Preparing an approved return",
+      title: '8. By-arrangement return handover ("in store")',
       paragraphs: [
-        "Return all parts, manuals, accessories, promotional items, and original packaging reasonably available. Package non-hazardous items securely and display the return reference we provide. Do not remove serial labels or attempt repairs before assessment.",
-        "We may inspect the product to confirm identity, condition, use, completeness, and the reported problem. An inspection is used to identify the correct remedy and does not remove a statutory right.",
+        'The return method recorded as "in store" means a return handover or collection that Jurgens Energy has approved and arranged in advance. It is not an unrestricted walk-in return service. Wait for confirmation of the location, date, and safe handover method before travelling to an address or sending an item.',
+        "LPG, filled cylinders, and other hazardous items are accepted only through a pre-authorized collection or handover that follows the applicable safety rules; they must never be sent through ordinary mail. For an approved non-hazardous return, package the item securely and display the return reference we provide.",
+        "Return all parts, manuals, accessories, promotional items, and original packaging reasonably available. Do not remove serial labels or attempt repairs before assessment. We may inspect the product to confirm identity, condition, use, completeness, and the reported problem. An inspection does not remove a statutory right.",
       ],
     },
     {
@@ -381,14 +383,14 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "9. Return and collection costs",
       paragraphs: [
         "We cover return risk and expense where the law requires it, including qualifying unsafe, failed, or defective goods and verified incorrect deliveries. For an eligible ECTA cooling-off cancellation, the consumer may be responsible for the direct cost of returning the goods.",
-        "For a discretionary change-of-mind return, the customer is normally responsible for the agreed return cost. We will disclose any proposed charge before arranging the return and will not charge an amount prohibited by law.",
+        "We do not charge a restocking fee for an approved return or exchange. For a discretionary change-of-mind return, the customer is normally responsible only for the agreed direct return or collection cost where permitted by law. We will disclose any proposed cost before arranging the return and will not charge an amount prohibited by law.",
       ],
     },
     {
       id: "refunds",
       title: "10. Refund timing and method",
       paragraphs: [
-        "Once a refund is approved, we return the amount due using the original payment method where reasonably possible. We may request verified bank details if the original method cannot receive a refund. Your bank or payment provider may take additional time to display the credit after we process it.",
+        "Once a refund is approved, we initiate it using the original payment method where reasonably possible. Allow up to 30 days after approval for the refund to be processed and reflected by the payment provider, unless applicable law requires an earlier deadline or calculates the period from an earlier event such as cancellation. We may request verified bank details if the original method cannot receive the refund.",
         "The refunded amount includes product and delivery charges where required by law. For other approved returns, original delivery or completed service charges may be excluded where lawful and disclosed. We will provide a clear calculation if a deduction is permitted.",
       ],
     },
@@ -414,15 +416,16 @@ export const deliveryInformation: PolicyDocument = {
       id: "coverage",
       title: "1. Delivery coverage",
       paragraphs: [
-        "Delivery availability depends on the address, products, stock location, and whether an approved service can safely transport the order. Enter the complete delivery address at checkout or provide it during an assisted order so that available options can be checked.",
-        "A product being available online does not mean that every address is serviceable. If we cannot safely or reasonably serve the address, we will contact you about an alternative, collection where available, or cancellation and refund of the affected order.",
+        "Jurgens Energy local delivery is available only to addresses whose postal codes fall within a currently supported local delivery zone. It is not offered to every address in South Africa. Courier availability for eligible non-local products is checked separately.",
+        "Delivery availability also depends on the products, stock location, order value, route conditions, and whether an approved service can safely transport the order. Enter the complete delivery address and postal code at checkout, or provide them during an assisted order, so the available option can be confirmed.",
+        "A product being available online does not mean that every address is serviceable. Checkout is the final confirmation of availability and cost before payment. If we cannot safely or reasonably serve the address, we will contact you about an alternative, collection where available, or cancellation and refund of the affected order.",
       ],
     },
     {
       id: "fees",
       title: "2. Delivery fees and quotes",
       paragraphs: [
-        "The delivery charge is calculated or confirmed from the destination, parcel or LPG handling requirements, product quantity, and available fulfilment method. The applicable charge is shown before online order confirmation or communicated for approval during an assisted order.",
+        "The delivery charge is calculated or confirmed from the supported destination postal code, parcel or LPG handling requirements, product quantity, order value, and available fulfilment method. The applicable option and charge are shown at checkout before payment, or communicated for approval during an assisted order.",
         "A quote may change if the address, products, quantities, access requirements, or fulfilment method changes. We will ask you to approve a material change before proceeding.",
       ],
     },

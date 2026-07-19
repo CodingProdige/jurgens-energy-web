@@ -23,5 +23,11 @@ export default async function NewAdminProductPage() {
 
   const data = await getSellerCreateProductData(access.session.user.id);
 
-  return <ProductCreateWizard data={data} enablePrivateCostPricing />;
+  return (
+    <ProductCreateWizard
+      data={data}
+      enableGoogleCommerceSettings
+      enablePrivateCostPricing
+    />
+  );
 }
