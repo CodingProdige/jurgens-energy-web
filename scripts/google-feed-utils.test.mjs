@@ -18,7 +18,8 @@ test("normalizes Google Business Profile store codes accepted by admin settings"
   );
   assert.equal(normalizeGoogleLocalInventoryStoreCode(""), null);
   assert.equal(normalizeGoogleLocalInventoryStoreCode("Paarl store"), null);
-  assert.equal(normalizeGoogleLocalInventoryStoreCode("x".repeat(101)), null);
+  assert.equal(normalizeGoogleLocalInventoryStoreCode("x".repeat(64)), "x".repeat(64));
+  assert.equal(normalizeGoogleLocalInventoryStoreCode("x".repeat(65)), null);
 });
 
 test("maps physical store stock to Google's local inventory availability values", () => {

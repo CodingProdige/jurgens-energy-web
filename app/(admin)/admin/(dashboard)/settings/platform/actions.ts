@@ -266,7 +266,7 @@ const optionalGoogleStoreCodeSchema = z
   .optional()
   .transform((value) => value || undefined)
   .refine(
-    (value) => !value || /^[A-Za-z0-9_-]{1,100}$/.test(value),
+    (value) => !value || /^[A-Za-z0-9_-]{1,64}$/.test(value),
     "The Business Profile store code can only contain letters, numbers, hyphens, and underscores.",
   );
 

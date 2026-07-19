@@ -14,7 +14,7 @@ export type GoogleMerchantDestinationControls = {
   included: GoogleMerchantDestination[];
 };
 
-const googleLocalInventoryStoreCodePattern = /^[A-Za-z0-9_-]{1,100}$/;
+const googleLocalInventoryStoreCodePattern = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function normalizeGoogleLocalInventoryStoreCode(
   value: string | null | undefined,
