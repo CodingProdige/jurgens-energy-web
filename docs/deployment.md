@@ -133,13 +133,12 @@ From the server checkout:
 ```bash
 cd ~/Dev/jurgens-energy-web
 git pull
-npm ci
-npm run lint
-npm run build
 npm run selfhost:deploy
 ```
 
-`npm run selfhost:deploy` starts Postgres and Redis, runs migrations, then
-rebuilds and restarts the self-hosted Docker stack. If
+`npm run selfhost:deploy` performs one cached Docker build that runs lint and
+the production Next.js build before touching production data. It then starts
+Postgres and Redis, reuses the builder image for migrations and catalog seed
+data, and restarts the stack without rebuilding it a second time. If
 `CLOUDFLARE_TUNNEL_TOKEN` is present in `.env`, it also starts the tunnel
 profile.

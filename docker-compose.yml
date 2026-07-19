@@ -29,6 +29,26 @@ services:
     networks:
       - marketplace
 
+  migrate:
+    profiles:
+      - ops
+    build:
+      context: .
+      target: builder
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-jurgens_energy}:${POSTGRES_PASSWORD:-jurgens_energy}@postgres:5432/${POSTGRES_DB:-jurgens_energy}
+    command: ["node", "scripts/migrate.mjs"]
+    networks:
+      - marketplace
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped

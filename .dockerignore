@@ -1,4 +1,6 @@
 .next
+.git
+.github
 node_modules
 npm-debug.log*
 Dockerfile
