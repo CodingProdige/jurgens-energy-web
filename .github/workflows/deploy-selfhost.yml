@@ -16,7 +16,9 @@ env:
 jobs:
   deploy:
     runs-on: [self-hosted, linux, x64, jurgens-energy-web-prod]
-    timeout-minutes: 30
+    # The self-hosted runner verifies the app and then performs a separate
+    # production Docker build, so cold dependency/image caches can exceed 30m.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
