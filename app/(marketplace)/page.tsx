@@ -15,6 +15,7 @@ import {
 } from "@/src/modules/marketplace/structured-data";
 import { getJurgensDeliveryZones } from "@/src/modules/shipping/jurgens-delivery";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
+import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 
 export async function generateMetadata(): Promise<Metadata> {
   return getStaticPageMetadata("home");
@@ -32,8 +33,16 @@ export default async function Home({
   const brandSlug = Array.isArray(resolvedSearchParams.brand)
     ? resolvedSearchParams.brand[0]
     : resolvedSearchParams.brand;
-  const [blogPosts, catalog, storefrontPage, settings, deliveryZones] = await Promise.all([
+  const [
+    blogPosts,
+    businessIdentity,
+    catalog,
+    storefrontPage,
+    settings,
+    deliveryZones,
+  ] = await Promise.all([
     getPublishedBlogPosts(12),
+    getPublicBusinessIdentity(),
     getMarketplaceCatalog({
       brandSlug,
       currencyContext,
@@ -50,6 +59,7 @@ export default async function Home({
         <MarketplaceJsonLd
           data={createMarketplaceBusinessStructuredData({
             areaNames: deliveryZones.map((zone) => zone.name),
+            businessIdentity,
             settings,
           })}
         />

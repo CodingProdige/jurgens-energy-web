@@ -50,6 +50,7 @@ import type {
   MarketplaceProductDetail,
   MarketplaceVariant,
 } from "@/src/modules/marketplace/catalog";
+import { isExchangeVariant } from "@/src/modules/marketplace/product-variant-presentation";
 
 export type MarketplaceProductDetailView = Omit<
   MarketplaceProductDetail,
@@ -79,7 +80,8 @@ const exchangeSteps = [
     icon: TruckIcon,
   },
   {
-    description: "Hand over your compatible empty cylinder to our driver.",
+    description:
+      "Hand over your compatible empty cylinder to our delivery representative.",
     icon: RefreshCcwIcon,
   },
   {
@@ -250,6 +252,7 @@ export function ProductDetailExperience({
   const deliveryLabel = deliveryPromise.label;
   const deliveryDetail = deliveryPromise.detail;
   const sizeLabel = getSizeLabel(selectedVariant?.title ?? product.title);
+  const isSelectedVariantExchange = isExchangeVariant(selectedVariant);
 
   function showPreviousImage() {
     setActiveImage((current) => getAdjacentImage(galleryImages, current, -1));
@@ -294,7 +297,7 @@ export function ProductDetailExperience({
       </section>
 
       <section className="grid min-w-0 gap-2 overflow-x-clip sm:gap-5">
-        <ExchangeStepsPanel />
+        {isSelectedVariantExchange ? <ExchangeStepsPanel /> : null}
 
         <ProductDescriptionSection product={product} />
 
@@ -998,7 +1001,7 @@ function MobileProductPurchaseSummary({
 
       <MobileConfidenceRows
         deliveryDetail={deliveryDetail}
-        hasExchangeOption={product.hasExchangeOption}
+        isExchangeSelected={isExchangeVariant(selectedVariant)}
       />
     </div>
   );
@@ -1255,8 +1258,9 @@ function ProductOptionsDialog({
           Select {variantOptionLabel}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          Choose {variantOptionLabel}, confirm exchange requirements when needed,
-          and add the item to your cart.
+          {hasExchangeRequirement
+            ? `Choose ${variantOptionLabel}, confirm the exchange requirements, and add the item to your cart.`
+            : `Choose ${variantOptionLabel} and add the item to your cart.`}
         </DialogDescription>
 
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-[#d8d8d2] dark:bg-white/20" />
@@ -1550,10 +1554,10 @@ function MobileTrustTicker({ deliveryLabel }: { deliveryLabel: string }) {
 
 function MobileConfidenceRows({
   deliveryDetail,
-  hasExchangeOption,
+  isExchangeSelected,
 }: {
   deliveryDetail: string;
-  hasExchangeOption: boolean;
+  isExchangeSelected: boolean;
 }) {
   const rows = [
     {
@@ -1574,7 +1578,7 @@ function MobileConfidenceRows({
       icon: ShieldCheckIcon,
       title: "Order support",
     },
-    ...(hasExchangeOption
+    ...(isExchangeSelected
       ? [
           {
             detail: "Empty confirmation before checkout.",
@@ -2007,13 +2011,6 @@ function getExchangeEmptySize(
     variant?.exchangeEmptyCylinderSize?.trim() ||
     getSizeLabel(variant?.title ?? "") ||
     getSizeLabel(product.title)
-  );
-}
-
-function isExchangeVariant(variant: MarketplaceVariant | null) {
-  return Boolean(
-    variant &&
-      (variant.requiresExchangeEmpty || /\bexchange\b/i.test(variant.title)),
   );
 }
 

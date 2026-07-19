@@ -7,8 +7,21 @@ import { auditLogs, businessInformation } from "@/src/db/schema";
 
 export type BusinessInformation = typeof businessInformation.$inferSelect;
 
+export type PublicRegisteredAddress = {
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  countryCode: string;
+  postalCode: string;
+  province: string;
+  suburb: string | null;
+};
+
 export type PublicBusinessIdentity = {
   companyRegistrationNumber: string | null;
+  legalName: string | null;
+  registeredAddress: PublicRegisteredAddress | null;
+  tradingName: string;
   tradingNameDisclosure: string | null;
   vatRegistrationNumber: string | null;
 };
@@ -66,9 +79,16 @@ function normalizeComparableBusinessName(value: string) {
 export async function getPublicBusinessIdentity(): Promise<PublicBusinessIdentity> {
   const [row] = await db
     .select({
+      addressLine1: businessInformation.addressLine1,
+      addressLine2: businessInformation.addressLine2,
+      city: businessInformation.city,
       companyRegistrationNumber:
         businessInformation.companyRegistrationNumber,
+      countryCode: businessInformation.countryCode,
       legalName: businessInformation.legalName,
+      postalCode: businessInformation.postalCode,
+      province: businessInformation.province,
+      suburb: businessInformation.suburb,
       tradingName: businessInformation.tradingName,
       vatRegistrationNumber: businessInformation.vatRegistrationNumber,
     })
@@ -82,10 +102,30 @@ export async function getPublicBusinessIdentity(): Promise<PublicBusinessIdentit
       normalizeComparableBusinessName(legalName) !==
         normalizeComparableBusinessName(tradingName),
   );
+  const addressLine1 = row?.addressLine1.trim() || "";
+  const city = row?.city.trim() || "";
+  const countryCode = row?.countryCode.trim().toUpperCase() || "";
+  const postalCode = row?.postalCode.trim() || "";
+  const province = row?.province.trim() || "";
+  const registeredAddress =
+    addressLine1 && city && countryCode && postalCode && province
+      ? {
+          addressLine1,
+          addressLine2: row?.addressLine2?.trim() || null,
+          city,
+          countryCode,
+          postalCode,
+          province,
+          suburb: row?.suburb?.trim() || null,
+        }
+      : null;
 
   return {
     companyRegistrationNumber:
       row?.companyRegistrationNumber?.trim() || null,
+    legalName: legalName || null,
+    registeredAddress,
+    tradingName,
     tradingNameDisclosure: legalNameDiffers
       ? `${tradingName} is a trading name of ${legalName}.`
       : null,

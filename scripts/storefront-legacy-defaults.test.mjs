@@ -21,6 +21,25 @@ test("historical default storefront claims are replaced exactly", () => {
       type: "hero",
     },
     {
+      componentCode: "CYLINDER-EXCHANGE-01",
+      enabled: true,
+      id: "cylinder-showcase",
+      settings: {
+        actions: [],
+        exchangeTitle: "How Cylinder Exchange Works",
+        exchangeTitleSize: 20,
+        exchangeTitleTag: "h2",
+        steps: [
+          {
+            description: "Our driver collects your empty cylinder.",
+            icon: "exchange",
+            title: "Hand Over Empty",
+          },
+        ],
+      },
+      type: "cylinder_showcase",
+    },
+    {
       enabled: true,
       id: "features",
       settings: {
@@ -55,8 +74,12 @@ test("historical default storefront claims are replaced exactly", () => {
     result[0].settings.copy,
     "LPG cylinders, exchange options and local delivery where available.",
   );
+  assert.equal(
+    result[1].settings.steps[0].description,
+    "A delivery representative collects your empty cylinder.",
+  );
   assert.deepEqual(
-    result[1].settings.features.map(({ text, title }) => ({ text, title })),
+    result[2].settings.features.map(({ text, title }) => ({ text, title })),
     [
       {
         text: "Local delivery options for eligible addresses.",
@@ -73,7 +96,7 @@ test("historical default storefront claims are replaced exactly", () => {
     ],
   );
   assert.equal(
-    result[1].settings.title,
+    result[2].settings.title,
     "LPG ordering with clear product, payment and delivery updates.",
   );
   assert.equal(

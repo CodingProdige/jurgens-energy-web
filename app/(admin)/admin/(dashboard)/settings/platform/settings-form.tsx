@@ -40,6 +40,7 @@ import {
   SearchIcon,
   SendIcon,
   Redo2Icon,
+  TriangleAlertIcon,
   Trash2Icon,
   TruckIcon,
   Undo2Icon,
@@ -75,6 +76,7 @@ import {
   type AdminSettingsState,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
 import type { JurgensDeliveryZone } from "@/src/modules/shipping/jurgens-delivery";
+import { findJurgensDeliveryPostalCodeConflicts } from "@/src/modules/shipping/jurgens-delivery-postal-rules";
 import { getJurgensImplicitFreeDeliveryThreshold } from "@/src/modules/shipping/jurgens-delivery-pricing";
 import type {
   AdminMediaAsset,
@@ -90,6 +92,7 @@ import type {
 } from "@/src/modules/notifications/templates";
 import { MediaManagerDialog } from "@/components/media/media-manager-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
@@ -2507,6 +2510,24 @@ function JurgensDeliveryZonesManager({
 }: {
   zones: JurgensDeliveryZone[];
 }) {
+  const activeZones = zones.filter((zone) => zone.isActive);
+  const zoneConflicts = activeZones.flatMap((zone, index) =>
+    findJurgensDeliveryPostalCodeConflicts({
+      candidatePostalCodes: zone.postalCodes,
+      existingZones: activeZones.slice(index + 1),
+    }).map((conflict) => ({
+      ...conflict,
+      candidateZoneId: zone.id,
+      candidateZoneName: zone.name,
+    })),
+  );
+  const conflictedZoneIds = new Set(
+    zoneConflicts.flatMap((conflict) => [
+      conflict.candidateZoneId,
+      conflict.existingZoneId,
+    ]),
+  );
+
   return (
     <section className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -2535,6 +2556,31 @@ function JurgensDeliveryZonesManager({
         />
       </div>
 
+      {zoneConflicts.length > 0 ? (
+        <Alert variant="destructive">
+          <TriangleAlertIcon />
+          <AlertTitle>Overlapping active delivery zones</AlertTitle>
+          <AlertDescription className="grid gap-2">
+            <p>
+              Checkout will refuse the ambiguous postal codes below instead of
+              guessing which price applies. Edit or deactivate a zone so every
+              postal code belongs to only one active zone.
+            </p>
+            <ul className="grid list-disc gap-1 pl-5">
+              {zoneConflicts.map((conflict) => (
+                <li
+                  key={`${conflict.candidateZoneId}-${conflict.existingZoneId}-${conflict.candidateRule}-${conflict.existingRule}`}
+                >
+                  <strong>{conflict.postalCode}</strong>: {conflict.candidateZoneName}{" "}
+                  ({conflict.candidateRule}) overlaps {conflict.existingZoneName}{" "}
+                  ({conflict.existingRule}).
+                </li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {zones.length > 0 ? (
         <div className="grid gap-3">
           {zones.map((zone) => (
@@ -2551,6 +2597,9 @@ function JurgensDeliveryZonesManager({
                     <Badge variant={zone.isActive ? "default" : "secondary"}>
                       {zone.isActive ? "Active" : "Inactive"}
                     </Badge>
+                    {conflictedZoneIds.has(zone.id) ? (
+                      <Badge variant="destructive">Postal overlap</Badge>
+                    ) : null}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
                     {zone.postalCodes.length} postal code

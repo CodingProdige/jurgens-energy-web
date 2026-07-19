@@ -25,6 +25,11 @@ const legacyFeatureTextReplacements: Readonly<Record<string, string>> = {
     "Review the product details and connection requirements before use.",
 };
 
+const legacyCylinderStepReplacements: Readonly<Record<string, string>> = {
+  "Our driver collects your empty cylinder.":
+    "A delivery representative collects your empty cylinder.",
+};
+
 function replaceExactLegacyText(
   value: string,
   replacements: Readonly<Record<string, string>>,
@@ -73,6 +78,22 @@ export function replaceLegacyDefaultStorefrontClaims(
             section.settings.title,
             legacyFeatureGridTitleReplacements,
           ),
+        },
+      };
+    }
+
+    if (section.type === "cylinder_showcase") {
+      return {
+        ...section,
+        settings: {
+          ...section.settings,
+          steps: section.settings.steps.map((step) => ({
+            ...step,
+            description: replaceExactLegacyText(
+              step.description,
+              legacyCylinderStepReplacements,
+            ),
+          })),
         },
       };
     }

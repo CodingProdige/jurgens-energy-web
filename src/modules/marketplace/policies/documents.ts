@@ -1,5 +1,10 @@
 export { POLICY_EFFECTIVE_DATE } from "@/src/modules/marketplace/policies/constants";
 
+import {
+  createPrivacyResponsiblePartyStatement,
+  type PrivacyPolicyBusinessIdentity,
+} from "@/src/modules/marketplace/policies/privacy-operator";
+
 export type PolicyKind = "delivery" | "privacy" | "returns" | "terms";
 
 export type PolicySection = {
@@ -172,6 +177,25 @@ export const privacyPolicy: PolicyDocument = {
     },
   ],
 };
+
+export function createPrivacyPolicyDocument(
+  identity: PrivacyPolicyBusinessIdentity,
+): PolicyDocument {
+  return {
+    ...privacyPolicy,
+    sections: privacyPolicy.sections.map((section) =>
+      section.id === "scope"
+        ? {
+            ...section,
+            paragraphs: [
+              createPrivacyResponsiblePartyStatement(identity),
+              ...section.paragraphs.slice(1),
+            ],
+          }
+        : section,
+    ),
+  };
+}
 
 export const termsAndConditions: PolicyDocument = {
   description:

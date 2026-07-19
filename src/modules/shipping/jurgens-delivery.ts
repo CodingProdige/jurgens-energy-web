@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/src/db";
@@ -8,7 +8,15 @@ import {
   shippingRateQuotes,
 } from "@/src/db/schema";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import {
+  findJurgensDeliveryPostalCodeConflicts,
+  normalizeJurgensDeliveryPostalCode,
+  normalizeJurgensDeliveryPostalCodeRules,
+  resolveJurgensDeliveryPostalZone,
+} from "@/src/modules/shipping/jurgens-delivery-postal-rules";
 import { getJurgensImplicitFreeDeliveryThreshold } from "@/src/modules/shipping/jurgens-delivery-pricing";
+
+const JURGENS_DELIVERY_ZONE_WRITE_LOCK_ID = 719_202_607;
 
 const addressSchema = z.object({
   code: z.string().trim().min(1),
@@ -53,6 +61,7 @@ export type JurgensDeliveryAvailabilityInput = z.infer<
 export type JurgensDeliveryAvailabilityUnavailableCode =
   | "shipping_disabled"
   | "postal_code_unavailable"
+  | "zone_configuration_conflict"
   | "minimum_order_not_met"
   | "rate_not_configured";
 
@@ -129,7 +138,11 @@ export async function getJurgensDeliveryZones({
     .select()
     .from(jurgensDeliveryZones)
     .where(activeOnly ? eq(jurgensDeliveryZones.isActive, true) : undefined)
-    .orderBy(asc(jurgensDeliveryZones.sortOrder), asc(jurgensDeliveryZones.name));
+    .orderBy(
+      asc(jurgensDeliveryZones.sortOrder),
+      asc(jurgensDeliveryZones.name),
+      asc(jurgensDeliveryZones.id),
+    );
 
   if (zoneRows.length === 0) {
     return [];
@@ -174,7 +187,7 @@ export async function getJurgensDeliveryZones({
     isActive: zone.isActive,
     minimumOrderAmount: Number(zone.minimumOrderAmount),
     name: zone.name,
-    postalCodes: normalizePostalCodes(zone.postalCodes),
+    postalCodes: normalizeJurgensDeliveryPostalCodeRules(zone.postalCodes),
     rates: ratesByZoneId.get(zone.id) ?? [],
     sortOrder: zone.sortOrder,
     updatedAt: zone.updatedAt,
@@ -185,7 +198,7 @@ export async function upsertJurgensDeliveryZone(
   input: UpsertJurgensDeliveryZoneInput,
 ) {
   const now = new Date();
-  const postalCodes = normalizePostalCodes(input.postalCodes);
+  const postalCodes = normalizeJurgensDeliveryPostalCodeRules(input.postalCodes);
   const rates = normalizeRates(input.rates);
 
   if (postalCodes.length === 0) {
@@ -199,7 +212,39 @@ export async function upsertJurgensDeliveryZone(
     return { ok: false, message: "Add at least one delivery price tier." };
   }
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    await lockJurgensDeliveryZoneWrites(tx);
+
+    if (input.isActive) {
+      const activeZones = await tx
+        .select({
+          id: jurgensDeliveryZones.id,
+          name: jurgensDeliveryZones.name,
+          postalCodes: jurgensDeliveryZones.postalCodes,
+        })
+        .from(jurgensDeliveryZones)
+        .where(eq(jurgensDeliveryZones.isActive, true))
+        .orderBy(asc(jurgensDeliveryZones.name), asc(jurgensDeliveryZones.id));
+      const conflicts = findJurgensDeliveryPostalCodeConflicts({
+        candidatePostalCodes: postalCodes,
+        existingZones: activeZones
+          .filter((zone) => zone.id !== input.id)
+          .map((zone) => ({
+            ...zone,
+            postalCodes: normalizeJurgensDeliveryPostalCodeRules(
+              zone.postalCodes,
+            ),
+          })),
+      });
+
+      if (conflicts.length > 0) {
+        return {
+          ok: false as const,
+          message: formatPostalCodeConflictMessage(conflicts),
+        };
+      }
+    }
+
     const zoneValues = {
       deliveryInformation: input.deliveryInformation?.trim() || null,
       isActive: input.isActive,
@@ -227,13 +272,16 @@ export async function upsertJurgensDeliveryZone(
         zoneId,
       })),
     );
-  });
 
-  return { ok: true, message: "Jurgens delivery zone saved." };
+    return { ok: true as const, message: "Jurgens delivery zone saved." };
+  });
 }
 
 export async function deleteJurgensDeliveryZone(id: string) {
-  await db.delete(jurgensDeliveryZones).where(eq(jurgensDeliveryZones.id, id));
+  await db.transaction(async (tx) => {
+    await lockJurgensDeliveryZoneWrites(tx);
+    await tx.delete(jurgensDeliveryZones).where(eq(jurgensDeliveryZones.id, id));
+  });
 
   return { ok: true, message: "Jurgens delivery zone deleted." };
 }
@@ -389,7 +437,7 @@ async function evaluateJurgensDeliveryAvailability({
 }: z.infer<
   typeof jurgensDeliveryAvailabilityInputSchema
 >): Promise<JurgensDeliveryAvailabilityEvaluation> {
-  const postalCode = normalizePostalCode(postalCodeInput);
+  const postalCode = normalizeJurgensDeliveryPostalCode(postalCodeInput);
 
   if (!postalCode) {
     throw new Error("A delivery postal code is required.");
@@ -408,11 +456,9 @@ async function evaluateJurgensDeliveryAvailability({
   }
 
   const zones = await getJurgensDeliveryZones({ activeOnly: true });
-  const matchingZone = zones.find((zone) =>
-    zone.postalCodes.some((rule) => postalCodeMatchesRule(postalCode, rule)),
-  );
+  const zoneResolution = resolveJurgensDeliveryPostalZone(postalCode, zones);
 
-  if (!matchingZone) {
+  if (zoneResolution.status === "none") {
     return {
       eligible: false,
       postalCode,
@@ -422,6 +468,27 @@ async function evaluateJurgensDeliveryAvailability({
       zone: null,
     };
   }
+
+  if (zoneResolution.status === "conflict") {
+    console.error("Conflicting active Jurgens delivery zones", {
+      postalCode,
+      zones: zoneResolution.zones.map((zone) => ({
+        id: zone.id,
+        name: zone.name,
+      })),
+    });
+
+    return {
+      eligible: false,
+      postalCode,
+      unavailableCode: "zone_configuration_conflict",
+      unavailableReason:
+        "Jurgens Energy delivery pricing needs confirmation for this postal code. Please contact support so we can confirm delivery without guessing.",
+      zone: null,
+    };
+  }
+
+  const matchingZone = zoneResolution.zone;
 
   const subtotal = roundMoney(declaredValue);
 
@@ -490,54 +557,6 @@ function normalizeRates(rates: UpsertJurgensDeliveryZoneInput["rates"]) {
     .sort((left, right) => left.fromAmount - right.fromAmount);
 }
 
-function normalizePostalCodes(values: unknown): string[] {
-  if (!Array.isArray(values)) {
-    return [];
-  }
-
-  return Array.from(
-    new Set(
-      values
-        .map((value) => normalizePostalCode(String(value)))
-        .filter(Boolean),
-    ),
-  );
-}
-
-function normalizePostalCode(value: string) {
-  return value.trim().toUpperCase().replace(/\s+/g, "");
-}
-
-function postalCodeMatchesRule(postalCode: string, rule: string) {
-  const normalizedRule = normalizePostalCode(rule);
-
-  if (!normalizedRule) {
-    return false;
-  }
-
-  if (normalizedRule.endsWith("*")) {
-    return postalCode.startsWith(normalizedRule.slice(0, -1));
-  }
-
-  const rangeMatch = normalizedRule.match(/^(\d+)-(\d+)$/);
-
-  if (rangeMatch) {
-    const current = Number(postalCode);
-    const start = Number(rangeMatch[1]);
-    const end = Number(rangeMatch[2]);
-
-    return (
-      Number.isFinite(current) &&
-      Number.isFinite(start) &&
-      Number.isFinite(end) &&
-      current >= Math.min(start, end) &&
-      current <= Math.max(start, end)
-    );
-  }
-
-  return postalCode === normalizedRule;
-}
-
 function subtotalMatchesRate(subtotal: number, rate: JurgensDeliveryZoneRate) {
   return (
     subtotal >= rate.fromAmount &&
@@ -600,4 +619,24 @@ async function insertNewZone(
     .returning({ id: jurgensDeliveryZones.id });
 
   return zone.id;
+}
+
+async function lockJurgensDeliveryZoneWrites(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(${JURGENS_DELIVERY_ZONE_WRITE_LOCK_ID})`,
+  );
+}
+
+function formatPostalCodeConflictMessage(
+  conflicts: ReturnType<typeof findJurgensDeliveryPostalCodeConflicts>,
+) {
+  const first = conflicts[0]!;
+  const additionalCount = conflicts.length - 1;
+  const additionalMessage = additionalCount > 0
+    ? ` ${additionalCount} additional overlap${additionalCount === 1 ? " was" : "s were"} also found.`
+    : "";
+
+  return `Postal code ${first.postalCode} overlaps active zone “${first.existingZoneName}” (new rule “${first.candidateRule}”; existing rule “${first.existingRule}”). Active delivery zones cannot share postal codes.${additionalMessage} Remove the overlap or deactivate one zone before saving.`;
 }

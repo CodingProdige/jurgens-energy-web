@@ -1,6 +1,8 @@
 import type { MarketplaceProductDetail } from "@/src/modules/marketplace/catalog";
+import { createMarketplaceBusinessAddress } from "@/src/modules/marketplace/business-structured-address";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
+import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 
 export type StructuredDataValue = Record<string, unknown>;
 
@@ -21,18 +23,31 @@ export function MarketplaceJsonLd({
 
 export function createMarketplaceBusinessStructuredData({
   areaNames,
+  businessIdentity,
   settings,
 }: {
   areaNames: string[];
+  businessIdentity: PublicBusinessIdentity;
   settings: MarketplaceSettings;
 }): StructuredDataValue {
   const homeUrl = createMarketplaceCanonicalUrl("/");
   const organizationId = `${homeUrl}#organization`;
-  const storeId = `${homeUrl}#store`;
+  const onlineStoreId = `${homeUrl}#online-store`;
   const contactPhone =
     settings.contactPhonePrimary.trim() ||
     settings.whatsappBusinessPhoneNumber?.trim() ||
     undefined;
+  const contactEmail = settings.contactEmail.trim() || undefined;
+  const businessAddress = createMarketplaceBusinessAddress(
+    businessIdentity.registeredAddress,
+    settings.contactAddress,
+  );
+  const tradingName = businessIdentity.tradingName.trim() || "Jurgens Energy";
+  const legalName = businessIdentity.legalName?.trim() || undefined;
+  const registrationNumber =
+    businessIdentity.companyRegistrationNumber?.trim() || undefined;
+  const vatRegistrationNumber =
+    businessIdentity.vatRegistrationNumber?.trim() || undefined;
   const sameAs = [
     settings.facebookUrl,
     settings.instagramUrl,
@@ -45,23 +60,37 @@ export function createMarketplaceBusinessStructuredData({
       {
         "@id": organizationId,
         "@type": "Organization",
-        name: "Jurgens Energy",
+        address: businessAddress,
+        email: contactEmail,
+        identifier: registrationNumber
+          ? {
+              "@type": "PropertyValue",
+              propertyID: "South African company registration number",
+              value: registrationNumber,
+            }
+          : undefined,
+        legalName,
+        name: tradingName,
+        telephone: contactPhone,
         url: homeUrl,
+        vatID: vatRegistrationNumber,
         ...(sameAs.length > 0 ? { sameAs } : {}),
       },
       {
-        "@id": storeId,
-        "@type": "Store",
-        address: settings.contactAddress.trim() || undefined,
+        "@id": onlineStoreId,
+        "@type": "OnlineStore",
+        address: businessAddress,
         areaServed: areaNames.map((name) => ({
           "@type": "AdministrativeArea",
           name,
         })),
-        email: settings.contactEmail.trim() || undefined,
-        name: "Jurgens Energy",
+        email: contactEmail,
+        legalName,
+        name: tradingName,
         parentOrganization: { "@id": organizationId },
         telephone: contactPhone,
         url: homeUrl,
+        vatID: vatRegistrationNumber,
       },
     ],
   };
@@ -90,6 +119,9 @@ export function createProductStructuredData(
     : undefined;
   const exactVariant = selectedVariant ??
     (availableVariants.length === 1 ? availableVariants[0] : undefined);
+  const exactVariantUrl = exactVariant
+    ? `${productUrl}?variant=${encodeURIComponent(exactVariant.id)}`
+    : undefined;
   const offer = exactVariant
       ? {
           "@type": "Offer",
@@ -100,7 +132,7 @@ export function createProductStructuredData(
           price: exactVariant.price,
           priceCurrency: "ZAR",
           seller: { "@id": `${createMarketplaceCanonicalUrl("/")}#organization` },
-          url: `${productUrl}?variant=${encodeURIComponent(exactVariant.id)}`,
+          url: exactVariantUrl,
         }
       : prices.length > 0
         ? {
@@ -115,7 +147,9 @@ export function createProductStructuredData(
 
   return {
     "@context": "https://schema.org",
-    "@id": `${productUrl}#product`,
+    "@id": exactVariantUrl
+      ? `${exactVariantUrl}#product`
+      : `${productUrl}#product`,
     "@type": "Product",
     brand: product.brandName
       ? { "@type": "Brand", name: product.brandName }
@@ -127,7 +161,9 @@ export function createProductStructuredData(
         : description,
     gtin:
       normalizeGtin(exactVariant?.barcode) ??
-      normalizeGtin(product.barcode) ??
+      (availableVariants.length === 1
+        ? normalizeGtin(product.barcode)
+        : null) ??
       undefined,
     image:
       exactVariant?.imageUrl
@@ -144,9 +180,7 @@ export function createProductStructuredData(
         : product.title,
     offers: offer,
     sku: exactVariant?.sku,
-    url: exactVariant
-      ? `${productUrl}?variant=${encodeURIComponent(exactVariant.id)}`
-      : productUrl,
+    url: exactVariantUrl ?? productUrl,
   };
 }
 
@@ -237,7 +271,7 @@ export function createDeliveryServiceStructuredData({
     description:
       "Local LPG cylinder delivery and eligible empty-cylinder exchange from Jurgens Energy, subject to live product, address and delivery-zone availability.",
     name: "Jurgens Energy local LPG delivery",
-    provider: { "@id": `${createMarketplaceCanonicalUrl("/")}#store` },
+    provider: { "@id": `${createMarketplaceCanonicalUrl("/")}#online-store` },
     serviceType: "LPG cylinder delivery and exchange",
     url,
   };

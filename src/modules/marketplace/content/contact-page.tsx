@@ -81,10 +81,11 @@ function buildContactMethods(settings: MarketplaceSettings) {
       : null,
     address
       ? {
-          description: "Open the configured business address in Google Maps.",
+          description:
+            "Business and dispatch contact address. Visits and returns are by prior arrangement only.",
           href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
           icon: MapPinIcon,
-          label: "Find us",
+          label: "Business & dispatch address",
           value: address,
           external: true,
         }
@@ -138,7 +139,7 @@ export async function ContactPage() {
       <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-7 sm:py-12 lg:px-10 lg:py-16">
         <section>
           <ContentSectionHeading
-            description="These details come directly from the store’s current contact settings. Tap a card to call, email, start a WhatsApp chat or open the address in Maps."
+            description="These details come directly from the store’s current contact settings. Tap a card to call, email, start a WhatsApp chat or view our business and dispatch address. Visits and returns are by prior arrangement only."
             eyebrow="Contact channels"
             title="Choose the fastest route."
           />

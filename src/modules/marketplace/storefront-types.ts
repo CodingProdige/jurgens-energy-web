@@ -316,7 +316,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
           title: "Choose Your Size",
         },
         {
-          description: "Our driver collects your empty cylinder.",
+          description: "A delivery representative collects your empty cylinder.",
           icon: "exchange",
           title: "Hand Over Empty",
         },
