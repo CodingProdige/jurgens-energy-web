@@ -25,7 +25,8 @@ if (!existsSync(".env")) {
 }
 
 // Build and verify the release once before touching production data. The
-// migration image reuses the exact dependency and builder layers used by web.
+// migration image reuses the locked dependency layer without exporting the
+// full application builder filesystem.
 run("docker", [...composeOpsArgs, "build", "web", "migrate"]);
 
 run("docker", [...composeBaseArgs, "up", "-d", "postgres", "redis"]);

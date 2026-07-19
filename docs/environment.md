@@ -125,6 +125,10 @@ can manage the encrypted API key, default model, and reasoning effort from
 
 For host-run commands like migrations, `DATABASE_URL` should point at `localhost:5433`. Docker Compose gives the `web` container its internal database URL automatically.
 
+Local video processing requires `ffmpeg` on `PATH`, or an absolute executable
+path in `FFMPEG_BIN`. The production Docker image installs Alpine's FFmpeg
+package and configures this automatically.
+
 The Docker Compose defaults intentionally avoid common ports used by the copied project: PostgreSQL publishes on `5433`, Redis on `6380`, Caddy HTTP on `3010`, and Caddy HTTPS on `3443`. Override `POSTGRES_PORT`, `REDIS_PORT`, `CADDY_HTTP_PORT`, or `CADDY_HTTPS_PORT` in the single root `.env` only if the server needs different bindings.
 
 ## Local Webhook Tunnels

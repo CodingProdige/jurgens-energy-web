@@ -903,32 +903,34 @@ async function runFfmpeg(
 }
 
 async function resolveFfmpegPath() {
-  const candidatePaths = [
-    process.env.FFMPEG_BIN,
-    path.join(
-      /*turbopackIgnore: true*/ process.cwd(),
-      "node_modules",
-      "ffmpeg-static",
-      "ffmpeg",
-    ),
-    path.join(
-      /*turbopackIgnore: true*/ process.cwd(),
-      "node_modules",
-      "ffmpeg-static",
-      "ffmpeg.exe",
-    ),
-  ].filter((candidate): candidate is string => Boolean(candidate));
+  const configuredPath = process.env.FFMPEG_BIN?.trim();
 
-  for (const candidatePath of candidatePaths) {
+  if (configuredPath) {
     try {
-      await access(candidatePath);
-      return candidatePath;
+      await access(configuredPath);
+      return configuredPath;
     } catch {
-      // Try the next known install location.
+      // Fall back to a system FFmpeg on PATH.
     }
   }
 
-  return null;
+  return (await canExecute("ffmpeg")) ? "ffmpeg" : null;
+}
+
+function canExecute(command: string) {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (available: boolean) => {
+      if (!settled) {
+        settled = true;
+        resolve(available);
+      }
+    };
+    const child = spawn(command, ["-version"], { stdio: "ignore" });
+
+    child.once("error", () => finish(false));
+    child.once("close", (code) => finish(code === 0));
+  });
 }
 
 async function writeMediaFile(relativePath: string, buffer: Buffer) {
