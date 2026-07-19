@@ -16,8 +16,9 @@ env:
 jobs:
   deploy:
     runs-on: [self-hosted, linux, x64, jurgens-energy-web-prod]
-    # Leave headroom for a completely cold dependency and Docker build cache.
-    timeout-minutes: 60
+    # A cold dependency/runtime build completes inside this window; fail a
+    # genuinely stalled deployment instead of occupying the runner for an hour.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
