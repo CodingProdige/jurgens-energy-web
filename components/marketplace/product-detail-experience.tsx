@@ -36,10 +36,15 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
+  convertFromZar,
   formatFromZar,
   type CurrencyContext,
 } from "@/src/modules/currency";
 import { addLocalCartItem } from "@/src/modules/cart";
+import {
+  trackGoogleEvent,
+  type GoogleAnalyticsItem,
+} from "@/src/modules/analytics/google";
 import type {
   MarketplaceProductCard as MarketplaceProductCardData,
   MarketplaceProductDetail,
@@ -67,12 +72,10 @@ type VariantMarkdownDisplay = {
 
 const previouslyViewedLimit = 16;
 const previouslyViewedStorageKey = "jurgens-energy:previously-viewed-products";
-const jurgensDeliveryTimeZone = "Africa/Johannesburg";
-const jurgensDeliveryUtcOffsetHours = 2;
 
 const exchangeSteps = [
   {
-    description: "We deliver your replacement cylinder to your door.",
+    description: "Eligible exchange orders can be delivered to your address.",
     icon: TruckIcon,
   },
   {
@@ -80,34 +83,52 @@ const exchangeSteps = [
     icon: RefreshCcwIcon,
   },
   {
-    description: "Your exchange is complete. Safe, simple and convenient.",
+    description: "The exchange is completed after the handover checks.",
     icon: CheckCircle2Icon,
   },
 ] as const;
 
-function useDeliveryClock(enabled: boolean) {
-  const [now, setNow] = useState<Date | null>(null);
+function getDisplayedCurrencyValue(
+  amount: string | number,
+  currencyContext: CurrencyContext,
+) {
+  const converted = convertFromZar(amount, currencyContext);
+  const maximumFractionDigits = new Intl.NumberFormat(currencyContext.locale, {
+    currency: currencyContext.currency,
+    style: "currency",
+  }).resolvedOptions().maximumFractionDigits ?? 2;
+  const factor = 10 ** maximumFractionDigits;
 
-  useEffect(() => {
-    if (!enabled) {
-      setNow(null);
-      return;
-    }
+  return Math.round((converted + Number.EPSILON) * factor) / factor;
+}
 
-    setNow(new Date());
-    const intervalId = window.setInterval(() => setNow(new Date()), 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [enabled]);
-
-  return now;
+function getGoogleAnalyticsProductItem({
+  currencyContext,
+  product,
+  quantity,
+  variant,
+}: {
+  currencyContext: CurrencyContext;
+  product: MarketplaceProductDetailView;
+  quantity: number;
+  variant: MarketplaceVariant;
+}): GoogleAnalyticsItem {
+  return {
+    affiliation: "Jurgens Energy",
+    item_brand: product.brandName ?? undefined,
+    item_category: product.category?.name,
+    item_id: variant.id,
+    item_name: product.title,
+    item_variant: variant.title,
+    price: getDisplayedCurrencyValue(variant.price, currencyContext),
+    quantity,
+  };
 }
 
 export function ProductDetailExperience({
   catalogProducts,
   currencyContext,
   initialVariantId,
-  jurgensDeliveryCutoffTime,
   product,
   relatedProducts,
 }: ProductDetailExperienceProps) {
@@ -147,9 +168,7 @@ export function ProductDetailExperience({
     MarketplaceProductCardData[]
   >([]);
   const [quantity, setQuantity] = useState(1);
-  const deliveryClock = useDeliveryClock(
-    product.fulfillmentMode === "piessang_fulfilled",
-  );
+  const lastTrackedViewItemRef = useRef<string | null>(null);
 
   useEffect(() => {
     setSelectedVariantId(defaultVariantId);
@@ -191,11 +210,43 @@ export function ProductDetailExperience({
   const selectedPrice = selectedVariant
     ? formatFromZar(selectedVariant.price, currencyContext)
     : product.priceLabel;
-  const deliveryPromise = getDeliveryPromise({
-    cutoffTime: jurgensDeliveryCutoffTime,
-    fulfillmentMode: product.fulfillmentMode,
-    now: deliveryClock,
-  });
+
+  useEffect(() => {
+    if (!selectedVariant) {
+      return;
+    }
+
+    const trackingKey = [
+      product.id,
+      selectedVariant.id,
+      currencyContext.currency,
+      currencyContext.rate,
+    ].join(":");
+
+    if (lastTrackedViewItemRef.current === trackingKey) {
+      return;
+    }
+
+    lastTrackedViewItemRef.current = trackingKey;
+    const value = getDisplayedCurrencyValue(
+      selectedVariant.price,
+      currencyContext,
+    );
+
+    trackGoogleEvent("view_item", {
+      currency: currencyContext.currency,
+      items: [
+        getGoogleAnalyticsProductItem({
+          currencyContext,
+          product,
+          quantity: 1,
+          variant: selectedVariant,
+        }),
+      ],
+      value,
+    });
+  }, [currencyContext, product, selectedVariant]);
+  const deliveryPromise = getDeliveryPromise(product.fulfillmentMode);
   const deliveryLabel = deliveryPromise.label;
   const deliveryDetail = deliveryPromise.detail;
   const sizeLabel = getSizeLabel(selectedVariant?.title ?? product.title);
@@ -632,6 +683,22 @@ function ProductBuyBox({
           ? `${product.title} - ${selectedVariant.title}`
           : product.title,
       variantId: selectedVariant.id,
+    });
+
+    trackGoogleEvent("add_to_cart", {
+      currency: currencyContext.currency,
+      items: [
+        getGoogleAnalyticsProductItem({
+          currencyContext,
+          product,
+          quantity,
+          variant: selectedVariant,
+        }),
+      ],
+      value: getDisplayedCurrencyValue(
+        Number(selectedVariant.price) * quantity,
+        currencyContext,
+      ),
     });
 
     setAdded(true);
@@ -1122,16 +1189,7 @@ function PriceWithMarkdown({
 }
 
 function DeliveryDetailInline({ detail }: { detail: string }) {
-  if (!isSameDayCountdownDetail(detail)) {
-    return <span>{detail}</span>;
-  }
-
-  return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-[3px] bg-[#fff3ec] px-1.5 py-0.5 text-[11px] font-black leading-4 text-[#ff5a1f] ring-1 ring-[#ff5a1f]/20 dark:bg-[#ff5a1f]/10 sm:text-xs">
-      <FlameIcon className="size-3 shrink-0 fill-[#ff5a1f]/20 stroke-[2.4]" />
-      <span className="min-w-0">{detail}</span>
-    </span>
-  );
+  return <span>{detail}</span>;
 }
 
 function ProductOptionsDialog({
@@ -1270,7 +1328,7 @@ function ProductOptionsDialog({
             />
           ) : null}
 
-          <CompactTrustRow className="mt-3" deliveryLabel="Safe delivery" />
+          <CompactTrustRow className="mt-3" deliveryLabel="Delivery options" />
 
           <section className="mt-3 grid gap-1.5">
             <h2 className="text-xs font-black text-[#080808] dark:text-[#f7f7f2]">
@@ -1282,7 +1340,7 @@ function ProductOptionsDialog({
 
         <footer className="absolute inset-x-0 bottom-0 z-10 grid gap-2 border-t border-[#e8e8e2] bg-white px-3 py-2.5 shadow-[0_-12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-[#101010]">
           <p className="text-center text-xs font-semibold text-[#080808] dark:text-[#f7f7f2]">
-            Safe LPG delivered by a certified reseller.
+            Order details are confirmed before payment.
           </p>
           <button
             className={cn(
@@ -1460,7 +1518,7 @@ function VariantOptionCard({
 
 function MobileTrustTicker({ deliveryLabel }: { deliveryLabel: string }) {
   const items = [
-    { icon: ShieldCheckIcon, label: "Certified reseller" },
+    { icon: ShieldCheckIcon, label: "Safety-first handling" },
     { icon: TruckIcon, label: deliveryLabel },
     { icon: CreditCardIcon, label: "Secure payments" },
     { icon: FileTextIcon, label: "VAT included" },
@@ -1514,7 +1572,7 @@ function MobileConfidenceRows({
     {
       detail: "Support before, during and after delivery.",
       icon: ShieldCheckIcon,
-      title: "Order guarantee",
+      title: "Order support",
     },
     ...(hasExchangeOption
       ? [
@@ -1576,7 +1634,7 @@ function CompactTrustRow({
         <span className="grid size-4 shrink-0 place-items-center rounded-full bg-emerald-700 text-white dark:bg-emerald-400 dark:text-[#080808]">
           <ShieldCheckIcon className="size-2.5 stroke-[2.5]" />
         </span>
-        <span className="truncate">Certified reseller</span>
+        <span className="truncate">Safety-first handling</span>
       </span>
       <span className="h-3 w-px shrink-0 bg-[#d8d8d2] dark:bg-white/15" />
       <span className="inline-flex min-w-0 items-start gap-1.5">
@@ -2031,108 +2089,20 @@ function getVariantPreviewList(
   return previewVariants.slice(0, 6);
 }
 
-function getDeliveryPromise({
-  cutoffTime,
-  fulfillmentMode,
-  now,
-}: {
-  cutoffTime: string;
-  fulfillmentMode: MarketplaceProductDetailView["fulfillmentMode"];
-  now: Date | null;
-}) {
+function getDeliveryPromise(
+  fulfillmentMode: MarketplaceProductDetailView["fulfillmentMode"],
+) {
   if (fulfillmentMode !== "piessang_fulfilled") {
     return {
-      detail: "Courier delivery calculated at checkout",
-      label: "Bob Go Courier Rates Available",
-    };
-  }
-
-  if (!now) {
-    return {
-      detail: "Delivery by Jurgens Energy",
-      label: "Same Day Delivery Available",
-    };
-  }
-
-  const cutoff = getJurgensCutoffInstant(cutoffTime, now);
-  const remainingMs = cutoff.getTime() - now.getTime();
-
-  if (remainingMs <= 0) {
-    return {
-      detail: "Jurgens Energy direct delivery",
-      label: "Delivery Tomorrow",
+      detail: "Courier rates are calculated at checkout",
+      label: "Courier delivery options",
     };
   }
 
   return {
-    detail: `Same-day cutoff: ${formatCountdown(remainingMs)}`,
-    label: "Same Day Delivery Available",
+    detail: "Eligibility and delivery details are confirmed at checkout",
+    label: "Local delivery subject to availability.",
   };
-}
-
-function isSameDayCountdownDetail(detail: string) {
-  return detail.startsWith("Same-day cutoff:");
-}
-
-function getJurgensCutoffInstant(cutoffTime: string, now: Date) {
-  const { hour, minute } = parseCutoffTime(cutoffTime);
-  const parts = getJohannesburgDateParts(now);
-
-  return new Date(
-    Date.UTC(
-      parts.year,
-      parts.month - 1,
-      parts.day,
-      hour - jurgensDeliveryUtcOffsetHours,
-      minute,
-      0,
-      0,
-    ),
-  );
-}
-
-function parseCutoffTime(value: string) {
-  const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-
-  if (!match) {
-    return { hour: 14, minute: 0 };
-  }
-
-  return {
-    hour: Number(match[1]),
-    minute: Number(match[2]),
-  };
-}
-
-function getJohannesburgDateParts(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: jurgensDeliveryTimeZone,
-    year: "numeric",
-  }).formatToParts(date);
-  const partByType = new Map(parts.map((part) => [part.type, part.value]));
-
-  return {
-    day: Number(partByType.get("day")),
-    month: Number(partByType.get("month")),
-    year: Number(partByType.get("year")),
-  };
-}
-
-function formatCountdown(milliseconds: number) {
-  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes.toString().padStart(2, "0")}m ${seconds
-      .toString()
-      .padStart(2, "0")}s`;
-  }
-
-  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
 function getExchangeConfirmationText({

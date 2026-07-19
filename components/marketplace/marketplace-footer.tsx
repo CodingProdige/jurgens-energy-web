@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
+import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
 import {
   FacebookMark,
   InstagramMark,
@@ -19,23 +20,24 @@ import {
   WhatsappMark,
 } from "@/components/brand/social-links";
 import { normalizePhoneNumber } from "@/src/modules/phone";
+import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 
 const footerServices = [
   {
-    description: "Fast & reliable delivery across your area.",
+    description: "Local delivery and courier options where available.",
     icon: TruckIcon,
-    title: "Same Day Delivery",
+    title: "Delivery Options",
   },
   {
-    description: "Our cylinders are tested, certified and compliant.",
+    description: "Eligibility and cylinder handover checks apply where required.",
     icon: ShieldCheckIcon,
-    title: "Safe & Certified",
+    title: "Safety-First Handling",
   },
   {
-    description: "Thousands of homes and businesses trust us.",
+    description: "Clear payment, invoice and delivery status updates.",
     icon: UsersIcon,
-    title: "Reliable Service",
+    title: "Clear Order Updates",
   },
   {
     description: "We're here to help before, during and after delivery.",
@@ -63,7 +65,10 @@ function createWhatsappUrl(phoneNumber: string | null) {
 }
 
 export async function MarketplaceFooter() {
-  const settings = await getMarketplaceSettings();
+  const [businessIdentity, settings] = await Promise.all([
+    getPublicBusinessIdentity(),
+    getMarketplaceSettings(),
+  ]);
   const whatsappUrl = createWhatsappUrl(settings.whatsappBusinessPhoneNumber);
   const primaryContactPhone =
     settings.contactPhonePrimary ?? settings.whatsappBusinessPhoneNumber;
@@ -191,7 +196,7 @@ export async function MarketplaceFooter() {
             links={[
               ["About Us", "/about"],
               ["Safety", "/lpg-safety"],
-              ["Delivery", "/delivery-information"],
+              ["Delivery", "/lpg-delivery"],
               ["FAQs", "/faq"],
               ["Contact Us", "/contact"],
             ]}
@@ -255,6 +260,11 @@ export async function MarketplaceFooter() {
             </div>
           ) : null}
         </section>
+
+        <PublicBusinessIdentityDisclosure
+          appearance="footer"
+          identity={businessIdentity}
+        />
 
         <div className="flex flex-col gap-3 px-4 pt-4 text-[12px] text-[#696963] dark:text-[#a8a89f] sm:flex-row sm:items-center sm:justify-between sm:px-0">
           <p>© {new Date().getFullYear()} Jurgens Energy. All rights reserved.</p>

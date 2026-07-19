@@ -343,7 +343,7 @@ function buildInterpreterInput({
     "- intent status: where is my order, tracking, delivery status, driver update.",
     "- intent human: call me, agent, help from staff, complaints, unclear non-order questions.",
     "- intent stop: stop, unsubscribe, opt out.",
-    "- purchaseType exchange: refill, swap, exchange, topup, empty cylinder, gas ran out, hand over empty.",
+    "- purchaseType exchange: refill, replace, replacement, swap, exchange, topup, empty cylinder, gas ran out, hand over empty.",
     "- purchaseType standard: full/new cylinder, buying from scratch, no empty to return.",
     "- If they say same/usual/again, prefer repeat even if size is missing.",
     "- Extract quantity and kg size from words or digits where present.",

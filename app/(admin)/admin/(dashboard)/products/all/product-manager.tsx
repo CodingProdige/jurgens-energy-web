@@ -7,6 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   ArchiveIcon,
   CheckCircleIcon,
+  CircleHelpIcon,
   DownloadIcon,
   EyeIcon,
   FilterIcon,
@@ -68,10 +69,14 @@ import {
 import { cn } from "@/lib/utils";
 import { updateAdminProductStatus } from "@/app/(admin)/admin/(dashboard)/products/all/actions";
 import type {
-  AdminProductReviewRow,
+  AdminProductRow,
   AdminProductReviewStatus,
   AdminProductsData,
 } from "@/src/modules/admin/product-reviews";
+import {
+  getVariantProfitability,
+  type VariantProfitability,
+} from "@/src/modules/products/cost-price";
 
 type StatusFilter = "all" | AdminProductReviewStatus;
 type ProductTableStatusMutation = "active" | "draft";
@@ -102,13 +107,106 @@ function humanizeStatus(status: string) {
     .join(" ");
 }
 
-function formatMoney(value: string | null) {
+function formatMoney(value: number | string | null) {
   const amount = Number(value ?? 0);
 
   return new Intl.NumberFormat("en-ZA", {
     currency: "ZAR",
     style: "currency",
   }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+function formatMoneyRange(values: number[], forceRange = false) {
+  if (values.length === 0) {
+    return "Not set";
+  }
+
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+
+  return !forceRange && Math.abs(maximum - minimum) < 0.005
+    ? formatMoney(minimum)
+    : `${formatMoney(minimum)} – ${formatMoney(maximum)}`;
+}
+
+function formatMoneyCents(value: number) {
+  return formatMoney(value / 100);
+}
+
+function formatMoneyCentsRange(values: number[], forceRange = false) {
+  return formatMoneyRange(
+    values.map((value) => value / 100),
+    forceRange,
+  );
+}
+
+function formatMarginBps(value: number) {
+  return new Intl.NumberFormat("en-ZA", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+    style: "percent",
+  }).format(value / 10_000);
+}
+
+function formatMarginBpsRange(values: number[], forceRange = false) {
+  if (values.length === 0) {
+    return "Not set";
+  }
+
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+
+  return !forceRange && minimum === maximum
+    ? formatMarginBps(minimum)
+    : `${formatMarginBps(minimum)} – ${formatMarginBps(maximum)}`;
+}
+
+function ProfitabilityInfo() {
+  return (
+    <span className="group/info relative inline-flex shrink-0">
+      <button
+        aria-label="Profit calculation information"
+        className="grid size-[18px] place-items-center rounded-full border border-slate-200 bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:border-white/10 dark:bg-white/10 dark:text-zinc-400 dark:hover:bg-white/15 dark:hover:text-zinc-200"
+        type="button"
+      >
+        <CircleHelpIcon className="size-3.5" />
+      </button>
+      <span className="pointer-events-none absolute left-1/2 top-full z-[80] mt-2 hidden w-64 max-w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 whitespace-normal rounded-lg border border-slate-200 bg-white p-2 text-left text-xs font-normal leading-snug text-slate-600 shadow-xl group-hover/info:block group-focus-within/info:block dark:border-white/10 dark:bg-[#151719] dark:text-zinc-300">
+        Gross profit is the VAT-inclusive selling price minus the VAT-inclusive
+        cost price. Margin is gross profit divided by the VAT-inclusive selling
+        price. This estimate excludes delivery, payment fees, and other
+        operating costs. Cost data is private to the admin dashboard.
+      </span>
+    </span>
+  );
+}
+
+function ProfitabilityValue({
+  label,
+  negative = false,
+  value,
+}: {
+  label: string;
+  negative?: boolean;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-[#101214]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 break-words text-sm font-semibold text-zinc-950 dark:text-white",
+          negative && "text-red-600 dark:text-red-400",
+          (value === "Not set" || value === "Unavailable") &&
+            "font-medium text-slate-500 dark:text-zinc-400",
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
 }
 
 function escapeCsvValue(value: string | number | null) {
@@ -149,7 +247,7 @@ function StatusBadge({ status }: { status: string }) {
 function FulfillmentBadge({
   mode,
 }: {
-  mode: AdminProductReviewRow["fulfillmentMode"];
+  mode: AdminProductRow["fulfillmentMode"];
 }) {
   return (
     <Badge
@@ -312,8 +410,28 @@ function ProductFilterPanel({
   );
 }
 
-function ProductDetails({ product }: { product: AdminProductReviewRow }) {
-  const firstVariant = product.variants[0];
+function ProductDetails({ product }: { product: AdminProductRow }) {
+  const variantProfitability = product.variants.map((variant) => ({
+    profitability: getVariantProfitability({
+      costPrice: variant.costPrice,
+      price: variant.price,
+    }),
+    variant,
+  }));
+  const costedVariants = variantProfitability.filter(
+    (item): item is {
+      profitability: VariantProfitability;
+      variant: AdminProductRow["variants"][number];
+    } => item.profitability !== null,
+  );
+  const marginValues = costedVariants
+    .map((item) => item.profitability.grossMarginBps)
+    .filter((margin): margin is number => margin !== null);
+  const hasLossMakingVariant = costedVariants.some(
+    (item) => item.profitability.grossProfitCents < 0,
+  );
+  const hasNegativeMargin = marginValues.some((margin) => margin < 0);
+  const costCoverage = `${costedVariants.length}/${product.variants.length}`;
 
   return (
     <DialogBody className="grid gap-5 overflow-x-hidden">
@@ -382,10 +500,14 @@ function ProductDetails({ product }: { product: AdminProductReviewRow }) {
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Price
+                Selling price (VAT incl.)
               </p>
               <p className="font-medium">
-                {firstVariant ? formatMoney(firstVariant.price) : "No variants"}
+                {product.variants.length > 0
+                  ? formatMoneyRange(
+                      product.variants.map((variant) => Number(variant.price)),
+                    )
+                  : "No variants"}
               </p>
             </div>
             <div className="min-w-0">
@@ -397,6 +519,76 @@ function ProductDetails({ product }: { product: AdminProductReviewRow }) {
           </div>
         </div>
       </div>
+      <section className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+                Product profitability
+              </h3>
+              <ProfitabilityInfo />
+            </div>
+            <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+              {costCoverage}{" "}
+              {product.variants.length === 1 ? "variant has" : "variants have"}{" "}
+              a private cost price.
+            </p>
+          </div>
+          <Badge className="h-6 rounded-md border-0 bg-slate-200 px-2 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-zinc-200">
+            Admin only
+          </Badge>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <ProfitabilityValue
+            label="Cost price (VAT incl., private)"
+            value={formatMoneyCentsRange(
+              costedVariants.map((item) => item.profitability.costPriceCents),
+              costedVariants.length > 1,
+            )}
+          />
+          <ProfitabilityValue
+            label="Gross profit (VAT incl. basis)"
+            negative={hasLossMakingVariant}
+            value={formatMoneyCentsRange(
+              costedVariants.map((item) => item.profitability.grossProfitCents),
+              costedVariants.length > 1,
+            )}
+          />
+          <ProfitabilityValue
+            label="Profit margin"
+            negative={hasNegativeMargin}
+            value={
+              costedVariants.length === 0
+                ? "Not set"
+                : marginValues.length === 0
+                  ? "Unavailable"
+                  : formatMarginBpsRange(
+                      marginValues,
+                      costedVariants.length > 1,
+                    )
+            }
+          />
+        </div>
+        {costedVariants.length === 0 ? (
+          <p className="text-xs text-slate-500 dark:text-zinc-400">
+            Cost prices are not set, so profit and margin cannot be calculated.
+          </p>
+        ) : null}
+        {costedVariants.length > 0 &&
+        costedVariants.length < product.variants.length ? (
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            The ranges exclude {product.variants.length - costedVariants.length}{" "}
+            variant
+            {product.variants.length - costedVariants.length === 1 ? "" : "s"}{" "}
+            with no cost price set.
+          </p>
+        ) : null}
+        {hasLossMakingVariant ? (
+          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+            This product includes at least one loss-making variant.
+          </p>
+        ) : null}
+      </section>
       <section className="grid gap-3">
         <div>
           <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
@@ -408,64 +600,117 @@ function ProductDetails({ product }: { product: AdminProductReviewRow }) {
           </p>
         </div>
         <div className="grid gap-3">
-          {product.variants.map((variant) => (
-            <article
-              key={variant.id}
-              className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/[0.04]"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold text-zinc-950 dark:text-white">
-                    {variant.title}
+          {variantProfitability.map(({ profitability, variant }) => {
+            const isLossMaking =
+              profitability !== null && profitability.grossProfitCents < 0;
+
+            return (
+              <article
+                key={variant.id}
+                className={cn(
+                  "rounded-lg border bg-slate-50/70 p-3 dark:bg-white/[0.04]",
+                  isLossMaking
+                    ? "border-red-200 dark:border-red-400/30"
+                    : "border-slate-200 dark:border-white/10",
+                )}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-semibold text-zinc-950 dark:text-white">
+                      {variant.title}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                      {humanizeStatus(variant.status)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {isLossMaking ? (
+                      <span className="rounded-md bg-red-100 px-2 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                        Loss
+                      </span>
+                    ) : null}
+                    <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-white/10 dark:text-zinc-200 dark:ring-white/10">
+                      {formatMoney(variant.price)}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <ProfitabilityValue
+                    label="Cost price (VAT incl., private)"
+                    value={
+                      profitability
+                        ? formatMoneyCents(profitability.costPriceCents)
+                        : "Not set"
+                    }
+                  />
+                  <ProfitabilityValue
+                    label="Gross profit (VAT incl. basis)"
+                    negative={isLossMaking}
+                    value={
+                      profitability
+                        ? formatMoneyCents(profitability.grossProfitCents)
+                        : "Not set"
+                    }
+                  />
+                  <ProfitabilityValue
+                    label="Profit margin"
+                    negative={isLossMaking}
+                    value={
+                      !profitability
+                        ? "Not set"
+                        : profitability.grossMarginBps === null
+                          ? "Unavailable"
+                          : formatMarginBps(profitability.grossMarginBps)
+                    }
+                  />
+                </div>
+                <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      SKU
+                    </dt>
+                    <dd className="break-words text-slate-800 dark:text-zinc-200">
+                      {variant.sku}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Stock
+                    </dt>
+                    <dd className="text-slate-800 dark:text-zinc-200">
+                      {variant.continueSellingOutOfStock
+                        ? "Oversell enabled"
+                        : variant.stockOnHand.toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Parcel
+                    </dt>
+                    <dd className="text-slate-800 dark:text-zinc-200">
+                      {variant.missingShippingFields.length > 0
+                        ? `Missing ${variant.missingShippingFields.length}`
+                        : `${variant.weightGrams} g, ${variant.lengthMm} x ${variant.widthMm} x ${variant.heightMm} mm`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Barcode
+                    </dt>
+                    <dd className="break-words text-slate-800 dark:text-zinc-200">
+                      {variant.barcode ?? "None"}
+                    </dd>
+                  </div>
+                </dl>
+                {profitability === null ? (
+                  <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">
+                    Set a private cost price to calculate gross profit and
+                    margin.
                   </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-                    {humanizeStatus(variant.status)}
-                  </p>
-                </div>
-                <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-white/10 dark:text-zinc-200 dark:ring-white/10">
-                  {formatMoney(variant.price)}
-                </span>
-              </div>
-              <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                <div className="min-w-0">
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    SKU
-                  </dt>
-                  <dd className="break-words text-slate-800 dark:text-zinc-200">
-                    {variant.sku}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Stock
-                  </dt>
-                  <dd className="text-slate-800 dark:text-zinc-200">
-                    {variant.continueSellingOutOfStock
-                      ? "Oversell enabled"
-                      : variant.stockOnHand.toLocaleString()}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Parcel
-                  </dt>
-                  <dd className="text-slate-800 dark:text-zinc-200">
-                    {variant.missingShippingFields.length > 0
-                      ? `Missing ${variant.missingShippingFields.length}`
-                      : `${variant.weightGrams} g, ${variant.lengthMm} x ${variant.widthMm} x ${variant.heightMm} mm`}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Barcode
-                  </dt>
-                  <dd className="break-words text-slate-800 dark:text-zinc-200">
-                    {variant.barcode ?? "None"}
-                  </dd>
-                </div>
-              </dl>
-            </article>
-          ))}
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       </section>
     </DialogBody>
@@ -482,7 +727,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [viewProduct, setViewProduct] = useState<AdminProductReviewRow | null>(
+  const [viewProduct, setViewProduct] = useState<AdminProductRow | null>(
     null,
   );
   const [statusFeedback, setStatusFeedback] = useState<{
@@ -639,7 +884,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
   }
 
   function handleProductStatusChange(
-    product: AdminProductReviewRow,
+    product: AdminProductRow,
     status: ProductTableStatusMutation,
   ) {
     setStatusFeedback(null);
@@ -937,7 +1182,8 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           <DialogHeader>
             <DialogTitle>Product details</DialogTitle>
             <DialogDescription>
-              Inspect lifecycle, delivery method, media, and variant data.
+              Inspect lifecycle, delivery method, private profitability, media,
+              and variant data.
             </DialogDescription>
           </DialogHeader>
           {viewProduct ? <ProductDetails product={viewProduct} /> : null}

@@ -256,7 +256,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
           variant: "secondary",
         },
       ],
-      copy: "Safe, certified and delivered to your home or business.",
+      copy: "LPG cylinders, exchange options and local delivery where available.",
       heading:
         "Buy full LPG cylinders, exchange empty cylinders, and shop gas accessories.",
       headingSize: 52,
@@ -418,18 +418,18 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       features: [
         {
           icon: "delivery",
-          text: "Fast local delivery for homes and businesses.",
-          title: "Same day delivery",
+          text: "Local delivery options for eligible addresses.",
+          title: "Local delivery",
         },
         {
           icon: "certified",
-          text: "Every cylinder is checked and handled with care.",
-          title: "Certified cylinders",
+          text: "Cylinder eligibility and handover checks apply where required.",
+          title: "Safety-first handling",
         },
         {
           icon: "flame",
-          text: "Full cylinders arrive ready for safe connection.",
-          title: "Ready to cook",
+          text: "Review the product details and connection requirements before use.",
+          title: "Clear product details",
         },
         {
           icon: "support",
@@ -437,7 +437,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
           title: "Helpful support",
         },
       ],
-      title: "LPG delivered with the speed, safety and service your day needs.",
+      title: "LPG ordering with clear product, payment and delivery updates.",
       titleSize: 30,
       titleTag: "h2",
     },

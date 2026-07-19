@@ -1,5 +1,5 @@
 import {
-  AwardIcon,
+  ClipboardCheckIcon,
   HeadphonesIcon,
   PackageCheckIcon,
   ShieldCheckIcon,
@@ -8,19 +8,19 @@ import {
 
 export const marketplaceTrustItems = [
   {
-    description: "100% secure",
+    description: "Eligibility checks apply",
     icon: ShieldCheckIcon,
-    title: "Safe & Certified",
+    title: "Safety-First Handling",
   },
   {
-    description: "Across your area",
+    description: "Where available",
     icon: TruckIcon,
-    title: "Same Day Delivery",
+    title: "Delivery Options",
   },
   {
-    description: "Tested & trusted",
-    icon: AwardIcon,
-    title: "Certified Quality",
+    description: "Payment, invoice & delivery",
+    icon: ClipboardCheckIcon,
+    title: "Clear Order Updates",
   },
   {
     description: "We're here to help",
@@ -28,8 +28,8 @@ export const marketplaceTrustItems = [
     title: "Support",
   },
   {
-    description: "Delivered to your door",
+    description: "Options shown at checkout",
     icon: PackageCheckIcon,
-    title: "Full cylinders",
+    title: "Cylinder Delivery",
   },
 ] as const;

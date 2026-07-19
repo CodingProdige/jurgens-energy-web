@@ -7,6 +7,12 @@ import { auditLogs, businessInformation } from "@/src/db/schema";
 
 export type BusinessInformation = typeof businessInformation.$inferSelect;
 
+export type PublicBusinessIdentity = {
+  companyRegistrationNumber: string | null;
+  tradingNameDisclosure: string | null;
+  vatRegistrationNumber: string | null;
+};
+
 const defaultBusinessInformation: BusinessInformation = {
   addressLine1: "",
   addressLine2: null,
@@ -45,6 +51,46 @@ export async function getBusinessInformation(): Promise<BusinessInformation> {
     .limit(1);
 
   return row ?? defaultBusinessInformation;
+}
+
+function normalizeComparableBusinessName(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-ZA");
+}
+
+/**
+ * Returns only the business identity fields that are safe to publish.
+ * Keep this explicit projection separate from the full invoice and collection
+ * profile so future private fields (including banking details) cannot leak into
+ * public components by accident.
+ */
+export async function getPublicBusinessIdentity(): Promise<PublicBusinessIdentity> {
+  const [row] = await db
+    .select({
+      companyRegistrationNumber:
+        businessInformation.companyRegistrationNumber,
+      legalName: businessInformation.legalName,
+      tradingName: businessInformation.tradingName,
+      vatRegistrationNumber: businessInformation.vatRegistrationNumber,
+    })
+    .from(businessInformation)
+    .where(eq(businessInformation.id, 1))
+    .limit(1);
+  const tradingName = row?.tradingName.trim() || "Jurgens Energy";
+  const legalName = row?.legalName.trim() || "";
+  const legalNameDiffers = Boolean(
+    legalName &&
+      normalizeComparableBusinessName(legalName) !==
+        normalizeComparableBusinessName(tradingName),
+  );
+
+  return {
+    companyRegistrationNumber:
+      row?.companyRegistrationNumber?.trim() || null,
+    tradingNameDisclosure: legalNameDiffers
+      ? `${tradingName} is a trading name of ${legalName}.`
+      : null,
+    vatRegistrationNumber: row?.vatRegistrationNumber.trim() || null,
+  };
 }
 
 export type UpdateBusinessInformationInput = Omit<

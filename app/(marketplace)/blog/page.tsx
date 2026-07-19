@@ -5,12 +5,11 @@ import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { MarketplaceHeader } from "@/components/marketplace/marketplace-header";
 import { getPublishedBlogPosts } from "@/src/modules/blog";
+import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 
-export const metadata: Metadata = {
-  title: "Blog",
-  description:
-    "Read Jurgens Energy guides, LPG safety tips, delivery updates, and product advice.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return getStaticPageMetadata("blog");
+}
 
 export const dynamic = "force-dynamic";
 

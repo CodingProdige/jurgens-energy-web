@@ -242,6 +242,29 @@ const faqGroups: FaqGroup[] = [
   },
 ];
 
+export const faqStructuredDataItems = [
+  {
+    question: "How do I place an order?",
+    answer:
+      "Browse the store, select the product and available option you need, and complete checkout. When WhatsApp ordering is available, you can also start from the primary WhatsApp action.",
+  },
+  {
+    question: "Do you deliver to my area?",
+    answer:
+      "Delivery depends on the entered address, the products in the cart and the available fulfilment method. Enter the complete delivery address during checkout to see the options available to the order.",
+  },
+  {
+    question: "How does a cylinder exchange work?",
+    answer:
+      "An exchange-supported option assumes that the eligible empty cylinder described on the product or selected variant will be handed over as the full replacement cylinder is delivered.",
+  },
+  {
+    question: "Do displayed prices include VAT?",
+    answer:
+      "Store product prices are VAT-inclusive unless a product clearly states otherwise. Applicable delivery, handling, deposit, exchange or other charges are displayed separately before the order is confirmed.",
+  },
+] as const;
+
 export function FaqPage() {
   return (
     <article>

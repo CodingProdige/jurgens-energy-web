@@ -87,6 +87,7 @@ import {
   saveProductDraft,
 } from "@/app/(seller)/seller/(dashboard)/products/new/actions";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
+import { getVariantProfitability } from "@/src/modules/products/cost-price";
 import type {
   SellerCreateProductData,
   SellerEditableProductData,
@@ -103,6 +104,7 @@ type ProductPublishStatus = "active" | "draft";
 type GeneratedVariant = {
   barcode: string;
   compareAtPrice: string;
+  costPrice: string;
   continueSellingOutOfStock: boolean;
   exchangeAcceptedReturnBrandsInput: string;
   exchangeConfirmationText: string;
@@ -166,7 +168,7 @@ type MediaSelectionTarget =
   | { type: "bulkVariants" }
   | { type: "product" }
   | { type: "variant"; variantId: string };
-type BulkValueField = "compareAtPrice" | "price" | "stock";
+type BulkValueField = "compareAtPrice" | "costPrice" | "price" | "stock";
 type BulkValueDialogState = {
   field: BulkValueField;
   label: string;
@@ -361,6 +363,68 @@ function getDiscountPercent(price: string, compareAtPrice: string) {
 
 function formatRand(value: number) {
   return `R ${value.toFixed(2)}`;
+}
+
+const randMoneyFormatter = new Intl.NumberFormat("en-ZA", {
+  currency: "ZAR",
+  style: "currency",
+});
+
+const marginFormatter = new Intl.NumberFormat("en-ZA", {
+  maximumFractionDigits: 1,
+  minimumFractionDigits: 1,
+  style: "percent",
+});
+
+function ProfitabilityEstimate({
+  costPrice,
+  price,
+}: {
+  costPrice: string;
+  price: string;
+}) {
+  const profitability = getVariantProfitability({
+    costPrice: costPrice.trim() ? costPrice : null,
+    price,
+  });
+
+  if (!costPrice.trim()) {
+    return (
+      <span className="text-slate-500 dark:text-zinc-400">
+        Add a private cost to estimate gross profit and margin.
+      </span>
+    );
+  }
+
+  if (!profitability) {
+    return (
+      <span className="text-amber-700 dark:text-amber-300">
+        Enter valid selling and cost prices to calculate profitability.
+      </span>
+    );
+  }
+
+  const isLoss = profitability.grossProfitCents < 0;
+  const grossMargin =
+    profitability.grossMarginBps === null
+      ? "Unavailable"
+      : marginFormatter.format(profitability.grossMarginBps / 10_000);
+
+  return (
+    <span
+      className={cn(
+        "font-medium",
+        isLoss
+          ? "text-red-600 dark:text-red-300"
+          : "text-emerald-700 dark:text-emerald-300",
+      )}
+    >
+      {isLoss ? "Estimated gross loss" : "Estimated gross profit"} (VAT-incl.
+      basis): {" "}
+      {randMoneyFormatter.format(profitability.grossProfitCents / 100)} · Margin {" "}
+      {grossMargin}
+    </span>
+  );
 }
 
 function getPricingBreakdown(price: string, compareAtPrice: string) {
@@ -1402,10 +1466,17 @@ function MediaTile({
 
 export function ProductCreateWizard({
   data,
+  enablePrivateCostPricing = false,
   initialProduct,
+  initialPrivateCosts,
 }: {
   data: SellerCreateProductData;
+  enablePrivateCostPricing?: boolean;
   initialProduct?: SellerEditableProductData | null;
+  initialPrivateCosts?: {
+    productCostPrice: string;
+    variantCostPricesById: Record<string, string>;
+  };
 }) {
   const initialVariantOptions =
     initialProduct?.optionSchema.length
@@ -1467,6 +1538,9 @@ export function ProductCreateWizard({
   const [compareAtPrice, setCompareAtPrice] = useState(
     initialProduct?.compareAtPrice ?? "",
   );
+  const [costPrice, setCostPrice] = useState(
+    initialPrivateCosts?.productCostPrice ?? "",
+  );
   const [stock, setStock] = useState(initialProduct?.stock ?? "0");
   const [continueSellingOutOfStock, setContinueSellingOutOfStock] =
     useState(initialProduct?.continueSellingOutOfStock ?? false);
@@ -1492,6 +1566,7 @@ export function ProductCreateWizard({
   const [generatedVariants, setGeneratedVariants] = useState<GeneratedVariant[]>(
     initialProduct?.variants.map((variant) => ({
       ...variant,
+      costPrice: initialPrivateCosts?.variantCostPricesById[variant.id] ?? "",
       exchangeAcceptedReturnBrandsInput: formatExchangeBrandInput(
         variant.exchangeAcceptedReturnBrands,
       ),
@@ -2444,6 +2519,7 @@ export function ProductCreateWizard({
       return {
         barcode: "",
         compareAtPrice,
+        costPrice,
         continueSellingOutOfStock,
         exchangeAcceptedReturnBrandsInput: "",
         exchangeConfirmationText: "",
@@ -2535,6 +2611,7 @@ export function ProductCreateWizard({
       brandName,
       categoryId: selectedCategoryId,
       compareAtPrice,
+      ...(enablePrivateCostPricing ? { costPrice } : {}),
       continueSellingOutOfStock,
       description,
       exchangeAcceptedReturnBrands: parseExchangeBrandInput(
@@ -2566,6 +2643,9 @@ export function ProductCreateWizard({
         ? generatedVariants.map((variant) => ({
             barcode: variant.barcode,
             compareAtPrice: variant.compareAtPrice,
+            ...(enablePrivateCostPricing
+              ? { costPrice: variant.costPrice }
+              : {}),
             continueSellingOutOfStock: variant.continueSellingOutOfStock,
             exchangeAcceptedReturnBrands: parseExchangeBrandInput(
               variant.exchangeAcceptedReturnBrandsInput,
@@ -3542,11 +3622,20 @@ export function ProductCreateWizard({
             title={hasVariants ? "Variant price defaults" : "Pricing"}
             description={
               hasVariants
-                ? "Optional defaults used to prefill newly generated variants. The storefront uses variant prices, starting from the lowest active variant."
-                : "Set the final customer-facing VAT-inclusive price for this product."
+                ? enablePrivateCostPricing
+                  ? "Optional defaults used to prefill newly generated variants. The storefront uses variant prices, while private costs remain internal."
+                  : "Optional defaults used to prefill newly generated variants. The storefront uses variant prices, starting from the lowest active variant."
+                : enablePrivateCostPricing
+                  ? "Set the final customer-facing VAT-inclusive price and, optionally, its private VAT-inclusive cost."
+                  : "Set the final customer-facing VAT-inclusive price for this product."
             }
           >
-            <div className="grid gap-4 md:grid-cols-2">
+            <div
+              className={cn(
+                "grid gap-4 md:grid-cols-2",
+                enablePrivateCostPricing && "xl:grid-cols-3",
+              )}
+            >
               <label className="grid gap-1.5">
                 <FieldLabel
                   info={
@@ -3601,6 +3690,40 @@ export function ProductCreateWizard({
                   value={compareAtPrice}
                 />
               </label>
+              {enablePrivateCostPricing ? (
+                <label className="grid gap-1.5">
+                  <FieldLabel info="Optional private acquisition cost, including VAT. It is used only for internal margin reporting and is never shown to customers.">
+                    {hasVariants
+                      ? "Default private cost (VAT incl.)"
+                      : "Cost price (VAT incl., private)"}
+                  </FieldLabel>
+                  <Input
+                    className={fieldClass}
+                    inputMode="decimal"
+                    min={0}
+                    onChange={(event) =>
+                      setCostPrice(
+                        sanitizeDecimalNumberInput(event.target.value),
+                      )
+                    }
+                    pattern="[0-9]*[.]?[0-9]*"
+                    placeholder="0.00"
+                    step="0.01"
+                    type="number"
+                    value={costPrice}
+                  />
+                  <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                    Optional, VAT inclusive, and private. Customers never see
+                    this value.
+                  </span>
+                  <span className="text-xs leading-5">
+                    <ProfitabilityEstimate
+                      costPrice={costPrice}
+                      price={price}
+                    />
+                  </span>
+                </label>
+              ) : null}
             </div>
             <div
               className={cn(
@@ -3944,6 +4067,21 @@ export function ProductCreateWizard({
                         >
                           Set price
                         </button>
+                        {enablePrivateCostPricing ? (
+                          <button
+                            className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
+                            onClick={() =>
+                              openBulkValueDialog(
+                                "costPrice",
+                                "Set private VAT-inclusive cost",
+                                "Private cost incl. VAT",
+                              )
+                            }
+                            type="button"
+                          >
+                            Set private cost
+                          </button>
+                        ) : null}
                         <button
                           className="flex w-full items-center px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-white/10"
                           onClick={() =>
@@ -4059,6 +4197,20 @@ export function ProductCreateWizard({
                               Compare at (VAT incl.)
                             </ColumnInfoTitle>
                           </TableHead>
+                          {enablePrivateCostPricing ? (
+                            <>
+                              <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                                <ColumnInfoTitle info="Optional private acquisition cost for this variant, including VAT. Customers never see this value.">
+                                  Cost (VAT incl., private)
+                                </ColumnInfoTitle>
+                              </TableHead>
+                              <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
+                                <ColumnInfoTitle info="Live estimate calculated from the VAT-inclusive selling and private cost prices.">
+                                  Profit / margin
+                                </ColumnInfoTitle>
+                              </TableHead>
+                            </>
+                          ) : null}
                           <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
                             <ColumnInfoTitle info="The available stock quantity for this variant.">
                               Stock
@@ -4242,6 +4394,38 @@ export function ProductCreateWizard({
                                   ) : null}
                                 </div>
                               </TableCell>
+                              {enablePrivateCostPricing ? (
+                                <>
+                                  <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
+                                    <Input
+                                      aria-label="Variant private VAT-inclusive cost price"
+                                      className="h-8 w-24 border-slate-300 text-xs"
+                                      inputMode="decimal"
+                                      min={0}
+                                      onChange={(event) =>
+                                        updateGeneratedVariant(variant.id, {
+                                          costPrice: sanitizeDecimalNumberInput(
+                                            event.target.value,
+                                          ),
+                                        })
+                                      }
+                                      pattern="[0-9]*[.]?[0-9]*"
+                                      placeholder="Optional"
+                                      step="0.01"
+                                      type="number"
+                                      value={variant.costPrice}
+                                    />
+                                  </TableCell>
+                                  <TableCell className={cn(dashboardTableCellClass, "hidden min-w-52 md:table-cell")}>
+                                    <span className="text-xs leading-5">
+                                      <ProfitabilityEstimate
+                                        costPrice={variant.costPrice}
+                                        price={variant.price}
+                                      />
+                                    </span>
+                                  </TableCell>
+                                </>
+                              ) : null}
                               <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>
                                 <Input
                                   aria-label="Variant stock"
@@ -4746,7 +4930,12 @@ export function ProductCreateWizard({
                   <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
                     Pricing and stock
                   </h3>
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div
+                    className={cn(
+                      "grid gap-4 md:grid-cols-3",
+                      enablePrivateCostPricing && "xl:grid-cols-4",
+                    )}
+                  >
                     <label className="grid gap-1.5">
                       <FieldLabel info="Final customer-facing variant price, including VAT. Do not enter an ex-VAT amount.">
                         Price (VAT incl.)
@@ -4766,6 +4955,36 @@ export function ProductCreateWizard({
                         value={activeExpandedVariant.price}
                       />
                     </label>
+                    {enablePrivateCostPricing ? (
+                      <label className="grid gap-1.5">
+                        <FieldLabel info="Optional private acquisition cost for this variant, including VAT. It is never shown to customers.">
+                          Cost price (VAT incl., private)
+                        </FieldLabel>
+                        <Input
+                          className={fieldClass}
+                          inputMode="decimal"
+                          min={0}
+                          onChange={(event) =>
+                            updateGeneratedVariant(activeExpandedVariant.id, {
+                              costPrice: sanitizeDecimalNumberInput(
+                                event.target.value,
+                              ),
+                            })
+                          }
+                          pattern="[0-9]*[.]?[0-9]*"
+                          placeholder="Optional"
+                          step="0.01"
+                          type="number"
+                          value={activeExpandedVariant.costPrice}
+                        />
+                        <span className="text-xs leading-5">
+                          <ProfitabilityEstimate
+                            costPrice={activeExpandedVariant.costPrice}
+                            price={activeExpandedVariant.price}
+                          />
+                        </span>
+                      </label>
+                    ) : null}
                     <label className="grid gap-1.5">
                       <FieldLabel info="Optional original VAT-inclusive price for markdown display. It must be higher than the selling price.">
                         Compare-at price (VAT incl.)

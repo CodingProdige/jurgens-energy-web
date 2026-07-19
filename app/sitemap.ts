@@ -4,6 +4,10 @@ import { getPublishedBlogPostSitemapEntries } from "@/src/modules/blog";
 import { getMarketplaceSitemapEntries } from "@/src/modules/marketplace/catalog";
 import { POLICY_EFFECTIVE_DATE_ISO } from "@/src/modules/marketplace/policies/constants";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
+import {
+  getStaticPageSeoUpdatedAtMap,
+  type StaticSeoPageKey,
+} from "@/src/modules/marketplace/static-page-seo";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +27,14 @@ function latestDate(dates: Array<Date | null | undefined>) {
 
     return !latest || date.getTime() > latest.getTime() ? date : latest;
   }, null);
+}
+
+function staticPageLastModified(
+  key: StaticSeoPageKey,
+  fallback: Date,
+  updates: Partial<Record<StaticSeoPageKey, Date>>,
+) {
+  return latestDate([fallback, updates[key]]) ?? fallback;
 }
 
 function sitemapEntry({
@@ -45,9 +57,10 @@ function sitemapEntry({
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalogEntries, blogEntries] = await Promise.all([
+  const [catalogEntries, blogEntries, staticSeoUpdatedAt] = await Promise.all([
     getMarketplaceSitemapEntries(),
     getPublishedBlogPostSitemapEntries(),
+    getStaticPageSeoUpdatedAtMap(),
   ]);
   const now = new Date();
   const latestProductDate = latestDate(
@@ -71,73 +84,131 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     sitemapEntry({
       changeFrequency: "weekly",
-      lastModified: latestMarketplaceDate,
+      lastModified: staticPageLastModified(
+        "home",
+        latestMarketplaceDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/",
       priority: 1,
     }),
     sitemapEntry({
       changeFrequency: "daily",
-      lastModified: latestProductDate ?? latestMarketplaceDate,
+      lastModified: staticPageLastModified(
+        "products",
+        latestProductDate ?? latestMarketplaceDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/products",
       priority: 0.9,
     }),
     sitemapEntry({
       changeFrequency: "weekly",
-      lastModified: latestBlogDate ?? latestMarketplaceDate,
+      lastModified: staticPageLastModified(
+        "blog",
+        latestBlogDate ?? latestMarketplaceDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/blog",
       priority: 0.7,
     }),
     sitemapEntry({
       changeFrequency: "weekly",
-      lastModified: latestBrandDate ?? latestMarketplaceDate,
+      lastModified: staticPageLastModified(
+        "brands",
+        latestBrandDate ?? latestMarketplaceDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/brands",
       priority: 0.7,
     }),
     sitemapEntry({
       changeFrequency: "monthly",
-      lastModified: contentPageLastModified,
+      lastModified: staticPageLastModified(
+        "lpg-delivery",
+        contentPageLastModified,
+        staticSeoUpdatedAt,
+      ),
+      path: "/lpg-delivery",
+      priority: 0.8,
+    }),
+    sitemapEntry({
+      changeFrequency: "monthly",
+      lastModified: staticPageLastModified(
+        "about",
+        contentPageLastModified,
+        staticSeoUpdatedAt,
+      ),
       path: "/about",
       priority: 0.6,
     }),
     sitemapEntry({
       changeFrequency: "monthly",
-      lastModified: contentPageLastModified,
+      lastModified: staticPageLastModified(
+        "contact",
+        contentPageLastModified,
+        staticSeoUpdatedAt,
+      ),
       path: "/contact",
       priority: 0.6,
     }),
     sitemapEntry({
       changeFrequency: "monthly",
-      lastModified: contentPageLastModified,
+      lastModified: staticPageLastModified(
+        "faq",
+        contentPageLastModified,
+        staticSeoUpdatedAt,
+      ),
       path: "/faq",
       priority: 0.6,
     }),
     sitemapEntry({
       changeFrequency: "monthly",
-      lastModified: contentPageLastModified,
+      lastModified: staticPageLastModified(
+        "lpg-safety",
+        contentPageLastModified,
+        staticSeoUpdatedAt,
+      ),
       path: "/lpg-safety",
       priority: 0.6,
     }),
     sitemapEntry({
       changeFrequency: "yearly",
-      lastModified: policyEffectiveDate,
+      lastModified: staticPageLastModified(
+        "privacy-policy",
+        policyEffectiveDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/privacy-policy",
       priority: 0.4,
     }),
     sitemapEntry({
       changeFrequency: "yearly",
-      lastModified: policyEffectiveDate,
+      lastModified: staticPageLastModified(
+        "terms-and-conditions",
+        policyEffectiveDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/terms-and-conditions",
       priority: 0.4,
     }),
     sitemapEntry({
       changeFrequency: "yearly",
-      lastModified: policyEffectiveDate,
+      lastModified: staticPageLastModified(
+        "returns-and-refunds",
+        policyEffectiveDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/returns-and-refunds",
       priority: 0.4,
     }),
     sitemapEntry({
       changeFrequency: "yearly",
-      lastModified: policyEffectiveDate,
+      lastModified: staticPageLastModified(
+        "delivery-information",
+        policyEffectiveDate,
+        staticSeoUpdatedAt,
+      ),
       path: "/delivery-information",
       priority: 0.4,
     }),

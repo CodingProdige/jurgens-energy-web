@@ -16,6 +16,7 @@ import {
   payments,
   shipments,
 } from "@/src/db/schema";
+import type { CampaignAttributionSnapshot } from "@/src/modules/marketing/campaign-attribution";
 
 const orderIdSchema = z.string().uuid();
 
@@ -26,6 +27,7 @@ function toMoney(value: string | number | null | undefined) {
 }
 
 export type AdminOrderDetail = {
+  campaignAttribution: CampaignAttributionSnapshot | null;
   createdAt: Date;
   currency: string;
   customer: {
@@ -153,6 +155,7 @@ export async function getAdminOrderDetail(
 
   const [order] = await db
     .select({
+      campaignAttribution: orders.campaignAttributionSnapshot,
       createdAt: orders.createdAt,
       currency: orders.currency,
       customerEmail: orders.customerEmail,
@@ -338,6 +341,7 @@ export async function getAdminOrderDetail(
   );
 
   return {
+    campaignAttribution: order.campaignAttribution,
     createdAt: order.createdAt,
     currency: order.currency,
     customer: {

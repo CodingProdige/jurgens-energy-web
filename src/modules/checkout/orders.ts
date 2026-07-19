@@ -33,6 +33,7 @@ import {
   updateCustomerAddress,
 } from "@/src/modules/marketplace/account/addresses";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
+import type { CampaignAttributionSnapshot } from "@/src/modules/marketing/campaign-attribution";
 import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
 import {
   linkWhatsappNumberToUser,
@@ -186,6 +187,9 @@ export async function getLatestOwnedCheckoutAddress(
 
 export async function createHostedCheckoutOrder(
   input: CreateCheckoutOrderRequest,
+  context: {
+    campaignAttribution?: CampaignAttributionSnapshot | null;
+  } = {},
 ) {
   const parsed = createCheckoutOrderRequestSchema.parse(input);
   const [session, payFastConfig, cart] = await Promise.all([
@@ -392,6 +396,7 @@ export async function createHostedCheckoutOrder(
       .insert(orders)
       .values({
         billingDetailsSnapshot,
+        campaignAttributionSnapshot: context.campaignAttribution ?? null,
         checkoutTokenHash,
         currency: "ZAR",
         customerEmail: checkoutDetails.customer.email.toLowerCase(),

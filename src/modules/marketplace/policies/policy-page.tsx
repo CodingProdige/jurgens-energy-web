@@ -16,6 +16,8 @@ import {
   policyLinks,
 } from "@/src/modules/marketplace/policies/documents";
 import { POLICY_EFFECTIVE_DATE_ISO } from "@/src/modules/marketplace/policies/constants";
+import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
+import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 
 const policyIcons = {
   delivery: TruckIcon,
@@ -24,7 +26,13 @@ const policyIcons = {
   terms: ClipboardCheckIcon,
 } satisfies Record<PolicyKind, typeof ShieldCheckIcon>;
 
-export function PolicyPage({ document }: { document: PolicyDocument }) {
+export function PolicyPage({
+  businessIdentity,
+  document,
+}: {
+  businessIdentity?: PublicBusinessIdentity;
+  document: PolicyDocument;
+}) {
   const DocumentIcon = policyIcons[document.kind];
   const relatedPolicies = policyLinks.filter(
     (policy) => policy.kind !== document.kind,
@@ -148,6 +156,14 @@ export function PolicyPage({ document }: { document: PolicyDocument }) {
               </section>
             ))}
           </div>
+
+          {businessIdentity ? (
+            <PublicBusinessIdentityDisclosure
+              className="mt-7"
+              identity={businessIdentity}
+              title="The operator of this store"
+            />
+          ) : null}
 
           <section className="mt-7 overflow-hidden rounded-lg bg-[#1a1a1a] px-5 py-6 text-[#f7f7f2] sm:px-7 sm:py-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

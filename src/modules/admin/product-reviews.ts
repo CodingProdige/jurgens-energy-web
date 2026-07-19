@@ -66,6 +66,14 @@ export type AdminProductReviewRow = {
   variants: AdminProductReviewVariant[];
 };
 
+export type AdminProductVariant = AdminProductReviewVariant & {
+  costPrice: string | null;
+};
+
+export type AdminProductRow = Omit<AdminProductReviewRow, "variants"> & {
+  variants: AdminProductVariant[];
+};
+
 export type AdminProductReviewsData = {
   metrics: {
     approved: number;
@@ -96,7 +104,7 @@ export type AdminProductsData = {
     warehouseFulfilled: number;
     variants: number;
   };
-  products: AdminProductReviewRow[];
+  products: AdminProductRow[];
 };
 
 function getMetricCount(
@@ -333,7 +341,32 @@ export async function getAdminProductReviews(): Promise<AdminProductReviewsData>
 
 export async function getAdminProducts(): Promise<AdminProductsData> {
   const data = await getAdminProductReviews();
-  const products = data.reviews;
+  const variantIds = data.reviews.flatMap((product) =>
+    product.variants.map((variant) => variant.id),
+  );
+  const costRows =
+    variantIds.length > 0
+      ? await db
+          .select({
+            costPrice: productVariants.costPrice,
+            id: productVariants.id,
+          })
+          .from(productVariants)
+          .where(inArray(productVariants.id, variantIds))
+      : [];
+  const costPriceByVariantId = new Map(
+    costRows.map((variant) => [variant.id, variant.costPrice]),
+  );
+  const products = data.reviews.map(
+    (product) =>
+      ({
+        ...product,
+        variants: product.variants.map((variant) => ({
+          ...variant,
+          costPrice: costPriceByVariantId.get(variant.id) ?? null,
+        })),
+      }) satisfies AdminProductRow,
+  );
 
   return {
     metrics: {

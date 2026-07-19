@@ -21,6 +21,10 @@ import { processAndStoreMediaUpload } from "@/src/modules/media/admin";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import { getOpenAiIntegrationConfig } from "@/src/modules/marketplace/settings";
+import {
+  optionalCostPriceInputSchema,
+  resolveOptionalCostPriceForSave,
+} from "@/src/modules/products/cost-price";
 import { fulfillmentModeSchema } from "@/src/modules/shipping";
 
 const productDescriptionGenerationSchema = z.object({
@@ -49,6 +53,7 @@ const productDraftVariantSchema = z.object({
   barcode: z.string().trim().max(120).optional(),
   compareAtPrice: z.string().trim().max(40).optional(),
   continueSellingOutOfStock: z.boolean().default(false),
+  costPrice: optionalCostPriceInputSchema,
   exchangeAcceptedReturnBrands: z
     .array(z.string().trim().min(1).max(80))
     .max(30)
@@ -76,6 +81,7 @@ const productDraftSchema = z.object({
   categoryId: z.string().uuid().nullable().optional(),
   compareAtPrice: z.string().trim().max(40).optional(),
   continueSellingOutOfStock: z.boolean().default(false),
+  costPrice: optionalCostPriceInputSchema,
   description: z.string().trim().max(400).optional(),
   exchangeAcceptedReturnBrands: z
     .array(z.string().trim().min(1).max(80))
@@ -193,48 +199,80 @@ function getExchangeConfirmationText({
     : "I confirm I have an empty cylinder in acceptable condition to exchange on delivery.";
 }
 
-function buildVariantRows(input: ParsedProductDraftInput) {
+function buildVariantRows(
+  input: ParsedProductDraftInput,
+  existingCosts: Array<{ costPrice: string | null; sku: string }> = [],
+) {
+  const existingCostBySku = new Map(
+    existingCosts.map((variant) => [variant.sku.toLowerCase(), variant.costPrice]),
+  );
+  const existingSingleVariantCost =
+    existingCosts.length === 1 ? existingCosts[0]?.costPrice ?? null : null;
+
   if (input.hasVariants) {
-    return input.variants.map((variant) => ({
-      barcode: variant.barcode?.trim() || null,
-      compareAtPrice: parseOptionalMoney(variant.compareAtPrice),
-      continueSellingOutOfStock: variant.continueSellingOutOfStock,
-      exchangeAcceptedReturnBrands: variant.exchangeRequiresEmpty
-        ? normalizeExchangeBrands(variant.exchangeAcceptedReturnBrands)
-        : [],
-      exchangeConfirmationText: getExchangeConfirmationText({
-        customText: variant.exchangeConfirmationText,
-        emptyCylinderSize: variant.exchangeEmptyCylinderSize,
-        requiresExchangeEmpty: variant.exchangeRequiresEmpty,
-      }),
-      exchangeEmptyCylinderSize: variant.exchangeRequiresEmpty
-        ? variant.exchangeEmptyCylinderSize?.trim() || null
-        : null,
-      exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
-      heightMm: parseOptionalMetric(variant.heightMm) ?? parseOptionalMetric(input.heightMm),
-      imageId: variant.imageId ?? null,
-      isActive: variant.status === "active",
-      lengthMm: parseOptionalMetric(variant.lengthMm) ?? parseOptionalMetric(input.lengthMm),
-      lowStockAlert: parseStock(variant.lowStockAlert || "5"),
-      notes: variant.notes?.trim() || null,
-      optionValues: variant.optionValues,
-      parcelPresetId: variant.parcelPresetId ?? input.parcelPresetId ?? null,
-      price: parseRequiredMoney(variant.price || input.price),
-      sku: variant.sku.trim(),
-      status: variant.status,
-      stockOnHand: parseStock(variant.stock),
-      title: variant.optionValues.join(" / ") || input.productName,
-      weightGrams:
-        parseOptionalMetric(variant.weightGrams) ?? parseOptionalMetric(input.weightGrams),
-      widthMm: parseOptionalMetric(variant.widthMm) ?? parseOptionalMetric(input.widthMm),
-    }));
+    return input.variants.map((variant) => {
+      const sku = variant.sku.trim();
+
+      return {
+        barcode: variant.barcode?.trim() || null,
+        compareAtPrice: parseOptionalMoney(variant.compareAtPrice),
+        continueSellingOutOfStock: variant.continueSellingOutOfStock,
+        costPrice: resolveOptionalCostPriceForSave({
+          existingCostPrice:
+            existingCostBySku.get(sku.toLowerCase()) ?? null,
+          input: variant.costPrice,
+        }),
+        exchangeAcceptedReturnBrands: variant.exchangeRequiresEmpty
+          ? normalizeExchangeBrands(variant.exchangeAcceptedReturnBrands)
+          : [],
+        exchangeConfirmationText: getExchangeConfirmationText({
+          customText: variant.exchangeConfirmationText,
+          emptyCylinderSize: variant.exchangeEmptyCylinderSize,
+          requiresExchangeEmpty: variant.exchangeRequiresEmpty,
+        }),
+        exchangeEmptyCylinderSize: variant.exchangeRequiresEmpty
+          ? variant.exchangeEmptyCylinderSize?.trim() || null
+          : null,
+        exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
+        heightMm:
+          parseOptionalMetric(variant.heightMm) ??
+          parseOptionalMetric(input.heightMm),
+        imageId: variant.imageId ?? null,
+        isActive: variant.status === "active",
+        lengthMm:
+          parseOptionalMetric(variant.lengthMm) ??
+          parseOptionalMetric(input.lengthMm),
+        lowStockAlert: parseStock(variant.lowStockAlert || "5"),
+        notes: variant.notes?.trim() || null,
+        optionValues: variant.optionValues,
+        parcelPresetId: variant.parcelPresetId ?? input.parcelPresetId ?? null,
+        price: parseRequiredMoney(variant.price || input.price),
+        sku,
+        status: variant.status,
+        stockOnHand: parseStock(variant.stock),
+        title: variant.optionValues.join(" / ") || input.productName,
+        weightGrams:
+          parseOptionalMetric(variant.weightGrams) ??
+          parseOptionalMetric(input.weightGrams),
+        widthMm:
+          parseOptionalMetric(variant.widthMm) ??
+          parseOptionalMetric(input.widthMm),
+      };
+    });
   }
+
+  const sku = input.sku.trim();
 
   return [
     {
       barcode: input.barcode?.trim() || null,
       compareAtPrice: parseOptionalMoney(input.compareAtPrice),
       continueSellingOutOfStock: input.continueSellingOutOfStock,
+      costPrice: resolveOptionalCostPriceForSave({
+        existingCostPrice:
+          existingCostBySku.get(sku.toLowerCase()) ?? existingSingleVariantCost,
+        input: input.costPrice,
+      }),
       exchangeAcceptedReturnBrands: input.exchangeRequiresEmpty
         ? normalizeExchangeBrands(input.exchangeAcceptedReturnBrands)
         : [],
@@ -256,7 +294,7 @@ function buildVariantRows(input: ParsedProductDraftInput) {
       optionValues: [],
       parcelPresetId: input.parcelPresetId ?? null,
       price: parseRequiredMoney(input.price),
-      sku: input.sku.trim(),
+      sku,
       status: "active" as const,
       stockOnHand: parseStock(input.stock),
       title: input.productName,
@@ -518,8 +556,45 @@ export async function saveProductDraft(input: ProductDraftInput) {
   }
 
   const draft = parsed.data;
+  const [existingProduct, existingVariantCosts] = draft.productId
+    ? await Promise.all([
+        db
+          .select({
+            id: products.id,
+            status: products.status,
+          })
+          .from(products)
+          .where(eq(products.id, draft.productId))
+          .limit(1)
+          .then(([product]) => product ?? null),
+        db
+          .select({
+            costPrice: productVariants.costPrice,
+            sku: productVariants.sku,
+          })
+          .from(productVariants)
+          .where(eq(productVariants.productId, draft.productId)),
+      ])
+    : [null, []];
 
-  const variantRows = buildVariantRows(draft);
+  if (draft.productId && !existingProduct) {
+    return {
+      ok: false,
+      message: "This product draft could not be confirmed.",
+    };
+  }
+
+  if (
+    existingProduct &&
+    ["archived", "admin_suspended"].includes(existingProduct.status)
+  ) {
+    return {
+      ok: false,
+      message: "Archived or suspended products cannot be edited here.",
+    };
+  }
+
+  const variantRows = buildVariantRows(draft, existingVariantCosts);
 
   if (variantRows.length === 0) {
     return {
@@ -542,35 +617,6 @@ export async function saveProductDraft(input: ProductDraftInput) {
     return {
       ok: false,
       message: "Every variant SKU must be unique in this product.",
-    };
-  }
-
-  const existingProduct = draft.productId
-    ? await db
-        .select({
-          id: products.id,
-          status: products.status,
-        })
-        .from(products)
-        .where(eq(products.id, draft.productId))
-        .limit(1)
-        .then(([product]) => product ?? null)
-    : null;
-
-  if (draft.productId && !existingProduct) {
-    return {
-      ok: false,
-      message: "This product draft could not be confirmed.",
-    };
-  }
-
-  if (
-    existingProduct &&
-    ["archived", "admin_suspended"].includes(existingProduct.status)
-  ) {
-    return {
-      ok: false,
-      message: "Archived or suspended products cannot be edited here.",
     };
   }
 
@@ -748,6 +794,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
         barcode: variant.barcode,
         compareAtPrice: variant.compareAtPrice,
         continueSellingOutOfStock: variant.continueSellingOutOfStock,
+        costPrice: variant.costPrice,
         exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands,
         exchangeConfirmationText: variant.exchangeConfirmationText,
         exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,

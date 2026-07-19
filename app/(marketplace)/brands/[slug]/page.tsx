@@ -11,6 +11,7 @@ import {
   parseMarketplaceCatalogFilters,
   type MarketplaceCatalogSearchParams,
 } from "@/src/modules/marketplace/catalog-filters";
+import { createMarketplaceDynamicPageMetadata } from "@/src/modules/marketplace/dynamic-page-metadata";
 
 export async function generateMetadata({
   params,
@@ -20,12 +21,29 @@ export async function generateMetadata({
   const { slug } = await params;
   const brand = (await getMarketplaceBrands()).find((item) => item.slug === slug);
 
-  return {
-    title: brand?.name ?? "Brand",
-    description: brand
-      ? `Shop ${brand.name} products from Jurgens Energy.`
-      : "Shop Jurgens Energy products by brand.",
-  };
+  if (!brand) {
+    return {
+      title: "Brand",
+      description: "Shop Jurgens Energy products by brand.",
+    };
+  }
+
+  return createMarketplaceDynamicPageMetadata({
+    description: `Shop ${brand.name} products from Jurgens Energy. Compare ${brand.productCount} current ${brand.productCount === 1 ? "option" : "options"}, prices, stock and available delivery methods online.`,
+    image: brand.firstProductImageUrl
+      ? {
+          alt: `${brand.name} products`,
+          url: brand.firstProductImageUrl,
+        }
+      : brand.logoUrl
+        ? {
+            alt: brand.name,
+            url: brand.logoUrl,
+          }
+        : null,
+    path: `/brands/${brand.slug}`,
+    title: `${brand.name} Products`,
+  });
 }
 
 export default async function BrandPage({

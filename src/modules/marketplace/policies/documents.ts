@@ -119,8 +119,9 @@ export const privacyPolicy: PolicyDocument = {
       id: "cookies-and-analytics",
       title: "6. Cookies, local storage, and analytics",
       paragraphs: [
-        "The website may use cookies or similar browser storage for essential functions such as security, sign-in, cart contents, currency, theme, and marketplace access. If analytics or advertising tools are enabled, they may set additional identifiers and record how the site is used.",
-        "You can limit or delete browser storage through your browser settings. Blocking essential storage may prevent sign-in, checkout, saved preferences, or other parts of the store from working correctly. Where a consent choice is presented, we apply that choice to the tools covered by it.",
+        "The website uses cookies or similar browser storage for essential functions such as security, sign-in, cart contents, currency, theme, marketplace access, and remembering your privacy choices. Essential storage is required for those functions and is not used to create an advertising profile.",
+        "Where configured, Google Analytics and Google Ads may measure page visits, product interactions, enquiries, completed purchases, and which campaign led to an order. These optional tools start with analytics and advertising storage denied. They receive the choice made through the cookie controls, and the advertising-attribution record is stored only after advertising consent. A captured campaign record may include UTM campaign values or a Google click identifier and is retained for up to 90 days so that an order can be attributed to the campaign that led to it.",
+        "You can change or withdraw optional consent at any time through Cookie settings. Withdrawal updates Google Consent Mode, removes applicable first-party measurement cookies that are accessible to the website, and clears our campaign-attribution cookie. You can also limit or delete browser storage through your browser settings. Blocking essential storage may prevent sign-in, checkout, saved preferences, or other parts of the store from working correctly.",
       ],
     },
     {

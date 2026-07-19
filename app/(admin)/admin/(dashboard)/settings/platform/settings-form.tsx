@@ -768,7 +768,9 @@ export function GoogleMarketingSettingsForm({
             />
           </div>
           <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            Loads the GTM container on public marketplace pages only.
+            Loads the GTM container on public marketplace pages. When this is
+            set, GTM owns the GA4 and Google Ads tags so direct Google tag IDs
+            below are not loaded a second time.
           </p>
         </div>
 
@@ -787,6 +789,10 @@ export function GoogleMarketingSettingsForm({
               placeholder="G-XXXXXXXXXX"
             />
           </div>
+          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            Used for consent-aware page, product, cart, checkout and verified
+            purchase events when no GTM container is configured.
+          </p>
         </div>
 
         <div className="grid gap-2">
@@ -820,8 +826,8 @@ export function GoogleMarketingSettingsForm({
             />
           </div>
           <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            Saved for checkout conversion events and future campaign-specific
-            tracking.
+            Together with the Ads ID, sends one purchase conversion only after
+            PayFast confirms payment. Refreshes are deduplicated by order.
           </p>
         </div>
 
@@ -2100,7 +2106,7 @@ export function ShippingSettingsForm({
           </label>
           <div className="grid gap-2 lg:col-span-2">
             <Label htmlFor="jurgensDeliveryCutoffTime">
-              Jurgens same-day cutoff
+              Jurgens preferred-date cutoff
             </Label>
             <Input
               id="jurgensDeliveryCutoffTime"
@@ -2109,9 +2115,9 @@ export function ShippingSettingsForm({
               defaultValue={jurgensDeliveryCutoffTime}
             />
             <p className="text-xs leading-5 text-slate-500">
-              Jurgens-delivered products show a same-day countdown until this
-              South African time, then switch to delivery tomorrow. Bob Go
-              courier items do not show delivery estimates.
+              Controls whether today is offered as an optional preferred date
+              for Jurgens-delivered items. This does not guarantee delivery on
+              the selected date. Bob Go courier items use their quoted service.
             </p>
           </div>
           <div className="grid gap-2 lg:col-span-2">

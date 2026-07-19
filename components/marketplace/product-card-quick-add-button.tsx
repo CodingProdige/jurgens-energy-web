@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { addLocalCartItem } from "@/src/modules/cart";
+import { trackGoogleEvent } from "@/src/modules/analytics/google";
 import type { MarketplaceProductCard as MarketplaceProductCardData } from "@/src/modules/marketplace/catalog";
 
 type ProductCardQuickAddButtonProps = {
@@ -46,6 +47,19 @@ export function ProductCardQuickAddButton({
       variantId: product.quickAddVariantId,
     });
 
+    trackGoogleEvent("add_to_cart", {
+      items: [
+        {
+          affiliation: "Jurgens Energy",
+          item_brand: product.brandName ?? undefined,
+          item_category: product.category?.name,
+          item_id: product.quickAddVariantId,
+          item_name: product.title,
+          quantity: 1,
+        },
+      ],
+    });
+
     setAdded(true);
 
     if (resetTimeoutRef.current) {
@@ -63,6 +77,11 @@ export function ProductCardQuickAddButton({
           "grid size-8 shrink-0 place-items-center rounded-md bg-[#ff5a1f] text-white transition hover:bg-[#e84c15] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25",
           className,
         )}
+        data-analytics-event="select_item"
+        data-analytics-item-brand={product.brandName ?? undefined}
+        data-analytics-item-category={product.category?.name ?? undefined}
+        data-analytics-item-id={product.id}
+        data-analytics-item-name={product.title}
         href={productHref}
         title="Choose options"
       >

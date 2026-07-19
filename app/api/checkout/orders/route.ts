@@ -1,5 +1,11 @@
+import { cookies } from "next/headers";
+
 import { createCheckoutOrderRequestSchema } from "@/src/modules/checkout/contracts";
 import { createHostedCheckoutOrder } from "@/src/modules/checkout/orders";
+import {
+  CAMPAIGN_ATTRIBUTION_COOKIE_NAME,
+  parseCampaignAttributionCookie,
+} from "@/src/modules/marketing/campaign-attribution";
 import {
   checkRateLimit,
   getClientIp,
@@ -49,7 +55,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await createHostedCheckoutOrder(parsed.data);
+    const cookieStore = await cookies();
+    const campaignAttribution = parseCampaignAttributionCookie(
+      cookieStore.get(CAMPAIGN_ATTRIBUTION_COOKIE_NAME)?.value,
+    );
+    const result = await createHostedCheckoutOrder(parsed.data, {
+      campaignAttribution,
+    });
 
     return Response.json(result, {
       headers: { "Cache-Control": "private, no-store" },

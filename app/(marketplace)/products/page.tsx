@@ -7,12 +7,11 @@ import {
   parseMarketplaceCatalogFilters,
   type MarketplaceCatalogSearchParams,
 } from "@/src/modules/marketplace/catalog-filters";
+import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 
-export const metadata: Metadata = {
-  title: "All Products",
-  description:
-    "Shop LPG cylinders, exchange-supported options, and gas accessories from Jurgens Energy.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return getStaticPageMetadata("products");
+}
 
 export default async function ProductsPage({
   searchParams,

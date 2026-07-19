@@ -20,6 +20,11 @@ export function MarketplaceProductCard({
       <Link
         aria-label={`View ${product.title}`}
         className="absolute inset-0 z-10"
+        data-analytics-event="select_item"
+        data-analytics-item-brand={product.brandName ?? undefined}
+        data-analytics-item-category={product.category?.name ?? undefined}
+        data-analytics-item-id={product.id}
+        data-analytics-item-name={product.title}
         href={productHref}
       />
 

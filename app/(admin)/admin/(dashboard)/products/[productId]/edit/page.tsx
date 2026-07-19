@@ -5,6 +5,7 @@ import { ProductCreateWizard } from "@/app/(seller)/seller/(dashboard)/products/
 import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
+  getAdminEditableProductCostData,
   getSellerCreateProductData,
   getSellerEditableProductData,
 } from "@/src/modules/sellers/product-create";
@@ -32,17 +33,25 @@ export default async function EditAdminProductPage({
     return <RestrictedAdminPage />;
   }
 
-  const [data, initialProduct] = await Promise.all([
+  const [data, initialProduct, initialPrivateCosts] = await Promise.all([
     getSellerCreateProductData(access.session.user.id),
     getSellerEditableProductData({
       productId,
       userId: access.session.user.id,
     }),
+    getAdminEditableProductCostData({ productId }),
   ]);
 
-  if (!initialProduct) {
+  if (!initialProduct || !initialPrivateCosts) {
     notFound();
   }
 
-  return <ProductCreateWizard data={data} initialProduct={initialProduct} />;
+  return (
+    <ProductCreateWizard
+      data={data}
+      enablePrivateCostPricing
+      initialPrivateCosts={initialPrivateCosts}
+      initialProduct={initialProduct}
+    />
+  );
 }

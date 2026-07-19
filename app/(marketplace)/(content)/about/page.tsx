@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 
 import { AboutPage } from "@/src/modules/marketplace/content/about-page";
+import { getPublicBusinessIdentity } from "@/src/modules/business-information";
+import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 
-export const metadata: Metadata = {
-  title: "About Us",
-  description:
-    "Meet Jurgens Energy and learn how we make LPG cylinder orders, exchanges, delivery and customer support straightforward.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return getStaticPageMetadata("about");
+}
 
-export default function AboutRoute() {
-  return <AboutPage />;
+export default async function AboutRoute() {
+  const businessIdentity = await getPublicBusinessIdentity();
+
+  return <AboutPage businessIdentity={businessIdentity} />;
 }

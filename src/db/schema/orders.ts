@@ -15,6 +15,7 @@ import { brands, categories } from "@/src/db/schema/catalog";
 import { productVariants } from "@/src/db/schema/products";
 import { sellers } from "@/src/db/schema/sellers";
 import { users } from "@/src/db/schema/users";
+import type { CampaignAttributionSnapshot } from "@/src/modules/marketing/campaign-attribution";
 
 export const orderStatus = pgEnum("order_status", [
   "pending",
@@ -61,6 +62,9 @@ export const orders = pgTable("orders", {
     returnsAndRefundsPath: string;
     termsAndConditionsPath: string;
   }>(),
+  campaignAttributionSnapshot: jsonb(
+    "campaign_attribution_snapshot",
+  ).$type<CampaignAttributionSnapshot>(),
   checkoutTokenHash: varchar("checkout_token_hash", { length: 64 }),
   currency: varchar("currency", { length: 3 }).notNull().default("ZAR"),
   status: orderStatus("status").notNull().default("pending"),

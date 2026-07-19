@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { db } from "@/src/db";
 import { storefrontPages } from "@/src/db/schema";
+import { replaceLegacyDefaultStorefrontClaims } from "@/src/modules/marketplace/storefront-legacy-defaults";
 import {
   cloneStorefrontSections,
   defaultStorefrontSections,
@@ -375,7 +376,9 @@ function parseStoredSections(value: unknown) {
     return fallbackSections();
   }
 
-  return normalizeSectionComponentCodes(parsed.data as StorefrontSection[]);
+  return replaceLegacyDefaultStorefrontClaims(
+    normalizeSectionComponentCodes(parsed.data as StorefrontSection[]),
+  );
 }
 
 export function validateStorefrontSections(value: unknown) {

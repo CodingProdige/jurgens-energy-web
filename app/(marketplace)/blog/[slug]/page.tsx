@@ -17,6 +17,12 @@ import {
   getPublishedBlogPostBySlug,
   getPublishedBlogPosts,
 } from "@/src/modules/blog";
+import { createMarketplaceDynamicPageMetadata } from "@/src/modules/marketplace/dynamic-page-metadata";
+import {
+  createArticleStructuredData,
+  createBreadcrumbStructuredData,
+  MarketplaceJsonLd,
+} from "@/src/modules/marketplace/structured-data";
 
 export const dynamic = "force-dynamic";
 
@@ -35,17 +41,28 @@ export async function generateMetadata({
     };
   }
 
-  return {
-    title: post.seoTitle ?? post.title,
-    description:
-      post.seoDescription ??
-      post.excerpt ??
-      "Read Jurgens Energy LPG advice, safety notes, and delivery updates.",
-    openGraph: {
-      images: post.coverImageUrl ? [post.coverImageUrl] : undefined,
-      title: post.seoTitle ?? post.title,
+  const title = post.seoTitle ?? post.title;
+  const description =
+    post.seoDescription ??
+    post.excerpt ??
+    "Read Jurgens Energy LPG advice, safety notes, and delivery updates.";
+
+  return createMarketplaceDynamicPageMetadata({
+    article: {
+      authorNames: post.authorName ? [post.authorName] : undefined,
+      modifiedAt: post.updatedAt,
+      publishedAt: post.publishedAt,
     },
-  };
+    description,
+    image: post.coverImageUrl
+      ? {
+          alt: post.title,
+          url: post.coverImageUrl,
+        }
+      : null,
+    path: `/blog/${post.slug}`,
+    title,
+  });
 }
 
 export default async function BlogPostPage({
@@ -67,6 +84,27 @@ export default async function BlogPostPage({
   return (
     <MarketplaceGate>
       <div className="min-h-screen bg-[#f7f7f2] text-[#080808] dark:bg-[#080808] dark:text-[#f7f7f2]">
+        <MarketplaceJsonLd
+          data={[
+            createArticleStructuredData({
+              authorName: post.authorName,
+              dateModified: post.updatedAt,
+              datePublished: post.publishedAt,
+              description:
+                post.seoDescription ??
+                post.excerpt ??
+                "Jurgens Energy LPG advice, safety information and delivery updates.",
+              imageUrl: post.coverImageUrl,
+              path: `/blog/${post.slug}`,
+              title: post.title,
+            }),
+            createBreadcrumbStructuredData([
+              { name: "Home", path: "/" },
+              { name: "Blog", path: "/blog" },
+              { name: post.title, path: `/blog/${post.slug}` },
+            ]),
+          ]}
+        />
         <MarketplaceHeader />
         <main className="w-full overflow-hidden bg-white dark:bg-[#101010] sm:mx-auto sm:w-[min(1500px,calc(100%-1rem))] sm:border-x sm:border-b sm:border-[#e8e8e2] sm:shadow-[0_18px_60px_rgba(8,8,8,0.06)] sm:dark:border-white/10">
           <article className="mx-auto w-full max-w-[1120px] px-4 py-7 sm:px-6 sm:py-11 lg:px-10">

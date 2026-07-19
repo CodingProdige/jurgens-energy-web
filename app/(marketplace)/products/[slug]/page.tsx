@@ -18,8 +18,16 @@ import {
   type MarketplaceProductCard,
   type MarketplaceProductDetail,
 } from "@/src/modules/marketplace/catalog";
-import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
+import {
+  compactMarketplaceMetadataDescription,
+  createMarketplaceDynamicPageMetadata,
+} from "@/src/modules/marketplace/dynamic-page-metadata";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import {
+  createBreadcrumbStructuredData,
+  createProductStructuredData,
+  MarketplaceJsonLd,
+} from "@/src/modules/marketplace/structured-data";
 
 const productSearchParamsSchema = z.object({
   variant: z.string().uuid().optional(),
@@ -41,20 +49,23 @@ export async function generateMetadata({
     };
   }
 
-  return {
-    alternates: {
-      canonical: createMarketplaceCanonicalUrl(`/products/${product.slug}`),
-    },
-    title: product.title,
-    description:
-      product.shortDescription ??
+  const description = compactMarketplaceMetadataDescription(
+    stripProductText(product.shortDescription) ??
       stripProductText(product.description) ??
-      `Shop ${product.title} from Jurgens Energy.`,
-    openGraph: {
-      images: product.coverImageUrl ? [product.coverImageUrl] : undefined,
-      title: product.title,
-    },
-  };
+      `Shop ${product.title} from Jurgens Energy. Compare current prices, stock and available delivery methods before ordering online.`,
+  );
+
+  return createMarketplaceDynamicPageMetadata({
+    description,
+    image: product.coverImageUrl
+      ? {
+          alt: product.title,
+          url: product.coverImageUrl,
+        }
+      : null,
+    path: `/products/${product.slug}`,
+    title: product.title,
+  });
 }
 
 export default async function ProductPage({
@@ -100,6 +111,24 @@ export default async function ProductPage({
 
   return (
     <MarketplaceGate>
+      <MarketplaceJsonLd
+        data={[
+          createProductStructuredData(product),
+          createBreadcrumbStructuredData([
+            { name: "Home", path: "/" },
+            { name: "Shop", path: "/products" },
+            ...(product.category
+              ? [
+                  {
+                    name: product.category.name,
+                    path: `/categories/${product.category.path}`,
+                  },
+                ]
+              : []),
+            { name: product.title, path: `/products/${product.slug}` },
+          ]),
+        ]}
+      />
       <MarketplaceHeader />
       <main className="grid min-w-0 w-full max-w-full gap-0 overflow-x-clip py-0 sm:mx-auto sm:w-[min(1280px,calc(100%-2rem))] sm:gap-6 sm:py-6">
         <nav

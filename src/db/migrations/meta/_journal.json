@@ -428,6 +428,27 @@
       "when": 1784628000000,
       "tag": "0060_whatsapp_webhook_signing_secret",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1784714400000,
+      "tag": "0061_campaign_attribution",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1784800800000,
+      "tag": "0062_static_page_seo",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1784887200000,
+      "tag": "0063_product_variant_cost_price",
+      "breakpoints": true
     }
   ]
 }

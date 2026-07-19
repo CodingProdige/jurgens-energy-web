@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
 import { Button } from "@/components/ui/button";
+import { trackGoogleEvent } from "@/src/modules/analytics/google";
 import type {
   MarketplaceCatalogPageContext,
   MarketplaceProductCard as MarketplaceProductCardData,
@@ -82,7 +83,39 @@ export function ProgressiveProductGrid({
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const loadingRef = useRef(false);
+  const trackedProductIdsRef = useRef(new Set<string>());
   const hasMore = loadedPage < totalPages;
+
+  useEffect(() => {
+    const newlyVisibleProducts = products.filter(
+      (product) => !trackedProductIdsRef.current.has(product.id),
+    );
+
+    if (newlyVisibleProducts.length === 0) {
+      return;
+    }
+
+    for (const product of newlyVisibleProducts) {
+      trackedProductIdsRef.current.add(product.id);
+    }
+
+    const listId = window.location.pathname;
+
+    trackGoogleEvent("view_item_list", {
+      item_list_id: listId,
+      item_list_name: context.name,
+      items: newlyVisibleProducts.map((product) => ({
+        index: products.findIndex((candidate) => candidate.id === product.id) + 1,
+        item_brand: product.brandName ?? undefined,
+        item_category: product.category?.name,
+        item_id: product.id,
+        item_list_id: listId,
+        item_list_name: context.name,
+        item_name: product.title,
+        quantity: 1,
+      })),
+    });
+  }, [context, products]);
 
   const updateBrowserPage = useCallback(
     (page: number) => {

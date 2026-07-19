@@ -12,6 +12,7 @@ import {
   parseMarketplaceCatalogFilters,
   type MarketplaceCatalogSearchParams,
 } from "@/src/modules/marketplace/catalog-filters";
+import { createMarketplaceDynamicPageMetadata } from "@/src/modules/marketplace/dynamic-page-metadata";
 
 type CategoryRouteParams = { path: string[] };
 
@@ -66,15 +67,24 @@ export async function generateMetadata({
   const { path } = await params;
   const { category } = resolveCategory(await getMarketplaceCategories(), path);
 
-  return {
-    title: category?.name ?? "Category",
-    description: category
-      ? `Shop ${category.name} products from Jurgens Energy.`
-      : "Shop Jurgens Energy products.",
-    ...(category
-      ? { alternates: { canonical: `/categories/${category.path}` } }
-      : {}),
-  };
+  if (!category) {
+    return {
+      title: "Category",
+      description: "Shop Jurgens Energy products.",
+    };
+  }
+
+  return createMarketplaceDynamicPageMetadata({
+    description: `Browse ${category.name} from Jurgens Energy. Compare ${category.productCount} current ${category.productCount === 1 ? "product" : "products"}, prices, stock and available delivery methods before ordering online.`,
+    image: category.firstProductImageUrl
+      ? {
+          alt: `${category.name} products`,
+          url: category.firstProductImageUrl,
+        }
+      : null,
+    path: `/categories/${category.path}`,
+    title: category.name,
+  });
 }
 
 export default async function CategoryPage({

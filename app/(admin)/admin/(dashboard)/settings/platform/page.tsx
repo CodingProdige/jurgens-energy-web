@@ -398,7 +398,7 @@ function SettingsSection({
     return (
       <DashboardPanel
         title="Google tags"
-        description="Manage the Google tags and verification values injected into the public marketplace surface."
+        description="Manage consent-aware Google measurement, verified purchase conversions, Merchant Center and Search Console values for the public marketplace."
       >
         <GoogleMarketingSettingsForm
           googleAdsConversionId={settings.googleAdsConversionId}

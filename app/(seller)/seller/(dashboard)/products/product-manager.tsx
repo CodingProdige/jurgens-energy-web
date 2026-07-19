@@ -277,7 +277,7 @@ function downloadCsvTemplate() {
     "Jurgens Energy",
     "Gas Cylinders > LPG Cylinders > 19 kg Cylinders",
     "Full 19 kg LPG cylinder for home and business use.",
-    "Certified LPG cylinder delivered to your door.",
+    "LPG cylinder with delivery options confirmed at checkout.",
     "559.00",
     "649.00",
     "24",

@@ -30,6 +30,10 @@ import type {
   CartValidationResponse,
   ValidatedCartItem,
 } from "@/src/modules/cart/contracts";
+import {
+  trackGoogleEvent,
+  type GoogleAnalyticsItem,
+} from "@/src/modules/analytics/google";
 
 function toValidationItems(items: LocalCartItem[]) {
   return items.map((item) => ({
@@ -53,6 +57,46 @@ function abortCartRequest(controller: AbortController | null) {
   }
 
   controller.abort(new DOMException("Cart refresh cancelled.", "AbortError"));
+}
+
+function toGoogleAnalyticsItem(
+  item: ValidatedCartItem,
+): GoogleAnalyticsItem {
+  const variant = [
+    item.variantTitle,
+    item.purchaseType === "exchange" ? "Exchange" : "Full/new",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    affiliation: item.sellerName ?? "Jurgens Energy",
+    ...(item.brandName ? { item_brand: item.brandName } : {}),
+    item_id: item.variantId,
+    item_name: item.productTitle,
+    ...(variant ? { item_variant: variant } : {}),
+    price: item.unitPriceZar,
+    quantity: item.quantity,
+  };
+}
+
+function createCartAnalyticsPayload(items: ValidatedCartItem[]) {
+  const analyticsItems = items.map(toGoogleAnalyticsItem);
+  const signature = JSON.stringify(
+    [...analyticsItems].sort((left, right) =>
+      left.item_id.localeCompare(right.item_id),
+    ),
+  );
+
+  return {
+    items: analyticsItems,
+    signature,
+    value: Number(
+      items
+        .reduce((total, item) => total + item.lineTotalZar, 0)
+        .toFixed(2),
+    ),
+  };
 }
 
 function CartQuantityControl({
@@ -259,6 +303,7 @@ export function CartExperience() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const trackedViewCartSignaturesRef = useRef(new Set<string>());
 
   const validate = useCallback(async (items: LocalCartItem[]) => {
     abortCartRequest(abortControllerRef.current);
@@ -383,6 +428,32 @@ export function CartExperience() {
         validation.currencyLocale,
       )
     : "—";
+  const viewCartAnalytics = useMemo(() => {
+    if (!validation || validation.items.length === 0) {
+      return null;
+    }
+
+    return createCartAnalyticsPayload(validation.items);
+  }, [validation]);
+
+  useEffect(() => {
+    if (!viewCartAnalytics || isLoading || error) {
+      return;
+    }
+
+    if (
+      trackedViewCartSignaturesRef.current.has(viewCartAnalytics.signature)
+    ) {
+      return;
+    }
+
+    trackedViewCartSignaturesRef.current.add(viewCartAnalytics.signature);
+    trackGoogleEvent("view_cart", {
+      currency: "ZAR",
+      items: viewCartAnalytics.items,
+      value: viewCartAnalytics.value,
+    });
+  }, [error, isLoading, viewCartAnalytics]);
 
   function persistSelection(next: string[]) {
     setSelectedVariantIds(next);
@@ -395,6 +466,15 @@ export function CartExperience() {
       : selectedVariantIds.filter((item) => item !== variantId);
 
     persistSelection(next);
+  }
+
+  function removeValidatedItem(item: ValidatedCartItem) {
+    trackGoogleEvent("remove_from_cart", {
+      currency: "ZAR",
+      items: [toGoogleAnalyticsItem(item)],
+      value: Number(item.lineTotalZar.toFixed(2)),
+    });
+    removeLocalCartItem(item.variantId);
   }
 
   if (!isLoading && localItems.length === 0) {
@@ -467,7 +547,7 @@ export function CartExperience() {
                 onQuantityChange={(quantity) =>
                   updateLocalCartItemQuantity(item.variantId, quantity)
                 }
-                onRemove={() => removeLocalCartItem(item.variantId)}
+                onRemove={() => removeValidatedItem(item)}
               />
             ) : (
               <MissingCartLine

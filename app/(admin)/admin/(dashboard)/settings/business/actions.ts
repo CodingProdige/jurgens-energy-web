@@ -157,6 +157,9 @@ export async function saveBusinessInformation(
   revalidatePath("/settings/business");
   revalidatePath("/settings/platform");
   revalidatePath("/checkout");
+  revalidatePath("/about");
+  revalidatePath("/terms-and-conditions");
+  revalidatePath("/", "layout");
 
   return {
     message:

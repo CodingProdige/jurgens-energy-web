@@ -424,11 +424,11 @@ export function MarketplaceShopMenu({
                 <ul className="mt-3 grid gap-3 text-[11px] font-semibold text-white/70">
                   <li className="flex gap-2.5">
                     <BadgeCheckIcon className="size-4 shrink-0 text-[#ff5a1f]" />
-                    Certified LPG reseller
+                    LPG cylinders and exchanges
                   </li>
                   <li className="flex gap-2.5">
                     <TruckIcon className="size-4 shrink-0 text-[#ff5a1f]" />
-                    Reliable local delivery
+                    Local delivery where available
                   </li>
                   <li className="flex gap-2.5">
                     <HeadphonesIcon className="size-4 shrink-0 text-[#ff5a1f]" />

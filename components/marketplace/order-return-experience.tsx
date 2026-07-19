@@ -14,7 +14,14 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  trackGoogleAdsConversion,
+  trackGoogleEvent,
+} from "@/src/modules/analytics/google";
 import { removeLocalCartItems } from "@/src/modules/cart";
+
+const PURCHASE_ANALYTICS_STORAGE_PREFIX =
+  "jurgens:analytics:google-purchase:v1";
 
 export type CheckoutOrderSummary = {
   createdAt: string;
@@ -55,6 +62,7 @@ export function OrderReturnExperience({
   const [confirmationDelayed, setConfirmationDelayed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const cleanedOrderIdRef = useRef<string | null>(null);
+  const trackedPurchaseOrderIdRef = useRef<string | null>(null);
   const isPaid = order.status === "paid" || order.status === "fulfilled";
   const isFailed = order.status === "cancelled" || order.paymentStatus === "failed";
   const invoiceReady = order.invoice?.renderStatus === "ready";
@@ -122,6 +130,80 @@ export function OrderReturnExperience({
       cleanedOrderIdRef.current = order.orderId;
     }
   }, [isPaid, order.orderId, order.purchasedVariantIds]);
+
+  useEffect(() => {
+    if (!isPaid || trackedPurchaseOrderIdRef.current === order.orderId) {
+      return;
+    }
+
+    const trackPaidOrderPurchase = () => {
+      if (
+        trackedPurchaseOrderIdRef.current === order.orderId ||
+        !window.jurgensGoogleTagMode ||
+        !window.jurgensGoogleTagsReady
+      ) {
+        return;
+      }
+
+      const storageKey = `${PURCHASE_ANALYTICS_STORAGE_PREFIX}:${order.orderId}`;
+
+      try {
+        if (window.localStorage.getItem(storageKey) !== null) {
+          trackedPurchaseOrderIdRef.current = order.orderId;
+          return;
+        }
+      } catch {
+        // Continue with in-memory deduplication when browser storage is unavailable.
+      }
+
+      const transactionId = order.orderNumber || order.orderId;
+      const purchase = {
+        currency: "ZAR",
+        items: order.items.map((item) => ({
+          item_id: item.variantId,
+          item_name: item.title,
+          quantity: item.quantity,
+        })),
+        shipping: order.shippingTotal,
+        transaction_id: transactionId,
+        value: order.grandTotal,
+      };
+
+      trackGoogleEvent("purchase", purchase);
+      trackGoogleAdsConversion({
+        currency: purchase.currency,
+        transaction_id: purchase.transaction_id,
+        value: purchase.value,
+      });
+
+      try {
+        window.localStorage.setItem(storageKey, transactionId);
+      } catch {
+        // The ref still prevents duplicate events during this mounted visit.
+      }
+
+      trackedPurchaseOrderIdRef.current = order.orderId;
+    };
+
+    trackPaidOrderPurchase();
+    window.addEventListener(
+      "jurgens:google-tags-ready",
+      trackPaidOrderPurchase,
+    );
+
+    return () =>
+      window.removeEventListener(
+        "jurgens:google-tags-ready",
+        trackPaidOrderPurchase,
+      );
+  }, [
+    isPaid,
+    order.grandTotal,
+    order.items,
+    order.orderId,
+    order.orderNumber,
+    order.shippingTotal,
+  ]);
 
   return (
     <section className="mx-auto w-full max-w-2xl border-y border-[#e8e8e2] bg-white px-4 py-8 text-center dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-8 sm:py-10">

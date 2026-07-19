@@ -8,6 +8,11 @@ import {
   sanitizeWhatsappTextForModel,
   updateWhatsappRollingMemory,
 } from "../src/modules/whatsapp-ordering/conversation-memory.ts";
+import {
+  buildWhatsappPendingOfferFollowUp,
+  classifyWhatsappPendingOfferFollowUp,
+  matchesWhatsappPendingOfferContext,
+} from "../src/modules/whatsapp-ordering/pending-offer-follow-up.ts";
 
 test("redacts identity and address data without corrupting commerce facts", () => {
   const url = "https://jurgensenergy.com/whatsapp/resume/90dfc7b1-5d5b-4dc0-8813-81349321d3e2";
@@ -241,4 +246,112 @@ test("flags unnatural replies with multiple questions and internal image paths",
 
   assert.equal(result.passed, false);
   assert.equal(result.failures.length, 2);
+});
+
+test("keeps the confirmed Handigas 9kg exchange offer through image and price follow-ups", () => {
+  const offer = {
+    brandName: null,
+    hasImage: true,
+    priceLabel: "R 365,99",
+    purchaseType: "exchange",
+    quantity: 1,
+    title: "Handigas - 9kg Lpg Gas Cylinder",
+    totalLabel: "R 365,99",
+  };
+  const imageKind = classifyWhatsappPendingOfferFollowUp(
+    "Can you send me an image of that Handigas 9kg?",
+  );
+
+  assert.equal(imageKind, "image");
+  assert.equal(
+    matchesWhatsappPendingOfferContext({
+      message: "Can you send me an image of that Handigas 9kg?",
+      offer,
+    }),
+    true,
+  );
+
+  const imageFollowUp = buildWhatsappPendingOfferFollowUp({
+    kind: imageKind,
+    offer,
+  });
+
+  assert.equal(imageFollowUp.attachImage, true);
+  assert.match(imageFollowUp.reply, /Handigas - 9kg Lpg Gas Cylinder/);
+  assert.match(imageFollowUp.reply, /still your exchange offer/i);
+  assert.doesNotMatch(
+    imageFollowUp.reply,
+    /exchange or full|full\/new|should (?:that|this) be an exchange/i,
+  );
+  assert.equal(
+    classifyWhatsappPendingOfferFollowUp(
+      "No, I just want an image of the product",
+    ),
+    "image",
+  );
+  assert.equal(
+    matchesWhatsappPendingOfferContext({
+      message: "No, I just want an image of the product",
+      offer,
+    }),
+    true,
+  );
+
+  const priceKind = classifyWhatsappPendingOfferFollowUp(
+    "price on that to replace?",
+  );
+
+  assert.equal(priceKind, "price");
+  assert.equal(
+    matchesWhatsappPendingOfferContext({
+      message: "price on that to replace?",
+      offer,
+    }),
+    true,
+  );
+
+  const priceFollowUp = buildWhatsappPendingOfferFollowUp({
+    kind: priceKind,
+    offer,
+  });
+
+  assert.equal(
+    priceFollowUp.reply,
+    [
+      "The Handigas - 9kg Lpg Gas Cylinder exchange price is R 365,99 each.",
+      "For 1 unit, the product subtotal is R 365,99.",
+      "Reply YES to confirm this offer, or tell me what to change.",
+    ].join("\n"),
+  );
+  assert.doesNotMatch(
+    priceFollowUp.reply,
+    /not enough verified information|team member|exchange or full|full\/new/i,
+  );
+});
+
+test("does not treat a different sized product as a pending-offer follow-up", () => {
+  const offer = {
+    brandName: "Handigas",
+    purchaseType: "exchange",
+    title: "9kg LPG Cylinder",
+  };
+  const message = "Can I see an image of another 19kg cylinder?";
+
+  assert.equal(
+    classifyWhatsappPendingOfferFollowUp(message),
+    "image",
+  );
+  assert.equal(
+    matchesWhatsappPendingOfferContext({ message, offer }),
+    false,
+  );
+});
+
+test("leaves delivery-price questions to the delivery workflow", () => {
+  assert.equal(
+    classifyWhatsappPendingOfferFollowUp(
+      "What is the delivery price for that cylinder?",
+    ),
+    null,
+  );
 });

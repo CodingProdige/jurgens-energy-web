@@ -10,6 +10,7 @@ import {
   products,
   productVariants,
 } from "@/src/db/schema";
+import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { getScopedMediaLibrary } from "@/src/modules/media/admin";
 
 export type SellerProductCategory = {
@@ -117,6 +118,11 @@ export type SellerEditableProductData = {
   }>;
   weightGrams: string;
   widthMm: string;
+};
+
+export type AdminEditableProductCostData = {
+  productCostPrice: string;
+  variantCostPricesById: Record<string, string>;
 };
 
 export async function getSellerCreateProductData(
@@ -320,5 +326,43 @@ export async function getSellerEditableProductData({
     })),
     weightGrams: formatEditableMetric(firstVariant?.weightGrams ?? null),
     widthMm: formatEditableMetric(firstVariant?.widthMm ?? null),
+  };
+}
+
+export async function getAdminEditableProductCostData({
+  productId,
+}: {
+  productId: string;
+}): Promise<AdminEditableProductCostData | null> {
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  if (!access.ok) {
+    return null;
+  }
+
+  const [product] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(eq(products.id, productId))
+    .limit(1);
+
+  if (!product) {
+    return null;
+  }
+
+  const variants = await db
+    .select({
+      costPrice: productVariants.costPrice,
+      id: productVariants.id,
+    })
+    .from(productVariants)
+    .where(eq(productVariants.productId, product.id))
+    .orderBy(asc(productVariants.createdAt), asc(productVariants.title));
+
+  return {
+    productCostPrice: variants[0]?.costPrice ?? "",
+    variantCostPricesById: Object.fromEntries(
+      variants.map((variant) => [variant.id, variant.costPrice ?? ""]),
+    ),
   };
 }

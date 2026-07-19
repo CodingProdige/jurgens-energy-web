@@ -238,7 +238,7 @@ export async function runJurgensWhatsappAgentTurn({
       confirmationDescription:
         "Prepare the requested product as an order offer for the customer to review. This does not create a payment or paid order.",
       description:
-        "Resolve a customer's cylinder request from the live catalogue and prepare an exact offer for explicit confirmation. Use when the customer wants to buy, refill, exchange, repeat or top up gas.",
+        "Resolve a customer's cylinder request from the live catalogue and prepare an exact offer for explicit confirmation. Use when the customer wants to buy, refill, replace, exchange, repeat or top up gas.",
       execute: (args) =>
         execute(() =>
           adapters.proposeOrder({
@@ -343,7 +343,7 @@ export async function runJurgensWhatsappAgentTurn({
       "Jurgens Energy is the sole seller in this store.",
       "For a delivery-area question, answer the coverage question first and then ask for only the missing product detail needed to continue.",
       "For a cylinder order, use propose_order rather than writing an offer from memory.",
-      "Set repeat_last_order true only when the customer explicitly refers to the same, usual or previous order; refill or top-up alone is an exchange request, not a repeat-order instruction.",
+      "Set repeat_last_order true only when the customer explicitly refers to the same, usual or previous order; refill, replace, replacement or top-up alone is an exchange request, not a repeat-order instruction.",
       "An exchange requires an eligible empty cylinder handover; a full/new cylinder does not.",
       "Do not create a checkout link until the persisted offer is explicitly confirmed.",
       "Do not ask for an address in chat when secure checkout can collect it.",

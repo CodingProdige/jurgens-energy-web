@@ -7,6 +7,7 @@ import {
   DownloadIcon,
   FileTextIcon,
   MapPinIcon,
+  MegaphoneIcon,
   PackageIcon,
   RefreshCwIcon,
   UserRoundIcon,
@@ -102,6 +103,22 @@ export default async function AdminOrderDetailPage({
   }
 
   const address = order.deliveryAddress;
+  const campaignAttributionRows = order.campaignAttribution
+    ? [
+        ["Source", order.campaignAttribution.utmSource],
+        ["Medium", order.campaignAttribution.utmMedium],
+        ["Campaign", order.campaignAttribution.utmCampaign],
+        ["Campaign ID", order.campaignAttribution.utmId],
+        ["Content", order.campaignAttribution.utmContent],
+        ["Search term", order.campaignAttribution.utmTerm],
+        [
+          "Google click ID",
+          order.campaignAttribution.gclid ??
+            order.campaignAttribution.wbraid ??
+            order.campaignAttribution.gbraid,
+        ],
+      ].filter((row): row is [string, string] => Boolean(row[1]))
+    : [];
   const canManageOrders = hasAdminCapability(
     access.session.user.adminCapabilities,
     "admin.orders.manage",
@@ -427,6 +444,35 @@ export default async function AdminOrderDetailPage({
               </div>
             </dl>
           </section>
+
+          {order.campaignAttribution ? (
+            <section className={cn("overflow-hidden", dashboardPanelClass)}>
+              <PanelTitle
+                icon={<MegaphoneIcon className="size-4" />}
+                title="Campaign attribution"
+              />
+              <dl className="grid gap-3 px-5 py-5 text-sm">
+                {campaignAttributionRows.map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-xs text-slate-500 dark:text-zinc-400">
+                      {label}
+                    </dt>
+                    <dd className="mt-1 break-all font-semibold">{value}</dd>
+                  </div>
+                ))}
+                <div>
+                  <dt className="text-xs text-slate-500 dark:text-zinc-400">
+                    Captured
+                  </dt>
+                  <dd className="mt-1">
+                    {dateFormatter.format(
+                      new Date(order.campaignAttribution.capturedAt),
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          ) : null}
 
           <section className={cn("overflow-hidden", dashboardPanelClass)}>
             <PanelTitle icon={<MapPinIcon className="size-4" />} title="Delivery address" />

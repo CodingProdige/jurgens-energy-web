@@ -1,13 +1,33 @@
 import type { Metadata } from "next";
 
-import { FaqPage } from "@/src/modules/marketplace/content/faq-page";
+import {
+  faqStructuredDataItems,
+  FaqPage,
+} from "@/src/modules/marketplace/content/faq-page";
+import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
+import {
+  createBreadcrumbStructuredData,
+  createFaqStructuredData,
+  MarketplaceJsonLd,
+} from "@/src/modules/marketplace/structured-data";
 
-export const metadata: Metadata = {
-  title: "Frequently Asked Questions",
-  description:
-    "Answers to common Jurgens Energy questions about LPG ordering, delivery, cylinder exchanges, product safety, payments, returns and support.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return getStaticPageMetadata("faq");
+}
 
 export default function FaqRoute() {
-  return <FaqPage />;
+  return (
+    <>
+      <MarketplaceJsonLd
+        data={[
+          createFaqStructuredData([...faqStructuredDataItems]),
+          createBreadcrumbStructuredData([
+            { name: "Home", path: "/" },
+            { name: "Frequently asked questions", path: "/faq" },
+          ]),
+        ]}
+      />
+      <FaqPage />
+    </>
+  );
 }

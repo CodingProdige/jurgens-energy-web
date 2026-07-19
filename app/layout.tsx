@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { themeStorageKey } from "@/components/theme/theme-sync";
+import { buildGoogleConsentDefaultsScript } from "@/src/modules/analytics/google-consent";
+import { getMarketplaceCanonicalBaseUrl } from "@/src/modules/marketplace/seo";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,11 +18,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: getMarketplaceCanonicalBaseUrl(),
   title: {
     default: "Jurgens Energy",
     template: "%s | Jurgens Energy",
   },
-  description: "Jurgens Energy online store.",
+  description:
+    "Shop LPG cylinders, exchange-supported options and gas accessories from Jurgens Energy.",
+  openGraph: {
+    description:
+      "Shop LPG cylinders, exchange-supported options and gas accessories from Jurgens Energy.",
+    siteName: "Jurgens Energy",
+    title: "Jurgens Energy",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    description:
+      "Shop LPG cylinders, exchange-supported options and gas accessories from Jurgens Energy.",
+    title: "Jurgens Energy",
+  },
   appleWebApp: {
     capable: true,
     title: "Jurgens Energy",
@@ -45,6 +63,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <Script id="google-consent-defaults" strategy="beforeInteractive">
+          {buildGoogleConsentDefaultsScript()}
+        </Script>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

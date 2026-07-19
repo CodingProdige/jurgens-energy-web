@@ -64,6 +64,7 @@ import {
   type WhatsappPendingAction,
   type WhatsappRollingMemory,
 } from "@/src/modules/whatsapp-ordering/conversation-memory";
+import { classifyWhatsappContextualProductRequest } from "@/src/modules/whatsapp-ordering/contextual-product-request";
 import {
   resolveWhatsappCustomerContext,
   sanitizeWhatsappDisplayName,
@@ -86,6 +87,11 @@ import {
   type WhatsappDeliveryInquiry,
   type WhatsappDeliveryProductChoice,
 } from "@/src/modules/whatsapp-ordering/delivery-inquiry";
+import {
+  buildWhatsappPendingOfferFollowUp,
+  classifyWhatsappPendingOfferFollowUp,
+  matchesWhatsappPendingOfferContext,
+} from "@/src/modules/whatsapp-ordering/pending-offer-follow-up";
 import type { LocalCartInput } from "@/src/modules/cart";
 
 const zarCurrencyContext = {
@@ -620,6 +626,17 @@ function interpretMessage(message: string): MessageInterpretation {
     return createInterpretation({ intent: "status", quantity, sizeKg });
   }
 
+  if (
+    classifyWhatsappContextualProductRequest(message) === "product_image"
+  ) {
+    return createInterpretation({
+      intent: "product_search",
+      query: message,
+      quantity,
+      sizeKg,
+    });
+  }
+
   if (/(\bdo you have\b|\bsell\b|\bstock\b|\bavailable\b|\blooking for\b)/.test(text)) {
     return createInterpretation({
       intent: "product_search",
@@ -685,11 +702,11 @@ function interpretMessage(message: string): MessageInterpretation {
 
   const wantsFull =
     /(\bfull\b|\bnew\b|\bbuy\b|\bpurchase\b|\banother cylinder\b)/.test(text) &&
-    !/(\bempty\b|\bexchange\b|\bswap\b|\brefill\b|\btop ?up\b|\btopup\b)/.test(
+    !/(\bempty\b|\bexchange\b|\bswap\b|\brefill\b|\breplace(?:ment)?\b|\btop ?up\b|\btopup\b)/.test(
       text,
     );
   const wantsExchange =
-    /(\bexchange\b|\bswap\b|\brefill\b|\btop ?up\b|\btopup\b|\bempty\b)/.test(
+    /(\bexchange\b|\bswap\b|\brefill\b|\breplace(?:ment)?\b|\btop ?up\b|\btopup\b|\bempty\b)/.test(
       text,
     );
   const wantsRepeat =
@@ -1591,6 +1608,81 @@ function buildOrderConfirmationReply({
     .join("\n");
 }
 
+async function answerPendingOrderFollowUp({
+  conversationId,
+  message,
+  provider,
+  state,
+}: {
+  conversationId: string;
+  message: string;
+  provider: WhatsappProvider;
+  state: WhatsappConversationState;
+}): Promise<WhatsappAssistantResult | null> {
+  const followUpKind = classifyWhatsappPendingOfferFollowUp(message);
+  const pendingOrder = state.pendingOrder;
+
+  if (!followUpKind || !pendingOrder) {
+    return null;
+  }
+
+  const snapshot = await getVariantSnapshot({
+    purchaseType: pendingOrder.candidate.purchaseType,
+    quantity: pendingOrder.candidate.quantity,
+    variantId: pendingOrder.candidate.variantId,
+  });
+
+  if (!snapshot) {
+    return null;
+  }
+
+  if (
+    !matchesWhatsappPendingOfferContext({
+      message,
+      offer: {
+        brandName: null,
+        purchaseType: snapshot.purchaseType,
+        title: snapshot.productTitle,
+      },
+    })
+  ) {
+    return null;
+  }
+
+  const followUp = buildWhatsappPendingOfferFollowUp({
+    kind: followUpKind,
+    offer: {
+      brandName: null,
+      hasImage: Boolean(snapshot.mediaId),
+      priceLabel: snapshot.priceLabel,
+      purchaseType: snapshot.purchaseType,
+      quantity: snapshot.quantity,
+      title: snapshot.productTitle,
+      totalLabel: snapshot.totalLabel,
+    },
+  });
+  const productImage = followUp.attachImage
+    ? createWhatsappProductImage({
+        mediaId: snapshot.mediaId,
+        title: snapshot.title,
+      })
+    : null;
+
+  await updateConversationAfterMessage({
+    conversationId,
+    direction: "inbound",
+    intent: "pending_order_follow_up",
+  });
+
+  return respond({
+    conversationId,
+    media: productImage ? [productImage] : [],
+    provider,
+    reply: followUp.reply,
+    status: "draft_confirmation",
+  });
+}
+
 async function buildGreetingReply(state: WhatsappConversationState) {
   const deliveryInquiry = state.deliveryInquiry;
 
@@ -2024,11 +2116,23 @@ function searchTerms(value: string | null) {
     "for",
     "have",
     "i",
+    "image",
     "looking",
+    "me",
     "need",
+    "of",
+    "photo",
+    "photograph",
+    "pic",
+    "picture",
+    "please",
+    "product",
+    "send",
     "sell",
+    "show",
     "stock",
     "the",
+    "want",
     "you",
   ]);
 
@@ -2144,7 +2248,9 @@ const deliverySearchStopWords = new Set([
 function getRequestedDeliveryPurchaseType(value: string) {
   const text = normalizeText(value);
   const wantsExchange =
-    /\b(exchange|swap|refill|top up|topup|empty)\b/.test(text);
+    /\b(exchange|swap|refill|replace|replacement|top up|topup|empty)\b/.test(
+      text,
+    );
   const wantsStandard =
     /\b(full|new|buy|purchase)\b/.test(text) && !wantsExchange;
 
@@ -2247,9 +2353,10 @@ function getDeliveryCatalogPurchaseType(candidate: {
   requiresExchangeEmpty: boolean;
   variantTitle: string;
 }) {
-  const labelledAsExchange = /\b(exchange|refill|swap|top\s*up)\b/.test(
-    normalizeText(`${candidate.productTitle} ${candidate.variantTitle}`),
-  );
+  const labelledAsExchange =
+    /\b(exchange|refill|replace|replacement|swap|top\s*up)\b/.test(
+      normalizeText(`${candidate.productTitle} ${candidate.variantTitle}`),
+    );
 
   return candidate.requiresExchangeEmpty || labelledAsExchange
     ? ("exchange" as const)
@@ -2315,7 +2422,7 @@ async function findDeliveryProductChoices({
       const isCylinder = isCylinderCandidate(row);
       const purchaseType = getDeliveryCatalogPurchaseType(row);
       const purchaseLabel = purchaseType === "exchange"
-        ? "exchange refill swap top up"
+        ? "exchange refill replacement replace swap top up"
         : "full new standard";
       const haystackTokens = new Set(
         normalizeText(
@@ -4855,6 +4962,23 @@ export async function processWhatsappInboundMessage(
           ? "cancel"
           : ruleBasedInterpretation.intent,
   };
+  const canAnswerPendingOrderFollowUp =
+    deterministicInterpretation.intent === "order" ||
+    deterministicInterpretation.intent === "product_search" ||
+    deterministicInterpretation.intent === "repeat" ||
+    deterministicInterpretation.intent === "support";
+  const pendingOrderFollowUp = canAnswerPendingOrderFollowUp
+    ? await answerPendingOrderFollowUp({
+        conversationId: conversation.id,
+        message: input.body,
+        provider: input.provider,
+        state: conversationState,
+      })
+    : null;
+
+  if (pendingOrderFollowUp) {
+    return pendingOrderFollowUp;
+  }
 
   // Active address/quote collection remains deterministic. All other turns
   // may be phrased naturally by the agent, while every business read or write

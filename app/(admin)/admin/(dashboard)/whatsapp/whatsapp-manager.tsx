@@ -28,7 +28,6 @@ import {
   dashboardTableActionHeadClass,
   dashboardTableCellClass,
   dashboardTableClass,
-  dashboardTableContainerClass,
   dashboardTableHeadClass,
   dashboardTableHeaderRowClass,
   dashboardTableMutedTextClass,
@@ -74,6 +73,15 @@ const rowActionMenuItemClass =
 const tablePreviewCellClass = cn(
   dashboardTableCellClass,
   "min-w-0 overflow-hidden whitespace-normal align-middle",
+);
+const whatsappTableActionHeadClass = cn(
+  dashboardTableHeadClass,
+  dashboardTableActionHeadClass,
+  "sticky right-0 z-20 bg-white shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.7)] dark:bg-[#151719]",
+);
+const whatsappTableActionCellClass = cn(
+  dashboardTableActionCellClass,
+  "sticky right-0 z-10 bg-white shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.7)] dark:bg-[#151719]",
 );
 
 type PendingConversationAction = {
@@ -426,18 +434,22 @@ export function AdminWhatsappManager({
         <section
           className={cn(
             dashboardPanelClass,
-            dashboardTableContainerClass,
             "overflow-visible",
           )}
         >
-          <Table className={cn(dashboardTableClass, "md:min-w-[1080px] md:table-fixed")}>
+          <Table
+            className={cn(
+              dashboardTableClass,
+              "min-w-[1080px] table-fixed md:min-w-[1080px] md:table-fixed",
+            )}
+          >
             <colgroup>
               <col className="w-[17%]" />
-              <col className="w-[24%]" />
-              <col className="w-[33%]" />
+              <col className="w-[23%]" />
+              <col className="w-[32%]" />
               <col className="w-[9%]" />
               <col className="w-[11%]" />
-              <col className="w-[6%]" />
+              <col className="w-[8%]" />
             </colgroup>
             <TableHeader>
               <TableRow className={dashboardTableHeaderRowClass}>
@@ -446,12 +458,7 @@ export function AdminWhatsappManager({
                 <TableHead className={dashboardTableHeadClass}>Latest message</TableHead>
                 <TableHead className={dashboardTableHeadClass}>Flags</TableHead>
                 <TableHead className={dashboardTableHeadClass}>Updated</TableHead>
-                <TableHead
-                  className={cn(
-                    dashboardTableHeadClass,
-                    dashboardTableActionHeadClass,
-                  )}
-                >
+                <TableHead className={whatsappTableActionHeadClass}>
                   Actions
                 </TableHead>
               </TableRow>
@@ -545,7 +552,7 @@ export function AdminWhatsappManager({
                           {formatDate(conversation.updatedAt)}
                         </span>
                       </TableCell>
-                      <TableCell className={dashboardTableActionCellClass}>
+                      <TableCell className={whatsappTableActionCellClass}>
                         <ConversationQuickActions
                           canManage={canManage}
                           conversation={conversation}

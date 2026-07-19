@@ -7,12 +7,11 @@ import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { MarketplaceHeader } from "@/components/marketplace/marketplace-header";
 import { MarketplaceBrandCard } from "@/components/marketplace/storefront-section-renderer";
 import { getMarketplaceBrands } from "@/src/modules/marketplace/catalog";
+import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 
-export const metadata: Metadata = {
-  title: "Brands",
-  description:
-    "Browse LPG cylinder, gas appliance, regulator, and accessory brands available from Jurgens Energy.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return getStaticPageMetadata("brands");
+}
 
 export const dynamic = "force-dynamic";
 

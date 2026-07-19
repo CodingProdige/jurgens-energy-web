@@ -16,6 +16,8 @@ import {
   ContentSectionHeading,
   NumberedStep,
 } from "@/src/modules/marketplace/content/content-page";
+import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
+import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 
 const services = [
   {
@@ -62,7 +64,11 @@ const commitments = [
   },
 ] as const;
 
-export function AboutPage() {
+export function AboutPage({
+  businessIdentity,
+}: {
+  businessIdentity: PublicBusinessIdentity;
+}) {
   return (
     <article>
       <ContentHero
@@ -108,6 +114,12 @@ export function AboutPage() {
             })}
           </div>
         </section>
+
+        <PublicBusinessIdentityDisclosure
+          className="mt-14 sm:mt-20"
+          identity={businessIdentity}
+          title="The business behind Jurgens Energy"
+        />
 
         <section className="mt-14 border-y border-[#dfdfd8] py-10 dark:border-white/10 sm:mt-20 sm:py-14">
           <ContentSectionHeading

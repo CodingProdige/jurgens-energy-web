@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -12,6 +13,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { brandRequests, brands, categories } from "@/src/db/schema/catalog";
 import { media } from "@/src/db/schema/media";
@@ -75,6 +77,7 @@ export const productVariants = pgTable(
     title: varchar("title", { length: 180 }).notNull(),
     optionValues: jsonb("option_values").$type<string[]>().notNull().default([]),
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+    costPrice: numeric("cost_price", { precision: 12, scale: 2 }),
     taxRateBps: integer("tax_rate_bps").notNull().default(1500),
     compareAtPrice: numeric("compare_at_price", { precision: 12, scale: 2 }),
     stockOnHand: integer("stock_on_hand").notNull().default(0),
@@ -131,6 +134,10 @@ export const productVariants = pgTable(
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
   (variant) => ({
+    costPriceNonNegativeCheck: check(
+      "product_variants_cost_price_non_negative_check",
+      sql`${variant.costPrice} is null or ${variant.costPrice} >= 0`,
+    ),
     mediaIdx: index("product_variants_media_id_idx").on(variant.mediaId),
     parcelPresetIdx: index("product_variants_parcel_preset_id_idx").on(
       variant.parcelPresetId,

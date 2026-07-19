@@ -142,6 +142,11 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
         href: "/settings/business",
         capability: "admin.settings.view",
       },
+      {
+        label: "SEO metadata",
+        href: "/settings/seo",
+        capability: "admin.marketing.view",
+      },
     ],
   },
 ];

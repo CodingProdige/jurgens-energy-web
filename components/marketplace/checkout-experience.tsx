@@ -38,7 +38,14 @@ import {
   readLocalCartItems,
   type LocalCartItem,
 } from "@/src/modules/cart";
-import type { CartValidationResponse } from "@/src/modules/cart/contracts";
+import type {
+  CartValidationResponse,
+  ValidatedCartItem,
+} from "@/src/modules/cart/contracts";
+import {
+  trackGoogleEvent,
+  type GoogleAnalyticsItem,
+} from "@/src/modules/analytics/google";
 import type {
   CheckoutAddressBookIntent,
   CheckoutAddressPrefill,
@@ -178,6 +185,46 @@ function abortCheckoutRequest(controller: AbortController | null) {
   controller.abort(new DOMException("Checkout refresh cancelled.", "AbortError"));
 }
 
+function toGoogleAnalyticsItem(
+  item: ValidatedCartItem,
+): GoogleAnalyticsItem {
+  const variant = [
+    item.variantTitle,
+    item.purchaseType === "exchange" ? "Exchange" : "Full/new",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    affiliation: item.sellerName ?? "Jurgens Energy",
+    ...(item.brandName ? { item_brand: item.brandName } : {}),
+    item_id: item.variantId,
+    item_name: item.productTitle,
+    ...(variant ? { item_variant: variant } : {}),
+    price: item.unitPriceZar,
+    quantity: item.quantity,
+  };
+}
+
+function createCartAnalyticsPayload(items: ValidatedCartItem[]) {
+  const analyticsItems = items.map(toGoogleAnalyticsItem);
+  const signature = JSON.stringify(
+    [...analyticsItems].sort((left, right) =>
+      left.item_id.localeCompare(right.item_id),
+    ),
+  );
+
+  return {
+    items: analyticsItems,
+    signature,
+    value: Number(
+      items
+        .reduce((total, item) => total + item.lineTotalZar, 0)
+        .toFixed(2),
+    ),
+  };
+}
+
 export function CheckoutExperience({
   initialAddresses,
   initialCustomer,
@@ -251,6 +298,9 @@ export function CheckoutExperience({
   const selectedQuoteByGroupRef = useRef<Record<string, string>>({});
   const jurgensDeliveryScheduleRef =
     useRef<CheckoutDeliverySchedule | null>(null);
+  const trackedBeginCheckoutSignaturesRef = useRef(new Set<string>());
+  const trackedShippingInfoSignaturesRef = useRef(new Set<string>());
+  const trackedPaymentInfoSignaturesRef = useRef(new Set<string>());
 
   useEffect(() => {
     const allItems = readLocalCartItems();
@@ -345,6 +395,58 @@ export function CheckoutExperience({
       items: checkoutItems,
     });
   }, [address, cart, cartReviewRequired, checkoutItems, isLoadingCart]);
+  const checkoutAnalytics = useMemo(() => {
+    if (!cart || cartReviewRequired || cart.items.length === 0) {
+      return null;
+    }
+
+    return createCartAnalyticsPayload(cart.items);
+  }, [cart, cartReviewRequired]);
+  const selectedShippingOptions = useMemo(() => {
+    if (!quotes || quotes.groups.length === 0) {
+      return null;
+    }
+
+    const selections = [];
+
+    for (const group of quotes.groups) {
+      const selectedQuoteId = selectedQuoteByGroup[group.groupKey];
+      const option = group.options.find(
+        (candidate) => candidate.quoteId === selectedQuoteId,
+      );
+
+      if (!option) {
+        return null;
+      }
+
+      selections.push({
+        amountZar: option.amountZar,
+        groupKey: group.groupKey,
+        label: option.label,
+        provider: option.provider,
+        serviceLevel: option.serviceLevel,
+      });
+    }
+
+    return selections;
+  }, [quotes, selectedQuoteByGroup]);
+  const shippingAnalytics = useMemo(() => {
+    if (!checkoutAnalytics || !selectedShippingOptions) {
+      return null;
+    }
+
+    const selections = [...selectedShippingOptions].sort((left, right) =>
+      left.groupKey.localeCompare(right.groupKey),
+    );
+
+    return {
+      signature: JSON.stringify({
+        cart: checkoutAnalytics.signature,
+        selections,
+      }),
+      tier: selections.map((selection) => selection.label).join(" + "),
+    };
+  }, [checkoutAnalytics, selectedShippingOptions]);
   const shippingTotal =
     quotes?.groups.reduce((total, group) => {
       const selectedQuoteId = selectedQuoteByGroup[group.groupKey];
@@ -357,10 +459,7 @@ export function CheckoutExperience({
   const allGroupsAvailable = Boolean(
     quotes &&
       quotes.groups.length > 0 &&
-      quotes.groups.every(
-        (group) =>
-          group.options.length > 0 && selectedQuoteByGroup[group.groupKey],
-      ),
+      selectedShippingOptions?.length === quotes.groups.length,
   );
   const jurgensFulfilledProductCount =
     cart?.items.filter(
@@ -453,6 +552,61 @@ export function CheckoutExperience({
     !isLoadingQuotes &&
     !quoteError &&
     !isCreatingOrder;
+
+  useEffect(() => {
+    if (!checkoutAnalytics || isLoadingCart || cartReviewRequired) {
+      return;
+    }
+
+    if (
+      trackedBeginCheckoutSignaturesRef.current.has(
+        checkoutAnalytics.signature,
+      )
+    ) {
+      return;
+    }
+
+    trackedBeginCheckoutSignaturesRef.current.add(checkoutAnalytics.signature);
+    trackGoogleEvent("begin_checkout", {
+      currency: "ZAR",
+      items: checkoutAnalytics.items,
+      value: checkoutAnalytics.value,
+    });
+  }, [cartReviewRequired, checkoutAnalytics, isLoadingCart]);
+
+  useEffect(() => {
+    if (
+      !checkoutAnalytics ||
+      !shippingAnalytics ||
+      !allGroupsAvailable ||
+      isLoadingQuotes ||
+      quoteError
+    ) {
+      return;
+    }
+
+    if (
+      trackedShippingInfoSignaturesRef.current.has(
+        shippingAnalytics.signature,
+      )
+    ) {
+      return;
+    }
+
+    trackedShippingInfoSignaturesRef.current.add(shippingAnalytics.signature);
+    trackGoogleEvent("add_shipping_info", {
+      currency: "ZAR",
+      items: checkoutAnalytics.items,
+      shipping_tier: shippingAnalytics.tier,
+      value: checkoutAnalytics.value,
+    });
+  }, [
+    allGroupsAvailable,
+    checkoutAnalytics,
+    isLoadingQuotes,
+    quoteError,
+    shippingAnalytics,
+  ]);
 
   function resetDeliverySelection() {
     quoteRequestIdRef.current += 1;
@@ -708,6 +862,24 @@ export function CheckoutExperience({
     setError(null);
 
     try {
+      if (
+        checkoutAnalytics &&
+        shippingAnalytics &&
+        !trackedPaymentInfoSignaturesRef.current.has(
+          shippingAnalytics.signature,
+        )
+      ) {
+        trackedPaymentInfoSignaturesRef.current.add(
+          shippingAnalytics.signature,
+        );
+        trackGoogleEvent("add_payment_info", {
+          currency: "ZAR",
+          items: checkoutAnalytics.items,
+          payment_type: "PayFast",
+          value: checkoutAnalytics.value,
+        });
+      }
+
       const response = await fetch("/api/checkout/orders", {
         body: JSON.stringify({
           addressBookIntent,
@@ -1624,7 +1796,7 @@ export function CheckoutExperience({
                     className="text-[10px] leading-4 text-[#777770] dark:text-[#aaa9a1]"
                     id="jurgens-delivery-date-help"
                   >
-                    Same-day requests close at{" "}
+                    Requests for today close at{" "}
                     {jurgensSchedulingGroup.scheduling.cutoffTime} SAST. {" "}
                     {jurgensScheduleOptions[0]?.isSameDay
                       ? "Today is currently available."

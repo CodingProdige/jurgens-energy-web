@@ -96,7 +96,7 @@ function ComingSoonVisual() {
           </h1>
           <p className="mt-5 max-w-[360px] text-[14px] font-medium leading-6 text-white/86">
             Jurgens Energy is building a focused online store for LPG cylinders,
-            exchanges, accessories, and reliable local delivery.
+            exchanges, accessories, and local delivery where available.
           </p>
         </div>
       </div>
@@ -137,7 +137,7 @@ function ComingSoonPanel({
         </h2>
         <p className="mx-auto mt-4 max-w-[360px] text-[14px] leading-6 text-[#596176] dark:text-zinc-300 lg:mx-0">
           Jurgens Energy is building a focused online store for LPG cylinders,
-          exchanges, accessories, and reliable local delivery.
+          exchanges, accessories, and local delivery where available.
         </p>
       </div>
 
