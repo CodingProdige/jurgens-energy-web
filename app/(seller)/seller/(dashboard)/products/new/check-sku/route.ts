@@ -7,7 +7,7 @@ import { productVariants, products } from "@/src/db/schema";
 
 const querySchema = z.object({
   productId: z.string().uuid().optional(),
-  sku: z.string().trim().min(1).max(120),
+  sku: z.string().trim().min(1).max(50),
 });
 
 export async function GET(request: Request) {

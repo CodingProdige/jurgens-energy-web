@@ -158,6 +158,7 @@ type ImportedProductScan = {
   description: string;
   images: ImportedProductImage[];
   longDescription: string;
+  manufacturerMpn: string;
   price: string;
   productName: string;
   sku: string;
@@ -266,8 +267,8 @@ const googleFulfillmentChannelConfig: Record<
   },
   local_lpg: {
     description:
-      "Use Jurgens Energy's postcode-limited local delivery coverage for this offer.",
-    label: "Local LPG delivery",
+      "Keep this offer in online Shopping and free listings, grouped under Jurgens Energy's postcode-limited LPG delivery policy.",
+    label: "Postcode-limited LPG delivery",
   },
   national_courier: {
     description:
@@ -358,7 +359,14 @@ function generateVariantSku(baseSku: string, productName: string, optionValues: 
     .filter(Boolean)
     .join("-");
 
-  return suffix ? `${base}-${suffix}` : base;
+  if (!suffix) {
+    return base.slice(0, 50);
+  }
+
+  const maxBaseLength = Math.max(1, 49 - suffix.length);
+  const boundedBase = base.slice(0, maxBaseLength).replace(/-+$/g, "");
+
+  return `${boundedBase || "P"}-${suffix}`;
 }
 
 function getSkuStatusClass(status: SkuStatus) {
@@ -3024,6 +3032,10 @@ export function ProductCreateWizard({
       setBarcode(importedProduct.barcode);
     }
 
+    if (importedProduct.manufacturerMpn) {
+      setManufacturerMpn(importedProduct.manufacturerMpn);
+    }
+
     if (importedProduct.brandName) {
       setBrandName(toTitleCaseInput(importedProduct.brandName).slice(0, 120));
     }
@@ -3210,13 +3222,14 @@ export function ProductCreateWizard({
               </label>
 
               <label className="grid gap-1.5">
-                <FieldLabel info="A unique stock keeping unit. SKUs must be unique across all products.">
+                <FieldLabel info="A unique stock keeping unit. Google Merchant Center uses this as the offer ID, so changing it after publication creates a new Google offer.">
                   SKU *
                 </FieldLabel>
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                   <Input
                     className={fieldClass}
                     disabled={fullListingControlsDisabled}
+                    maxLength={50}
                     onChange={(event) =>
                       setSku(normalizeSkuPart(event.target.value))
                     }
@@ -4409,7 +4422,7 @@ export function ProductCreateWizard({
                             </ColumnInfoTitle>
                           </TableHead>
                           <TableHead className={cn(dashboardTableHeadClass, "hidden md:table-cell")}>
-                            <ColumnInfoTitle info="A globally unique stock keeping unit for this variant.">
+                            <ColumnInfoTitle info="A globally unique stock keeping unit for this variant. It is also the stable Google Merchant offer ID.">
                               SKU
                             </ColumnInfoTitle>
                           </TableHead>
@@ -4557,6 +4570,7 @@ export function ProductCreateWizard({
                                       "h-8 w-full border-slate-300 text-xs",
                                       getSkuStatusClass(variantSkuStatus),
                                     )}
+                                    maxLength={50}
                                     onChange={(event) =>
                                       updateGeneratedVariant(variant.id, {
                                         sku: event.target.value,
@@ -5111,7 +5125,7 @@ export function ProductCreateWizard({
                   </h3>
                   <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
                     <label className="grid gap-1.5">
-                      <FieldLabel info="Globally unique SKU for this variant.">
+                      <FieldLabel info="Globally unique SKU and stable Google Merchant offer ID for this variant. Avoid changing it after publication.">
                         SKU
                       </FieldLabel>
                       <Input
@@ -5121,6 +5135,7 @@ export function ProductCreateWizard({
                             variantSkuStatuses[activeExpandedVariant.id] ?? "idle",
                           ),
                         )}
+                        maxLength={50}
                         onChange={(event) =>
                           updateGeneratedVariant(activeExpandedVariant.id, {
                             sku: event.target.value,
@@ -6014,6 +6029,14 @@ export function ProductCreateWizard({
                     </p>
                     <p className="truncate text-sm font-semibold">
                       {importedProduct.sku || "Will be generated if missing"}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Manufacturer MPN
+                    </p>
+                    <p className="truncate text-sm font-semibold">
+                      {importedProduct.manufacturerMpn || "Not found"}
                     </p>
                   </div>
                   <div className="min-w-0">

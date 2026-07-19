@@ -43,7 +43,6 @@ export type GoogleMerchantFeedItem = {
   imageLink: string;
   itemGroupId: string | null;
   itemGroupTitle: string | null;
-  identifierExists: boolean;
   includedDestinations: GoogleMerchantDestination[];
   link: string;
   mpn: string | null;
@@ -83,6 +82,7 @@ export async function getGoogleMerchantFeedItems() {
       variantBarcode: productVariants.barcode,
       variantId: productVariants.id,
       variantMediaId: productVariants.mediaId,
+      variantSku: productVariants.sku,
       variantTitle: productVariants.title,
     })
     .from(productVariants)
@@ -216,8 +216,11 @@ export async function getGoogleMerchantFeedItems() {
     const title = isExchangeOffer
       ? `${baseTitle} - Empty cylinder required`
       : baseTitle;
+    const hasSingleEligibleVariant =
+      (eligibleVariantCountByProductId.get(row.productId) ?? 0) === 1;
     const gtin =
-      getValidGtin(row.variantBarcode) ?? getValidGtin(row.productBarcode);
+      getValidGtin(row.variantBarcode) ??
+      (hasSingleEligibleVariant ? getValidGtin(row.productBarcode) : null);
     const mpn =
       firstCleanProductText([row.manufacturerMpn])?.slice(0, 70) ?? null;
     const returnPolicyLabel =
@@ -248,13 +251,12 @@ export async function getGoogleMerchantFeedItems() {
         description: description.slice(0, googleFeedDescriptionLimit),
         excludedDestinations: destinations.excluded,
         gtin,
-        id: row.variantId,
+        id: row.variantSku,
         imageLink,
         itemGroupId: shouldGroupVariants ? row.productId : null,
         itemGroupTitle: shouldGroupVariants
           ? cleanProductText(row.productTitle).slice(0, googleFeedTitleLimit)
           : null,
-        identifierExists: Boolean(gtin || mpn),
         includedDestinations: destinations.included,
         link: link.toString(),
         mpn,
@@ -312,9 +314,6 @@ function renderGoogleMerchantFeedItem(item: GoogleMerchantFeedItem) {
     `      <g:brand>${escapeXml(item.brand)}</g:brand>`,
     ...(item.mpn ? [`      <g:mpn>${escapeXml(item.mpn)}</g:mpn>`] : []),
     ...(item.gtin ? [`      <g:gtin>${item.gtin}</g:gtin>`] : []),
-    ...(!item.identifierExists
-      ? ["      <g:identifier_exists>no</g:identifier_exists>"]
-      : []),
     ...item.includedDestinations.map(
       (destination) =>
         `      <g:included_destination>${destination}</g:included_destination>`,

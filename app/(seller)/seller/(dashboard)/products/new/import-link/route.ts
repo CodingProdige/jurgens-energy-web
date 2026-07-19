@@ -17,6 +17,7 @@ type ImportedProductScan = {
   description: string;
   images: ImportedProductImage[];
   longDescription: string;
+  manufacturerMpn: string;
   price: string;
   productName: string;
   sku: string;
@@ -316,11 +317,15 @@ function extractProductData(html: string, sourceUrl: string): ImportedProductSca
     getMeta($, "description", "og:description", "twitter:description"),
     $('[itemprop="description"]').first().text(),
   );
-  const sku = firstString(product?.sku, product?.mpn, getMeta($, "product:retailer_item_id"))
+  const sku = firstString(product?.sku, getMeta($, "product:retailer_item_id"))
     .replace(/[^a-zA-Z0-9-_]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toUpperCase()
-    .slice(0, 120);
+    .slice(0, 50);
+  const manufacturerMpn = firstString(
+    product?.mpn,
+    getMeta($, "product:mpn", "mpn", "manufacturer_part_number"),
+  ).slice(0, 70);
   const barcode = firstString(
     product?.gtin,
     product?.gtin8,
@@ -356,6 +361,7 @@ function extractProductData(html: string, sourceUrl: string): ImportedProductSca
     description: description.slice(0, 400),
     images: collectImages({ $, baseUrl: sourceUrl, product, productName }),
     longDescription: toHtmlDescription(description).slice(0, 12000),
+    manufacturerMpn,
     price,
     productName,
     sku,

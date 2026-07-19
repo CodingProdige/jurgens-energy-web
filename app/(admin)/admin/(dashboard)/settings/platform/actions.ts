@@ -260,48 +260,13 @@ const optionalGoogleVerificationTokenSchema = z
     "Paste only the Google verification token, or the full meta tag from Google.",
   );
 
-const optionalGoogleStoreCodeSchema = z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => value || undefined)
-  .refine(
-    (value) => !value || /^[A-Za-z0-9_-]{1,64}$/.test(value),
-    "The Business Profile store code can only contain letters, numbers, hyphens, and underscores.",
-  );
-
 const googleMarketingSettingsSchema = z.object({
   googleAdsConversionId: optionalGoogleAdsConversionIdSchema,
   googleAdsConversionLabel: optionalGoogleAdsConversionLabelSchema,
   googleAnalyticsMeasurementId: optionalGoogleAnalyticsMeasurementIdSchema,
-  googleLocalInventoryCustomerAccessible: z.boolean(),
-  googleLocalInventoryEnabled: z.boolean(),
-  googleLocalInventoryStoreCode: optionalGoogleStoreCodeSchema,
   googleMerchantCenterId: optionalGoogleMerchantCenterIdSchema,
   googleSiteVerificationToken: optionalGoogleVerificationTokenSchema,
   googleTagManagerId: optionalGoogleTagManagerIdSchema,
-}).superRefine((value, context) => {
-  if (!value.googleLocalInventoryEnabled) {
-    return;
-  }
-
-  if (!value.googleLocalInventoryCustomerAccessible) {
-    context.addIssue({
-      code: "custom",
-      message:
-        "Local inventory can only be enabled for a customer-accessible physical store.",
-      path: ["googleLocalInventoryCustomerAccessible"],
-    });
-  }
-
-  if (!value.googleLocalInventoryStoreCode) {
-    context.addIssue({
-      code: "custom",
-      message:
-        "Add the exact Google Business Profile store code before enabling local inventory.",
-      path: ["googleLocalInventoryStoreCode"],
-    });
-  }
 });
 
 function extractGoogleSiteVerificationToken(value: string) {
@@ -324,13 +289,6 @@ export async function updateGoogleMarketingSettings(
     ),
     googleAnalyticsMeasurementId: String(
       formData.get("googleAnalyticsMeasurementId") ?? "",
-    ),
-    googleLocalInventoryCustomerAccessible:
-      formData.get("googleLocalInventoryCustomerAccessible") === "on",
-    googleLocalInventoryEnabled:
-      formData.get("googleLocalInventoryEnabled") === "on",
-    googleLocalInventoryStoreCode: String(
-      formData.get("googleLocalInventoryStoreCode") ?? "",
     ),
     googleMerchantCenterId: String(
       formData.get("googleMerchantCenterId") ?? "",

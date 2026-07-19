@@ -1493,9 +1493,6 @@ export async function updateMarketplaceGoogleMarketingSettings({
   googleAdsConversionId,
   googleAdsConversionLabel,
   googleAnalyticsMeasurementId,
-  googleLocalInventoryCustomerAccessible,
-  googleLocalInventoryEnabled,
-  googleLocalInventoryStoreCode,
   googleMerchantCenterId,
   googleSiteVerificationToken,
   googleTagManagerId,
@@ -1503,9 +1500,6 @@ export async function updateMarketplaceGoogleMarketingSettings({
   googleAdsConversionId?: string;
   googleAdsConversionLabel?: string;
   googleAnalyticsMeasurementId?: string;
-  googleLocalInventoryCustomerAccessible: boolean;
-  googleLocalInventoryEnabled: boolean;
-  googleLocalInventoryStoreCode?: string;
   googleMerchantCenterId?: string;
   googleSiteVerificationToken?: string;
   googleTagManagerId?: string;
@@ -1517,9 +1511,9 @@ export async function updateMarketplaceGoogleMarketingSettings({
       googleAdsConversionId: googleAdsConversionId || null,
       googleAdsConversionLabel: googleAdsConversionLabel || null,
       googleAnalyticsMeasurementId: googleAnalyticsMeasurementId || null,
-      googleLocalInventoryCustomerAccessible,
-      googleLocalInventoryEnabled,
-      googleLocalInventoryStoreCode: googleLocalInventoryStoreCode || null,
+      googleLocalInventoryCustomerAccessible: false,
+      googleLocalInventoryEnabled: false,
+      googleLocalInventoryStoreCode: null,
       googleMerchantCenterId: googleMerchantCenterId || null,
       googleSiteVerificationToken: googleSiteVerificationToken || null,
       googleTagManagerId: googleTagManagerId || null,
@@ -1531,9 +1525,9 @@ export async function updateMarketplaceGoogleMarketingSettings({
         googleAdsConversionId: googleAdsConversionId || null,
         googleAdsConversionLabel: googleAdsConversionLabel || null,
         googleAnalyticsMeasurementId: googleAnalyticsMeasurementId || null,
-        googleLocalInventoryCustomerAccessible,
-        googleLocalInventoryEnabled,
-        googleLocalInventoryStoreCode: googleLocalInventoryStoreCode || null,
+        googleLocalInventoryCustomerAccessible: false,
+        googleLocalInventoryEnabled: false,
+        googleLocalInventoryStoreCode: null,
         googleMerchantCenterId: googleMerchantCenterId || null,
         googleSiteVerificationToken: googleSiteVerificationToken || null,
         googleTagManagerId: googleTagManagerId || null,

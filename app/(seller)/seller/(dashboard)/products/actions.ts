@@ -69,7 +69,7 @@ const csvImportRowSchema = z.object({
   productName: z.string().trim().min(1).max(240),
   rowNumber: z.number().int().positive(),
   shortDescription: z.string().trim().max(400).optional(),
-  sku: z.string().trim().min(1).max(120),
+  sku: z.string().trim().min(1).max(50),
   stock: z.string().trim().max(20).optional(),
   weightGrams: z.string().trim().max(40).optional(),
   widthMm: z.string().trim().max(40).optional(),
@@ -93,7 +93,7 @@ const linkImportDraftSchema = z.object({
   longDescription: z.string().max(12000).optional(),
   price: z.string().trim().max(40).optional(),
   productName: z.string().trim().min(1).max(240),
-  sku: z.string().trim().max(120).optional(),
+  sku: z.string().trim().max(50).optional(),
   sourceUrl: z.string().url().optional(),
 });
 const productLifecycleSchema = z.object({
