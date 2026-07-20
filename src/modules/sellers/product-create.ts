@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
@@ -252,7 +252,12 @@ export async function getSellerEditableProductData({
         widthMm: productVariants.widthMm,
       })
       .from(productVariants)
-      .where(eq(productVariants.productId, product.id))
+      .where(
+        and(
+          eq(productVariants.productId, product.id),
+          ne(productVariants.status, "retired"),
+        ),
+      )
       .orderBy(asc(productVariants.title)),
     db
       .select({
@@ -380,7 +385,12 @@ export async function getAdminEditableProductCostData({
       id: productVariants.id,
     })
     .from(productVariants)
-    .where(eq(productVariants.productId, product.id))
+    .where(
+      and(
+        eq(productVariants.productId, product.id),
+        ne(productVariants.status, "retired"),
+      ),
+    )
     .orderBy(asc(productVariants.createdAt), asc(productVariants.title));
 
   return {

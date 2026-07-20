@@ -75,10 +75,16 @@ import type {
   AdminMediaFolder,
   MediaStorageSettings,
 } from "@/src/modules/media/admin";
+import {
+  getInitialMediaPickerSelection,
+  normalizeMediaSelectionIds,
+  toggleMediaPickerSelection,
+} from "@/src/modules/media/selection";
 
 type MediaManagerDialogProps = {
   acceptedMediaTypes?: MediaType[];
   allowMultipleSelection?: boolean;
+  applySelectionOnClose?: boolean;
   assets: AdminMediaAsset[];
   folders?: AdminMediaFolder[];
   onOpenChange: (open: boolean) => void;
@@ -86,6 +92,7 @@ type MediaManagerDialogProps = {
   onSelectMany?: (assets: AdminMediaAsset[]) => void;
   open: boolean;
   selectedAssetId?: string | null;
+  selectedAssetIds?: readonly string[];
   storage: MediaStorageSettings;
   surface?: MediaManagerSurface;
   title?: string;
@@ -210,6 +217,7 @@ const mediaManagerAccentClasses = {
 export function MediaManagerDialog({
   acceptedMediaTypes = ["document", "image", "video"],
   allowMultipleSelection = false,
+  applySelectionOnClose = false,
   assets,
   folders: initialFolders = [],
   onOpenChange,
@@ -217,6 +225,7 @@ export function MediaManagerDialog({
   onSelectMany,
   open,
   selectedAssetId,
+  selectedAssetIds: initialSelectedAssetIds,
   storage,
   surface = "marketplace",
   title = "Media Manager",
@@ -230,8 +239,11 @@ export function MediaManagerDialog({
     useState(usedStorageBytes);
   const [persistedFolders, setPersistedFolders] =
     useState<AdminMediaFolder[]>(initialFolders);
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(
-    selectedAssetId ? [selectedAssetId] : [],
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>(() =>
+    getInitialMediaPickerSelection({
+      selectedAssetId,
+      selectedAssetIds: initialSelectedAssetIds,
+    }),
   );
   const [activeTab, setActiveTab] = useState("library");
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>("all");
@@ -303,9 +315,14 @@ export function MediaManagerDialog({
 
   useEffect(() => {
     if (open) {
-      setSelectedAssetIds([]);
+      setSelectedAssetIds(
+        getInitialMediaPickerSelection({
+          selectedAssetId,
+          selectedAssetIds: initialSelectedAssetIds,
+        }),
+      );
     }
-  }, [open]);
+  }, [initialSelectedAssetIds, open, selectedAssetId]);
 
   const filteredAssets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -483,7 +500,11 @@ export function MediaManagerDialog({
         : [asset, ...current],
     );
     setLocalUsedStorageBytes((current) => current + asset.byteSize);
-    setSelectedAssetIds((current) => (current.length ? current : [asset.id]));
+    setSelectedAssetIds((current) =>
+      allowMultipleSelection
+        ? normalizeMediaSelectionIds([...current, asset.id])
+        : [asset.id],
+    );
     setPendingUploads((current) => {
       const completedUpload = current.find((upload) => upload.id === id);
 
@@ -587,9 +608,11 @@ export function MediaManagerDialog({
     }
 
     setSelectedAssetIds((current) =>
-      current.includes(asset.id)
-        ? current.filter((selectedId) => selectedId !== asset.id)
-        : [...current, asset.id],
+      toggleMediaPickerSelection({
+        allowMultipleSelection,
+        assetId: asset.id,
+        selectedAssetIds: current,
+      }),
     );
   }
 
@@ -661,9 +684,23 @@ export function MediaManagerDialog({
     onOpenChange(false);
   }
 
+  function handleMediaManagerOpenChange(nextOpen: boolean) {
+    if (
+      !nextOpen &&
+      applySelectionOnClose &&
+      allowMultipleSelection &&
+      onSelectMany &&
+      selectedAssets.length === selectedAssetIds.length
+    ) {
+      onSelectMany(selectedAssets);
+    }
+
+    onOpenChange(nextOpen);
+  }
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleMediaManagerOpenChange}>
         <DialogContent
           showCloseButton={false}
           className="z-[80] h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[min(88rem,calc(100vw-1rem))] max-w-none overflow-hidden border border-slate-200 bg-white p-0 text-zinc-950 shadow-2xl shadow-black/20 sm:h-[min(54rem,calc(100dvh-1.5rem))] sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(88rem,calc(100vw-1.5rem))] sm:max-w-none dark:border-white/10 dark:bg-[#0d1218] dark:text-white dark:shadow-black/50"
@@ -682,7 +719,7 @@ export function MediaManagerDialog({
                   <Button
                     aria-label="Close media manager"
                     className="size-9 shrink-0 rounded-lg border-slate-200 bg-white text-zinc-950 hover:bg-slate-50 lg:hidden dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:hover:bg-white/10"
-                    onClick={() => onOpenChange(false)}
+                    onClick={() => handleMediaManagerOpenChange(false)}
                     size="icon"
                     type="button"
                     variant="outline"
@@ -766,7 +803,7 @@ export function MediaManagerDialog({
                 <Button
                   aria-label="Close media manager"
                   className="size-10 rounded-lg border-slate-200 bg-white text-zinc-950 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:hover:bg-white/10"
-                  onClick={() => onOpenChange(false)}
+                  onClick={() => handleMediaManagerOpenChange(false)}
                   size="icon"
                   type="button"
                   variant="outline"

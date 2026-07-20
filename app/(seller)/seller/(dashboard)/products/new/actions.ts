@@ -25,6 +25,7 @@ import {
   optionalCostPriceInputSchema,
   resolveOptionalCostPriceForSave,
 } from "@/src/modules/products/cost-price";
+import { reconcileProductVariantIdentities } from "@/src/modules/products/variant-reconciliation";
 import { fulfillmentModeSchema } from "@/src/modules/shipping";
 
 const productDescriptionGenerationSchema = z.object({
@@ -76,6 +77,7 @@ const productDraftVariantSchema = z.object({
   notes: z.string().trim().max(500).optional(),
   optionValues: z.array(z.string().trim().min(1).max(120)).max(20),
   parcelPresetId: z.string().uuid().nullable().optional(),
+  persistedVariantId: z.string().uuid().nullable().optional(),
   price: z.string().trim().max(40).optional(),
   sku: z.string().trim().min(1).max(50),
   status: variantStatusSchema.default("active"),
@@ -112,6 +114,7 @@ const productDraftSchema = z.object({
   price: z.string().trim().max(40).optional(),
   productId: z.string().uuid().nullable().optional(),
   productName: z.string().trim().min(1).max(240),
+  singleVariantId: z.string().uuid().nullable().optional(),
   sku: z.string().trim().min(1).max(50),
   status: productPublishStatusSchema.default("active"),
   stock: z.string().trim().max(20).optional(),
@@ -216,10 +219,15 @@ function buildVariantRows(
     costPrice: string | null;
     googleFulfillmentChannel: "excluded" | "local_lpg" | "national_courier";
     googleReturnPolicyLabel: string | null;
+    id: string;
     manufacturerMpn: string | null;
     sku: string;
   }> = [],
+  resolvedVariantIds: Array<string | null> = [],
 ) {
+  const existingVariantById = new Map(
+    existingVariants.map((variant) => [variant.id, variant]),
+  );
   const existingVariantBySku = new Map(
     existingVariants.map((variant) => [variant.sku.toLowerCase(), variant]),
   );
@@ -233,9 +241,12 @@ function buildVariantRows(
       : ("local_lpg" as const);
 
   if (input.hasVariants) {
-    return input.variants.map((variant) => {
+    return input.variants.map((variant, index) => {
       const sku = variant.sku.trim();
-      const existingVariant = existingVariantBySku.get(sku.toLowerCase());
+      const persistedVariantId = resolvedVariantIds[index] ?? null;
+      const existingVariant = persistedVariantId
+        ? existingVariantById.get(persistedVariantId)
+        : existingVariantBySku.get(sku.toLowerCase());
 
       return {
         barcode: variant.barcode?.trim() || null,
@@ -281,6 +292,7 @@ function buildVariantRows(
         notes: variant.notes?.trim() || null,
         optionValues: variant.optionValues,
         parcelPresetId: variant.parcelPresetId ?? input.parcelPresetId ?? null,
+        persistedVariantId,
         price: parseRequiredMoney(variant.price || input.price),
         sku,
         status: variant.status,
@@ -297,8 +309,10 @@ function buildVariantRows(
   }
 
   const sku = input.sku.trim();
-  const existingVariant =
-    existingVariantBySku.get(sku.toLowerCase()) ?? existingSingleVariant;
+  const persistedVariantId = resolvedVariantIds[0] ?? null;
+  const existingVariant = persistedVariantId
+    ? existingVariantById.get(persistedVariantId)
+    : existingVariantBySku.get(sku.toLowerCase()) ?? existingSingleVariant;
 
   return [
     {
@@ -342,6 +356,7 @@ function buildVariantRows(
       notes: null,
       optionValues: [],
       parcelPresetId: input.parcelPresetId ?? null,
+      persistedVariantId,
       price: parseRequiredMoney(input.price),
       sku,
       status: "active" as const,
@@ -622,6 +637,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
             googleFulfillmentChannel:
               productVariants.googleFulfillmentChannel,
             googleReturnPolicyLabel: productVariants.googleReturnPolicyLabel,
+            id: productVariants.id,
             manufacturerMpn: productVariants.manufacturerMpn,
             sku: productVariants.sku,
           })
@@ -647,7 +663,32 @@ export async function saveProductDraft(input: ProductDraftInput) {
     };
   }
 
-  const variantRows = buildVariantRows(draft, existingVariants);
+  const submittedVariantIdentities = draft.hasVariants
+    ? draft.variants.map((variant) => ({
+        persistedVariantId: variant.persistedVariantId,
+        sku: variant.sku,
+      }))
+    : [
+        {
+          persistedVariantId: draft.singleVariantId,
+          sku: draft.sku,
+        },
+      ];
+  const variantIdentityResult = reconcileProductVariantIdentities({
+    existingVariants,
+    fallbackToOnlyExistingVariant: !draft.hasVariants,
+    submittedVariants: submittedVariantIdentities,
+  });
+
+  if (!variantIdentityResult.ok) {
+    return variantIdentityResult;
+  }
+
+  const variantRows = buildVariantRows(
+    draft,
+    existingVariants,
+    variantIdentityResult.resolvedVariantIds,
+  );
 
   if (variantRows.length === 0) {
     return {
@@ -676,15 +717,29 @@ export async function saveProductDraft(input: ProductDraftInput) {
   const skus = variantRows.map((variant) => variant.sku);
   const conflictingSkus = await db
     .select({
+      id: productVariants.id,
       productId: productVariants.productId,
       sku: productVariants.sku,
     })
     .from(productVariants)
     .where(inArray(productVariants.sku, skus));
 
-  const skuConflict = conflictingSkus.find(
-    (variant) => !draft.productId || variant.productId !== draft.productId,
+  const resolvedVariantIdBySku = new Map(
+    variantRows.map((variant) => [
+      variant.sku.toLowerCase(),
+      variant.persistedVariantId,
+    ]),
   );
+  const skuConflict = conflictingSkus.find((variant) => {
+    const resolvedVariantId = resolvedVariantIdBySku.get(
+      variant.sku.toLowerCase(),
+    );
+
+    return (
+      variant.id !== resolvedVariantId &&
+      variant.productId !== draft.productId
+    );
+  });
 
   if (skuConflict) {
     return {
@@ -782,12 +837,36 @@ export async function saveProductDraft(input: ProductDraftInput) {
   const productSlug = await getUniqueProductSlug(draft.productName, draft.productId);
   const nextProductStatus = draft.status;
 
-  const productId = await db.transaction(async (tx) => {
-    const savedProductId = draft.productId
-      ? draft.productId
-      : await tx
-          .insert(products)
-          .values({
+  let savedProduct: { productId: string; variantIds: string[] };
+
+  try {
+    savedProduct = await db.transaction(async (tx) => {
+      const savedProductId = draft.productId
+        ? draft.productId
+        : await tx
+            .insert(products)
+            .values({
+              brandId,
+              brandRequestId,
+              barcode: draft.barcode?.trim() || null,
+              categoryId: draft.categoryId ?? null,
+              description: draft.description || null,
+              fulfillmentMode: draft.fulfillmentMode,
+              fullDescription: draft.longDescription || null,
+              optionSchema: draft.hasVariants ? draft.optionSchema : null,
+              shortDescription: draft.description || null,
+              slug: productSlug,
+              status: nextProductStatus,
+              title: draft.productName,
+              updatedAt: now,
+            })
+            .returning({ id: products.id })
+            .then(([product]) => product.id);
+
+      if (draft.productId) {
+        await tx
+          .update(products)
+          .set({
             brandId,
             brandRequestId,
             barcode: draft.barcode?.trim() || null,
@@ -802,108 +881,166 @@ export async function saveProductDraft(input: ProductDraftInput) {
             title: draft.productName,
             updatedAt: now,
           })
-          .returning({ id: products.id })
-          .then(([product]) => product.id);
+          .where(eq(products.id, savedProductId));
+      }
 
-    if (draft.productId) {
       await tx
-        .update(products)
-        .set({
-          brandId,
-          brandRequestId,
-          barcode: draft.barcode?.trim() || null,
-          categoryId: draft.categoryId ?? null,
-          description: draft.description || null,
-          fulfillmentMode: draft.fulfillmentMode,
-          fullDescription: draft.longDescription || null,
-          optionSchema: draft.hasVariants ? draft.optionSchema : null,
-          shortDescription: draft.description || null,
-          slug: productSlug,
-          status: nextProductStatus,
-          title: draft.productName,
-          updatedAt: now,
-        })
-        .where(eq(products.id, savedProductId));
-    }
+        .delete(productMedia)
+        .where(eq(productMedia.productId, savedProductId));
 
-    await tx.delete(productMedia).where(eq(productMedia.productId, savedProductId));
-    await tx
-      .delete(productVariants)
-      .where(eq(productVariants.productId, savedProductId));
+      if (draft.mediaIds.length > 0) {
+        await tx.insert(productMedia).values(
+          draft.mediaIds.map((mediaId, index) => ({
+            isCover: index === 0,
+            mediaId,
+            productId: savedProductId,
+            sortOrder: index,
+          })),
+        );
+      }
 
-    if (draft.mediaIds.length > 0) {
-      await tx.insert(productMedia).values(
-        draft.mediaIds.map((mediaId, index) => ({
-          isCover: index === 0,
-          mediaId,
-          productId: savedProductId,
-          sortOrder: index,
-        })),
-      );
-    }
+      const variantsWithChangedSkus = variantRows.filter((variant) => {
+        if (!variant.persistedVariantId) {
+          return false;
+        }
 
-    await tx.insert(productVariants).values(
-      variantRows.map((variant) => ({
-        barcode: variant.barcode,
-        compareAtPrice: variant.compareAtPrice,
-        continueSellingOutOfStock: variant.continueSellingOutOfStock,
-        costPrice: variant.costPrice,
-        exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands,
-        exchangeConfirmationText: variant.exchangeConfirmationText,
-        exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
-        googleFulfillmentChannel: variant.googleFulfillmentChannel,
-        googleReturnPolicyLabel: variant.googleReturnPolicyLabel,
-        requiresExchangeEmpty: variant.exchangeRequiresEmpty,
-        heightMm: variant.heightMm,
-        isActive: variant.isActive,
-        lengthMm: variant.lengthMm,
-        lowStockAlert: variant.lowStockAlert,
-        manufacturerMpn: variant.manufacturerMpn,
-        mediaId: variant.imageId,
-        notes: variant.notes,
-        optionValues: variant.optionValues,
-        parcelPresetId: variant.parcelPresetId,
-        price: variant.price,
-        productId: savedProductId,
-        sku: variant.sku,
-        status: variant.status,
-        stockOnHand: variant.stockOnHand,
-        title: variant.title,
-        weightGrams: variant.weightGrams,
-        widthMm: variant.widthMm,
-      })),
-    );
+        const existingVariant = existingVariants.find(
+          (candidate) => candidate.id === variant.persistedVariantId,
+        );
 
-    await tx.insert(productReviewEvents).values({
-      action:
-        nextProductStatus === "draft" ? "saved_as_draft" : "saved_as_active",
-      actorUserId: session.user.id,
-      fromStatus: existingProduct?.status ?? null,
-      note:
-        nextProductStatus === "draft"
-          ? "Admin saved product as draft."
-          : "Admin saved product as active.",
-      productId: savedProductId,
-      toStatus: nextProductStatus,
-    });
+        return existingVariant?.sku !== variant.sku;
+      });
 
-    await tx.insert(auditLogs).values({
-      action:
-        nextProductStatus === "draft"
-          ? "product.saved_as_draft"
-          : "product.saved_as_active",
-      actorUserId: session.user.id,
-      entityId: savedProductId,
-      entityType: "product",
-      metadata: JSON.stringify({
+      for (const variant of variantsWithChangedSkus) {
+        await tx
+          .update(productVariants)
+          .set({ sku: `saving-${crypto.randomUUID()}` })
+          .where(
+            and(
+              eq(productVariants.id, variant.persistedVariantId!),
+              eq(productVariants.productId, savedProductId),
+            ),
+          );
+      }
+
+      for (const retiredVariantId of variantIdentityResult.retiredVariantIds) {
+        await tx
+          .update(productVariants)
+          .set({
+            isActive: false,
+            sku: `retired-${retiredVariantId}`,
+            status: "retired",
+            stockOnHand: 0,
+          })
+          .where(
+            and(
+              eq(productVariants.id, retiredVariantId),
+              eq(productVariants.productId, savedProductId),
+            ),
+          );
+      }
+
+      const savedVariantIds: string[] = [];
+
+      for (const variant of variantRows) {
+        const variantValues = {
+          barcode: variant.barcode,
+          compareAtPrice: variant.compareAtPrice,
+          continueSellingOutOfStock: variant.continueSellingOutOfStock,
+          costPrice: variant.costPrice,
+          exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands,
+          exchangeConfirmationText: variant.exchangeConfirmationText,
+          exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
+          googleFulfillmentChannel: variant.googleFulfillmentChannel,
+          googleReturnPolicyLabel: variant.googleReturnPolicyLabel,
+          requiresExchangeEmpty: variant.exchangeRequiresEmpty,
+          heightMm: variant.heightMm,
+          isActive: variant.isActive,
+          lengthMm: variant.lengthMm,
+          lowStockAlert: variant.lowStockAlert,
+          manufacturerMpn: variant.manufacturerMpn,
+          mediaId: variant.imageId,
+          notes: variant.notes,
+          optionValues: variant.optionValues,
+          parcelPresetId: variant.parcelPresetId,
+          price: variant.price,
+          sku: variant.sku,
+          status: variant.status,
+          stockOnHand: variant.stockOnHand,
+          title: variant.title,
+          weightGrams: variant.weightGrams,
+          widthMm: variant.widthMm,
+        };
+
+        if (variant.persistedVariantId) {
+          const [updatedVariant] = await tx
+            .update(productVariants)
+            .set(variantValues)
+            .where(
+              and(
+                eq(productVariants.id, variant.persistedVariantId),
+                eq(productVariants.productId, savedProductId),
+              ),
+            )
+            .returning({ id: productVariants.id });
+
+          if (!updatedVariant) {
+            throw new Error("A saved product variant could not be updated.");
+          }
+
+          savedVariantIds.push(updatedVariant.id);
+          continue;
+        }
+
+        const [insertedVariant] = await tx
+          .insert(productVariants)
+          .values({
+            ...variantValues,
+            productId: savedProductId,
+          })
+          .returning({ id: productVariants.id });
+
+        savedVariantIds.push(insertedVariant.id);
+      }
+
+      await tx.insert(productReviewEvents).values({
+        action:
+          nextProductStatus === "draft" ? "saved_as_draft" : "saved_as_active",
+        actorUserId: session.user.id,
         fromStatus: existingProduct?.status ?? null,
-        title: draft.productName,
+        note:
+          nextProductStatus === "draft"
+            ? "Admin saved product as draft."
+            : "Admin saved product as active.",
+        productId: savedProductId,
         toStatus: nextProductStatus,
-      }),
-    });
+      });
 
-    return savedProductId;
-  });
+      await tx.insert(auditLogs).values({
+        action:
+          nextProductStatus === "draft"
+            ? "product.saved_as_draft"
+            : "product.saved_as_active",
+        actorUserId: session.user.id,
+        entityId: savedProductId,
+        entityType: "product",
+        metadata: JSON.stringify({
+          fromStatus: existingProduct?.status ?? null,
+          title: draft.productName,
+          toStatus: nextProductStatus,
+        }),
+      });
+
+      return { productId: savedProductId, variantIds: savedVariantIds };
+    });
+  } catch (error) {
+    console.error("Failed to save product draft", error);
+
+    return {
+      ok: false,
+      message: "The product could not be saved. No changes were applied.",
+    };
+  }
 
   revalidatePath("/admin/products/all");
   revalidatePath("/admin/products/new");
@@ -918,7 +1055,8 @@ export async function saveProductDraft(input: ProductDraftInput) {
       nextProductStatus === "draft"
         ? "Product saved as draft."
         : "Product saved as active.",
-    productId,
+    productId: savedProduct.productId,
+    variantIds: savedProduct.variantIds,
   };
 }
 

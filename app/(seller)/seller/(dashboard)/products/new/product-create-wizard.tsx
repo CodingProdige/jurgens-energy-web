@@ -87,6 +87,7 @@ import {
   saveProductDraft,
 } from "@/app/(seller)/seller/(dashboard)/products/new/actions";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
+import { normalizeMediaSelectionIds } from "@/src/modules/media/selection";
 import { getVariantProfitability } from "@/src/modules/products/cost-price";
 import type {
   GoogleFulfillmentChannel,
@@ -1738,6 +1739,11 @@ export function ProductCreateWizard({
       persistedVariantId: variant.id,
     })) ?? [],
   );
+  const [singleVariantId, setSingleVariantId] = useState<string | null>(
+    initialProduct && !initialProduct.hasVariants
+      ? (initialProduct.variants[0]?.id ?? null)
+      : null,
+  );
   const [variantSkuStatuses, setVariantSkuStatuses] = useState<Record<string, SkuStatus>>(
     {},
   );
@@ -1877,13 +1883,13 @@ export function ProductCreateWizard({
     .filter((asset): asset is AdminMediaAsset => Boolean(asset));
   const mediaById = new Map(mediaLibraryAssets.map((asset) => [asset.id, asset]));
   const mediaDialogSelectedAssetId =
-    mediaSelectionTarget.type === "product"
-      ? (selectedMediaIds[0] ?? null)
-      : mediaSelectionTarget.type === "variant"
-        ? (generatedVariants.find(
-            (variant) => variant.id === mediaSelectionTarget.variantId,
-          )?.imageId ?? null)
-        : null;
+    mediaSelectionTarget.type === "variant"
+      ? (generatedVariants.find(
+          (variant) => variant.id === mediaSelectionTarget.variantId,
+        )?.imageId ?? null)
+      : null;
+  const mediaDialogSelectedAssetIds =
+    mediaSelectionTarget.type === "product" ? selectedMediaIds : undefined;
   const usableVariantOptions = variantOptions.filter(
     (option) => option.name.trim() && option.values.length > 0,
   );
@@ -2351,17 +2357,12 @@ export function ProductCreateWizard({
       return;
     }
 
-    setSelectedMediaIds((current) => {
-      const next = [...current];
-
-      for (const asset of assets) {
-        if (!next.includes(asset.id) && next.length < 10) {
-          next.push(asset.id);
-        }
-      }
-
-      return next;
-    });
+    setSelectedMediaIds(
+      normalizeMediaSelectionIds(
+        assets.map((asset) => asset.id),
+        10,
+      ),
+    );
   }
 
   function moveSelectedMedia(fromId: string, toId: string) {
@@ -2810,6 +2811,9 @@ export function ProductCreateWizard({
       price,
       productId: draftProductId,
       productName,
+      singleVariantId: hasVariants
+        ? null
+        : singleVariantId ?? generatedVariants[0]?.persistedVariantId ?? null,
       sku,
       status,
       stock,
@@ -2843,6 +2847,7 @@ export function ProductCreateWizard({
             notes: variant.notes,
             optionValues: variant.optionValues,
             parcelPresetId: variant.parcelPresetId,
+            persistedVariantId: variant.persistedVariantId,
             price: variant.price,
             sku: variant.sku,
             status: variant.status,
@@ -2871,6 +2876,17 @@ export function ProductCreateWizard({
         if (result.ok) {
           setDraftProductId(result.productId ?? draftProductId);
           setProductPublishStatus(status);
+          if (hasVariants) {
+            setGeneratedVariants((current) =>
+              current.map((variant, index) => ({
+                ...variant,
+                persistedVariantId:
+                  result.variantIds?.[index] ?? variant.persistedVariantId,
+              })),
+            );
+          } else {
+            setSingleVariantId(result.variantIds?.[0] ?? singleVariantId);
+          }
           setDraftSaveFeedback({
             message: result.message ?? "Product saved.",
             tone: "success",
@@ -4025,7 +4041,15 @@ export function ProductCreateWizard({
             checked={hasVariants}
             disabled={fullListingControlsDisabled}
             onCheckedChange={(checked) => {
-              setHasVariants(Boolean(checked));
+              const nextHasVariants = Boolean(checked);
+
+              if (!nextHasVariants) {
+                setSingleVariantId(
+                  generatedVariants[0]?.persistedVariantId ?? singleVariantId,
+                );
+              }
+
+              setHasVariants(nextHasVariants);
               setExpandedVariantId(null);
             }}
             className="size-4 rounded-[4px] border-slate-300 bg-white data-checked:border-emerald-600 data-checked:bg-emerald-600 data-checked:text-white"
@@ -6138,6 +6162,7 @@ export function ProductCreateWizard({
       <MediaManagerDialog
         acceptedMediaTypes={["image", "video"]}
         allowMultipleSelection={mediaSelectionTarget.type === "product"}
+        applySelectionOnClose={mediaSelectionTarget.type === "product"}
         assets={mediaLibraryAssets}
         folders={data.mediaLibrary.folders}
         onOpenChange={setIsMediaOpen}
@@ -6145,6 +6170,7 @@ export function ProductCreateWizard({
         onSelectMany={handleMediaSelectMany}
         open={isMediaOpen}
         selectedAssetId={mediaDialogSelectedAssetId}
+        selectedAssetIds={mediaDialogSelectedAssetIds}
         storage={data.mediaLibrary.storage}
         surface="admin"
         title="Product media"

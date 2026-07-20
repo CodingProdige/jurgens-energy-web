@@ -21,6 +21,7 @@ import {
 } from "@/components/brand/social-links";
 import { normalizePhoneNumber } from "@/src/modules/phone";
 import { getPublicBusinessIdentity } from "@/src/modules/business-information";
+import { policyLinks } from "@/src/modules/marketplace/policies/documents";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 
 const footerServices = [
@@ -45,6 +46,10 @@ const footerServices = [
     title: "Customer Support",
   },
 ] as const;
+
+const footerPolicyLinks = policyLinks.map(
+  ({ href, label }) => [label, href] as const,
+);
 
 function createWhatsappUrl(phoneNumber: string | null) {
   if (!phoneNumber) {
@@ -147,7 +152,7 @@ export async function MarketplaceFooter() {
           })}
         </section>
 
-        <section className="grid gap-7 border-b border-[#ecece6] px-4 py-7 dark:border-white/10 sm:px-0 sm:py-9 md:grid-cols-[1.3fr_0.8fr_0.8fr] lg:grid-cols-[1.5fr_0.75fr_0.75fr_0.75fr_1.1fr_1fr]">
+        <section className="grid gap-7 border-b border-[#ecece6] px-4 py-7 dark:border-white/10 sm:px-0 sm:py-9 md:grid-cols-[1.3fr_0.8fr_0.8fr] lg:grid-cols-4 xl:grid-cols-[1.5fr_0.75fr_0.75fr_0.65fr_1fr_1.1fr_1fr]">
           <div className="min-w-0">
             <Link aria-label="Jurgens Energy home" href="/">
               <JurgensEnergyLogo />
@@ -203,14 +208,10 @@ export async function MarketplaceFooter() {
             title="Company"
           />
           <FooterColumn
-            links={[
-              ["My Orders", "/account/orders"],
-              ["Returns", "/returns-and-refunds"],
-              ["Terms & Conditions", "/terms-and-conditions"],
-              ["Privacy Policy", "/privacy-policy"],
-            ]}
+            links={[["My Orders", "/account/orders"]]}
             title="Help"
           />
+          <FooterColumn links={footerPolicyLinks} title="Policies" />
 
           <div className="min-w-0">
             <h2 className="text-[13px] font-black uppercase">Contact Us</h2>
@@ -315,7 +316,7 @@ function FooterColumn({
   links,
   title,
 }: {
-  links: Array<[string, string]>;
+  links: ReadonlyArray<readonly [string, string]>;
   title: string;
 }) {
   return (
