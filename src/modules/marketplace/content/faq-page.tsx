@@ -48,7 +48,7 @@ const faqGroups: FaqGroup[] = [
             available fulfilment method. Enter the delivery address during
             checkout to see the options available to the order. Read the full{" "}
             <Link className="font-bold text-[#ff5a1f] hover:underline" href="/delivery-information">
-              delivery information
+              shipping and delivery policy
             </Link>{" "}
             for coverage and handover details.
           </>
@@ -74,7 +74,7 @@ const faqGroups: FaqGroup[] = [
             requested change. Whether a change or cancellation is possible depends
             on payment and fulfilment status. See the{" "}
             <Link className="font-bold text-[#ff5a1f] hover:underline" href="/returns-and-refunds">
-              returns and refunds policy
+              Returns &amp; Refunds Policy
             </Link>{" "}
             for the applicable process.
           </>
@@ -216,7 +216,7 @@ const faqGroups: FaqGroup[] = [
             Eligibility depends on the product, timing, condition, reason for the
             return and any applicable safety or statutory rules. Start with the{" "}
             <Link className="font-bold text-[#ff5a1f] hover:underline" href="/returns-and-refunds">
-              returns and refunds policy
+              Returns &amp; Refunds Policy
             </Link>{" "}
             and contact the team before transporting an LPG product back.
           </>

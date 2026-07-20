@@ -38,16 +38,18 @@ export const policyLinks = [
     label: "Terms & Conditions",
   },
   {
-    description: "Your options when an order is cancelled, damaged, or unsuitable.",
+    description:
+      "The policy for cancellations, returns, exchanges, damaged goods, and refunds.",
     href: "/returns-and-refunds",
     kind: "returns",
-    label: "Returns & Refunds",
+    label: "Returns & Refunds Policy",
   },
   {
-    description: "How delivery quotes, timing, handover, and exchanges work.",
+    description:
+      "The policy for shipping coverage, delivery quotes, timing, handover, and order issues.",
     href: "/delivery-information",
     kind: "delivery",
-    label: "Delivery Information",
+    label: "Shipping & Delivery Policy",
   },
 ] as const;
 
@@ -332,8 +334,8 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
     "Our South African returns policy for new and unused goods, defects, exchanges, by-arrangement handovers, return costs, and refunds.",
   eyebrow: "Order resolutions",
   kind: "returns",
-  shortTitle: "Returns & Refunds",
-  title: "Returns & Refunds",
+  shortTitle: "Returns & Refunds Policy",
+  title: "Returns & Refunds Policy",
   sections: [
     {
       id: "start-a-request",
@@ -430,11 +432,11 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
 
 export const deliveryInformation: PolicyDocument = {
   description:
-    "How we confirm delivery coverage, calculate charges, estimate timing, complete LPG handovers, and resolve delivery problems.",
+    "Our shipping and delivery policy explains how we confirm coverage, calculate charges, estimate timing, complete LPG handovers, and resolve delivery problems.",
   eyebrow: "Getting your order",
   kind: "delivery",
-  shortTitle: "Delivery Information",
-  title: "Delivery Information",
+  shortTitle: "Shipping & Delivery Policy",
+  title: "Shipping & Delivery Policy",
   sections: [
     {
       id: "coverage",

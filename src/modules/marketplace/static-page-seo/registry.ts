@@ -118,13 +118,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "delivery-information": {
     defaultDescription:
-      "Learn how Jurgens Energy delivery areas, address checks, local delivery pricing, courier options and cylinder exchange handovers work before ordering online.",
-    defaultTitle: "LPG Delivery Areas, Rates & Ordering",
+      "Read the Jurgens Energy Shipping & Delivery Policy covering delivery areas, address checks, rates, courier options, timing and cylinder exchange handovers.",
+    defaultTitle: "Shipping & Delivery Policy",
     key: "delivery-information",
-    label: "Delivery information",
+    label: "Shipping & delivery policy",
     path: "/delivery-information",
     scanFocus:
-      "Published delivery rules, address-based rates, courier availability and exchange handover requirements, without inventing rates or coverage.",
+      "The published shipping and delivery policy, including address-based rates, courier availability and exchange handover requirements, without inventing rates or coverage.",
   },
   "privacy-policy": {
     defaultDescription:
@@ -139,9 +139,9 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   "returns-and-refunds": {
     defaultDescription:
       "Read the Jurgens Energy returns, refunds and exchanges policy, including product-condition requirements, exclusions and the process for requesting assistance.",
-    defaultTitle: "Returns, Refunds & Exchanges Policy",
+    defaultTitle: "Returns & Refunds Policy",
     key: "returns-and-refunds",
-    label: "Returns and refunds",
+    label: "Returns & refunds policy",
     path: "/returns-and-refunds",
     scanFocus:
       "A faithful summary of the live returns and refunds policy. Do not invent eligibility, time windows, fees or statutory promises.",

@@ -3867,7 +3867,7 @@ async function getWhatsappKnowledgeFacts(question: string) {
         : null,
     `Online store: ${createStoreUrl("/")}`,
     `All products: ${createStoreUrl("/products")}`,
-    `Delivery information: ${createStoreUrl("/delivery-information")}`,
+    `Shipping and delivery policy: ${createStoreUrl("/delivery-information")}`,
     `Frequently asked questions: ${createStoreUrl("/faq")}`,
     `Returns and refunds policy: ${createStoreUrl("/returns-and-refunds")}`,
     ...getRelevantPolicyFacts(question),
