@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/src/db";
 import {
@@ -18,6 +19,7 @@ import {
   type CurrencyContext,
 } from "@/src/modules/currency";
 import type { MarketplaceCatalogFilters } from "@/src/modules/marketplace/catalog-filters";
+import { filterPopulatedShopMenuCategories } from "@/src/modules/marketplace/shop-menu-categories";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 
 const publicProductStatuses = ["live", "active"] as const;
@@ -965,8 +967,8 @@ export async function getMarketplaceCategories(): Promise<
   });
 }
 
-export async function getMarketplaceShopMenuData(): Promise<MarketplaceShopMenuData> {
-  const [categoryRows, brandRows, productRows, exchangeableVariantRows] =
+async function readMarketplaceShopMenuData(): Promise<MarketplaceShopMenuData> {
+  const [categoryRows, brandRows, publicProductRows, activeVariantRows] =
     await Promise.all([
       db
         .select({
@@ -994,22 +996,32 @@ export async function getMarketplaceShopMenuData(): Promise<MarketplaceShopMenuD
         .orderBy(asc(brands.name)),
       getPublicProductsBaseRows(),
       db
-        .select({ productId: productVariants.productId })
+        .select({
+          productId: productVariants.productId,
+          requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
+        })
         .from(productVariants)
         .where(
           and(
             eq(productVariants.isActive, true),
-            eq(productVariants.requiresExchangeEmpty, true),
             eq(productVariants.status, "active"),
           ),
         ),
     ]);
+  const visibleProductIds = new Set(
+    activeVariantRows.map((row) => row.productId),
+  );
+  const productRows = publicProductRows.filter((product) =>
+    visibleProductIds.has(product.id),
+  );
   const coverByProductId = await getCoverUrlsByProductId(
     productRows.map((row) => row.id),
   );
   const categoryById = new Map(categoryRows.map((row) => [row.id, row]));
   const exchangeableProductIds = new Set(
-    exchangeableVariantRows.map((row) => row.productId),
+    activeVariantRows
+      .filter((row) => row.requiresExchangeEmpty)
+      .map((row) => row.productId),
   );
   const childRowsByParentId = new Map<string, typeof categoryRows>();
   const brandById = new Map(brandRows.map((row) => [row.id, row]));
@@ -1126,13 +1138,15 @@ export async function getMarketplaceShopMenuData(): Promise<MarketplaceShopMenuD
       slug: category.slug,
     };
   };
-  const rootCategories = categoryRows
-    .filter(
-      (category) =>
-        !category.parentId || !categoryById.has(category.parentId),
-    )
-    .sort(compareCategories)
-    .map(toMenuCategory);
+  const rootCategories = filterPopulatedShopMenuCategories(
+    categoryRows
+      .filter(
+        (category) =>
+          !category.parentId || !categoryById.has(category.parentId),
+      )
+      .sort(compareCategories)
+      .map(toMenuCategory),
+  );
   const lpgRootCategory =
     rootCategories.find((category) =>
       ["gas-cylinders", "lpg-cylinders"].includes(category.slug),
@@ -1187,6 +1201,8 @@ export async function getMarketplaceShopMenuData(): Promise<MarketplaceShopMenuD
     totalProductCount: productRows.length,
   };
 }
+
+export const getMarketplaceShopMenuData = cache(readMarketplaceShopMenuData);
 
 export async function getMarketplaceSitemapEntries(): Promise<MarketplaceSitemapEntries> {
   const [productRows, categoryRows, brandRows] = await Promise.all([

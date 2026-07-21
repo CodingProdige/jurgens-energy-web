@@ -19,6 +19,7 @@
     "test:google-feeds": "node --experimental-strip-types --test scripts/google-feed-utils.test.mjs",
     "test:product-costs": "node --experimental-strip-types --test scripts/product-cost-price.test.mjs",
     "test:product-detail": "node --experimental-strip-types --test scripts/exchange-requirements.test.mjs scripts/product-media-selection.test.mjs scripts/product-variant-presentation.test.mjs scripts/product-variant-reconciliation.test.mjs",
+    "test:marketplace-navigation": "node --experimental-strip-types --test scripts/shop-menu-categories.test.mjs",
     "test:customer-support": "node --experimental-strip-types --test scripts/customer-support-contact-details.test.mjs scripts/business-structured-address.test.mjs",
     "test:jurgens-delivery": "node --experimental-strip-types --test scripts/jurgens-delivery-postal-rules.test.mjs",
     "test:seo": "node --experimental-strip-types --test scripts/business-structured-address.test.mjs scripts/privacy-operator.test.mjs scripts/static-page-seo.test.mjs scripts/storefront-legacy-defaults.test.mjs",

@@ -27,30 +27,8 @@ import {
 import { getCurrencyPreference } from "@/src/modules/currency/server";
 import {
   getMarketplaceShopMenuData,
-  type MarketplaceShopMenuCategory,
 } from "@/src/modules/marketplace/catalog";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
-
-function findAccessoriesCategory(
-  categories: MarketplaceShopMenuCategory[],
-): MarketplaceShopMenuCategory | null {
-  for (const category of categories) {
-    if (
-      category.name.toLowerCase().includes("accessor") ||
-      category.slug.toLowerCase().includes("accessor")
-    ) {
-      return category;
-    }
-
-    const childMatch = findAccessoriesCategory(category.children);
-
-    if (childMatch) {
-      return childMatch;
-    }
-  }
-
-  return null;
-}
 
 export async function MarketplaceHeader() {
   const [session, currencyPreference, shopMenuData, marketplaceSettings] =
@@ -65,15 +43,10 @@ export async function MarketplaceHeader() {
         marketplaceSettings.whatsappBusinessPhoneNumber,
       )
     : null;
-  const accessoriesCategory = findAccessoriesCategory(shopMenuData.categories);
-  const accessoriesHref = accessoriesCategory
-    ? `/categories/${accessoriesCategory.path}`
-    : "/products";
   const navItems: readonly MarketplaceNavItem[] = [
     ["Home", "/"],
     ["Shop", "/products"],
     ["Cylinder Exchange", "/products?exchange=1"],
-    ["Accessories", accessoriesHref],
     ["Delivery", "/lpg-delivery"],
     ["Blog", "/blog"],
     ["About Us", "/about"],

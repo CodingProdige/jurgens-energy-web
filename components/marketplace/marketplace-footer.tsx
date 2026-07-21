@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
+  CheckIcon,
   HeadphonesIcon,
   type LucideIcon,
   MailIcon,
@@ -22,8 +23,10 @@ import {
 import { normalizePhoneNumber } from "@/src/modules/phone";
 import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
+import { getMarketplaceShopMenuData } from "@/src/modules/marketplace/catalog";
 import { policyLinks } from "@/src/modules/marketplace/policies/documents";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import { findShopMenuCategory } from "@/src/modules/marketplace/shop-menu-categories";
 
 const footerServices = [
   {
@@ -72,11 +75,18 @@ function createWhatsappUrl(phoneNumber: string | null) {
 }
 
 export async function MarketplaceFooter() {
-  const [businessIdentity, settings, support] = await Promise.all([
+  const [businessIdentity, settings, shopMenuData, support] = await Promise.all([
     getPublicBusinessIdentity(),
     getMarketplaceSettings(),
+    getMarketplaceShopMenuData(),
     getCustomerSupportContactDetails(),
   ]);
+  const accessoriesCategory = findShopMenuCategory(
+    shopMenuData.categories,
+    (category) =>
+      category.name.toLowerCase().includes("accessor") ||
+      category.slug.toLowerCase().includes("accessor"),
+  );
   const whatsappUrl = createWhatsappUrl(support.whatsappPhone);
   const socialLinks = [
     settings.facebookUrl
@@ -153,11 +163,39 @@ export async function MarketplaceFooter() {
             <Link aria-label="Jurgens Energy home" href="/">
               <JurgensEnergyLogo />
             </Link>
-            {settings.footerTagline ? (
-              <p className="mt-3 max-w-xs text-[13px] leading-6 text-[#4f4f49] dark:text-[#c8c8c0]">
-                {settings.footerTagline}
-              </p>
-            ) : null}
+            <h2 className="mt-5 text-[11px] font-black uppercase tracking-[0.12em] text-[#ff5a1f]">
+              About Jurgens Energy
+            </h2>
+            <p className="mt-2 max-w-sm text-[15px] font-black leading-5 text-[#1a1a1a] dark:text-[#f7f7f2]">
+              {settings.footerTagline.trim() ||
+                "South African online store for LPG cylinders, exchanges and gas accessories."}
+            </p>
+            <p className="mt-3 max-w-sm text-[12px] leading-5 text-[#696963] dark:text-[#a8a89f]">
+              Browse new LPG cylinders, exchange options and gas accessories,
+              pay online, and arrange eligible delivery across South Africa.
+              We operate online without a walk-in retail location.
+            </p>
+            <ul className="mt-4 grid max-w-sm gap-2 text-[11px] font-bold text-[#4f4f49] dark:text-[#c8c8c0]">
+              {[
+                "Online ordering and payment",
+                "Clear cylinder exchange guidance",
+                "Support before and after delivery",
+              ].map((item) => (
+                <li className="flex items-center gap-2" key={item}>
+                  <span className="grid size-4 shrink-0 place-items-center rounded-full bg-[#ff5a1f]/10 text-[#ff5a1f]">
+                    <CheckIcon className="size-3 stroke-[2.5]" />
+                  </span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              className="mt-4 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-[0.08em] text-[#ff5a1f] transition hover:text-[#e44c15]"
+              href="/about"
+            >
+              Learn more about us
+              <span aria-hidden="true">→</span>
+            </Link>
             {socialLinks.length > 0 ? (
               <div className="mt-5 flex items-center gap-3">
                 {socialLinks.map((item) => {
@@ -184,10 +222,14 @@ export async function MarketplaceFooter() {
             links={[
               ["All Products", "/products"],
               ["Cylinder Exchange", "/products?exchange=1"],
-              [
-                "Accessories",
-                "/categories/gas-cylinders/cylinder-accessories",
-              ],
+              ...(accessoriesCategory
+                ? ([
+                    [
+                      "Accessories",
+                      `/categories/${accessoriesCategory.path}`,
+                    ],
+                  ] as const)
+                : []),
               ["Deals", "/products?sale=1"],
               ["Brands", "/brands"],
             ]}
