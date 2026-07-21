@@ -463,6 +463,27 @@
       "when": 1785060000000,
       "tag": "0065_google_local_inventory_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1785146400000,
+      "tag": "0066_contact_inquiries",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1785232800000,
+      "tag": "0067_contact_inquiry_admin_route",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1785319200000,
+      "tag": "0068_jurgens_password_reset_branding",
+      "breakpoints": true
     }
   ]
 }

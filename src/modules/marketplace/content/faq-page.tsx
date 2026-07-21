@@ -27,7 +27,7 @@ type FaqGroup = {
 const faqGroups: FaqGroup[] = [
   {
     description:
-      "How availability, address checks, timing and support work before an order reaches you.",
+      "How ordering, South Africa delivery, timing and support work before an order reaches you.",
     id: "ordering-delivery",
     items: [
       {
@@ -44,25 +44,31 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Delivery depends on the address, the products in your cart and the
-            available fulfilment method. Enter the delivery address during
-            checkout to see the options available to the order. Read the full{" "}
-            <Link className="font-bold text-[#ff5a1f] hover:underline" href="/delivery-information">
+            We deliver eligible online-store orders within South Africa.
+            Enter your complete delivery address during checkout to confirm the
+            available option and fee for the selected products. Read the full{" "}
+            <Link
+              className="font-bold text-[#ff5a1f] hover:underline"
+              href="/delivery-information"
+            >
               shipping and delivery policy
             </Link>{" "}
-            for coverage and handover details.
+            for delivery and handover details.
           </>
         ),
-        question: "Do you deliver to my area?",
+        question: "Where do you deliver?",
       },
       {
         answer: (
           <>
-            Delivery dates and time windows are estimates unless a fixed
-            appointment is expressly confirmed. Timing can be affected by payment,
-            stock, route capacity, traffic, weather, access and LPG safety
-            requirements. The order flow shows the most relevant information
-            available at the time.
+            Handling takes 0–1 business day after payment confirmation. Our order
+            cutoff is 2:00 PM SAST on business days, and an order placed after the
+            cutoff begins processing on the next business day. Handling does not
+            begin before payment is confirmed. Shipping then takes an estimated
+            1–3 business days after dispatch, giving an estimated total delivery
+            time of 1–4 business days. These times are estimates; stock, courier or
+            vehicle capacity, weather, traffic, access and LPG safety requirements
+            can affect them.
           </>
         ),
         question: "How quickly will my order arrive?",
@@ -213,12 +219,21 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Eligibility depends on the product, timing, condition, reason for the
-            return and any applicable safety or statutory rules. Start with the{" "}
-            <Link className="font-bold text-[#ff5a1f] hover:underline" href="/returns-and-refunds">
+            Eligible online purchases have applicable seven-day cooling-off
+            rights, and we also accept eligible new and unused voluntary returns
+            when you contact us within seven calendar days after receipt. You pay
+            the direct return courier cost for an eligible cooling-off or
+            voluntary change-of-mind return. Jurgens Energy covers qualifying
+            return transport for verified incorrect, damaged, unsafe or defective
+            goods where required by law. Read the{" "}
+            <Link
+              className="font-bold text-[#ff5a1f] hover:underline"
+              href="/returns-and-refunds"
+            >
               Returns &amp; Refunds Policy
             </Link>{" "}
-            and contact the team before transporting an LPG product back.
+            and contact the team before returning anything. Never send LPG or a
+            filled cylinder through an ordinary parcel service.
           </>
         ),
         question: "How do returns and refunds work?",
@@ -249,9 +264,14 @@ export const faqStructuredDataItems = [
       "Browse the store, select the product and available option you need, and complete checkout. When WhatsApp ordering is available, you can also start from the primary WhatsApp action.",
   },
   {
-    question: "Do you deliver to my area?",
+    question: "Where do you deliver?",
     answer:
-      "Delivery depends on the entered address, the products in the cart and the available fulfilment method. Enter the complete delivery address during checkout to see the options available to the order.",
+      "Jurgens Energy delivers eligible online-store orders within South Africa. Enter the complete delivery address during checkout to confirm the available option and fee for the selected products.",
+  },
+  {
+    question: "How quickly will my order arrive?",
+    answer:
+      "Handling takes 0–1 business day after payment confirmation. The order cutoff is 2:00 PM SAST on business days, and an order placed after the cutoff begins processing on the next business day. Handling does not begin before payment is confirmed. Shipping takes an estimated 1–3 business days after dispatch, giving an estimated total delivery time of 1–4 business days. Stock, transport capacity, weather, traffic, access and LPG safety requirements can affect timing.",
   },
   {
     question: "How does a cylinder exchange work?",
@@ -262,6 +282,11 @@ export const faqStructuredDataItems = [
     question: "Do displayed prices include VAT?",
     answer:
       "Store product prices are VAT-inclusive unless a product clearly states otherwise. Applicable delivery, handling, deposit, exchange or other charges are displayed separately before the order is confirmed.",
+  },
+  {
+    question: "How do returns and refunds work?",
+    answer:
+      "Eligible online purchases have applicable seven-day cooling-off rights, and Jurgens Energy also accepts eligible new and unused voluntary returns when the customer contacts us within seven calendar days after receipt. The customer pays the direct return courier cost for an eligible cooling-off or voluntary change-of-mind return. Jurgens Energy covers qualifying incorrect, damaged, unsafe or defective return transport where required by law.",
   },
 ] as const;
 
@@ -346,7 +371,7 @@ export function FaqPage() {
                 variant: "secondary",
               },
             ]}
-            description="Tell us which product, cylinder size, delivery suburb or order you are asking about, and we’ll help with the next step."
+            description="Tell us which product, cylinder size or order you are asking about, and we’ll help with the next step."
             eyebrow="Still need help?"
             title="Ask a more specific question."
           />

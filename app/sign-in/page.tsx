@@ -15,7 +15,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Customer Sign In",
-  description: "Sign in to your Piessang marketplace account.",
+  description: "Sign in to your Jurgens Energy online-store account.",
   robots: {
     index: false,
     follow: false,

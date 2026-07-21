@@ -37,7 +37,6 @@ import {
 
 function toValidationItems(items: LocalCartItem[]) {
   return items.map((item) => ({
-    exchangeEmptyConfirmed: item.exchangeEmptyConfirmed,
     purchaseType: item.purchaseType,
     quantity: item.quantity,
     variantId: item.variantId,
@@ -204,21 +203,27 @@ function CartLine({
         </div>
 
         {item.purchaseType === "exchange" ? (
-          <span className="mt-1 w-fit bg-[#ffb000] px-1.5 py-0.5 text-[9px] font-bold uppercase text-black">
-            Cylinder exchange
-          </span>
+          <div className="mt-1 grid gap-1">
+            <span className="w-fit bg-[#ffb000] px-1.5 py-0.5 text-[9px] font-bold uppercase text-black">
+              Cylinder exchange
+            </span>
+            <p className="text-[10px] font-semibold leading-4 text-[#9a3b13] dark:text-orange-300 sm:text-[11px]">
+              Empty cylinder required
+              {item.exchangeRequiredEmptyCylinderSize
+                ? `: ${item.exchangeRequiredEmptyCylinderSize}`
+                : ""}
+              .
+              {item.exchangeAcceptedReturnBrands.length > 0
+                ? ` Accepted return brands: ${item.exchangeAcceptedReturnBrands.join(", ")}.`
+                : ""}
+            </p>
+          </div>
         ) : null}
 
         {!item.available ? (
           <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 dark:text-red-300">
             <AlertCircleIcon className="size-3.5" />
             Currently unavailable
-          </p>
-        ) : null}
-
-        {item.exchangeConfirmationMissing ? (
-          <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-300">
-            Reconfirm the empty cylinder requirement on the product page.
           </p>
         ) : null}
 

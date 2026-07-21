@@ -98,6 +98,8 @@ export function NotificationBell({
     width: NOTIFICATION_PANEL_MAX_WIDTH,
   });
   const styles = accentStyles[accent];
+  const notificationBrandName =
+    surface === "marketplace" ? "Jurgens Energy" : "Piessang";
 
   useEffect(() => {
     setPromptPortal(document.body);
@@ -426,12 +428,15 @@ export function NotificationBell({
         method: "POST",
       });
 
-      await registration.showNotification("Piessang notifications enabled", {
-        badge: "/brand/favicon-for-app/web-app-manifest-192x192.png",
-        body: "You will receive important updates from Piessang here.",
-        icon: "/brand/favicon-for-app/web-app-manifest-192x192.png",
-        tag: "piessang-push-enabled",
-      });
+      await registration.showNotification(
+        `${notificationBrandName} notifications enabled`,
+        {
+          badge: "/brand/favicon-for-app/web-app-manifest-192x192.png",
+          body: `You will receive important updates from ${notificationBrandName} here.`,
+          icon: "/brand/favicon-for-app/web-app-manifest-192x192.png",
+          tag: "piessang-push-enabled",
+        },
+      );
 
       setPushStatus("enabled");
       setShowSessionPrompt(false);
@@ -611,6 +616,7 @@ export function NotificationBell({
               <div className="mt-2 border-t border-slate-200 p-3 dark:border-white/10">
                 <PushNotificationPrompt
                   accent={accent}
+                  brandName={notificationBrandName}
                   onEnable={enablePushNotifications}
                   status={pushStatus}
                   variant="popover"
@@ -643,6 +649,7 @@ export function NotificationBell({
         ? createPortal(
             <PushNotificationPrompt
               accent={accent}
+              brandName={notificationBrandName}
               onDismiss={dismissSessionPrompt}
               onEnable={enablePushNotifications}
               status={pushStatus}

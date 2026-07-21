@@ -33,7 +33,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
   convertFromZar,
@@ -41,6 +40,7 @@ import {
   type CurrencyContext,
 } from "@/src/modules/currency";
 import { addLocalCartItem } from "@/src/modules/cart";
+import { getExchangeRequirementText } from "@/src/modules/cart/exchange-requirements";
 import {
   trackGoogleEvent,
   type GoogleAnalyticsItem,
@@ -616,42 +616,35 @@ function ProductBuyBox({
   setSelectedVariantId: (variantId: string) => void;
 }) {
   const hasExchangeRequirement = isExchangeVariant(selectedVariant);
-  const [exchangeConfirmed, setExchangeConfirmed] = useState(false);
   const [added, setAdded] = useState(false);
   const [isOptionsDialogOpen, setIsOptionsDialogOpen] = useState(false);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exchangeAcceptedReturnBrands =
     selectedVariant?.exchangeAcceptedReturnBrands ?? [];
   const exchangeEmptySize = getExchangeEmptySize(product, selectedVariant);
-  const exchangeConfirmationText = selectedVariant
-    ? getExchangeConfirmationText({
-        product,
+  const exchangeRequirementText = selectedVariant
+    ? getExchangeRequirementText({
+        emptySize: exchangeEmptySize,
+        fallbackText: selectedVariant.exchangeConfirmationText,
         quantity,
-        variant: selectedVariant,
       })
     : "";
-  const canAddToCart =
-    Boolean(selectedVariant) && (!hasExchangeRequirement || exchangeConfirmed);
-  const needsExchangeConfirmation =
-    hasExchangeRequirement && !exchangeConfirmed;
+  const canAddToCart = Boolean(selectedVariant);
   const needsMobileOptionsDialog =
-    product.variants.length > 1 ||
-    hasExchangeRequirement ||
-    needsExchangeConfirmation;
+    product.variants.length > 1 || hasExchangeRequirement;
   const mobilePrimaryActionLabel = added
     ? "Added"
-    : needsMobileOptionsDialog
-      ? needsExchangeConfirmation
-        ? "Confirm Exchange First"
-        : "Select An Option"
-      : "Add To Cart";
+    : product.variants.length > 1
+      ? "Select An Option"
+      : hasExchangeRequirement
+        ? "Review & Add"
+        : "Add To Cart";
   const selectedPriceMarkdown = selectedVariant
     ? getVariantMarkdownDisplay(selectedVariant, currencyContext)
     : null;
   const topSoldVariantId = getTopSoldVariantId(product.variants);
 
   useEffect(() => {
-    setExchangeConfirmed(false);
     setAdded(false);
   }, [selectedVariantId]);
 
@@ -672,8 +665,8 @@ function ProductBuyBox({
     addLocalCartItem({
       brandName: product.brandName,
       exchangeAcceptedReturnBrands,
-      exchangeConfirmationText,
-      exchangeEmptyConfirmed: hasExchangeRequirement ? exchangeConfirmed : false,
+      exchangeConfirmationText: exchangeRequirementText,
+      exchangeEmptyConfirmed: false,
       exchangeRequiredEmptyCylinderSize: exchangeEmptySize,
       imageUrl: selectedVariant.imageUrl ?? product.coverImageUrl,
       priceLabel: selectedPrice,
@@ -794,13 +787,11 @@ function ProductBuyBox({
       ) : null}
 
       {hasExchangeRequirement ? (
-        <ExchangeConfirmationPanel
+        <ExchangeRequirementNotice
           acceptedReturnBrands={exchangeAcceptedReturnBrands}
-          confirmationText={exchangeConfirmationText}
           emptySize={exchangeEmptySize}
-          isConfirmed={exchangeConfirmed}
-          onConfirmedChange={setExchangeConfirmed}
           quantity={quantity}
+          requirementText={exchangeRequirementText}
         />
       ) : null}
 
@@ -847,11 +838,7 @@ function ProductBuyBox({
             <ShoppingCartIcon className="size-4 shrink-0" />
           )}
           <span className="leading-none">
-            {added
-              ? "Added"
-              : needsExchangeConfirmation
-                ? "Confirm Exchange First"
-                : "Add To Cart"}
+            {added ? "Added" : "Add To Cart"}
           </span>
         </button>
       </div>
@@ -863,9 +850,7 @@ function ProductBuyBox({
         type="button"
       >
         <ZapIcon className="size-4 shrink-0" />
-        <span className="leading-none">
-          {needsExchangeConfirmation ? "Confirm Exchange First" : "Buy Now"}
-        </span>
+        <span className="leading-none">Buy Now</span>
       </button>
       </aside>
 
@@ -875,14 +860,11 @@ function ProductBuyBox({
         currencyContext={currencyContext}
         deliveryDetail={deliveryDetail}
         exchangeAcceptedReturnBrands={exchangeAcceptedReturnBrands}
-        exchangeConfirmationText={exchangeConfirmationText}
-        exchangeConfirmed={exchangeConfirmed}
         exchangeEmptySize={exchangeEmptySize}
+        exchangeRequirementText={exchangeRequirementText}
         hasExchangeRequirement={hasExchangeRequirement}
         isOpen={isOptionsDialogOpen}
-        needsExchangeConfirmation={needsExchangeConfirmation}
         onAddToCart={() => handleAddToCart({ closeOptions: true })}
-        onExchangeConfirmedChange={setExchangeConfirmed}
         onOpenChange={setIsOptionsDialogOpen}
         product={product}
         quantity={quantity}
@@ -898,8 +880,8 @@ function ProductBuyBox({
       <MobileStickyPurchaseBar
         added={added}
         deliveryDetail={deliveryDetail}
+        hasExchangeRequirement={hasExchangeRequirement}
         label={mobilePrimaryActionLabel}
-        needsExchangeConfirmation={needsExchangeConfirmation}
         onAction={handleMobilePrimaryAction}
         selectedPrice={selectedPrice}
       />
@@ -941,11 +923,7 @@ function MobileProductPurchaseSummary({
   return (
     <div className="grid min-w-0 gap-0 lg:hidden">
       <MobileTrustTicker
-        deliveryLabel={
-          product.fulfillmentMode === "piessang_fulfilled"
-            ? "Local delivery zones"
-            : "Courier rates"
-        }
+        deliveryLabel={deliveryLabel}
       />
 
       <section className="grid gap-2.5 border-b border-[#e8e8e2] bg-white px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04] sm:rounded-lg sm:border sm:p-3 sm:shadow-sm">
@@ -1201,14 +1179,11 @@ function ProductOptionsDialog({
   currencyContext,
   deliveryDetail,
   exchangeAcceptedReturnBrands,
-  exchangeConfirmationText,
-  exchangeConfirmed,
   exchangeEmptySize,
+  exchangeRequirementText,
   hasExchangeRequirement,
   isOpen,
-  needsExchangeConfirmation,
   onAddToCart,
-  onExchangeConfirmedChange,
   onOpenChange,
   product,
   quantity,
@@ -1225,14 +1200,11 @@ function ProductOptionsDialog({
   currencyContext: CurrencyContext;
   deliveryDetail: string;
   exchangeAcceptedReturnBrands: string[];
-  exchangeConfirmationText: string;
-  exchangeConfirmed: boolean;
   exchangeEmptySize: string | null;
+  exchangeRequirementText: string;
   hasExchangeRequirement: boolean;
   isOpen: boolean;
-  needsExchangeConfirmation: boolean;
   onAddToCart: () => void;
-  onExchangeConfirmedChange: (checked: boolean) => void;
   onOpenChange: (open: boolean) => void;
   product: MarketplaceProductDetailView;
   quantity: number;
@@ -1259,7 +1231,7 @@ function ProductOptionsDialog({
         </DialogTitle>
         <DialogDescription className="sr-only">
           {hasExchangeRequirement
-            ? `Choose ${variantOptionLabel}, confirm the exchange requirements, and add the item to your cart.`
+            ? `Choose ${variantOptionLabel}, review the exchange requirement, and add the item to your cart.`
             : `Choose ${variantOptionLabel} and add the item to your cart.`}
         </DialogDescription>
 
@@ -1321,14 +1293,12 @@ function ProductOptionsDialog({
           ) : null}
 
           {hasExchangeRequirement ? (
-            <ExchangeConfirmationPanel
+            <ExchangeRequirementNotice
               acceptedReturnBrands={exchangeAcceptedReturnBrands}
               className="mt-3"
-              confirmationText={exchangeConfirmationText}
               emptySize={exchangeEmptySize}
-              isConfirmed={exchangeConfirmed}
-              onConfirmedChange={onExchangeConfirmedChange}
               quantity={quantity}
+              requirementText={exchangeRequirementText}
             />
           ) : null}
 
@@ -1360,13 +1330,7 @@ function ProductOptionsDialog({
             ) : (
               <ShoppingCartIcon className="size-4 shrink-0" />
             )}
-            <span>
-              {added
-                ? "Added"
-                : needsExchangeConfirmation
-                  ? "Confirm Exchange First"
-                  : "Add To Cart"}
-            </span>
+            <span>{added ? "Added" : "Add To Cart"}</span>
           </button>
         </footer>
       </DialogContent>
@@ -1581,9 +1545,9 @@ function MobileConfidenceRows({
     ...(isExchangeSelected
       ? [
           {
-            detail: "Empty confirmation before checkout.",
+            detail: "An eligible empty cylinder is required at delivery.",
             icon: RefreshCcwIcon,
-            title: "Exchange checked on delivery",
+            title: "Empty cylinder required",
           },
         ]
       : []),
@@ -1651,56 +1615,39 @@ function CompactTrustRow({
   );
 }
 
-function ExchangeConfirmationPanel({
+function ExchangeRequirementNotice({
   acceptedReturnBrands,
   className,
-  confirmationText,
   emptySize,
-  isConfirmed,
-  onConfirmedChange,
   quantity,
+  requirementText,
 }: {
   acceptedReturnBrands: string[];
   className?: string;
-  confirmationText: string;
   emptySize: string | null;
-  isConfirmed: boolean;
-  onConfirmedChange: (checked: boolean) => void;
   quantity: number;
+  requirementText: string;
 }) {
   return (
-    <label
+    <section
+      aria-label="Empty cylinder required"
       className={cn(
-        "grid cursor-pointer gap-2.5 rounded-lg border bg-[#fffaf6] p-2.5 shadow-[0_12px_28px_rgba(8,8,8,0.04)] transition dark:bg-orange-500/10 sm:gap-4 sm:p-4",
-        isConfirmed
-          ? "border-[#ff5a1f]/35 ring-2 ring-[#ff5a1f]/10 dark:border-[#ff5a1f]/30"
-          : "border-[#ff5a1f]/25 hover:border-[#ff5a1f]/45 dark:border-[#ff5a1f]/25",
+        "grid gap-2.5 rounded-lg border border-[#ff5a1f]/30 bg-[#fffaf6] p-2.5 shadow-[0_12px_28px_rgba(8,8,8,0.04)] dark:border-[#ff5a1f]/25 dark:bg-orange-500/10 sm:gap-4 sm:p-4",
         className,
       )}
+      role="note"
     >
       <span className="grid gap-2.5 sm:gap-3">
         <span className="flex min-w-0 items-start gap-2.5 sm:gap-3 sm:items-center">
-          <Checkbox
-            aria-label="Confirm empty cylinder exchange"
-            checked={isConfirmed}
-            className="size-6 rounded-md border-[#ff5a1f]/45 bg-white shadow-sm data-checked:border-[#ff5a1f] data-checked:bg-[#ff5a1f] data-checked:text-white dark:bg-white/[0.04] sm:size-8 sm:rounded-lg"
-            onCheckedChange={(checked) => onConfirmedChange(checked === true)}
-          />
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#ff5a1f] text-white shadow-sm sm:size-10">
+            <RefreshCcwIcon className="size-4 sm:size-5" />
+          </span>
           <span className="grid min-w-0 gap-1">
             <span className="text-[13px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2] sm:text-base">
-              Confirm empty cylinder exchange
+              Empty cylinder required
             </span>
-            <span
-              className={cn(
-                "text-[10px] font-black leading-none sm:text-xs",
-                isConfirmed
-                  ? "text-emerald-700 dark:text-emerald-300"
-                  : "text-[#ff5a1f]",
-              )}
-            >
-              {isConfirmed
-                ? "Confirmed for the current quantity"
-                : "Required before adding to cart"}
+            <span className="text-[10px] font-black leading-none text-[#ff5a1f] sm:text-xs">
+              Required for this exchange option
             </span>
           </span>
         </span>
@@ -1718,7 +1665,7 @@ function ExchangeConfirmationPanel({
       </span>
 
       <span className="text-[11px] leading-5 text-slate-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
-        {confirmationText}
+        {requirementText}
       </span>
 
       {acceptedReturnBrands.length > 0 ? (
@@ -1743,7 +1690,7 @@ function ExchangeConfirmationPanel({
           </span>
         </span>
       ) : null}
-    </label>
+    </section>
   );
 }
 
@@ -1782,15 +1729,15 @@ function QuantityStepper({
 function MobileStickyPurchaseBar({
   added,
   deliveryDetail,
+  hasExchangeRequirement,
   label,
-  needsExchangeConfirmation,
   onAction,
   selectedPrice,
 }: {
   added: boolean;
   deliveryDetail: string;
+  hasExchangeRequirement: boolean;
   label: string;
-  needsExchangeConfirmation: boolean;
   onAction: () => void;
   selectedPrice: string;
 }) {
@@ -1798,10 +1745,10 @@ function MobileStickyPurchaseBar({
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8e8e2] bg-white px-3 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2 shadow-[0_-12px_30px_rgba(8,8,8,0.12)] dark:border-white/10 dark:bg-[#101010] lg:hidden">
       <div className="mx-auto grid w-full max-w-4xl gap-1.5">
         <p className="flex min-w-0 items-center justify-center gap-1.5 text-center text-[11px] font-semibold text-[#080808] dark:text-[#f7f7f2]">
-          {needsExchangeConfirmation ? (
+          {hasExchangeRequirement ? (
             <>
               <RefreshCcwIcon className="size-3.5 shrink-0 text-[#ff5a1f]" />
-              <span className="truncate">Exchange confirmation required</span>
+              <span className="truncate">Empty cylinder required</span>
             </>
           ) : (
             <>
@@ -2091,46 +2038,17 @@ function getDeliveryPromise(
 ) {
   if (fulfillmentMode !== "piessang_fulfilled") {
     return {
-      detail: "Courier rates are calculated at checkout",
-      label: "Courier delivery options",
+      detail:
+        "Estimated delivery in 1–4 business days; fees are shown at checkout",
+      label: "Delivery in South Africa",
     };
   }
 
   return {
-    detail: "Eligibility and delivery details are confirmed at checkout",
-    label: "Local delivery subject to availability.",
+    detail:
+      "Estimated delivery in 1–4 business days; fees are shown at checkout",
+    label: "Delivery in South Africa",
   };
-}
-
-function getExchangeConfirmationText({
-  product,
-  quantity,
-  variant,
-}: {
-  product: MarketplaceProductDetailView;
-  quantity: number;
-  variant: MarketplaceVariant;
-}) {
-  const customText = variant.exchangeConfirmationText
-    ? cleanInlineText(variant.exchangeConfirmationText)
-    : "";
-
-  if (quantity === 1 && customText) {
-    return customText;
-  }
-
-  const emptySize = getExchangeEmptySize(product, variant);
-  const quantityText =
-    quantity === 1
-      ? emptySize
-        ? `a ${emptySize}`
-        : "a compatible"
-      : emptySize
-        ? `x${quantity} ${emptySize}`
-        : `x${quantity} compatible`;
-  const cylinderText = quantity === 1 ? "empty cylinder" : "empty cylinders";
-
-  return `I confirm I have ${quantityText} ${cylinderText} in acceptable condition to exchange on delivery.`;
 }
 
 function getExchangeEmptyCountLabel(quantity: number, emptySize: string | null) {

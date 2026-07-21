@@ -58,7 +58,7 @@ export async function registerCustomerWithPassword(
   if (existingUser) {
     return {
       error:
-        "This email already has a Piessang account. Please sign in to continue.",
+        "This email already has a Jurgens Energy account. Please sign in to continue.",
     };
   }
 

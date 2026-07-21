@@ -19,6 +19,7 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   contactPhonePrimary: text("contact_phone_primary"),
   contactPhoneSecondary: text("contact_phone_secondary"),
   contactEmail: text("contact_email"),
+  // Legacy storage only. Public addresses come from business_information.
   contactAddress: text("contact_address"),
   paymentMethodBadges: text("payment_method_badges"),
   googleTagManagerId: text("google_tag_manager_id"),

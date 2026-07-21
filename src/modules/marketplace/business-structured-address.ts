@@ -11,24 +11,23 @@ export type MarketplacePostalAddress = {
 
 export function createMarketplaceBusinessAddress(
   registeredAddress: PublicRegisteredAddress | null,
-  fallbackContactAddress: string | null | undefined,
-): MarketplacePostalAddress | string | undefined {
-  if (registeredAddress) {
-    return {
-      "@type": "PostalAddress",
-      addressCountry: registeredAddress.countryCode,
-      addressLocality: registeredAddress.city,
-      addressRegion: registeredAddress.province,
-      postalCode: registeredAddress.postalCode,
-      streetAddress: [
-        registeredAddress.addressLine1,
-        registeredAddress.addressLine2,
-        registeredAddress.suburb,
-      ]
-        .filter((value): value is string => Boolean(value))
-        .join(", "),
-    };
+): MarketplacePostalAddress | undefined {
+  if (!registeredAddress) {
+    return undefined;
   }
 
-  return fallbackContactAddress?.trim() || undefined;
+  return {
+    "@type": "PostalAddress",
+    addressCountry: registeredAddress.countryCode,
+    addressLocality: registeredAddress.city,
+    addressRegion: registeredAddress.province,
+    postalCode: registeredAddress.postalCode,
+    streetAddress: [
+      registeredAddress.addressLine1,
+      registeredAddress.addressLine2,
+      registeredAddress.suburb,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(", "),
+  };
 }

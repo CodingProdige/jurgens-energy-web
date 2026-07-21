@@ -39,14 +39,14 @@ export const policyLinks = [
   },
   {
     description:
-      "The policy for cancellations, returns, exchanges, damaged goods, and refunds.",
+      "Seven-day returns, return courier costs, defective goods, exchanges, and refunds.",
     href: "/returns-and-refunds",
     kind: "returns",
     label: "Returns & Refunds Policy",
   },
   {
     description:
-      "The policy for shipping coverage, delivery quotes, timing, handover, and order issues.",
+      "South Africa delivery, handling and shipping estimates, fees, handover, and order issues.",
     href: "/delivery-information",
     kind: "delivery",
     label: "Shipping & Delivery Policy",
@@ -99,7 +99,7 @@ export const privacyPolicy: PolicyDocument = {
         "We process personal information in accordance with the Protection of Personal Information Act, 2013 (POPIA) and other applicable South African law. Depending on the situation, processing may be necessary to perform an order, comply with law, pursue a legitimate operational interest, protect a lawful interest, or act with your consent.",
       ],
       bullets: [
-        "Create and manage accounts, carts, orders, payments, deliveries, collections, exchanges, returns, and refunds.",
+        "Create and manage accounts, carts, orders, payments, deliveries, cylinder exchanges, returns, and refunds.",
         "Confirm availability, delivery details, safety requirements, and the status of an order.",
         "Respond to questions, investigate problems, prevent fraud or abuse, and secure the website and our records.",
         "Keep accounting, tax, audit, transaction, and compliance records.",
@@ -116,7 +116,7 @@ export const privacyPolicy: PolicyDocument = {
       bullets: [
         "Hosting, database, authentication, security, analytics, customer-support, and other technology providers.",
         "Payment processors, banks, and fraud-prevention providers involved in a transaction.",
-        "Couriers, delivery partners, suppliers, or collection teams that need order and contact details to fulfil an order.",
+        "Couriers, delivery partners, suppliers, or approved return-collection teams that need order and contact details to fulfil an order or return.",
         "Communications providers, including WhatsApp or Meta where you choose to communicate through WhatsApp, and email or messaging providers where used.",
         "Professional advisers, insurers, auditors, regulators, law-enforcement bodies, or courts where disclosure is lawful and necessary.",
         "A successor or purchaser in a genuine restructuring or sale, subject to appropriate confidentiality and legal safeguards.",
@@ -126,7 +126,7 @@ export const privacyPolicy: PolicyDocument = {
       id: "cookies-and-analytics",
       title: "6. Cookies, local storage, and analytics",
       paragraphs: [
-        "The website uses cookies or similar browser storage for essential functions such as security, sign-in, cart contents, currency, theme, marketplace access, and remembering your privacy choices. Essential storage is required for those functions and is not used to create an advertising profile.",
+        "The website uses cookies or similar browser storage for essential functions such as security, sign-in, cart contents, currency, theme, online-store access, and remembering your privacy choices. Essential storage is required for those functions and is not used to create an advertising profile.",
         "Where configured, Google Analytics and Google Ads may measure page visits, product interactions, enquiries, completed purchases, and which campaign led to an order. These optional tools start with analytics and advertising storage denied. They receive the choice made through the cookie controls, and the advertising-attribution record is stored only after advertising consent. A captured campaign record may include UTM campaign values or a Google click identifier and is retained for up to 90 days so that an order can be attributed to the campaign that led to it.",
         "You can change or withdraw optional consent at any time through Cookie settings. Withdrawal updates Google Consent Mode, removes applicable first-party measurement cookies that are accessible to the website, and clears our campaign-attribution cookie. You can also limit or delete browser storage through your browser settings. Blocking essential storage may prevent sign-in, checkout, saved preferences, or other parts of the store from working correctly.",
       ],
@@ -220,7 +220,7 @@ export const termsAndConditions: PolicyDocument = {
       title: "2. Product information and availability",
       paragraphs: [
         "We aim to describe products, sizes, brands, exchange options, compatibility, images, and stock accurately. Screen colours and product packaging may vary, and a manufacturer may make non-material changes. Please check dimensions, connections, appliance requirements, and intended use before ordering an accessory or LPG product.",
-        "Stock indicators are not a reservation. Products, exchange options, delivery areas, and quantities remain subject to availability and any lawful safety or supply restrictions. We will contact you if an ordered item cannot be supplied as described.",
+        "Stock indicators are not a reservation. Products, exchange options, delivery services, and quantities remain subject to availability and any lawful safety or supply restrictions. We will contact you if an ordered item cannot be supplied as described.",
       ],
     },
     {
@@ -236,7 +236,7 @@ export const termsAndConditions: PolicyDocument = {
       id: "orders",
       title: "4. Placing and accepting an order",
       paragraphs: [
-        "Adding an item to a cart, submitting a checkout, or sending an order request through WhatsApp does not by itself guarantee acceptance. An order is accepted when we confirm that it has been accepted for fulfilment, dispatch, delivery, or collection.",
+        "Adding an item to a cart, submitting a checkout, or sending an order request through WhatsApp does not by itself guarantee acceptance. An order is accepted when we confirm that it has been accepted for fulfilment, dispatch, or delivery.",
         "We may reasonably refuse or cancel an order before fulfilment because of unavailable stock, an unsupported delivery address, a failed or reversed payment, suspected fraud, an obvious catalogue error, a safety concern, or a legal restriction. If we cancel after receiving cleared payment, we will arrange the appropriate refund.",
       ],
     },
@@ -250,10 +250,14 @@ export const termsAndConditions: PolicyDocument = {
     },
     {
       id: "delivery",
-      title: "6. Delivery and collection",
+      title: "6. Shipping and delivery",
       paragraphs: [
-        "Delivery availability, fees, and estimated timing depend on the address, products, stock, vehicle or courier capacity, and LPG handling requirements. A time shown before acceptance is an estimate unless we expressly agree to a fixed time.",
+        "We deliver eligible online-store orders to addresses within South Africa. Checkout confirms whether the selected products can be delivered to the entered address and shows the delivery fee before payment.",
+        "Our handling time is 0–1 business day after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched that day. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.",
+        "After dispatch, the estimated shipping or transit time is 1–3 business days. Handling and transit together give an estimated total delivery time of 1–4 business days. These periods are estimates rather than guaranteed appointments unless we expressly confirm otherwise.",
+        "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
         "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
+        "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the eligible empty cylinder at the delivery handover.",
       ],
     },
     {
@@ -308,7 +312,7 @@ export const termsAndConditions: PolicyDocument = {
       id: "privacy-and-messages",
       title: "13. Privacy and communications",
       paragraphs: [
-        "Our Privacy Policy explains how personal information is handled. By placing an order, you agree that we may send the service messages reasonably needed to confirm payment, delivery, collection, exchange, safety, return, or support information. Marketing communications follow separate consent and opt-out rules.",
+        "Our Privacy Policy explains how personal information is handled. By placing an order, you agree that we may send the service messages reasonably needed to confirm payment, delivery, cylinder exchange, return collection, safety, refund, or support information. Marketing communications follow separate consent and opt-out rules.",
       ],
     },
     {
@@ -323,7 +327,8 @@ export const termsAndConditions: PolicyDocument = {
       id: "contact",
       title: "15. Contact details",
       paragraphs: [
-        "The store is operated under the Jurgens Energy name. Our current customer-service email address, telephone numbers, and physical or service address, where configured, appear in the footer. Use those details for order notices, cancellations, complaints, or formal questions about these terms.",
+        "The online store is operated under the Jurgens Energy name. Use the current customer-service email address and telephone numbers shown on the Contact page or in the footer for order notices, cancellations, complaints, or formal questions about these terms.",
+        "A registered or legal address shown in a formal disclosure is provided for legal notices and administration. It is not a public walk-in shop, customer collection point, or returns counter. Do not visit an address or send goods there unless we have given you written instructions for the specific matter.",
       ],
     },
   ],
@@ -331,7 +336,7 @@ export const termsAndConditions: PolicyDocument = {
 
 export const returnsAndRefundsPolicy: PolicyDocument = {
   description:
-    "Our South African returns policy for new and unused goods, defects, exchanges, by-arrangement handovers, return costs, and refunds.",
+    "Eligible online orders have seven-day cooling-off rights, and eligible new and unused goods have a seven-day store-return option. This policy explains costs and refunds.",
   eyebrow: "Order resolutions",
   kind: "returns",
   shortTitle: "Returns & Refunds Policy",
@@ -341,8 +346,8 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       id: "start-a-request",
       title: "1. Start with a return request",
       paragraphs: [
-        "This policy applies to orders delivered in South Africa. Contact us before returning any item and include your order number, the affected product, the reason for the request, and photographs where an item is damaged, incorrect, or defective. We will confirm the next step, return reference, collection method, or inspection arrangements.",
-        "Do not send LPG, a filled cylinder, or another hazardous item through an ordinary parcel or postal service. Keep the item in a safe, ventilated location and wait for a pre-authorized collection or return-handover plan.",
+        "This policy applies to orders delivered in South Africa. Contact us before returning any item and include your order number, the affected product, the reason for the request, and photographs where an item is damaged, incorrect, or defective. We will confirm the next step, return reference, approved courier method, collection method, or inspection arrangements.",
+        "Do not send LPG, a filled cylinder, or another hazardous item through an ordinary parcel service. Keep the item in a safe, ventilated location and wait for a pre-authorised safe collection plan.",
       ],
     },
     {
@@ -355,11 +360,11 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
     },
     {
       id: "online-cooling-off",
-      title: "3. Seven-day returns for new and unused goods",
+      title: "3. Seven-day cooling-off and store returns",
       paragraphs: [
-        "Where lawful and applicable, we accept a request to return or exchange a non-defective product that remains new and unused when the request is made within seven calendar days after the customer receives it. This includes eligible online cooling-off cancellations under section 44 of the Electronic Communications and Transactions Act.",
-        "For a non-defective return or exchange, keep the product unused, undamaged, complete, safely stored, and in its original resaleable packaging where reasonably applicable. Statutory exclusions and product-safety rules may affect the available return method, but they do not remove rights relating to an incorrect, unsafe, or defective product.",
-        "Contact us within the seven-day period so that we can authorize the return handover or collection. A customer exercising an eligible cooling-off right may be responsible only for the direct return cost permitted by law. This policy does not limit a longer or additional right provided by applicable law.",
+        "Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within seven calendar days after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.",
+        "Separately, Jurgens Energy accepts eligible new and unused goods for a voluntary change-of-mind return when you contact us within seven calendar days after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.",
+        "Contact us within the seven-day period so that we can authorise the return courier or safe collection. For a voluntary change-of-mind return, you pay the direct return courier cost. We do not charge a restocking fee. Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.",
       ],
     },
     {
@@ -375,7 +380,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "5. Incorrect, damaged, or incomplete orders",
       paragraphs: [
         "Check the order at handover where reasonably possible. If an item is visibly unsafe, leaking, seriously damaged, or not what you ordered, do not use it and tell the delivery representative or contact us immediately.",
-        "Report concealed damage, missing parts, or an incorrect item as soon as reasonably possible after delivery. Once verified, we will arrange the remedy and return transport required by applicable law, which may include correction, replacement, repair, or refund.",
+        "Report concealed damage, missing parts, or an incorrect item as soon as reasonably possible after delivery. Once verified, Jurgens Energy will cover the qualifying return transport required by applicable law and arrange the appropriate correction, replacement, repair, or refund.",
       ],
     },
     {
@@ -397,10 +402,10 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
     },
     {
       id: "return-condition",
-      title: '8. By-arrangement return handover ("in store")',
+      title: "8. Approved return courier or collection",
       paragraphs: [
-        'The return method recorded as "in store" means a return handover or collection that Jurgens Energy has approved and arranged in advance. It is not an unrestricted walk-in return service. Wait for confirmation of the location, date, and safe handover method before travelling to an address or sending an item.',
-        "LPG, filled cylinders, and other hazardous items are accepted only through a pre-authorized collection or handover that follows the applicable safety rules; they must never be sent through ordinary mail. For an approved non-hazardous return, package the item securely and display the return reference we provide.",
+        "Jurgens Energy is an online-only store with no public walk-in shop, customer collection point, or returns counter. Do not travel to or send goods to a registered or administrative address. Wait for our written return authorisation and the approved courier or collection instructions.",
+        "LPG, filled cylinders, and other hazardous items are accepted only through a pre-authorised collection that follows the applicable safety rules; they must never be sent through ordinary mail. For an approved non-hazardous return, package the item securely and display the return reference we provide.",
         "Return all parts, manuals, accessories, promotional items, and original packaging reasonably available. Do not remove serial labels or attempt repairs before assessment. We may inspect the product to confirm identity, condition, use, completeness, and the reported problem. An inspection does not remove a statutory right.",
       ],
     },
@@ -408,15 +413,15 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       id: "costs",
       title: "9. Return and collection costs",
       paragraphs: [
-        "We cover return risk and expense where the law requires it, including qualifying unsafe, failed, or defective goods and verified incorrect deliveries. For an eligible ECTA cooling-off cancellation, the consumer may be responsible for the direct cost of returning the goods.",
-        "We do not charge a restocking fee for an approved return or exchange. For a discretionary change-of-mind return, the customer is normally responsible only for the agreed direct return or collection cost where permitted by law. We will disclose any proposed cost before arranging the return and will not charge an amount prohibited by law.",
+        "For an eligible change-of-mind return, including an eligible ECTA cooling-off cancellation, the customer pays the direct return courier or approved collection cost. We do not charge a restocking fee for an approved return or exchange.",
+        "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, unsafe, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
       ],
     },
     {
       id: "refunds",
       title: "10. Refund timing and method",
       paragraphs: [
-        "Once a refund is approved, we initiate it using the original payment method where reasonably possible. Allow up to 30 days after approval for the refund to be processed and reflected by the payment provider, unless applicable law requires an earlier deadline or calculates the period from an earlier event such as cancellation. We may request verified bank details if the original method cannot receive the refund.",
+        "For an eligible ECTA cooling-off cancellation, we refund the payments received within 30 days after cancellation. For another approved refund, we initiate payment promptly and within the deadline required by applicable law, using the original payment method where reasonably possible. Your bank or payment provider may take additional time to reflect an initiated refund. We may request verified bank details if the original method cannot receive it.",
         "The refunded amount includes product and delivery charges where required by law. For other approved returns, original delivery or completed service charges may be excluded where lawful and disclosed. We will provide a clear calculation if a deduction is permitted.",
       ],
     },
@@ -432,7 +437,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
 
 export const deliveryInformation: PolicyDocument = {
   description:
-    "Our shipping and delivery policy explains how we confirm coverage, calculate charges, estimate timing, complete LPG handovers, and resolve delivery problems.",
+    "Eligible South Africa orders have 0–1 business day handling and 1–3 business day shipping, for an estimated total of 1–4 business days.",
   eyebrow: "Getting your order",
   kind: "delivery",
   shortTitle: "Shipping & Delivery Policy",
@@ -440,26 +445,30 @@ export const deliveryInformation: PolicyDocument = {
   sections: [
     {
       id: "coverage",
-      title: "1. Delivery coverage",
+      title: "1. Where we deliver",
       paragraphs: [
-        "Jurgens Energy local delivery is available only to addresses whose postal codes fall within a currently supported local delivery zone. It is not offered to every address in South Africa. Courier availability for eligible non-local products is checked separately.",
-        "Delivery availability also depends on the products, stock location, order value, route conditions, and whether an approved service can safely transport the order. Enter the complete delivery address and postal code at checkout, or provide them during an assisted order, so the available option can be confirmed.",
-        "A product being available online does not mean that every address is serviceable. Checkout is the final confirmation of availability and cost before payment. If we cannot safely or reasonably serve the address, we will contact you about an alternative, collection where available, or cancellation and refund of the affected order.",
+        "Jurgens Energy delivers eligible online-store orders to valid addresses within South Africa. We do not offer international shipping.",
+        "Enter a complete South African delivery address and working telephone number at checkout, or provide them during an assisted order. Delivery availability also depends on the selected products, stock, order preparation, access, and whether an approved service can safely transport the order.",
+        "Checkout is the final confirmation of delivery availability and cost before payment. If a legal, safety, stock, or transport constraint means we cannot complete the delivery, we will contact you about a practical alternative or cancellation and refund of the affected order.",
+        "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. Cylinder exchanges take place at the delivery handover when the eligible empty cylinder is collected.",
       ],
     },
     {
       id: "fees",
       title: "2. Delivery fees and quotes",
       paragraphs: [
-        "The delivery charge is calculated or confirmed from the supported destination postal code, parcel or LPG handling requirements, product quantity, order value, and available fulfilment method. The applicable option and charge are shown at checkout before payment, or communicated for approval during an assisted order.",
+        "The delivery charge is calculated or confirmed from the products, quantity, order value, parcel dimensions, LPG handling requirements, and available fulfilment method. The applicable option and charge are shown at checkout before payment, or communicated for approval during an assisted order.",
         "A quote may change if the address, products, quantities, access requirements, or fulfilment method changes. We will ask you to approve a material change before proceeding.",
       ],
     },
     {
       id: "timing",
-      title: "3. Delivery timing",
+      title: "3. Handling and shipping time",
       paragraphs: [
-        "Delivery dates and time windows are estimates unless we expressly confirm a fixed appointment. Timing depends on payment confirmation, stock, order preparation, route capacity, courier availability, weather, traffic, access, and LPG safety requirements.",
+        "Handling time is 0–1 business day after payment confirmation. This means an eligible order may be prepared and dispatched on the same business day or the next business day.",
+        "Our order cutoff is 2:00 PM South African Standard Time (SAST) on business days. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed. Orders placed on weekends or South African public holidays also begin processing on the next business day.",
+        "Shipping or transit time after dispatch is estimated at 1–3 business days. Combined with handling, the estimated total delivery time is 1–4 business days. Delivery dates and time windows are estimates unless we expressly confirm a fixed appointment.",
+        "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements.",
         "We will communicate a material delay and provide the available next step. If an accepted order cannot be fulfilled within an agreed or legally required period, you may have a right to cancel and receive the applicable refund.",
       ],
     },
@@ -499,7 +508,7 @@ export const deliveryInformation: PolicyDocument = {
       title: "7. Missed or unsuccessful delivery",
       paragraphs: [
         "A delivery may be unsuccessful if nobody is available, the address or contact details are incorrect, access is unsafe or blocked, required authorisation is missing, or an exchange cylinder is unavailable or ineligible.",
-        "We will contact you about redelivery, collection, order correction, or cancellation. A reasonable additional attempt or route charge may apply where the failure was caused by incorrect customer information or unavailable access, but it will be disclosed before the next attempt and applied only where lawful.",
+        "We will contact you about redelivery, order correction, or cancellation. A reasonable additional delivery-attempt charge may apply where the failure was caused by incorrect customer information or unavailable access, but it will be disclosed before the next attempt and applied only where lawful.",
       ],
     },
     {
@@ -514,7 +523,7 @@ export const deliveryInformation: PolicyDocument = {
       id: "delays-and-unavailability",
       title: "9. Delays, shortages, and events outside control",
       paragraphs: [
-        "Fuel or LPG shortages, road closures, severe weather, vehicle breakdowns, supplier disruption, public emergencies, or other events can affect a route. We will take reasonable steps to communicate and rebook rather than leave an order unresolved.",
+        "Fuel or LPG shortages, road closures, severe weather, vehicle breakdowns, supplier disruption, public emergencies, or other events can affect delivery. We will take reasonable steps to communicate and rebook rather than leave an order unresolved.",
         "If products become unavailable after payment, we will offer a lawful practical option such as a revised delivery date, an agreed substitute, cancellation of the affected item, or a refund. We will not substitute a materially different product without your agreement.",
       ],
     },
@@ -522,7 +531,7 @@ export const deliveryInformation: PolicyDocument = {
       id: "contact",
       title: "10. Delivery support",
       paragraphs: [
-        "Use the contact details in the footer for address corrections, access information, delays, missed delivery, or a handover problem. Include the order number and contact us before the order is dispatched where possible; an address or route cannot always be changed after dispatch.",
+        "Use the contact details in the footer for address corrections, access information, delays, missed delivery, or a handover problem. Include the order number and contact us before the order is dispatched where possible; a delivery address cannot always be changed after dispatch.",
       ],
     },
   ],

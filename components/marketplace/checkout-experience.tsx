@@ -93,7 +93,6 @@ function RequiredMark() {
 
 function toValidationItems(items: LocalCartItem[]) {
   return items.map((item) => ({
-    exchangeEmptyConfirmed: item.exchangeEmptyConfirmed,
     purchaseType: item.purchaseType,
     quantity: item.quantity,
     variantId: item.variantId,
@@ -1024,6 +1023,18 @@ export function CheckoutExperience({
                   <p className="mt-1 truncate text-[10px] text-[#777770] dark:text-[#aaa9a1]">
                     {item.variantTitle} · Qty {item.quantity}
                   </p>
+                  {item.purchaseType === "exchange" ? (
+                    <p className="mt-1 text-[10px] font-semibold leading-4 text-[#9a3b13] dark:text-orange-300">
+                      Empty cylinder required
+                      {item.exchangeRequiredEmptyCylinderSize
+                        ? `: ${item.exchangeRequiredEmptyCylinderSize}`
+                        : ""}
+                      .
+                      {item.exchangeAcceptedReturnBrands.length > 0
+                        ? ` Accepted return brands: ${item.exchangeAcceptedReturnBrands.join(", ")}.`
+                        : ""}
+                    </p>
+                  ) : null}
                   <div className="mt-2 flex min-w-0 items-center">
                     <MarketplaceProductFulfillmentBadge
                       fulfillmentMode={item.fulfillmentMode}
@@ -1923,8 +1934,7 @@ export function CheckoutExperience({
                 target="_blank"
               >
                 Privacy Policy
-              </Link>{" "}
-              and{" "}
+              </Link>,{" "}
               <Link
                 className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
                 href="/returns-and-refunds"
@@ -1932,6 +1942,14 @@ export function CheckoutExperience({
                 target="_blank"
               >
                 Returns &amp; Refunds Policy
+              </Link>, and{" "}
+              <Link
+                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                href="/delivery-information"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Shipping &amp; Delivery Policy
               </Link>
               .
             </label>

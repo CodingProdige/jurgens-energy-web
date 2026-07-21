@@ -6,6 +6,7 @@ import { MarketplaceHeader } from "@/components/marketplace/marketplace-header";
 import { StorefrontPageRenderer } from "@/components/marketplace/storefront-section-renderer";
 import { getPublishedBlogPosts } from "@/src/modules/blog";
 import { getCurrencyContext } from "@/src/modules/currency/server";
+import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { getMarketplaceCatalog } from "@/src/modules/marketplace/catalog";
 import { getPublishedStorefrontPage } from "@/src/modules/marketplace/storefront";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
@@ -13,7 +14,6 @@ import {
   createMarketplaceBusinessStructuredData,
   MarketplaceJsonLd,
 } from "@/src/modules/marketplace/structured-data";
-import { getJurgensDeliveryZones } from "@/src/modules/shipping/jurgens-delivery";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 
@@ -39,28 +39,29 @@ export default async function Home({
     catalog,
     storefrontPage,
     settings,
-    deliveryZones,
-  ] = await Promise.all([
-    getPublishedBlogPosts(12),
-    getPublicBusinessIdentity(),
-    getMarketplaceCatalog({
-      brandSlug,
-      currencyContext,
-      limit: 36,
-    }),
-    getPublishedStorefrontPage(),
-    getMarketplaceSettings(),
-    getJurgensDeliveryZones({ activeOnly: true }),
-  ]);
+    support,
+  ] =
+    await Promise.all([
+      getPublishedBlogPosts(12),
+      getPublicBusinessIdentity(),
+      getMarketplaceCatalog({
+        brandSlug,
+        currencyContext,
+        limit: 36,
+      }),
+      getPublishedStorefrontPage(),
+      getMarketplaceSettings(),
+      getCustomerSupportContactDetails(),
+    ]);
 
   return (
     <MarketplaceGate>
       <div className="min-h-screen bg-[#f7f7f2] text-[#080808] dark:bg-[#080808] dark:text-[#f7f7f2]">
         <MarketplaceJsonLd
           data={createMarketplaceBusinessStructuredData({
-            areaNames: deliveryZones.map((zone) => zone.name),
             businessIdentity,
             settings,
+            support,
           })}
         />
         <MarketplaceHeader />

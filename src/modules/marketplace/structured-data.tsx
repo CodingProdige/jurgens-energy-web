@@ -1,4 +1,5 @@
 import type { MarketplaceProductDetail } from "@/src/modules/marketplace/catalog";
+import type { CustomerSupportContactDetails } from "@/src/modules/customer-support/contact-details";
 import { createMarketplaceBusinessAddress } from "@/src/modules/marketplace/business-structured-address";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
@@ -22,25 +23,21 @@ export function MarketplaceJsonLd({
 }
 
 export function createMarketplaceBusinessStructuredData({
-  areaNames,
   businessIdentity,
   settings,
+  support,
 }: {
-  areaNames: string[];
   businessIdentity: PublicBusinessIdentity;
   settings: MarketplaceSettings;
+  support: CustomerSupportContactDetails;
 }): StructuredDataValue {
   const homeUrl = createMarketplaceCanonicalUrl("/");
   const organizationId = `${homeUrl}#organization`;
   const onlineStoreId = `${homeUrl}#online-store`;
-  const contactPhone =
-    settings.contactPhonePrimary.trim() ||
-    settings.whatsappBusinessPhoneNumber?.trim() ||
-    undefined;
-  const contactEmail = settings.contactEmail.trim() || undefined;
+  const contactPhone = support.phoneNumbers[0] ?? support.whatsappPhone ?? undefined;
+  const contactEmail = support.email ?? undefined;
   const businessAddress = createMarketplaceBusinessAddress(
     businessIdentity.registeredAddress,
-    settings.contactAddress,
   );
   const tradingName = businessIdentity.tradingName.trim() || "Jurgens Energy";
   const legalName = businessIdentity.legalName?.trim() || undefined;
@@ -80,10 +77,10 @@ export function createMarketplaceBusinessStructuredData({
         "@id": onlineStoreId,
         "@type": "OnlineStore",
         address: businessAddress,
-        areaServed: areaNames.map((name) => ({
-          "@type": "AdministrativeArea",
-          name,
-        })),
+        areaServed: {
+          "@type": "Country",
+          name: "South Africa",
+        },
         email: contactEmail,
         legalName,
         name: tradingName,
@@ -253,24 +250,20 @@ export function createArticleStructuredData({
   };
 }
 
-export function createDeliveryServiceStructuredData({
-  areaNames,
-}: {
-  areaNames: string[];
-}): StructuredDataValue {
+export function createDeliveryServiceStructuredData(): StructuredDataValue {
   const url = createMarketplaceCanonicalUrl("/lpg-delivery");
 
   return {
     "@context": "https://schema.org",
     "@id": `${url}#service`,
     "@type": "Service",
-    areaServed: areaNames.map((name) => ({
-      "@type": "AdministrativeArea",
-      name,
-    })),
+    areaServed: {
+      "@type": "Country",
+      name: "South Africa",
+    },
     description:
-      "Local LPG cylinder delivery and eligible empty-cylinder exchange from Jurgens Energy, subject to live product, address and delivery-zone availability.",
-    name: "Jurgens Energy local LPG delivery",
+      "Online delivery of eligible LPG cylinders, cylinder exchanges and gas accessories within South Africa, with 0–1 business day handling, a 2:00 PM SAST order cut-off, 1–3 business day shipping after dispatch and an estimated total of 1–4 business days.",
+    name: "Jurgens Energy South Africa LPG delivery",
     provider: { "@id": `${createMarketplaceCanonicalUrl("/")}#online-store` },
     serviceType: "LPG cylinder delivery and exchange",
     url,

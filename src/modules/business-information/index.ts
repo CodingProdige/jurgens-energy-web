@@ -1,6 +1,7 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/src/db";
 import { auditLogs, businessInformation } from "@/src/db/schema";
@@ -56,7 +57,7 @@ const defaultBusinessInformation: BusinessInformation = {
   vatRegistrationNumber: "",
 };
 
-export async function getBusinessInformation(): Promise<BusinessInformation> {
+const readBusinessInformation = async (): Promise<BusinessInformation> => {
   const [row] = await db
     .select()
     .from(businessInformation)
@@ -64,74 +65,60 @@ export async function getBusinessInformation(): Promise<BusinessInformation> {
     .limit(1);
 
   return row ?? defaultBusinessInformation;
-}
+};
+
+export const getBusinessInformation = cache(readBusinessInformation);
 
 function normalizeComparableBusinessName(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-ZA");
 }
 
 /**
- * Returns only the business identity fields that are safe to publish.
- * Keep this explicit projection separate from the full invoice and collection
- * profile so future private fields (including banking details) cannot leak into
- * public components by accident.
+ * Returns only the business identity fields that are safe to publish. The
+ * explicit result object prevents invoice, collection, and future private
+ * fields from leaking into public components.
  */
-export async function getPublicBusinessIdentity(): Promise<PublicBusinessIdentity> {
-  const [row] = await db
-    .select({
-      addressLine1: businessInformation.addressLine1,
-      addressLine2: businessInformation.addressLine2,
-      city: businessInformation.city,
-      companyRegistrationNumber:
-        businessInformation.companyRegistrationNumber,
-      countryCode: businessInformation.countryCode,
-      legalName: businessInformation.legalName,
-      postalCode: businessInformation.postalCode,
-      province: businessInformation.province,
-      suburb: businessInformation.suburb,
-      tradingName: businessInformation.tradingName,
-      vatRegistrationNumber: businessInformation.vatRegistrationNumber,
-    })
-    .from(businessInformation)
-    .where(eq(businessInformation.id, 1))
-    .limit(1);
-  const tradingName = row?.tradingName.trim() || "Jurgens Energy";
-  const legalName = row?.legalName.trim() || "";
-  const legalNameDiffers = Boolean(
-    legalName &&
-      normalizeComparableBusinessName(legalName) !==
-        normalizeComparableBusinessName(tradingName),
-  );
-  const addressLine1 = row?.addressLine1.trim() || "";
-  const city = row?.city.trim() || "";
-  const countryCode = row?.countryCode.trim().toUpperCase() || "";
-  const postalCode = row?.postalCode.trim() || "";
-  const province = row?.province.trim() || "";
-  const registeredAddress =
-    addressLine1 && city && countryCode && postalCode && province
-      ? {
-          addressLine1,
-          addressLine2: row?.addressLine2?.trim() || null,
-          city,
-          countryCode,
-          postalCode,
-          province,
-          suburb: row?.suburb?.trim() || null,
-        }
-      : null;
+export const getPublicBusinessIdentity = cache(
+  async (): Promise<PublicBusinessIdentity> => {
+    const row = await getBusinessInformation();
+    const tradingName = row.tradingName.trim() || "Jurgens Energy";
+    const legalName = row.legalName.trim();
+    const legalNameDiffers = Boolean(
+      legalName &&
+        normalizeComparableBusinessName(legalName) !==
+          normalizeComparableBusinessName(tradingName),
+    );
+    const addressLine1 = row.addressLine1.trim();
+    const city = row.city.trim();
+    const countryCode = row.countryCode.trim().toUpperCase();
+    const postalCode = row.postalCode.trim();
+    const province = row.province.trim();
+    const registeredAddress =
+      addressLine1 && city && countryCode && postalCode && province
+        ? {
+            addressLine1,
+            addressLine2: row.addressLine2?.trim() || null,
+            city,
+            countryCode,
+            postalCode,
+            province,
+            suburb: row.suburb?.trim() || null,
+          }
+        : null;
 
-  return {
-    companyRegistrationNumber:
-      row?.companyRegistrationNumber?.trim() || null,
-    legalName: legalName || null,
-    registeredAddress,
-    tradingName,
-    tradingNameDisclosure: legalNameDiffers
-      ? `${tradingName} is a trading name of ${legalName}.`
-      : null,
-    vatRegistrationNumber: row?.vatRegistrationNumber.trim() || null,
-  };
-}
+    return {
+      companyRegistrationNumber:
+        row.companyRegistrationNumber?.trim() || null,
+      legalName: legalName || null,
+      registeredAddress,
+      tradingName,
+      tradingNameDisclosure: legalNameDiffers
+        ? `${tradingName} is a trading name of ${legalName}.`
+        : null,
+      vatRegistrationNumber: row.vatRegistrationNumber.trim() || null,
+    };
+  },
+);
 
 export type UpdateBusinessInformationInput = Omit<
   typeof businessInformation.$inferInsert,

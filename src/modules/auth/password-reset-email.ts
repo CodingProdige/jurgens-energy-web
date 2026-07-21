@@ -20,7 +20,7 @@ export async function sendPasswordResetEmail({
       ? "admin"
       : surface === "seller"
         ? "seller"
-        : "marketplace";
+        : "online store";
   const expiresAtLabel = expiresAt.toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",

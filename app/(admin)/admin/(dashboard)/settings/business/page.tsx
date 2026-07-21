@@ -40,7 +40,8 @@ export default async function BusinessInformationPage() {
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-zinc-300">
           Control the registered business, VAT, invoice, and courier collection
-          information used throughout checkout and customer documents.
+          information used throughout the storefront, checkout, shipping, and
+          customer documents.
         </p>
       </div>
 

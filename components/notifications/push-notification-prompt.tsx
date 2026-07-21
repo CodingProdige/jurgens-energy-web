@@ -20,6 +20,7 @@ export type PushNotificationStatus =
 
 type PushNotificationPromptProps = {
   accent?: "amber" | "green" | "marketplace";
+  brandName?: string;
   className?: string;
   onDismiss?: () => void;
   onEnable: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -44,6 +45,7 @@ const accentStyles = {
 
 export function PushNotificationPrompt({
   accent = "amber",
+  brandName = "Piessang",
   className,
   onDismiss,
   onEnable,
@@ -61,7 +63,7 @@ export function PushNotificationPrompt({
   const isBlocked = status === "denied";
   const isUnavailable = status === "unconfigured";
   const ctaLabel = getCtaLabel(status);
-  const message = getMessage(status);
+  const message = getMessage(status, brandName);
 
   return (
     <section
@@ -194,7 +196,7 @@ export function PushNotificationPrompt({
           <ol className="mt-2 list-decimal space-y-1 pl-4 leading-5">
             <li>Click the notification or site settings icon in the address bar.</li>
             <li>Change notifications from Block to Allow.</li>
-            <li>Refresh Piessang, then enable notifications again.</li>
+            <li>Refresh {brandName}, then enable notifications again.</li>
           </ol>
         </div>
       ) : null}
@@ -219,14 +221,14 @@ function getCtaLabel(status: PushNotificationStatus) {
   }
 }
 
-function getMessage(status: PushNotificationStatus) {
+function getMessage(status: PushNotificationStatus, brandName: string) {
   switch (status) {
     case "denied":
       return "Notifications are turned off in your browser settings. We can show you how to turn them back on.";
     case "unconfigured":
       return "Push notifications need the VAPID keys to be loaded before they can be enabled.";
     case "allowed":
-      return "Browser notifications are allowed. Complete setup so Piessang can deliver updates to this device.";
+      return `Browser notifications are allowed. Complete setup so ${brandName} can deliver updates to this device.`;
     default:
       return "Enable notifications to get important updates about your store, orders and messages.";
   }

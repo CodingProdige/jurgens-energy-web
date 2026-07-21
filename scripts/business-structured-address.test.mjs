@@ -7,31 +7,26 @@ test("structured business address prefers the registered address", () => {
   assert.deepEqual(
     createMarketplaceBusinessAddress(
       {
-        addressLine1: "6 Christelle Street",
+        addressLine1: "10 Example Road",
         addressLine2: null,
-        city: "Paarl",
+        city: "Cape Town",
         countryCode: "ZA",
-        postalCode: "7646",
+        postalCode: "8001",
         province: "Western Cape",
-        suburb: "Denneburg",
+        suburb: "Gardens",
       },
-      "An independently configured contact address",
     ),
     {
       "@type": "PostalAddress",
       addressCountry: "ZA",
-      addressLocality: "Paarl",
+      addressLocality: "Cape Town",
       addressRegion: "Western Cape",
-      postalCode: "7646",
-      streetAddress: "6 Christelle Street, Denneburg",
+      postalCode: "8001",
+      streetAddress: "10 Example Road, Gardens",
     },
   );
 });
 
-test("structured business address uses the public contact fallback when needed", () => {
-  assert.equal(
-    createMarketplaceBusinessAddress(null, " 6 Christelle Street, Paarl "),
-    "6 Christelle Street, Paarl",
-  );
-  assert.equal(createMarketplaceBusinessAddress(null, ""), undefined);
+test("structured business address is omitted until Business Information is complete", () => {
+  assert.equal(createMarketplaceBusinessAddress(null), undefined);
 });

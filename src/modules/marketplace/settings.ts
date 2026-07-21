@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 import { eq, inArray } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/src/db";
 import { marketplaceSettings, media } from "@/src/db/schema";
@@ -31,7 +32,7 @@ export const openAiReasoningEfforts = [
 export type OpenAiReasoningEffort = (typeof openAiReasoningEfforts)[number];
 export const defaultWhatsappFollowUpMessages = {
   default:
-    "Hi, just checking in. If you still need gas, send the cylinder size, quantity, and delivery suburb and we will help you finish it.",
+    "Hi, just checking in. If you still need gas, send the cylinder size and quantity and we will help you finish the order.",
   draft:
     "Hi, just checking in. Would you like to continue with this order? Reply YES to confirm, or tell us what to change.",
   support:
@@ -191,7 +192,6 @@ export type MarketplaceSettings = {
   bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
   comingSoonEnabled: boolean;
   comingSoonPasswordHash: string | null;
-  contactAddress: string;
   contactEmail: string;
   contactPhonePrimary: string;
   contactPhoneSecondary: string;
@@ -309,13 +309,12 @@ const defaultSettings: MarketplaceSettings = {
   bobgoBookingMode: "disabled",
   comingSoonEnabled: false,
   comingSoonPasswordHash: null,
-  contactAddress:
-    "6 Christelle Street, Denneburg, Paarl, Western Cape 7646, South Africa",
-  contactEmail: "support@jurgensenergy.com",
-  contactPhonePrimary: "+27 60 689 3558",
+  contactEmail: "",
+  contactPhonePrimary: "",
   contactPhoneSecondary: "",
   facebookUrl: null,
-  footerTagline: "Modern energy, delivered.",
+  footerTagline:
+    "South African online store for LPG cylinders, exchanges and gas accessories.",
   freeStorageQuotaMb: 512,
   googleAdsConversionId: null,
   googleAdsConversionLabel: null,
@@ -398,12 +397,11 @@ const defaultSettings: MarketplaceSettings = {
   whatsappWebhookUrl: getWhatsappWebhookUrl(),
 };
 
-export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
+const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
   const [settings] = await db
     .select({
       comingSoonEnabled: marketplaceSettings.comingSoonEnabled,
       comingSoonPasswordHash: marketplaceSettings.comingSoonPasswordHash,
-      contactAddress: marketplaceSettings.contactAddress,
       contactEmail: marketplaceSettings.contactEmail,
       contactPhonePrimary: marketplaceSettings.contactPhonePrimary,
       contactPhoneSecondary: marketplaceSettings.contactPhoneSecondary,
@@ -536,7 +534,6 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     ...settings,
     bobgoBookingMode: normalizeBobgoBookingMode(settings.bobgoBookingMode),
     bobgoMode: settings.bobgoMode === "live" ? "live" : "sandbox",
-    contactAddress: settings.contactAddress ?? defaultSettings.contactAddress,
     contactEmail: settings.contactEmail ?? defaultSettings.contactEmail,
     contactPhonePrimary:
       settings.contactPhonePrimary ?? defaultSettings.contactPhonePrimary,
@@ -635,7 +632,9 @@ export async function getMarketplaceSettings(): Promise<MarketplaceSettings> {
     whatsappProvider: normalizeWhatsappProvider(settings.whatsappProvider),
     whatsappWebhookUrl: getWhatsappWebhookUrl(),
   };
-}
+};
+
+export const getMarketplaceSettings = cache(readMarketplaceSettings);
 
 export async function updateMarketplaceMediaSettings({
   freeStorageQuotaMb,
@@ -1388,7 +1387,6 @@ export async function updateMarketplaceSocialLinks({
 }
 
 export async function updateMarketplaceFooterSettings({
-  contactAddress,
   contactEmail,
   contactPhonePrimary,
   contactPhoneSecondary,
@@ -1399,7 +1397,6 @@ export async function updateMarketplaceFooterSettings({
   paymentMethodBadges,
   twitterUrl,
 }: {
-  contactAddress: string;
   contactEmail: string;
   contactPhonePrimary: string;
   contactPhoneSecondary: string;
@@ -1457,7 +1454,6 @@ export async function updateMarketplaceFooterSettings({
     .insert(marketplaceSettings)
     .values({
       id: 1,
-      contactAddress,
       contactEmail,
       contactPhonePrimary,
       contactPhoneSecondary,
@@ -1472,7 +1468,6 @@ export async function updateMarketplaceFooterSettings({
     .onConflictDoUpdate({
       target: marketplaceSettings.id,
       set: {
-        contactAddress,
         contactEmail,
         contactPhonePrimary,
         contactPhoneSecondary,

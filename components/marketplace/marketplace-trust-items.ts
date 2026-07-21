@@ -13,9 +13,9 @@ export const marketplaceTrustItems = [
     title: "Safety-First Handling",
   },
   {
-    description: "Where available",
+    description: "Estimated 1–4 business days",
     icon: TruckIcon,
-    title: "Delivery Options",
+    title: "South Africa Delivery",
   },
   {
     description: "Payment, invoice & delivery",

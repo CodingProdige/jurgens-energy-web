@@ -407,6 +407,7 @@ export async function createHostedCheckoutOrder(
         orderNumber,
         policyAcceptanceSnapshot: {
           acceptedAt: new Date().toISOString(),
+          deliveryInformationPath: "/delivery-information",
           effectiveDate: parsed.policyAcceptance.version,
           privacyPolicyPath: "/privacy-policy",
           returnsAndRefundsPath: "/returns-and-refunds",

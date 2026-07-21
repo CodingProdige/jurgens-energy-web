@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import { getExchangeRequirementText as buildExchangeRequirementText } from "@/src/modules/cart/exchange-requirements";
 import { db } from "@/src/db";
 import {
   auditLogs,
@@ -187,7 +188,7 @@ function normalizeExchangeBrands(brandsList: string[]) {
   return [...new Set(normalized)];
 }
 
-function getExchangeConfirmationText({
+function getExchangeRequirementTextForSave({
   customText,
   emptyCylinderSize,
   requiresExchangeEmpty,
@@ -203,14 +204,17 @@ function getExchangeConfirmationText({
   const trimmedText = customText?.trim();
 
   if (trimmedText) {
-    return trimmedText;
+    return buildExchangeRequirementText({
+      emptySize: emptyCylinderSize,
+      fallbackText: trimmedText,
+      quantity: 1,
+    });
   }
 
-  const sizeText = emptyCylinderSize?.trim();
-
-  return sizeText
-    ? `I confirm I have a ${sizeText} empty cylinder in acceptable condition to exchange on delivery.`
-    : "I confirm I have an empty cylinder in acceptable condition to exchange on delivery.";
+  return buildExchangeRequirementText({
+    emptySize: emptyCylinderSize,
+    quantity: 1,
+  });
 }
 
 function buildVariantRows(
@@ -259,7 +263,7 @@ function buildVariantRows(
         exchangeAcceptedReturnBrands: variant.exchangeRequiresEmpty
           ? normalizeExchangeBrands(variant.exchangeAcceptedReturnBrands)
           : [],
-        exchangeConfirmationText: getExchangeConfirmationText({
+        exchangeConfirmationText: getExchangeRequirementTextForSave({
           customText: variant.exchangeConfirmationText,
           emptyCylinderSize: variant.exchangeEmptyCylinderSize,
           requiresExchangeEmpty: variant.exchangeRequiresEmpty,
@@ -327,7 +331,7 @@ function buildVariantRows(
       exchangeAcceptedReturnBrands: input.exchangeRequiresEmpty
         ? normalizeExchangeBrands(input.exchangeAcceptedReturnBrands)
         : [],
-      exchangeConfirmationText: getExchangeConfirmationText({
+      exchangeConfirmationText: getExchangeRequirementTextForSave({
         customText: input.exchangeConfirmationText,
         emptyCylinderSize: input.exchangeEmptyCylinderSize,
         requiresExchangeEmpty: input.exchangeRequiresEmpty,

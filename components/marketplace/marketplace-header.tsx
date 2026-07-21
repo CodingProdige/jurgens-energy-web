@@ -99,7 +99,7 @@ export async function MarketplaceHeader() {
       <div className="border-b border-[#ecece6] bg-[#f7f7f2]/92 dark:border-white/10 dark:bg-[#101010]/92">
         <div className="mx-auto flex w-full items-center justify-end gap-2 overflow-hidden px-2 py-1.5 sm:w-[min(1500px,calc(100%-1rem))] sm:justify-between sm:px-6 sm:py-2 lg:px-10">
           <p className="hidden text-[11px] font-bold uppercase tracking-[0.16em] text-[#5c5c57] dark:text-[#c8c8c0] md:block">
-            LPG cylinders, exchanges and local delivery.
+            South African online LPG store · Delivery in 1–4 business days.
           </p>
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:ml-auto sm:flex-none sm:gap-2">
             <CurrencySelector
@@ -167,7 +167,7 @@ export async function MarketplaceHeader() {
           <MarketplaceCartLink />
           <Link
             className={cn(
-              "hidden min-[390px]:inline-flex sm:px-5",
+              "hidden sm:inline-flex sm:px-5",
               marketplacePrimaryActionBaseClass,
             )}
             href="/products"

@@ -2,15 +2,31 @@ import { Building2Icon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { PublicBusinessIdentity } from "@/src/modules/business-information";
+import { formatRegisteredBusinessAddress } from "@/src/modules/business-information/address-formatting";
 
-function getIdentityLines(identity: PublicBusinessIdentity) {
+export function formatRegisteredAddress(identity: PublicBusinessIdentity) {
+  return formatRegisteredBusinessAddress(identity.registeredAddress);
+}
+
+function getIdentityLines(
+  identity: PublicBusinessIdentity,
+  showRegisteredAddress: boolean,
+) {
+  const registeredAddress = showRegisteredAddress
+    ? formatRegisteredAddress(identity)
+    : null;
+
   return [
-    identity.tradingNameDisclosure,
+    `Trading name: ${identity.tradingName}`,
+    identity.legalName ? `Legal name: ${identity.legalName}` : null,
     identity.companyRegistrationNumber
       ? `Company registration: ${identity.companyRegistrationNumber}`
       : null,
     identity.vatRegistrationNumber
       ? `VAT registration: ${identity.vatRegistrationNumber}`
+      : null,
+    registeredAddress
+      ? `Registered address for legal notices only (not a shop or returns counter): ${registeredAddress}`
       : null,
   ].filter((line): line is string => Boolean(line));
 }
@@ -19,14 +35,16 @@ export function PublicBusinessIdentityDisclosure({
   appearance = "panel",
   className,
   identity,
+  showRegisteredAddress = false,
   title = "Registered business",
 }: {
   appearance?: "footer" | "panel";
   className?: string;
   identity: PublicBusinessIdentity;
+  showRegisteredAddress?: boolean;
   title?: string;
 }) {
-  const lines = getIdentityLines(identity);
+  const lines = getIdentityLines(identity, showRegisteredAddress);
 
   if (lines.length === 0) {
     return null;

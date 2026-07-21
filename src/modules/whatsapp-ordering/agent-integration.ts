@@ -25,9 +25,7 @@ export type WhatsappAgentOrderProposal = {
 
 export type WhatsappAgentAdapters = {
   cancelPendingRequest: () => Promise<WhatsappAgentAdapterResult>;
-  checkDeliveryArea: (
-    destinationOrPostalCode: string,
-  ) => Promise<WhatsappAgentAdapterResult>;
+  checkDeliveryArea: (destination: string) => Promise<WhatsappAgentAdapterResult>;
   confirmOrderAndCreateCheckout: () => Promise<WhatsappAgentAdapterResult>;
   getBusinessInformation: (
     question: string,
@@ -174,7 +172,7 @@ export async function runJurgensWhatsappAgentTurn({
       AgentAuthorizationContext
     >({
       description:
-        "Check whether a supplied South African destination name or four-digit postal code matches a configured Jurgens Energy local-delivery area. This does not calculate a final checkout quote.",
+        "Retrieve the verified country-level delivery policy for eligible online-store orders within South Africa. Exact product eligibility and delivery fees are confirmed at checkout from the customer's complete delivery address.",
       execute: ({ value }) =>
         execute(() => adapters.checkDeliveryArea(value)),
       name: "check_delivery_area",
@@ -341,7 +339,10 @@ export async function runJurgensWhatsappAgentTurn({
     tools,
     trustedBusinessInstructions: [
       "Jurgens Energy is the sole seller in this store.",
-      "For a delivery-area question, answer the coverage question first and then ask for only the missing product detail needed to continue.",
+      "Jurgens Energy is an online store that delivers eligible online-store orders within South Africa.",
+      "For delivery questions, state the South Africa policy first: handling takes 0–1 business day after payment confirmation; the order cutoff is 2:00 PM SAST, with after-cutoff orders starting processing on the next business day; shipping takes 1–3 business days after dispatch; and the combined estimated delivery time is 1–4 business days. Delivery fees are shown at checkout.",
+      "Do not describe postal-code zones, subregions, local-delivery areas or configured rate tiers. Exact product eligibility is confirmed at checkout from the complete South African delivery address.",
+      "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
       "For a cylinder order, use propose_order rather than writing an offer from memory.",
       "Set repeat_last_order true only when the customer explicitly refers to the same, usual or previous order; refill, replace, replacement or top-up alone is an exchange request, not a repeat-order instruction.",
       "An exchange requires an eligible empty cylinder handover; a full/new cylinder does not.",

@@ -433,8 +433,7 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
                     {item.purchaseType === "exchange" ? (
                       <p className="mt-2 inline-flex items-center gap-1.5 rounded-sm bg-[#ff5a1f]/10 px-2 py-1 text-[11px] font-bold text-[#d9460f] dark:text-[#ff8a60]">
                         <PackageCheckIcon className="size-3" />
-                        Cylinder exchange
-                        {item.exchangeEmptyConfirmed ? " · empty confirmed" : ""}
+                        Cylinder exchange · empty cylinder required
                       </p>
                     ) : null}
                   </div>
@@ -482,7 +481,7 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
                   </span>
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-black">Jurgens local delivery</p>
+                      <p className="font-black">Jurgens Energy delivery</p>
                       <Badge
                         className={cn(
                           "h-6 border-0 capitalize",

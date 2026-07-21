@@ -8,6 +8,11 @@ import {
   whatsappMessages,
   type JurgensDeliveryScheduleStatus,
 } from "@/src/db/schema";
+import { getBusinessInformation } from "@/src/modules/business-information";
+import {
+  createCustomerSupportContactDetails,
+  formatCustomerSupportContactSentence,
+} from "@/src/modules/customer-support/contact-details";
 import {
   formatScheduleDate,
   formatScheduleWindow,
@@ -34,6 +39,7 @@ type DeliveryNotificationContext = {
   ratingUrl: string | null;
   scheduledWindow: string | null;
   status: JurgensDeliveryScheduleStatus;
+  supportContactSentence: string | null;
 };
 
 function getStatusMessage({
@@ -43,6 +49,7 @@ function getStatusMessage({
   ratingUrl,
   scheduledWindow,
   status,
+  supportContactSentence,
 }: DeliveryNotificationContext) {
   if (status === "scheduled") {
     return `Your Jurgens Energy delivery for order ${orderNumber} is scheduled for ${deliveryDate}${scheduledWindow ? ` during ${scheduledWindow}` : ""}.`;
@@ -65,14 +72,22 @@ function getStatusMessage({
   }
 
   if (status === "missed") {
-    return `We could not complete delivery for order ${orderNumber}. Reply to WhatsApp or contact us and we will help reschedule.`;
+    return [
+      `We could not complete delivery for order ${orderNumber}. Reply to this WhatsApp message and we will help reschedule.`,
+      supportContactSentence,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   if (status === "rescheduled") {
     return `Your Jurgens Energy delivery for order ${orderNumber} has been rescheduled for ${deliveryDate}${scheduledWindow ? ` during ${scheduledWindow}` : ""}.`;
   }
 
-  return `Your Jurgens Energy delivery for order ${orderNumber} has been cancelled. Contact us if you need help.`;
+  return [
+    `Your Jurgens Energy delivery for order ${orderNumber} has been cancelled.`,
+    supportContactSentence ?? "Reply to this WhatsApp message if you need help.",
+  ].join(" ");
 }
 
 export async function sendJurgensDeliveryStatusNotification({
@@ -120,10 +135,15 @@ export async function sendJurgensDeliveryStatusNotification({
     return { ok: false, skipped: true, reason: "already_notified" } as const;
   }
 
-  const settings = await getMarketplaceSettings();
+  const [business, settings] = await Promise.all([
+    getBusinessInformation(),
+    getMarketplaceSettings(),
+  ]);
+  const support = createCustomerSupportContactDetails({ business, settings });
   const deliveryDate = formatScheduleDate(row.scheduledDate);
   const scheduledWindow = formatScheduleWindow(row);
   const ratingUrl = settings.googleReviewUrl;
+  const supportContactSentence = formatCustomerSupportContactSentence(support);
   const statusMessage = getStatusMessage({
     customerName: row.customerName,
     deliveryDate,
@@ -131,6 +151,7 @@ export async function sendJurgensDeliveryStatusNotification({
     ratingUrl,
     scheduledWindow,
     status: row.status,
+    supportContactSentence,
   });
   const ratingLink =
     row.status === "completed" && ratingUrl

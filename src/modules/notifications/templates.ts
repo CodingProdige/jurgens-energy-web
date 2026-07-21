@@ -20,6 +20,7 @@ import {
   sendEmail,
   type SendEmailAttachment,
 } from "@/src/modules/email/sendgrid";
+import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { sendPushNotificationToUser } from "@/src/modules/notifications/push";
 
 export type AdminNotificationDeliveryPolicy = {
@@ -1459,14 +1460,18 @@ function escapeRegExp(value: string) {
 }
 
 async function getNotificationGlobalVariables() {
-  const customVariables = await db
-    .select()
-    .from(notificationGlobalVariables)
-    .orderBy(notificationGlobalVariables.key);
+  const [customVariables, systemVariables] = await Promise.all([
+    db
+      .select()
+      .from(notificationGlobalVariables)
+      .orderBy(notificationGlobalVariables.key),
+    getSystemNotificationGlobalVariables(),
+  ]);
+  const systemKeys = getSystemNotificationGlobalVariableKeys();
 
   return [
-    ...getSystemNotificationGlobalVariables(),
-    ...customVariables.map(
+    ...systemVariables,
+    ...customVariables.filter((variable) => !systemKeys.has(variable.key)).map(
       (variable): AdminNotificationGlobalVariable => ({
         description: variable.description,
         id: variable.id,
@@ -1489,7 +1494,28 @@ async function getNotificationGlobalVariableData() {
   );
 }
 
-function getSystemNotificationGlobalVariables(): AdminNotificationGlobalVariable[] {
+const systemNotificationGlobalVariableKeys = new Set([
+  "adminDashboardUrl",
+  "businessAddress",
+  "businessName",
+  "companyRegistrationNumber",
+  "contactPageUrl",
+  "legalBusinessName",
+  "marketplaceUrl",
+  "sellerDashboardUrl",
+  "supportEmail",
+  "supportPhone",
+  "supportPhoneSecondary",
+  "vatRegistrationNumber",
+  "whatsappPhone",
+]);
+
+async function getSystemNotificationGlobalVariables(): Promise<
+  AdminNotificationGlobalVariable[]
+> {
+  const support = await getCustomerSupportContactDetails();
+  const marketplaceUrl = buildMarketplaceUrl();
+
   return [
     {
       description: "Public marketplace base URL from APP_URL or AUTH_URL.",
@@ -1499,7 +1525,7 @@ function getSystemNotificationGlobalVariables(): AdminNotificationGlobalVariable
       source: "system",
       usageCount: 0,
       updatedAt: null,
-      value: buildMarketplaceUrl(),
+      value: marketplaceUrl,
     },
     {
       description:
@@ -1523,13 +1549,119 @@ function getSystemNotificationGlobalVariables(): AdminNotificationGlobalVariable
       updatedAt: null,
       value: buildSurfaceUrl("admin"),
     },
+    {
+      description:
+        "Current public trading name from Settings > Business Information.",
+      id: null,
+      key: "businessName",
+      label: "Business name",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.businessName,
+    },
+    {
+      description:
+        "Current registered legal name from Settings > Business Information.",
+      id: null,
+      key: "legalBusinessName",
+      label: "Legal business name",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.legalName ?? "",
+    },
+    {
+      description:
+        "Current registered address from Settings > Business Information.",
+      id: null,
+      key: "businessAddress",
+      label: "Registered business address",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.businessAddress ?? "",
+    },
+    {
+      description:
+        "Current public support email from Marketplace Settings, with the invoice email as its Business Information fallback.",
+      id: null,
+      key: "supportEmail",
+      label: "Support email",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.email ?? "",
+    },
+    {
+      description:
+        "Current primary support phone from Marketplace Settings, with the invoice phone as its Business Information fallback.",
+      id: null,
+      key: "supportPhone",
+      label: "Support phone",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.phoneNumbers[0] ?? "",
+    },
+    {
+      description:
+        "Current secondary support phone from Marketplace Settings.",
+      id: null,
+      key: "supportPhoneSecondary",
+      label: "Secondary support phone",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.phoneNumbers[1] ?? "",
+    },
+    {
+      description: "Current WhatsApp number from Marketplace Settings.",
+      id: null,
+      key: "whatsappPhone",
+      label: "WhatsApp phone",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.whatsappPhone ?? "",
+    },
+    {
+      description:
+        "Current company registration number from Settings > Business Information.",
+      id: null,
+      key: "companyRegistrationNumber",
+      label: "Company registration number",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.companyRegistrationNumber ?? "",
+    },
+    {
+      description:
+        "Current VAT registration number from Settings > Business Information.",
+      id: null,
+      key: "vatRegistrationNumber",
+      label: "VAT registration number",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: support.vatRegistrationNumber ?? "",
+    },
+    {
+      description: "Public contact page URL derived from the marketplace URL.",
+      id: null,
+      key: "contactPageUrl",
+      label: "Contact page URL",
+      source: "system",
+      usageCount: 0,
+      updatedAt: null,
+      value: new URL("/contact", marketplaceUrl).toString(),
+    },
   ];
 }
 
 function getSystemNotificationGlobalVariableKeys() {
-  return new Set(
-    getSystemNotificationGlobalVariables().map((variable) => variable.key),
-  );
+  return systemNotificationGlobalVariableKeys;
 }
 
 function renderTemplate(

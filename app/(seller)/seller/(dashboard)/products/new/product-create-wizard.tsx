@@ -80,6 +80,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { getExchangeRequirementText } from "@/src/modules/cart/exchange-requirements";
 import {
   createSellerParcelPreset,
   generateProductDescription,
@@ -268,13 +269,13 @@ const googleFulfillmentChannelConfig: Record<
   },
   local_lpg: {
     description:
-      "Keep this offer in online Shopping and free listings, grouped under Jurgens Energy's postcode-limited LPG delivery policy.",
-    label: "Postcode-limited LPG delivery",
+      "Use for LPG and exchange offers delivered by Jurgens Energy within South Africa.",
+    label: "Jurgens Energy delivery",
   },
   national_courier: {
     description:
-      "Use only when this exact variant can genuinely be couriered to supported destinations nationwide.",
-    label: "National courier",
+      "Use when this exact variant can be sent by an approved courier within South Africa.",
+    label: "South Africa courier",
   },
 };
 const googleFulfillmentChannelOptions = Object.entries(
@@ -627,12 +628,11 @@ function parseExchangeBrandInput(value: string) {
   return [...new Set(brands)];
 }
 
-function getDefaultExchangeConfirmationText(size: string) {
-  const sizeText = size.trim();
-
-  return sizeText
-    ? `I confirm I have a ${sizeText} empty cylinder in acceptable condition to exchange on delivery.`
-    : "I confirm I have an empty cylinder in acceptable condition to exchange on delivery.";
+function getDefaultExchangeRequirementText(size: string) {
+  return getExchangeRequirementText({
+    emptySize: size,
+    quantity: 1,
+  });
 }
 
 function normalizeLookupValue(value: string) {
@@ -1143,14 +1143,14 @@ function ExchangeRulesFields({
     onEnabledChange(value);
 
     if (value && !confirmationText.trim()) {
-      onConfirmationTextChange(getDefaultExchangeConfirmationText(emptyCylinderSize));
+      onConfirmationTextChange(getDefaultExchangeRequirementText(emptyCylinderSize));
     }
   }
 
   function handleEmptyCylinderSizeChange(value: string) {
     const previousDefaultText =
-      getDefaultExchangeConfirmationText(emptyCylinderSize);
-    const nextDefaultText = getDefaultExchangeConfirmationText(value);
+      getDefaultExchangeRequirementText(emptyCylinderSize);
+    const nextDefaultText = getDefaultExchangeRequirementText(value);
 
     onEmptyCylinderSizeChange(value);
 
@@ -1170,11 +1170,11 @@ function ExchangeRulesFields({
         />
         <span>
           <span className="block font-semibold text-zinc-950 dark:text-white">
-            Require empty cylinder exchange confirmation
+            Requires eligible empty-cylinder handover
           </span>
           <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
-            Use this on exchange variants so the customer confirms they have a
-            compatible empty cylinder before checkout.
+            Use this on exchange variants to show the required empty-cylinder
+            size and accepted return brands to customers.
           </span>
         </span>
       </label>
@@ -1212,8 +1212,8 @@ function ExchangeRulesFields({
             </label>
           </div>
           <label className="grid gap-1.5">
-            <FieldLabel info="The exact checkbox text customers must accept for this exchange option.">
-              Customer confirmation text
+            <FieldLabel info="Additional exchange requirement text shown to customers for this option.">
+              Customer exchange notice
             </FieldLabel>
             <Textarea
               className={cn(textareaClass, "min-h-20")}
@@ -1223,9 +1223,9 @@ function ExchangeRulesFields({
             />
           </label>
           <p className="text-xs leading-5 text-slate-600 dark:text-zinc-300">
-            Checkout will snapshot the accepted brands and confirmation text on
-            the order item so future catalog changes do not alter what the
-            customer agreed to.
+            Checkout snapshots the accepted brands and exchange notice on the
+            order item so future catalog changes do not alter the fulfilment
+            requirements.
           </p>
         </div>
       ) : null}
@@ -4998,8 +4998,8 @@ export function ProductCreateWizard({
                   Single variant exchange rules
                 </h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                  When enabled, checkout will require the customer to confirm
-                  they have an accepted empty cylinder for this variant.
+                  When enabled, customers see the required empty-cylinder size
+                  and accepted return brands for this variant.
                 </p>
               </div>
               <ExchangeRulesFields

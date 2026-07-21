@@ -21,14 +21,16 @@ import {
 } from "@/components/brand/social-links";
 import { normalizePhoneNumber } from "@/src/modules/phone";
 import { getPublicBusinessIdentity } from "@/src/modules/business-information";
+import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { policyLinks } from "@/src/modules/marketplace/policies/documents";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 
 const footerServices = [
   {
-    description: "Local delivery and courier options where available.",
+    description:
+      "Eligible orders: estimated delivery in 1–4 business days.",
     icon: TruckIcon,
-    title: "Delivery Options",
+    title: "South Africa Delivery",
   },
   {
     description: "Eligibility and cylinder handover checks apply where required.",
@@ -70,13 +72,12 @@ function createWhatsappUrl(phoneNumber: string | null) {
 }
 
 export async function MarketplaceFooter() {
-  const [businessIdentity, settings] = await Promise.all([
+  const [businessIdentity, settings, support] = await Promise.all([
     getPublicBusinessIdentity(),
     getMarketplaceSettings(),
+    getCustomerSupportContactDetails(),
   ]);
-  const whatsappUrl = createWhatsappUrl(settings.whatsappBusinessPhoneNumber);
-  const primaryContactPhone =
-    settings.contactPhonePrimary ?? settings.whatsappBusinessPhoneNumber;
+  const whatsappUrl = createWhatsappUrl(support.whatsappPhone);
   const socialLinks = [
     settings.facebookUrl
       ? { href: settings.facebookUrl, icon: FacebookMark, label: "Facebook" }
@@ -92,29 +93,24 @@ export async function MarketplaceFooter() {
       : null,
   ].filter((item): item is NonNullable<typeof item> => Boolean(item));
   const contactLines = [
-    primaryContactPhone
+    ...support.phoneNumbers.map((phoneNumber) => ({
+      href: `tel:${phoneNumber.replace(/[^\d+]/g, "")}`,
+      icon: PhoneIcon,
+      label: phoneNumber,
+    })),
+    support.email
       ? {
-          href: `tel:${primaryContactPhone.replace(/[^\d+]/g, "")}`,
-          icon: PhoneIcon,
-          label: primaryContactPhone,
-        }
-      : null,
-    settings.contactPhoneSecondary
-      ? {
-          href: `tel:${settings.contactPhoneSecondary.replace(/[^\d+]/g, "")}`,
-          icon: PhoneIcon,
-          label: settings.contactPhoneSecondary,
-        }
-      : null,
-    settings.contactEmail
-      ? {
-          href: `mailto:${settings.contactEmail}`,
+          href: `mailto:${support.email}`,
           icon: MailIcon,
-          label: settings.contactEmail,
+          label: support.email,
         }
       : null,
-    settings.contactAddress
-      ? { href: null, icon: MapPinIcon, label: settings.contactAddress }
+    support.businessAddress
+      ? {
+          href: null,
+          icon: MapPinIcon,
+          label: support.businessAddress,
+        }
       : null,
   ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 

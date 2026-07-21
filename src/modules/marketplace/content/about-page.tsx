@@ -1,66 +1,37 @@
-import Link from "next/link";
 import {
-  ArrowRightIcon,
-  BadgeCheckIcon,
   FlameIcon,
-  HeadphonesIcon,
+  PackageCheckIcon,
   RefreshCcwIcon,
   ShoppingBagIcon,
-  ShieldCheckIcon,
   TruckIcon,
 } from "lucide-react";
 
+import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
+import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 import {
   ContentActionPanel,
   ContentHero,
   ContentSectionHeading,
-  NumberedStep,
 } from "@/src/modules/marketplace/content/content-page";
-import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
-import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 
-const services = [
+const storeCategories = [
   {
     description:
-      "Shop LPG cylinders and the everyday gas equipment that keeps homes and businesses running.",
-    href: "/products",
+      "Buy LPG cylinders online with clear product details, pricing and availability.",
     icon: ShoppingBagIcon,
-    title: "LPG essentials",
+    title: "LPG cylinders",
   },
   {
     description:
-      "Choose an exchange-supported option and hand over an eligible empty cylinder when your order arrives.",
-    href: "/products?exchange=1",
+      "Choose an exchange-supported option and provide an eligible empty cylinder when your order is delivered.",
     icon: RefreshCcwIcon,
-    title: "Cylinder exchange",
+    title: "Cylinder exchanges",
   },
   {
     description:
-      "Delivery options, availability and fees are confirmed from the address and products in your order.",
-    href: "/delivery-information",
-    icon: TruckIcon,
-    title: "Practical delivery",
-  },
-] as const;
-
-const commitments = [
-  {
-    description:
-      "We make safe handling, eligible exchanges and the right next step clear before handover.",
-    icon: ShieldCheckIcon,
-    title: "Safety is part of the service",
-  },
-  {
-    description:
-      "Product, price and exchange information should help you choose with confidence—not create another guessing game.",
-    icon: BadgeCheckIcon,
-    title: "Clear information",
-  },
-  {
-    description:
-      "Questions about a product, delivery or an existing order can be handled through the channel that suits you.",
-    icon: HeadphonesIcon,
-    title: "Human support",
+      "Shop gas accessories and equipment for safe, practical everyday use.",
+    icon: PackageCheckIcon,
+    title: "Gas accessories",
   },
 ] as const;
 
@@ -73,115 +44,73 @@ export function AboutPage({
     <article>
       <ContentHero
         breadcrumbLabel="About us"
-        description="Jurgens Energy is a focused LPG store built around straightforward ordering, safe cylinder handling and dependable customer support."
-        eyebrow="Modern energy, delivered"
+        description="JurgensEnergy.com is a South African online store for LPG cylinders, cylinder exchange options and gas accessories. Customers can browse, order and pay online for delivery within South Africa."
+        eyebrow="About Jurgens Energy"
         icon={FlameIcon}
-        title="Gas should be simple."
+        title="JurgensEnergy.com is a South African online store."
       />
 
       <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-7 sm:py-12 lg:px-10 lg:py-16">
-        <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-14">
+        <section>
           <ContentSectionHeading
-            description="We bring cylinders, exchange options and gas accessories into one clear shopping experience. Whether you are replacing an empty cylinder or setting up a new order, the aim is the same: fewer surprises and a safer handover."
-            eyebrow="What we do"
-            title="The LPG essentials, without the runaround."
+            description="Jurgens Energy brings the LPG products customers need into one straightforward online shopping experience. Product details explain what is included and whether an exchange requires an eligible empty cylinder at handover."
+            eyebrow="What we sell"
+            title="Cylinders, exchanges and accessories—online."
           />
 
-          <div className="grid gap-3">
-            {services.map((service) => {
-              const Icon = service.icon;
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {storeCategories.map((category) => {
+              const Icon = category.icon;
 
               return (
-                <Link
-                  className="group grid min-w-0 grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-4 rounded-lg border border-[#e2e2db] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#ff5a1f]/65 hover:shadow-[0_14px_34px_rgba(8,8,8,0.06)] dark:border-white/10 dark:bg-[#141414] dark:hover:border-[#ff5a1f]/60 dark:hover:shadow-none sm:p-5"
-                  href={service.href}
-                  key={service.title}
+                <article
+                  className="min-w-0 rounded-lg border border-[#e2e2db] bg-white p-5 dark:border-white/10 dark:bg-[#141414] sm:p-6"
+                  key={category.title}
                 >
-                  <span className="grid size-12 place-items-center rounded-lg bg-[#fff0e9] text-[#ff5a1f] dark:bg-[#ff5a1f]/10">
-                    <Icon className="size-6" strokeWidth={1.8} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[15px] font-black uppercase leading-tight">
-                      {service.title}
-                    </span>
-                    <span className="mt-1 block text-[12px] leading-5 text-[#676761] dark:text-[#b9b9b1] sm:text-[13px]">
-                      {service.description}
-                    </span>
-                  </span>
-                  <ArrowRightIcon className="size-4 text-[#aaa9a2] transition group-hover:translate-x-0.5 group-hover:text-[#ff5a1f]" />
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-
-        <PublicBusinessIdentityDisclosure
-          className="mt-14 sm:mt-20"
-          identity={businessIdentity}
-          title="The business behind Jurgens Energy"
-        />
-
-        <section className="mt-14 border-y border-[#dfdfd8] py-10 dark:border-white/10 sm:mt-20 sm:py-14">
-          <ContentSectionHeading
-            description="A good LPG order is more than a product in a box. The details around compatibility, exchange eligibility, delivery and support matter just as much."
-            eyebrow="How we work"
-            title="Built around the handover."
-          />
-
-          <div className="mt-8 grid gap-6 md:grid-cols-3 md:gap-8">
-            {commitments.map((commitment) => {
-              const Icon = commitment.icon;
-
-              return (
-                <article className="min-w-0" key={commitment.title}>
-                  <span className="grid size-11 place-items-center rounded-full border border-[#ff5a1f]/35 text-[#ff5a1f]">
+                  <span className="grid size-11 place-items-center rounded-lg bg-[#fff0e9] text-[#ff5a1f] dark:bg-[#ff5a1f]/10">
                     <Icon className="size-5" strokeWidth={1.8} />
                   </span>
                   <h3 className="mt-5 text-[17px] font-black uppercase leading-tight">
-                    {commitment.title}
+                    {category.title}
                   </h3>
                   <p className="mt-2 text-[13px] leading-6 text-[#62625c] dark:text-[#bdbdb5]">
-                    {commitment.description}
+                    {category.description}
                   </p>
                 </article>
               );
             })}
           </div>
-        </section>
 
-        <section className="py-12 sm:py-16">
-          <ContentSectionHeading
-            description="The store is designed to keep each step visible, from choosing the right product to receiving it safely."
-            eyebrow="From browse to delivery"
-            title="A straightforward way to order."
-          />
-          <div className="mt-8 grid gap-7 sm:grid-cols-3 sm:gap-8">
-            <NumberedStep number="01" title="Choose what you need">
-              Browse full cylinders, exchange-supported options and accessories.
-              Check the product details before adding it to your cart.
-            </NumberedStep>
-            <NumberedStep number="02" title="Confirm the details">
-              Provide the delivery address and, for an exchange, confirm the
-              eligible empty cylinder required at handover.
-            </NumberedStep>
-            <NumberedStep number="03" title="Receive it safely">
-              We confirm the applicable fulfilment details and keep you informed
-              if availability, access or safety affects the handover.
-            </NumberedStep>
+          <div className="mt-5 flex min-w-0 flex-col gap-4 rounded-lg bg-[#f7f7f2] p-5 dark:bg-[#1a1a1a] sm:flex-row sm:items-center sm:p-6">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full border border-[#ff5a1f]/35 text-[#ff5a1f]">
+              <TruckIcon className="size-5" strokeWidth={1.8} />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-black uppercase leading-tight">
+                Delivery in South Africa
+              </h3>
+              <p className="mt-1 text-[13px] leading-6 text-[#62625c] dark:text-[#bdbdb5]">
+                Jurgens Energy does not operate a customer-facing physical
+                store. Eligible orders are delivered within South Africa.
+                Handling takes 0–1 business day after payment confirmation, with
+                a 2:00 PM SAST order cut-off. Shipping takes 1–3 business days
+                after dispatch, for an estimated total of 1–4 business days.
+              </p>
+            </div>
           </div>
         </section>
 
+        <PublicBusinessIdentityDisclosure
+          className="my-14 sm:my-20"
+          identity={businessIdentity}
+          title="The business behind Jurgens Energy"
+        />
+
         <ContentActionPanel
-          actions={[
-            { href: "/products", label: "Shop all products" },
-            {
-              href: "/contact",
-              label: "Contact our team",
-              variant: "secondary",
-            },
-          ]}
-          description="Explore the current range or speak to us if you need help choosing a cylinder, exchange option or accessory."
-          title="Let’s get the right gas to you."
+          actions={[{ href: "/products", label: "Shop LPG products" }]}
+          description="Browse LPG cylinders, exchange options and gas accessories available to order online."
+          eyebrow="Shop online"
+          title="Find what you need."
         />
       </div>
     </article>

@@ -16,6 +16,10 @@ import {
   type ValidatedCartItem,
 } from "@/src/modules/cart/contracts";
 import {
+  getExchangeRequirementText,
+  resolveCartLineExchangePolicy,
+} from "@/src/modules/cart/exchange-requirements";
+import {
   convertFromZar,
   formatFromZar,
   type CurrencyContext,
@@ -173,9 +177,17 @@ export async function validateCartLines(
     );
     const requiresExchangeEmpty =
       row.requiresExchangeEmpty || /\bexchange\b/i.test(row.variantTitle);
-    const purchaseType = requiresExchangeEmpty ? "exchange" : "standard";
-    const exchangeConfirmationMissing =
-      requiresExchangeEmpty && !requested.exchangeEmptyConfirmed;
+    const exchangePolicy = resolveCartLineExchangePolicy({
+      available,
+      requiresExchangeEmpty,
+    });
+    const exchangeRequirementText = requiresExchangeEmpty
+      ? getExchangeRequirementText({
+          emptySize: row.exchangeEmptyCylinderSize,
+          fallbackText: row.exchangeConfirmationText,
+          quantity,
+        })
+      : null;
 
     return [
       {
@@ -183,7 +195,7 @@ export async function validateCartLines(
         brandId: row.productBrandId,
         brandName: row.brandName,
         categoryId: row.productCategoryId,
-        checkoutEligible: available && !exchangeConfirmationMissing,
+        checkoutEligible: exchangePolicy.checkoutEligible,
         compareAtPriceZar:
           row.compareAtPrice === null ? null : Number(row.compareAtPrice),
         continueSellingOutOfStock: row.continueSellingOutOfStock,
@@ -192,8 +204,8 @@ export async function validateCartLines(
         exchangeAcceptedReturnBrands: normalizeStringList(
           row.exchangeAcceptedReturnBrands,
         ),
-        exchangeConfirmationMissing,
-        exchangeConfirmationText: row.exchangeConfirmationText,
+        exchangeConfirmationMissing: exchangePolicy.exchangeConfirmationMissing,
+        exchangeConfirmationText: exchangeRequirementText,
         exchangeEmptyConfirmed: requested.exchangeEmptyConfirmed,
         exchangeRequiredEmptyCylinderSize: row.exchangeEmptyCylinderSize,
         fulfillmentMode: row.fulfillmentMode,
@@ -212,7 +224,7 @@ export async function validateCartLines(
         productId: row.productId,
         productSlug: row.productSlug,
         productTitle: row.productTitle,
-        purchaseType,
+        purchaseType: exchangePolicy.purchaseType,
         quantity,
         sellerId: row.productSellerId,
         sellerName: row.sellerName,

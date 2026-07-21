@@ -1,3 +1,5 @@
+import { getExchangeRequirementText } from "@/src/modules/cart/exchange-requirements";
+
 export type LocalCartPurchaseType = "standard" | "exchange";
 
 export type LocalCartItem = {
@@ -85,32 +87,6 @@ function normalizeStringList(value: unknown) {
 
 function normalizeNullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function getExchangeConfirmationText({
-  emptySize,
-  fallbackText,
-  quantity,
-}: {
-  emptySize: string | null;
-  fallbackText: string | null;
-  quantity: number;
-}) {
-  if (quantity === 1 && fallbackText) {
-    return fallbackText;
-  }
-
-  const quantityText =
-    quantity === 1
-      ? emptySize
-        ? `a ${emptySize}`
-        : "a compatible"
-      : emptySize
-        ? `x${quantity} ${emptySize}`
-        : `x${quantity} compatible`;
-  const cylinderText = quantity === 1 ? "empty cylinder" : "empty cylinders";
-
-  return `I confirm I have ${quantityText} ${cylinderText} in acceptable condition to exchange on delivery.`;
 }
 
 function normalizeCartItem(value: unknown): LocalCartItem | null {
@@ -330,7 +306,7 @@ export function addLocalCartItem(input: LocalCartInput): LocalCartState {
       ...exchangeSnapshot,
       exchangeConfirmationText:
         purchaseType === "exchange"
-          ? getExchangeConfirmationText({
+          ? getExchangeRequirementText({
               emptySize: combinedEmptySize,
               fallbackText:
                 exchangeConfirmationText ?? existingItem.exchangeConfirmationText,
@@ -347,7 +323,7 @@ export function addLocalCartItem(input: LocalCartInput): LocalCartState {
       ...exchangeSnapshot,
       exchangeConfirmationText:
         purchaseType === "exchange"
-          ? getExchangeConfirmationText({
+          ? getExchangeRequirementText({
               emptySize: exchangeRequiredEmptyCylinderSize,
               fallbackText: exchangeConfirmationText,
               quantity: nextQuantity,
@@ -398,7 +374,7 @@ export function updateLocalCartItemQuantity(
     ...item,
     exchangeConfirmationText:
       item.purchaseType === "exchange"
-        ? getExchangeConfirmationText({
+        ? getExchangeRequirementText({
             emptySize: item.exchangeRequiredEmptyCylinderSize,
             fallbackText: item.exchangeConfirmationText,
             quantity: nextQuantity,

@@ -17,18 +17,18 @@ import {
 test("redacts identity and address data without corrupting commerce facts", () => {
   const url = "https://jurgensenergy.com/whatsapp/resume/90dfc7b1-5d5b-4dc0-8813-81349321d3e2";
   const input = [
-    "My name is Dillon Jurgens",
-    "Email: dillon@example.com and phone +27 82 722 3783",
-    "Delivery address: 6 Christelle Street, Paarl, 7646",
+    "My name is Alex Example",
+    "Email: alex@example.com and phone +27 82 123 4567",
+    "Delivery address: 10 Example Road, Cape Town, 8001",
     "Order JE-20260716-00A9E4CBA8 costs R 1 152,99.",
     `Pay here: ${url}`,
     "Customer ID: d882d0d2-fa41-4767-a416-34f2c866c575",
   ].join("\n");
   const safe = sanitizeWhatsappTextForModel(input, {
-    knownNames: ["Dillon Jurgens", "Dillon"],
+    knownNames: ["Alex Example", "Alex"],
   });
 
-  assert.doesNotMatch(safe, /Dillon|dillon@example|82 722|Christelle|7646|d882d0d2/i);
+  assert.doesNotMatch(safe, /Alex|alex@example|82 123|Example Road|8001|d882d0d2/i);
   assert.match(safe, /\[customer name omitted\]/i);
   assert.match(safe, /\[email omitted\]/i);
   assert.match(safe, /\[phone omitted\]/i);
@@ -88,9 +88,9 @@ test("bounds rolling memory and exposes no raw workflow identifiers or addresses
         "Checkout https://jurgensenergy.com/pay/abc",
         "Email customer@example.com",
       ],
-      summary: `Dillon wants LPG. Address: 6 Christelle Street, Paarl 7646. ${"z".repeat(300)}`,
+      summary: `Alex wants LPG. Address: 10 Example Road, Cape Town 8001. ${"z".repeat(300)}`,
     },
-    knownNames: ["Dillon"],
+    knownNames: ["Alex"],
     workflowState: {
       pendingOrder: {
         candidate: {
@@ -99,7 +99,7 @@ test("bounds rolling memory and exposes no raw workflow identifiers or addresses
           quantity: 1,
           variantId: "7cd6d5f1-6081-4f03-a72c-9cd315a693a0",
         },
-        customerPrompt: "Dillon at 6 Christelle Street wants a 9kg exchange",
+        customerPrompt: "Alex at 10 Example Road wants a 9kg exchange",
       },
     },
   });
@@ -113,7 +113,7 @@ test("bounds rolling memory and exposes no raw workflow identifiers or addresses
   assert.equal(memory.rollingMemory.facts.length, 2);
   assert.equal(memory.workflow.pendingAction, "confirm_order");
   assert.equal(memory.workflow.order?.purchaseType, "exchange");
-  assert.doesNotMatch(JSON.stringify(memory.workflow), /d882d0d2|7cd6d5f1|Christelle|Dillon/);
+  assert.doesNotMatch(JSON.stringify(memory.workflow), /d882d0d2|7cd6d5f1|Example Road|Alex/);
 });
 
 test("updates rolling memory with deduplicated verified facts and redacts its summary", () => {
@@ -122,9 +122,9 @@ test("updates rolling memory with deduplicated verified facts and redacts its su
       facts: ["Order JE-20260716-00A9E4CBA8 total is R 365,99."],
       summary: "Customer wants LPG.",
     },
-    knownNames: ["Dillon"],
+    knownNames: ["Alex"],
     limits: { maxFacts: 2 },
-    summary: "Dillon wants delivery to Address: 6 Christelle Street, Paarl 7646.",
+    summary: "Alex wants delivery to Address: 10 Example Road, Cape Town 8001.",
     verifiedFacts: [
       "Order JE-20260716-00A9E4CBA8 total is R 365,99.",
       "Checkout https://jurgensenergy.com/whatsapp/resume/abc123",
@@ -140,7 +140,7 @@ test("updates rolling memory with deduplicated verified facts and redacts its su
     memory.facts[1],
     "Checkout https://jurgensenergy.com/whatsapp/resume/abc123",
   );
-  assert.doesNotMatch(memory.summary, /Dillon|Christelle|7646/i);
+  assert.doesNotMatch(memory.summary, /Alex|Example Road|8001/i);
 });
 
 test("requires pending server state before treating yes or ja as confirmation", () => {
@@ -200,8 +200,8 @@ test("evaluates a messy code-switch conversation and preserves exact reply facts
     currentInbound: "Ja stuur die link asseblief",
     expectedConfirmation: "confirmed",
     expectedContext: ["Paarl", "9kg", "exchange"],
-    forbiddenContext: ["Dillon", "dillon@example.com", "+27827223783"],
-    knownNames: ["Dillon Jurgens", "Dillon"],
+    forbiddenContext: ["Alex", "alex@example.com", "+27821234567"],
+    knownNames: ["Alex Example", "Alex"],
     mustIncludeExactReplyFacts: [orderReference, total, checkoutUrl],
     mustNotIncludeReply: ["/media/admin-media-thumbs/"],
     recentTurns: [

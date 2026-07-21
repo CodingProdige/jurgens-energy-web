@@ -28,13 +28,13 @@ export type StaticSeoPageRegistryEntry = {
 export const STATIC_SEO_PAGE_REGISTRY = {
   home: {
     defaultDescription:
-      "Shop LPG cylinders, exchange-supported options and gas accessories from Jurgens Energy, with local delivery information for Paarl and the Cape Winelands.",
-    defaultTitle: "LPG Cylinders, Exchange & Local Delivery",
+      "Shop LPG cylinders, cylinder exchange options and gas accessories at JurgensEnergy.com, a South African online store delivering within South Africa.",
+    defaultTitle: "South African Online LPG Store",
     key: "home",
     label: "Homepage",
     path: "/",
     scanFocus:
-      "The overall LPG storefront, core product range, exchange options and genuinely supported local delivery areas.",
+      "The online LPG storefront, core product range, cylinder exchange options and South Africa delivery information.",
   },
   products: {
     defaultDescription:
@@ -68,18 +68,18 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   about: {
     defaultDescription:
-      "Learn about Jurgens Energy, our approach to safe LPG supply and the online service we provide for gas cylinders, exchanges, accessories and local delivery.",
-    defaultTitle: "About Your Local LPG Gas Supplier",
+      "JurgensEnergy.com is a South African online store for LPG cylinders, cylinder exchange options and gas accessories, delivering within South Africa.",
+    defaultTitle: "About Our Online LPG Store",
     key: "about",
     label: "About us",
     path: "/about",
     scanFocus:
-      "Verified business background, LPG service, safety approach and service area claims explicitly supported by the page.",
+      "Verified business identity, the online-store model, LPG products, cylinder exchanges and South Africa delivery information shown on the page.",
   },
   contact: {
     defaultDescription:
-      "Contact Jurgens Energy for help with LPG cylinder orders, exchanges, delivery, products or an existing purchase by WhatsApp, phone, email or online enquiry.",
-    defaultTitle: "Contact Us for LPG Orders & Delivery Help",
+      "Contact the Jurgens Energy online store for help with LPG products, cylinder exchanges, delivery, returns, refunds or an order by phone, email or WhatsApp.",
+    defaultTitle: "Contact Our Online LPG Store",
     key: "contact",
     label: "Contact",
     path: "/contact",
@@ -88,7 +88,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   faq: {
     defaultDescription:
-      "Find answers about ordering LPG cylinders, exchange handovers, product availability, delivery, payments, accounts and support from Jurgens Energy.",
+      "Find answers about ordering LPG cylinders, exchange handovers, product availability, delivery, payments, returns and support from Jurgens Energy.",
     defaultTitle: "LPG Ordering, Exchange & Delivery FAQs",
     key: "faq",
     label: "FAQs",
@@ -98,13 +98,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "lpg-delivery": {
     defaultDescription:
-      "Order LPG cylinders online for Jurgens Energy delivery in supported Paarl and Cape Winelands areas. Check products, your address and live checkout options.",
-    defaultTitle: "LPG Delivery in Paarl & Cape Winelands",
+      "Shop LPG online for delivery within South Africa, with 0–1 day handling, a 2:00 PM SAST cut-off, 1–3 day shipping and a 1–4 business day total estimate.",
+    defaultTitle: "LPG Delivery in South Africa",
     key: "lpg-delivery",
-    label: "Local LPG delivery",
+    label: "LPG delivery",
     path: "/lpg-delivery",
     scanFocus:
-      "Only active, visibly supported delivery areas and the real address-based ordering flow; never promise unsupported coverage or delivery times.",
+      "The online ordering flow, South Africa delivery coverage, published timing estimate, fees and safe cylinder-exchange handover requirements.",
   },
   "lpg-safety": {
     defaultDescription:
@@ -118,13 +118,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "delivery-information": {
     defaultDescription:
-      "Read the Jurgens Energy Shipping & Delivery Policy covering delivery areas, address checks, rates, courier options, timing and cylinder exchange handovers.",
+      "Read our South Africa Shipping & Delivery Policy: 0–1 day handling, the 2:00 PM SAST cut-off, 1–3 day shipping and a 1–4 business day total estimate.",
     defaultTitle: "Shipping & Delivery Policy",
     key: "delivery-information",
     label: "Shipping & delivery policy",
     path: "/delivery-information",
     scanFocus:
-      "The published shipping and delivery policy, including address-based rates, courier availability and exchange handover requirements, without inventing rates or coverage.",
+      "The published shipping and delivery policy, including South Africa coverage, delivery fees, handling, cutoff, transit, total timing and exchange handover requirements.",
   },
   "privacy-policy": {
     defaultDescription:
@@ -138,13 +138,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "returns-and-refunds": {
     defaultDescription:
-      "Read the Jurgens Energy returns, refunds and exchanges policy, including product-condition requirements, exclusions and the process for requesting assistance.",
+      "Read our Returns & Refunds Policy, including the seven-day return period, change-of-mind courier fees and help for incorrect, damaged or defective goods.",
     defaultTitle: "Returns & Refunds Policy",
     key: "returns-and-refunds",
     label: "Returns & refunds policy",
     path: "/returns-and-refunds",
     scanFocus:
-      "A faithful summary of the live returns and refunds policy. Do not invent eligibility, time windows, fees or statutory promises.",
+      "A faithful summary of the live returns and refunds policy, including eligibility, the seven-day period, courier fees and statutory remedies.",
   },
   "terms-and-conditions": {
     defaultDescription:

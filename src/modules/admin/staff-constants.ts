@@ -10,6 +10,8 @@ export const adminCapabilities = [
   "admin.catalog.manage",
   "admin.orders.view",
   "admin.orders.manage",
+  "admin.contact_inquiries.view",
+  "admin.contact_inquiries.manage",
   "admin.marketing.view",
   "admin.marketing.manage",
   "admin.analytics.view",
@@ -60,7 +62,14 @@ export const adminStaffRoleReadme: Record<
   },
   operations: {
     description: "Handle daily marketplace operations across users, orders, and catalog workflows.",
-    permissions: ["Dashboard", "Users", "Orders", "Catalog", "Analytics"],
+    permissions: [
+      "Dashboard",
+      "Users",
+      "Orders",
+      "Contact inquiries",
+      "Catalog",
+      "Analytics",
+    ],
   },
   owner: {
     description: "Full admin dashboard access. Reserved for trusted platform superadmins.",
@@ -80,6 +89,6 @@ export const adminStaffRoleReadme: Record<
   },
   support: {
     description: "Assist customers without write access to sensitive settings.",
-    permissions: ["Dashboard", "Users", "Orders"],
+    permissions: ["Dashboard", "Users", "Orders", "Contact inquiries"],
   },
 };

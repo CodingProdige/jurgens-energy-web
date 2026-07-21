@@ -120,6 +120,11 @@ export function BusinessInformationForm({
             />
           </div>
         </div>
+        <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+          Public support email and phone numbers are managed under Footer and
+          public details. If those fields are blank, the invoice contacts above
+          are used as the customer-support fallback.
+        </p>
       </section>
 
       <section className="grid gap-5 border-t border-slate-200 pt-7 dark:border-white/10">
@@ -128,7 +133,9 @@ export function BusinessInformationForm({
             Registered business address
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-            Printed on every VAT invoice.
+            Used automatically on VAT invoices, the contact page, footer,
+            policy disclosures, and structured business data. It is not
+            presented as a walk-in shop or returns counter.
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">

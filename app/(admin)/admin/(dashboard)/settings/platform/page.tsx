@@ -468,7 +468,6 @@ function SettingsSection({
         description="Set the public Jurgens Energy footer details, contact information, social links, and payment badges."
       >
         <SocialLinksForm
-          contactAddress={settings.contactAddress}
           contactEmail={settings.contactEmail}
           contactPhonePrimary={settings.contactPhonePrimary}
           contactPhoneSecondary={settings.contactPhoneSecondary}

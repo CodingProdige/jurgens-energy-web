@@ -6,8 +6,8 @@ import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { isPasswordResetTokenValid } from "@/src/modules/auth/service";
 
 export const metadata: Metadata = {
-  title: "Reset Marketplace Password",
-  description: "Set a new password for your Piessang account.",
+  title: "Reset Online Store Password",
+  description: "Set a new password for your Jurgens Energy online-store account.",
   robots: {
     index: false,
     follow: false,

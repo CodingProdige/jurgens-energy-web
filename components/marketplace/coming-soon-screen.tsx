@@ -89,14 +89,15 @@ function ComingSoonVisual() {
             Coming soon
           </p>
           <h1 className="mt-5 text-[36px] font-extrabold leading-[1.05] sm:text-[42px] lg:text-[48px]">
-            A new{" "}
-            <span className="text-primary">global</span>
+            A South African{" "}
+            <span className="text-primary">online</span>
             <br />
-            marketplace is coming.
+            LPG store is coming.
           </h1>
           <p className="mt-5 max-w-[360px] text-[14px] font-medium leading-6 text-white/86">
-            Jurgens Energy is building a focused online store for LPG cylinders,
-            exchanges, accessories, and local delivery where available.
+            JurgensEnergy.com is an online store for LPG cylinders, cylinder
+            exchanges and gas accessories, with estimated delivery in 1–4
+            business days within South Africa.
           </p>
         </div>
       </div>
@@ -130,14 +131,15 @@ function ComingSoonPanel({
           Coming soon
         </p>
         <h2 className="mt-4 text-[30px] font-extrabold leading-[1.08] text-[#070b16] dark:text-white sm:text-[34px]">
-          A new{" "}
-          <span className="text-primary">global</span>
+          A South African{" "}
+          <span className="text-primary">online</span>
           <br />
-          marketplace is coming.
+          LPG store is coming.
         </h2>
         <p className="mx-auto mt-4 max-w-[360px] text-[14px] leading-6 text-[#596176] dark:text-zinc-300 lg:mx-0">
-          Jurgens Energy is building a focused online store for LPG cylinders,
-          exchanges, accessories, and local delivery where available.
+          JurgensEnergy.com is an online store for LPG cylinders, cylinder
+          exchanges and gas accessories, with estimated delivery in 1–4 business
+          days within South Africa.
         </p>
       </div>
 
@@ -217,7 +219,7 @@ function ComingSoonPanel({
           className="mt-4 inline-flex h-[45px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#111315] bg-[linear-gradient(180deg,#202124,#121315)] text-[13px] font-extrabold text-white shadow-[0_10px_24px_rgba(18,19,21,0.2)] transition hover:brightness-[1.08] disabled:cursor-not-allowed disabled:opacity-70"
         >
           <LockKeyhole className="size-4" />
-          {isUnlockPending ? "Checking..." : "View Marketplace"}
+          {isUnlockPending ? "Checking..." : "View Online Store"}
         </button>
         {accessState.error ? (
           <p className="mt-3 rounded-[6px] border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
@@ -228,7 +230,7 @@ function ComingSoonPanel({
 
       <footer className="mt-10 border-t border-[#e2e6ef] pt-7 text-center dark:border-white/12">
         <p className="text-[12px] leading-5 text-[#596176] dark:text-zinc-400">
-          © 2024 Piessang Marketplace. All rights reserved.
+          © Jurgens Energy. All rights reserved.
         </p>
         <PlatformSocialLinks
           className="mt-5 text-[#070b16] dark:text-white"

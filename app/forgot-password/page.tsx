@@ -5,8 +5,8 @@ import { ForgotPasswordScreen } from "@/components/auth/forgot-password-screen";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 
 export const metadata: Metadata = {
-  title: "Marketplace Password Reset",
-  description: "Request a password reset link for your Piessang account.",
+  title: "Online Store Password Reset",
+  description: "Request a password reset link for your Jurgens Energy online-store account.",
   robots: {
     index: false,
     follow: false,
@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
         accent="gold"
         titleLead="No worries,"
         titleAccent="it happens"
-        description="Enter your email address and we'll send you a link to reset your marketplace password."
+        description="Enter your email address and we'll send you a link to reset your Jurgens Energy account password."
       />
     </MarketplaceGate>
   );

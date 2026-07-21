@@ -161,6 +161,7 @@ export function PolicyPage({
             <PublicBusinessIdentityDisclosure
               className="mt-7"
               identity={businessIdentity}
+              showRegisteredAddress
               title="The operator of this store"
             />
           ) : null}

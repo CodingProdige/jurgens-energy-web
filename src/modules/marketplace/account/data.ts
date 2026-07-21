@@ -150,6 +150,14 @@ function toMoney(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function toPublicDeliveryLabel(value: string | null) {
+  if (/^Jurgens Energy delivery(?:\s*-\s*.+)?$/i.test(value ?? "")) {
+    return "Jurgens Energy delivery";
+  }
+
+  return value;
+}
+
 function safeTrackingUrl(value: string | null) {
   if (!value) {
     return null;
@@ -460,6 +468,7 @@ export const getCustomerOrderDetail = cache(
       id: order.id,
       items: itemRows.map((item) => ({
         ...item,
+        deliveryLabel: toPublicDeliveryLabel(item.deliveryLabel),
         lineTotal: toMoney(item.unitPrice) * item.quantity,
         unitPrice: toMoney(item.unitPrice),
       })),

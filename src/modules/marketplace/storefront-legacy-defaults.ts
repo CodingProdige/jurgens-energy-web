@@ -2,7 +2,9 @@ import type { StorefrontSection } from "./storefront-types";
 
 const legacyHeroCopyReplacements: Readonly<Record<string, string>> = {
   "Safe, certified and delivered to your home or business.":
-    "LPG cylinders, exchange options and local delivery where available.",
+    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
+  "LPG cylinders, exchange options and local delivery where available.":
+    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
 };
 
 const legacyFeatureGridTitleReplacements: Readonly<Record<string, string>> = {
@@ -10,17 +12,26 @@ const legacyFeatureGridTitleReplacements: Readonly<Record<string, string>> = {
     "LPG ordering with clear product, payment and delivery updates.",
 };
 
+const legacyFeatureGridEyebrowReplacements: Readonly<Record<string, string>> = {
+  "Modern energy, delivered": "South African online LPG store",
+};
+
 const legacyFeatureTitleReplacements: Readonly<Record<string, string>> = {
   "Certified cylinders": "Safety-first handling",
   "Ready to cook": "Clear product details",
-  "Same day delivery": "Local delivery",
+  "Same day delivery": "Delivery in South Africa",
+  "Local delivery": "Delivery in South Africa",
 };
 
 const legacyFeatureTextReplacements: Readonly<Record<string, string>> = {
   "Every cylinder is checked and handled with care.":
     "Cylinder eligibility and handover checks apply where required.",
   "Fast local delivery for homes and businesses.":
-    "Local delivery options for eligible addresses.",
+    "Estimated delivery in 1–4 business days.",
+  "Local delivery options for eligible addresses.":
+    "Estimated delivery in 1–4 business days.",
+  "Estimated delivery in 1–3 business days after payment confirmation.":
+    "Estimated delivery in 1–4 business days.",
   "Full cylinders arrive ready for safe connection.":
     "Review the product details and connection requirements before use.",
 };
@@ -63,6 +74,10 @@ export function replaceLegacyDefaultStorefrontClaims(
         ...section,
         settings: {
           ...section.settings,
+          eyebrow: replaceExactLegacyText(
+            section.settings.eyebrow,
+            legacyFeatureGridEyebrowReplacements,
+          ),
           features: section.settings.features.map((feature) => ({
             ...feature,
             text: replaceExactLegacyText(

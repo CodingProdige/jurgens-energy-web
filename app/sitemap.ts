@@ -17,7 +17,7 @@ const policyEffectiveDate = new Date(
   `${POLICY_EFFECTIVE_DATE_ISO}T00:00:00+02:00`,
 );
 // Keep this aligned with edits to the static About, Contact, FAQ, or Safety copy.
-const contentPageLastModified = new Date("2026-07-15T00:00:00+02:00");
+const contentPageLastModified = new Date("2026-07-20T00:00:00+02:00");
 
 function latestDate(dates: Array<Date | null | undefined>) {
   return dates.reduce<Date | null>((latest, date) => {

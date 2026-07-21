@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
@@ -38,6 +38,8 @@ const roleCapabilities: Record<AdminStaffRole, readonly AdminCapability[]> = {
     "admin.users.manage",
     "admin.orders.view",
     "admin.orders.manage",
+    "admin.contact_inquiries.view",
+    "admin.contact_inquiries.manage",
     "admin.catalog.view",
     "admin.analytics.view",
   ],
@@ -51,6 +53,8 @@ const roleCapabilities: Record<AdminStaffRole, readonly AdminCapability[]> = {
     "admin.dashboard.view",
     "admin.users.view",
     "admin.orders.view",
+    "admin.contact_inquiries.view",
+    "admin.contact_inquiries.manage",
   ],
   finance: [
     "admin.dashboard.view",
@@ -134,6 +138,34 @@ export async function getAdminStaffAccess(userId: string) {
     role: roles[0] ?? null,
     capabilities: getCapabilitiesForAdminStaffRoles(roles),
   };
+}
+
+export async function getAdminStaffUserIdsWithCapability(
+  capability: AdminCapability,
+) {
+  const staffRows = await db
+    .selectDistinct({
+      role: adminStaff.role,
+      roles: adminStaff.roles,
+      userId: adminStaff.userId,
+    })
+    .from(adminStaff)
+    .innerJoin(users, eq(users.id, adminStaff.userId))
+    .innerJoin(userRoles, eq(userRoles.userId, adminStaff.userId))
+    .where(
+      and(
+        eq(users.isActive, true),
+        inArray(userRoles.role, ["admin", "superadmin"]),
+      ),
+    );
+
+  return staffRows
+    .filter((staff) => {
+      const roles = normalizeAdminStaffRoles(staff.roles, staff.role);
+
+      return getCapabilitiesForAdminStaffRoles(roles).includes(capability);
+    })
+    .map((staff) => staff.userId);
 }
 
 export async function userHasAdminStaffAccess(userId: string) {

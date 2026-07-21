@@ -65,7 +65,8 @@ export async function joinMarketplaceWaitlist(
 
   return {
     ok: true,
-    message: "You're on the list. We'll let you know when Piessang opens.",
+    message:
+      "You're on the list. We'll let you know when the Jurgens Energy online store opens.",
   };
 }
 

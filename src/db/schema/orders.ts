@@ -57,6 +57,7 @@ export const orders = pgTable("orders", {
   }>(),
   policyAcceptanceSnapshot: jsonb("policy_acceptance_snapshot").$type<{
     acceptedAt: string;
+    deliveryInformationPath?: string;
     effectiveDate: string;
     privacyPolicyPath: string;
     returnsAndRefundsPath: string;

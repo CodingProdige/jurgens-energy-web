@@ -13,8 +13,8 @@ import {
 } from "@/src/modules/whatsapp-ordering/draft-tokens";
 
 export const metadata: Metadata = {
-  title: "Create Marketplace Account",
-  description: "Create your Piessang marketplace account.",
+  title: "Create Online Store Account",
+  description: "Create your Jurgens Energy online-store account.",
   robots: {
     index: false,
     follow: false,

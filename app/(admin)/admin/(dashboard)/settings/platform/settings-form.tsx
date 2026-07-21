@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import {
   type ComponentProps,
   type ChangeEvent,
@@ -28,7 +29,6 @@ import {
   LinkIcon,
   LockIcon,
   MailCheckIcon,
-  MapPinIcon,
   MessageCircleIcon,
   MonitorIcon,
   MousePointerClickIcon,
@@ -279,7 +279,6 @@ export function SettingsForm({
 }
 
 type SocialLinksFormProps = {
-  contactAddress: string;
   contactEmail: string;
   contactPhonePrimary: string;
   contactPhoneSecondary: string;
@@ -297,7 +296,6 @@ type EditablePaymentMethodBadge = MarketplacePaymentMethodBadge & {
 };
 
 export function SocialLinksForm({
-  contactAddress,
   contactEmail,
   contactPhonePrimary,
   contactPhoneSecondary,
@@ -420,7 +418,7 @@ export function SocialLinksForm({
             id="footerTagline"
             name="footerTagline"
             defaultValue={footerTagline}
-            placeholder="Modern energy, delivered."
+            placeholder="South African online store for LPG products."
           />
         </div>
 
@@ -435,7 +433,7 @@ export function SocialLinksForm({
                 type="tel"
                 autoComplete="tel"
                 defaultValue={contactPhonePrimary}
-                placeholder="+27 60 689 3558"
+                placeholder="Enter the public support number"
                 className="pl-10"
               />
             </div>
@@ -467,24 +465,27 @@ export function SocialLinksForm({
                 type="email"
                 autoComplete="email"
                 defaultValue={contactEmail}
-                placeholder="support@jurgensenergy.com"
+                placeholder="Enter the public support email"
                 className="pl-10"
               />
             </div>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="contactAddress">Address</Label>
-            <div className="relative">
-              <MapPinIcon className="pointer-events-none absolute left-3 top-3.5 size-4 text-zinc-400" />
-              <Textarea
-                id="contactAddress"
-                name="contactAddress"
-                defaultValue={contactAddress}
-                placeholder="6 Christelle Street, Denneburg, Paarl, Western Cape 7646, South Africa"
-                className="min-h-24 pl-10"
-              />
-            </div>
+          <div className="grid content-start gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+            <p className="text-sm font-semibold text-zinc-950 dark:text-white">
+              Registered business address
+            </p>
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Managed once under Business Information and used automatically
+              on the contact page, in the footer, policies, and structured
+              business data.
+            </p>
+            <Link
+              className="w-fit text-xs font-semibold text-[#ff5a1f] hover:underline"
+              href="/settings/business"
+            >
+              Edit Business Information
+            </Link>
           </div>
         </div>
       </div>
@@ -1618,7 +1619,7 @@ export function WhatsappOrderingSettingsForm({
               inputMode="tel"
               value={businessPhoneValue}
               onChange={(event) => setBusinessPhoneValue(event.target.value)}
-              placeholder="+27 60 689 3558"
+              placeholder="+27 82 123 4567"
             />
             <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
               Used for the storefront WhatsApp launcher and customer-facing
@@ -3379,9 +3380,11 @@ function NotificationGlobalVariables({
               Global template variables
             </h3>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Create reusable values that can be inserted into any email or
-              in-app template with double braces, for example{" "}
-              {"{{supportEmail}}"}.
+              System values such as {"{{supportEmail}}"},{" "}
+              {"{{supportPhone}}"}, and {"{{businessAddress}}"} are read from
+              Business Information and Marketplace Settings whenever a
+              notification is rendered. You can also create custom reusable
+              values.
             </p>
             <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">
               Values are resolved at render time. Updating a value applies the
@@ -3662,7 +3665,7 @@ function NotificationGlobalVariableForm({
               name="value"
               defaultValue={variable?.value ?? ""}
               maxLength={5000}
-              placeholder="support@jurgensenergy.com"
+              placeholder="value@example.com"
               required
             />
           </div>

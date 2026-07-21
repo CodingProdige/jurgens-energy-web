@@ -198,7 +198,7 @@ export async function signInCustomerWithPassword(
   return signInWithPasswordForSurface(state, formData, {
     requiredCapability: "marketplace",
     redirectTo: "/",
-    capabilityError: "This account cannot access the marketplace.",
+    capabilityError: "This account cannot access the online store.",
     rememberByDefault: true,
   });
 }

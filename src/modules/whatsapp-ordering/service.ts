@@ -13,22 +13,18 @@ import {
   productMedia,
   products,
   productVariants,
-  sellerFulfillmentProfiles,
-  sellers,
   shipments,
   whatsappConversations,
   whatsappMessages,
   whatsappOrderDrafts,
 } from "@/src/db/schema";
 import { env } from "@/src/config/env";
+import { getBusinessCollectionAddress } from "@/src/modules/business-information";
 import { validateCartLines } from "@/src/modules/cart/server";
-import { getBusinessInformation } from "@/src/modules/business-information";
 import { formatFromZar } from "@/src/modules/currency";
+import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
-import {
-  getMarketplaceSettings,
-  getOpenAiIntegrationConfig,
-} from "@/src/modules/marketplace/settings";
+import { getOpenAiIntegrationConfig } from "@/src/modules/marketplace/settings";
 import {
   deliveryInformation,
   privacyPolicy,
@@ -37,10 +33,7 @@ import {
   type PolicyDocument,
 } from "@/src/modules/marketplace/policies/documents";
 import { probeBobGoCheckoutRates } from "@/src/modules/shipping/bobgo-client";
-import {
-  checkJurgensDeliveryAvailability,
-  getJurgensDeliveryZones,
-} from "@/src/modules/shipping/jurgens-delivery";
+import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
 import {
   send360DialogTextMessage,
   type WhatsappMediaMessageAttachment,
@@ -103,6 +96,18 @@ const zarCurrencyContext = {
 } as const;
 const draftTtlMs = 60 * 60 * 1000;
 const publicProductStatuses = new Set(["active", "live"]);
+const southAfricaDeliveryTimingFacts = [
+  "Handling takes 0–1 business day after payment confirmation.",
+  "The order cutoff is 2:00 PM SAST; orders placed after the cutoff start processing on the next business day.",
+  "Shipping takes 1–3 business days after dispatch, for a combined estimated delivery time of 1–4 business days.",
+] as const;
+const southAfricaDeliveryFacts = [
+  "Jurgens Energy is an online store.",
+  "Jurgens Energy delivers eligible online-store orders within South Africa.",
+  ...southAfricaDeliveryTimingFacts,
+  "Delivery fees are shown at checkout.",
+  "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
+] as const;
 const checkoutLinkExpiryLabel = "1 hour";
 
 type WhatsappProvider = "360dialog" | "generic" | "meta" | "take_app" | "twilio";
@@ -1702,10 +1707,15 @@ async function buildGreetingReply(state: WhatsappConversationState) {
 
     if (deliveryInquiry.step === "awaiting_postal_code") {
       if (deliveryInquiry.postalCode) {
-        return "Hi, welcome back. I still have the postal code, but the last local delivery check did not complete. Reply RETRY and I will try again, or ask for a human.";
+        return "Hi, welcome back. I still have the delivery address details, but the last delivery check did not complete. Reply RETRY and I will try again, or ask for a human.";
       }
 
-      return "Hi, welcome back. Send the four-digit delivery postal code and I will finish the local delivery check.";
+      return [
+        "Hi, welcome back.",
+        buildDeliveryAddressPrompt(
+          getMissingDeliveryAddressFields(deliveryInquiry.address),
+        ),
+      ].join("\n");
     }
 
     if (deliveryInquiry.step === "awaiting_address") {
@@ -1780,9 +1790,9 @@ async function buildGreetingReply(state: WhatsappConversationState) {
   }
 
   return [
-    "Hi, this is Jurgens Energy.",
-    "Do you need a gas top-up or cylinder exchange today?",
-    "Send the size, quantity, and delivery suburb.",
+    "Hi, this is Jurgens Energy, a South African online store.",
+    "Do you need a gas top-up, cylinder exchange or another gas product today?",
+    "Send the product, size and quantity you need.",
   ].join("\n");
 }
 
@@ -2051,60 +2061,59 @@ async function answerOrderStatus({
 }
 
 async function answerDeliveryAreas() {
-  return "Delivery depends on the exact product because some items use Jurgens Energy local delivery and others use live courier delivery. Send the product, variant and quantity so I can check the correct method.";
+  return [
+    "Jurgens Energy delivers eligible online-store orders within South Africa.",
+    ...southAfricaDeliveryTimingFacts,
+    "Exact product eligibility and delivery fees are confirmed at checkout from the complete delivery address.",
+  ].join("\n");
 }
 
 async function answerShippingRates() {
-  return "Delivery pricing depends on the exact product, quantity and destination. Send the product and quantity first so I can route the check through Jurgens Energy local delivery or the live courier provider.";
+  return [
+    "Delivery fees are shown at checkout after you enter the complete South African delivery address.",
+    "Jurgens Energy delivers eligible online-store orders within South Africa.",
+    ...southAfricaDeliveryTimingFacts,
+  ].join("\n");
 }
 
 async function answerContactDetails() {
-  const [settings, business] = await Promise.all([
-    getMarketplaceSettings(),
-    getBusinessInformation(),
-  ]);
-  const phoneNumbers = [
-    settings.contactPhonePrimary,
-    settings.contactPhoneSecondary,
-    !settings.contactPhonePrimary && !settings.contactPhoneSecondary
-      ? business.invoicePhone
-      : null,
-  ].filter(Boolean);
+  const support = await getCustomerSupportContactDetails();
   const details = [
-    settings.contactEmail || business.invoiceEmail
-      ? `Email: ${settings.contactEmail || business.invoiceEmail}`
+    support.email ? `Email: ${support.email}` : null,
+    support.phoneNumbers.length > 0
+      ? `Phone: ${support.phoneNumbers.join(" / ")}`
       : null,
-    phoneNumbers.length > 0 ? `Phone: ${phoneNumbers.join(" / ")}` : null,
-    settings.contactAddress ? `Address: ${settings.contactAddress}` : null,
+    support.whatsappPhone ? `WhatsApp: ${support.whatsappPhone}` : null,
+    support.businessAddress
+      ? `Registered business address: ${support.businessAddress}`
+      : null,
     `Website: ${createStoreUrl("/")}`,
+    `${support.businessName} is an online store with no public walk-in shop, customer collection counter or returns desk. The registered address is not a return address.`,
   ].filter(Boolean);
 
   return details.length > 0
-    ? ["You can contact Jurgens Energy here:", ...details].join("\n")
-    : `You can contact Jurgens Energy through the marketplace: ${createStoreUrl("/")}`;
+    ? [`You can contact ${support.businessName} here:`, ...details].join("\n")
+    : `You can contact ${support.businessName} through the online store: ${createStoreUrl("/")}`;
 }
 
 async function answerLocation() {
-  const [settings, business] = await Promise.all([
-    getMarketplaceSettings(),
-    getBusinessInformation(),
-  ]);
-  const registeredAddress = [
-    business.addressLine1,
-    business.addressLine2,
-    business.suburb,
-    business.city,
-    business.province,
-    business.postalCode,
-    business.countryCode,
+  const support = await getCustomerSupportContactDetails();
+
+  return [
+    `${support.businessName} is a South African online store delivering eligible orders within South Africa.`,
+    support.businessAddress
+      ? `Registered business address: ${support.businessAddress}`
+      : null,
+    "There is no public walk-in shop, customer collection counter or returns desk.",
+    support.email ? `Email: ${support.email}` : null,
+    support.phoneNumbers.length > 0
+      ? `Phone: ${support.phoneNumbers.join(" / ")}`
+      : null,
+    support.whatsappPhone ? `WhatsApp: ${support.whatsappPhone}` : null,
+    `For help or an approved return, contact us through ${createStoreUrl("/contact")} before sending anything to the registered address.`,
   ]
     .filter(Boolean)
-    .join(", ");
-  const publicAddress = settings.contactAddress || registeredAddress;
-
-  return publicAddress
-    ? `Jurgens Energy is located at ${publicAddress}.`
-    : "Jurgens Energy is based in South Africa. Ask for a human if you need a specific branch or collection address.";
+    .join("\n");
 }
 
 function searchTerms(value: string | null) {
@@ -2710,16 +2719,16 @@ async function respondToDeliveryInquiry({
 
 function buildDeliveryAddressPrompt(missingFields?: string[]) {
   return [
-    "This item uses courier delivery. I need the complete delivery address to check live courier availability.",
+    "I need the complete South African delivery address to confirm delivery for this online-store item.",
     missingFields?.length
       ? `Still needed: ${missingFields.join(", ")}.`
       : null,
     "Send it in this format:",
-    "Street address: 12 Main Street",
-    "Suburb: Denneburg",
-    "City: Paarl",
-    "Province: Western Cape",
-    "Postal code: 7646",
+    "Street address: [street number and name]",
+    "Suburb: [suburb]",
+    "City: [city]",
+    "Province: [province]",
+    "Postal code: [four digits]",
     "You can send the fields over more than one message.",
   ]
     .filter(Boolean)
@@ -2863,17 +2872,30 @@ async function checkJurgensDeliveryInquiry({
     });
   }
 
+  const itemLabel = `${inquiry.quantity} x ${item.productTitle}${
+    item.variantTitle !== item.productTitle ? ` - ${item.variantTitle}` : ""
+  }`;
+  const nextStep = getDeliveryResultNextStep(
+    context.conversationState,
+    item,
+  );
   const postalCode = inquiry.postalCode ?? inquiry.address?.postalCode ?? null;
 
   if (!postalCode) {
+    const reply = [
+      `Delivery for ${itemLabel} is confirmed at checkout from the complete South African delivery address.`,
+      "Jurgens Energy delivers eligible online-store orders within South Africa.",
+      ...southAfricaDeliveryTimingFacts,
+      "The delivery fee will be shown before payment.",
+      nextStep,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     return respondToDeliveryInquiry({
       context,
-      inquiry: {
-        ...inquiry,
-        step: "awaiting_postal_code",
-        updatedAt: new Date().toISOString(),
-      },
-      reply: `That item uses Jurgens Energy local delivery. Send the four-digit delivery postal code so I can check ${inquiry.quantity} x ${item.productTitle} accurately.`,
+      inquiry: createResolvedDeliveryInquiry({ inquiry, reply }),
+      reply,
     });
   }
 
@@ -2898,19 +2920,12 @@ async function checkJurgensDeliveryInquiry({
         "I could not read the Jurgens Energy delivery settings right now. That does not mean delivery is unavailable. Reply RETRY in a moment or ask for a human.",
     });
   }
-  const itemLabel = `${inquiry.quantity} x ${item.productTitle}${
-    item.variantTitle !== item.productTitle ? ` - ${item.variantTitle}` : ""
-  }`;
-  const nextStep = getDeliveryResultNextStep(
-    context.conversationState,
-    item,
-  );
-
   if (availability.eligible) {
     const reply = [
-      `Yes — ${itemLabel} can be delivered to postal code ${availability.postalCode} through ${availability.zone.name}.`,
-      `Delivery fee: ${formatMoney(availability.deliveryFee)}.`,
-      availability.zone.deliveryInformation?.slice(0, 500),
+      `Yes — delivery is available for ${itemLabel} to the address you supplied.`,
+      "Jurgens Energy delivers eligible online-store orders within South Africa.",
+      ...southAfricaDeliveryTimingFacts,
+      "The delivery fee will be shown at checkout.",
       nextStep,
     ]
       .filter(Boolean)
@@ -2925,8 +2940,8 @@ async function checkJurgensDeliveryInquiry({
 
   if (availability.unavailableCode === "postal_code_unavailable") {
     const reply = [
-      `No — Jurgens Energy local delivery for ${itemLabel} is not currently available to postal code ${availability.postalCode}.`,
-      "That answer applies to this specific product; courier-fulfilled products use a separate live courier check.",
+      `I could not confirm delivery for ${itemLabel} to the address you supplied.`,
+      "Jurgens Energy delivers eligible online-store orders within South Africa; exact product eligibility is confirmed from the complete address at checkout.",
       getUnavailableDeliveryNextStep(),
     ].join("\n");
 
@@ -2939,9 +2954,9 @@ async function checkJurgensDeliveryInquiry({
 
   if (availability.unavailableCode === "minimum_order_not_met") {
     const reply = [
-      `Postal code ${availability.postalCode} is covered by ${availability.zone?.name ?? "a Jurgens Energy delivery zone"}, but ${itemLabel} does not meet that zone's minimum order yet.`,
-      availability.unavailableReason,
-      "Send a larger quantity or a different product and I will recalculate it, or ask for a human.",
+      `I could not confirm delivery for ${itemLabel} to the address you supplied at this quantity.`,
+      "Delivery availability and the fee are confirmed at checkout from the complete address.",
+      "Send a larger quantity or a different product and I will check again, or ask for a human.",
     ].join("\n");
 
     return respondToDeliveryInquiry({
@@ -2959,50 +2974,8 @@ async function checkJurgensDeliveryInquiry({
       updatedAt: new Date().toISOString(),
     },
     reply:
-      "I could not confirm Jurgens Energy delivery right now because delivery quoting is not fully available. Reply RETRY in a moment or ask for a human; I will not guess about coverage.",
+      "I could not confirm delivery for this item and address right now. Reply RETRY in a moment, continue through checkout, or ask for a human; I will not guess about item-specific availability.",
   });
-}
-
-async function getBobGoCollectionProfile(sellerId: string) {
-  const [seller] = await db
-    .select({
-      addressLine1: sellerFulfillmentProfiles.addressLine1,
-      addressLine2: sellerFulfillmentProfiles.addressLine2,
-      city: sellerFulfillmentProfiles.city,
-      countryCode: sellerFulfillmentProfiles.countryCode,
-      displayName: sellers.displayName,
-      postalCode: sellerFulfillmentProfiles.postalCode,
-      province: sellerFulfillmentProfiles.province,
-      suburb: sellerFulfillmentProfiles.suburb,
-    })
-    .from(sellers)
-    .leftJoin(
-      sellerFulfillmentProfiles,
-      eq(sellerFulfillmentProfiles.sellerId, sellers.id),
-    )
-    .where(eq(sellers.id, sellerId))
-    .limit(1);
-
-  if (
-    !seller?.addressLine1 ||
-    !seller.city ||
-    !seller.postalCode ||
-    !seller.province ||
-    !seller.suburb
-  ) {
-    return null;
-  }
-
-  return {
-    addressLine1: seller.addressLine1,
-    addressLine2: seller.addressLine2,
-    city: seller.city,
-    countryCode: seller.countryCode ?? "ZA",
-    displayName: seller.displayName,
-    postalCode: seller.postalCode,
-    province: seller.province,
-    suburb: seller.suburb,
-  };
 }
 
 function isPositiveNumber(value: number | null): value is number {
@@ -3092,7 +3065,7 @@ async function checkBobGoDeliveryInquiry({
     isPositiveNumber(weightGrams) &&
     isPositiveNumber(widthMm);
 
-  if (!item.sellerId || !parcelComplete) {
+  if (!parcelComplete) {
     return respondToDeliveryInquiry({
       context,
       inquiry: {
@@ -3101,11 +3074,11 @@ async function checkBobGoDeliveryInquiry({
         updatedAt: new Date().toISOString(),
       },
       reply:
-        "I cannot confirm courier delivery for this item because its seller or parcel shipping details are incomplete. Ask for a human and the team can check it manually.",
+        "I cannot confirm courier delivery for this item because its parcel shipping details are incomplete. Ask for a human and the team can check it manually.",
     });
   }
 
-  const collection = await getBobGoCollectionProfile(item.sellerId);
+  const collection = await getBusinessCollectionAddress();
 
   if (!collection) {
     return respondToDeliveryInquiry({
@@ -3116,7 +3089,7 @@ async function checkBobGoDeliveryInquiry({
         updatedAt: new Date().toISOString(),
       },
       reply:
-        "I cannot confirm courier delivery because the seller's collection address is not ready. Ask for a human and the team can check it manually.",
+        "I cannot confirm courier delivery because the configured business dispatch details are incomplete. Ask for a human and the team can check it manually.",
     });
   }
 
@@ -3149,7 +3122,7 @@ async function checkBobGoDeliveryInquiry({
       provider: context.provider,
       reply: changedProbeInputs
         ? "I saved the changed item, quantity or address. Please wait a minute, then reply RETRY so I can request a fresh courier result for those new details."
-        : "I have already asked the courier for this address. Please wait a minute before retrying so we do not send duplicate rate requests.",
+        : "I have already asked the courier for this address. Please wait a minute before retrying so we do not send duplicate delivery checks.",
       status: "support_answer",
     });
   }
@@ -3199,9 +3172,9 @@ async function checkBobGoDeliveryInquiry({
       collectionAddress: {
         city: collection.city,
         code: collection.postalCode,
-        company: collection.displayName,
-        country: collection.countryCode ?? "ZA",
-        local_area: collection.suburb,
+        company: collection.company,
+        country: collection.countryCode,
+        local_area: collection.suburb || collection.city,
         street_address: [collection.addressLine1, collection.addressLine2]
           .filter(Boolean)
           .join(", "),
@@ -3242,9 +3215,9 @@ async function checkBobGoDeliveryInquiry({
 
     if (result.mode !== "live") {
       const reply = [
-        `I reached Bob Go's test environment for ${itemLabel} to ${address.suburb}, ${address.postalCode}.`,
-        "Test rates cannot confirm real courier availability, so I will not present them as a delivery promise.",
-        "Ask for a human to confirm delivery, or try again once the Bob Go integration is in live mode.",
+        `The courier connection is in test mode for ${itemLabel} and the delivery address you supplied.`,
+        "A test result cannot confirm real delivery availability, so I will not present it as a delivery promise.",
+        "Ask for a human to confirm delivery, or try again once live courier checking is available.",
       ].join("\n");
 
       return respondToDeliveryInquiry({
@@ -3261,7 +3234,7 @@ async function checkBobGoDeliveryInquiry({
 
     if (result.rates.length === 0) {
       const reply = [
-        `Bob Go returned no current courier options for ${itemLabel} to ${address.suburb}, ${address.postalCode}.`,
+        `The courier returned no current delivery options for ${itemLabel} and the delivery address you supplied.`,
         "That result applies to this exact item, quantity and address.",
         getUnavailableDeliveryNextStep(),
       ].join("\n");
@@ -3278,19 +3251,11 @@ async function checkBobGoDeliveryInquiry({
       });
     }
 
-    const sortedRates = [...result.rates].sort(
-      (first, second) => first.customerAmount - second.customerAmount,
-    );
     const reply = [
-      `Yes — Bob Go currently returns courier options for ${itemLabel} to ${address.suburb}, ${address.postalCode}:`,
-      ...sortedRates
-        .slice(0, 3)
-        .map((rate) => `- ${rate.serviceName}: ${formatMoney(rate.customerAmount)}`),
-      `These live estimates expire at ${new Intl.DateTimeFormat("en-ZA", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Africa/Johannesburg",
-      }).format(result.expiresAt)} and will be confirmed again at checkout.`,
+      `Yes — courier delivery is available for ${itemLabel} to the address you supplied.`,
+      "Jurgens Energy delivers eligible online-store orders within South Africa.",
+      ...southAfricaDeliveryTimingFacts,
+      "The delivery fee and final delivery option will be shown at checkout.",
       nextStep,
     ].join("\n");
 
@@ -3765,8 +3730,9 @@ async function handleDeliveryInquiryMessage(
       return respondToDeliveryInquiry({
         context,
         inquiry,
-        reply:
-          "Send the four-digit delivery postal code, for example 7646. A suburb name alone is not precise enough for the configured delivery zones.",
+        reply: buildDeliveryAddressPrompt(
+          getMissingDeliveryAddressFields(inquiry.address),
+        ),
       });
     }
 
@@ -3797,16 +3763,13 @@ async function handleDeliveryInquiryMessage(
 }
 
 async function getWhatsappKnowledgeFacts(question: string) {
-  const [settings, business, zones, catalogRows] = await Promise.all([
-    getMarketplaceSettings(),
-    getBusinessInformation(),
-    getJurgensDeliveryZones({ activeOnly: true }),
+  const [support, catalogRows] = await Promise.all([
+    getCustomerSupportContactDetails(),
     db
       .select({
         brandName: brands.name,
         categoryPath: categories.path,
         continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
-        fulfillmentMode: products.fulfillmentMode,
         price: productVariants.price,
         productSlug: products.slug,
         productTitle: products.title,
@@ -3829,58 +3792,38 @@ async function getWhatsappKnowledgeFacts(question: string) {
       .orderBy(asc(products.title), asc(productVariants.price))
       .limit(28),
   ]);
-  const publicName =
-    business.tradingName.trim() || business.legalName.trim() || "Jurgens Energy";
-  const registeredAddress = [
-    business.addressLine1,
-    business.addressLine2,
-    business.suburb,
-    business.city,
-    business.province,
-    business.postalCode,
-    business.countryCode,
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const publicName = support.businessName;
   const facts = [
-    `${publicName} supplies LPG cylinders, eligible cylinder exchanges, and gas-related products through its online store.`,
-    business.legalName.trim() && business.legalName.trim() !== publicName
-      ? `${publicName} is the trading name of ${business.legalName.trim()}.`
+    `${publicName} is a South African online store for LPG cylinders, eligible cylinder exchanges, and gas-related products.`,
+    ...southAfricaDeliveryFacts,
+    support.legalName && support.legalName !== publicName
+      ? `${publicName} is the trading name of ${support.legalName}.`
       : null,
-    business.companyRegistrationNumber?.trim()
-      ? `Company registration number: ${business.companyRegistrationNumber.trim()}.`
+    support.companyRegistrationNumber
+      ? `Company registration number: ${support.companyRegistrationNumber}.`
       : null,
-    business.vatRegistrationNumber.trim()
-      ? `VAT registration number: ${business.vatRegistrationNumber.trim()}.`
+    support.vatRegistrationNumber
+      ? `VAT registration number: ${support.vatRegistrationNumber}.`
       : null,
-    settings.contactEmail ? `Customer support email: ${settings.contactEmail}.` : null,
-    settings.contactPhonePrimary
-      ? `Primary customer support phone: ${settings.contactPhonePrimary}.`
+    support.email ? `Customer support email: ${support.email}.` : null,
+    support.phoneNumbers[0]
+      ? `Primary customer support phone: ${support.phoneNumbers[0]}.`
       : null,
-    settings.contactPhoneSecondary
-      ? `Secondary customer support phone: ${settings.contactPhoneSecondary}.`
+    support.phoneNumbers[1]
+      ? `Secondary customer support phone: ${support.phoneNumbers[1]}.`
       : null,
-    settings.contactAddress
-      ? `Public contact address: ${settings.contactAddress}.`
-      : registeredAddress
-        ? `Registered business address: ${registeredAddress}.`
-        : null,
+    support.whatsappPhone
+      ? `Customer support WhatsApp phone: ${support.whatsappPhone}.`
+      : null,
+    support.businessAddress
+      ? `Registered business address: ${support.businessAddress}. This is not a public shop, customer collection counter or returns address.`
+      : null,
     `Online store: ${createStoreUrl("/")}`,
     `All products: ${createStoreUrl("/products")}`,
     `Shipping and delivery policy: ${createStoreUrl("/delivery-information")}`,
     `Frequently asked questions: ${createStoreUrl("/faq")}`,
     `Returns and refunds policy: ${createStoreUrl("/returns-and-refunds")}`,
     ...getRelevantPolicyFacts(question),
-    ...zones.map((zone) => {
-      const rates = zone.rates
-        .map(
-          (rate) =>
-            `${formatMoney(rate.price)} from ${formatMoney(rate.fromAmount)}${rate.upToAmount === null ? " upward" : ` to ${formatMoney(rate.upToAmount)}`}`,
-        )
-        .join("; ");
-
-      return `Active Jurgens Energy delivery zone ${zone.name}: postal codes ${zone.postalCodes.join(", ")}; minimum order ${formatMoney(zone.minimumOrderAmount)}; rates ${rates || "not listed"}${zone.deliveryInformation ? `; ${zone.deliveryInformation}` : ""}.`;
-    }),
     ...catalogRows.map((row) => {
       const variantLabel =
         row.variantTitle && row.variantTitle !== row.productTitle
@@ -3890,12 +3833,7 @@ async function getWhatsappKnowledgeFacts(question: string) {
         row.continueSellingOutOfStock || row.stockOnHand > 0
           ? "currently available to order"
           : "currently out of stock";
-      const fulfillment =
-        row.fulfillmentMode === "piessang_fulfilled"
-          ? "Jurgens Energy local fulfilment"
-          : "courier fulfilment";
-
-      return `${row.brandName ? `${row.brandName} ` : ""}${row.productTitle}${variantLabel}: ${formatMoney(row.price)}, ${stock}, ${fulfillment}${row.requiresExchangeEmpty ? ", exchange requires an eligible empty cylinder handover" : ""}${row.categoryPath ? `, category ${row.categoryPath}` : ""}. ${row.shortDescription?.slice(0, 220) ?? ""} Product page: ${createStoreUrl(`/products/${row.productSlug}`)}`;
+      return `${row.brandName ? `${row.brandName} ` : ""}${row.productTitle}${variantLabel}: ${formatMoney(row.price)}, ${stock}, delivery availability and fees confirmed at checkout${row.requiresExchangeEmpty ? ", exchange requires an eligible empty cylinder handover" : ""}${row.categoryPath ? `, category ${row.categoryPath}` : ""}. ${row.shortDescription?.slice(0, 220) ?? ""} Product page: ${createStoreUrl(`/products/${row.productSlug}`)}`;
     }),
   ].filter((fact): fact is string => Boolean(fact));
 
@@ -3961,7 +3899,7 @@ async function answerSupportQuestion({
 
   switch (interpretation.supportTopic) {
     case "account_setup":
-      return textReply(`You can create a Jurgens Energy marketplace account here: ${createStoreUrl("/register")}. If you already have one, sign in here: ${createStoreUrl("/sign-in")}.`);
+      return textReply(`You can create a Jurgens Energy online-store account here: ${createStoreUrl("/register")}. If you already have one, sign in here: ${createStoreUrl("/sign-in")}.`);
     case "business_info":
       {
         const answer = await answerWhatsappQuestionWithAi({
@@ -3972,9 +3910,12 @@ async function answerSupportQuestion({
 
         return answer
           ? { grounded: true, media: [], reply: answer }
-          : textReply(
-              "Jurgens Energy supplies LPG cylinders, eligible cylinder exchanges, and gas-related products through the online store, with local or courier fulfilment depending on the product and destination.",
-            );
+          : textReply([
+              "Jurgens Energy is a South African online store for LPG cylinders, eligible cylinder exchanges and gas-related products.",
+              "Eligible online-store orders are delivered within South Africa.",
+              ...southAfricaDeliveryTimingFacts,
+              "Delivery fees are shown at checkout.",
+            ].join(" "));
       }
     case "contact":
       return textReply(await answerContactDetails());
@@ -4131,73 +4072,17 @@ function withWhatsappMemory({
   };
 }
 
-async function checkDeliveryAreaForAgent(
-  destinationOrPostalCode: string,
-): Promise<WhatsappAgentAdapterResult> {
-  const zones = await getJurgensDeliveryZones({ activeOnly: true });
-  const postalCode = extractSouthAfricanPostalCode(destinationOrPostalCode);
-  const normalizedDestination = normalizeText(destinationOrPostalCode)
-    .replace(/\b(?:do|does|you|deliver|delivery|to|in|at|near|please|check)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const destinationTokens = normalizedDestination
-    .split(" ")
-    .filter((token) => token.length >= 3);
-  const matchingZones = zones.filter((zone) => {
-    if (postalCode && zone.postalCodes.includes(postalCode)) {
-      return true;
-    }
-
-    if (destinationTokens.length === 0) {
-      return false;
-    }
-
-    const searchableZone = normalizeText(
-      [zone.name, zone.deliveryInformation].filter(Boolean).join(" "),
-    );
-
-    return destinationTokens.every((token) => searchableZone.includes(token));
-  });
-
-  if (matchingZones.length === 0) {
-    return createWhatsappAgentAdapterResult({
-      data: { localDeliveryMatch: false },
-      facts: [
-        `No configured Jurgens Energy local-delivery zone match was verified for "${destinationOrPostalCode.trim()}".`,
-        "A missing local-zone match does not rule out courier fulfilment. A live courier quote requires the exact product and complete checkout address.",
-      ],
-      status: "not_verified",
-    });
-  }
-
-  const facts = matchingZones.flatMap((zone) => {
-    const rates = zone.rates.map((rate) =>
-      `${formatMoney(rate.price)} from order value ${formatMoney(rate.fromAmount)}${
-        rate.upToAmount === null
-          ? " upward"
-          : ` through ${formatMoney(rate.upToAmount)}`
-      }`,
-    );
-
-    return [
-      `Jurgens Energy local delivery is configured for the supplied destination in the active zone "${zone.name}".`,
-      zone.deliveryInformation
-        ? `Zone delivery information: ${zone.deliveryInformation}`
-        : null,
-      rates.length > 0
-        ? `Configured zone price tiers: ${rates.join("; ")}. The applicable tier depends on the eligible Jurgens-fulfilled product subtotal.`
-        : "No local-delivery price tier is currently listed for this zone.",
-      "The exact delivery option and fee must still be confirmed from the selected product and checkout address.",
-    ].filter((fact): fact is string => Boolean(fact));
-  });
-
+async function checkDeliveryAreaForAgent(): Promise<WhatsappAgentAdapterResult> {
   return createWhatsappAgentAdapterResult({
     data: {
-      localDeliveryMatch: true,
-      zoneNames: matchingZones.map((zone) => zone.name),
+      countryCode: "ZA",
+      exactAddressConfirmedAtCheckout: true,
     },
-    facts,
-    status: "matched",
+    facts: [
+      ...southAfricaDeliveryFacts,
+      "Exact product eligibility is confirmed at checkout from the customer's complete South African delivery address.",
+    ],
+    status: "checkout_confirmation_required",
   });
 }
 
@@ -4523,10 +4408,6 @@ async function tryProcessWhatsappMessageWithAgent({
     message: currentMessage,
     pendingAction,
   });
-  const currentMessagePostalCode = extractSouthAfricanPostalCode(
-    currentMessage,
-    { allowBare: true },
-  );
   const deterministicIntent = interpretMessage(currentMessage).intent;
   const isOrderRequest =
     interpretation.intent === "order" ||
@@ -4556,10 +4437,7 @@ async function tryProcessWhatsappMessageWithAgent({
         status: "cancelled",
       });
     },
-    checkDeliveryArea: (destinationOrPostalCode: string) =>
-      checkDeliveryAreaForAgent(
-        currentMessagePostalCode ?? destinationOrPostalCode,
-      ),
+    checkDeliveryArea: () => checkDeliveryAreaForAgent(),
     confirmOrderAndCreateCheckout: () =>
       confirmWhatsappOrderForAgent({
         conversationId,
@@ -4706,9 +4584,6 @@ async function tryProcessWhatsappMessageWithAgent({
     modelMemory.rollingMemory.summary,
     ...modelMemory.rollingMemory.facts,
     modelMemory.workflowSummary,
-    currentMessagePostalCode
-      ? 'The current customer message contains a server-detected postal code. Call check_delivery_area with the value "current message postal code"; the application will use the protected value without exposing it to the model.'
-      : null,
     `Deterministic fallback intent: ${interpretation.intent}. This is advisory only and never authorizes a write.`,
   ]
     .filter(Boolean)

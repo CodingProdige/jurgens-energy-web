@@ -428,11 +428,11 @@ export function MarketplaceShopMenu({
                   </li>
                   <li className="flex gap-2.5">
                     <TruckIcon className="size-4 shrink-0 text-[#ff5a1f]" />
-                    Local delivery where available
+                    Estimated delivery in 1–4 business days
                   </li>
                   <li className="flex gap-2.5">
                     <HeadphonesIcon className="size-4 shrink-0 text-[#ff5a1f]" />
-                    Local customer support
+                    South African customer support
                   </li>
                 </ul>
                 {whatsappHref ? (

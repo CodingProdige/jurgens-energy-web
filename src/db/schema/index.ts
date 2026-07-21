@@ -24,3 +24,4 @@ export * from "@/src/db/schema/notifications";
 export * from "@/src/db/schema/admin-staff";
 export * from "@/src/db/schema/whatsapp";
 export * from "@/src/db/schema/static-page-seo";
+export * from "@/src/db/schema/contact-inquiries";

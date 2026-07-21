@@ -44,7 +44,6 @@ export function createCheckoutFingerprint({
 }) {
   const normalizedItems = [...items]
     .map((item) => ({
-      exchangeEmptyConfirmed: item.exchangeEmptyConfirmed,
       purchaseType: item.purchaseType,
       quantity: item.quantity,
       variantId: item.variantId,
@@ -190,7 +189,7 @@ export async function getCheckoutDeliveryQuotes(
           sellerId: null,
           unavailableReason: result.eligible
             ? null
-            : (result.unavailableReason ?? "Local delivery is unavailable."),
+            : (result.unavailableReason ?? "Delivery is unavailable."),
         });
       } catch (error) {
         groups.push({
@@ -200,7 +199,7 @@ export async function getCheckoutDeliveryQuotes(
           scheduling: null,
           sellerId: null,
           unavailableReason:
-            error instanceof Error ? error.message : "Local delivery is unavailable.",
+            error instanceof Error ? error.message : "Delivery is unavailable.",
         });
       }
 

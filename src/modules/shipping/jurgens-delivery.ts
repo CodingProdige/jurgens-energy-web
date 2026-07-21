@@ -340,9 +340,6 @@ export async function getJurgensDeliveryCheckoutRates(
       mode: "jurgens_delivery" as const,
       rates: [],
       unavailableReason: evaluation.unavailableReason,
-      ...(evaluation.zone
-        ? { zone: toCheckoutZone(evaluation.zone) }
-        : {}),
     };
   }
 
@@ -369,13 +366,13 @@ export async function getJurgensDeliveryCheckoutRates(
     bufferAmount: 0,
     currency: "ZAR" as const,
     customerAmount: roundMoney(evaluation.deliveryFee),
-    deliveryInformation: matchingZone.deliveryInformation,
+    deliveryInformation:
+      "Handling takes 0–1 business day after payment confirmation, with a 2:00 PM SAST order cut-off. Shipping takes 1–3 business days after dispatch; estimated total delivery is 1–4 business days.",
     marginAmount: 0,
     providerAmount: roundMoney(evaluation.deliveryFee),
     providerRateId,
     serviceLevel: "local_delivery",
-    serviceName: `Jurgens Energy delivery - ${matchingZone.name}`,
-    zone: toCheckoutZone(matchingZone),
+    serviceName: "Jurgens Energy delivery",
   };
 
   const [quote] = await db
@@ -409,7 +406,6 @@ export async function getJurgensDeliveryCheckoutRates(
     expiresAt,
     mode: "jurgens_delivery" as const,
     rates: [{ ...rate, quoteId: quote.id }],
-    zone: toCheckoutZone(matchingZone),
   };
 }
 
@@ -440,7 +436,7 @@ async function evaluateJurgensDeliveryAvailability({
   const postalCode = normalizeJurgensDeliveryPostalCode(postalCodeInput);
 
   if (!postalCode) {
-    throw new Error("A delivery postal code is required.");
+    throw new Error("A complete delivery address is required.");
   }
 
   const settings = await getMarketplaceSettings();
@@ -464,7 +460,7 @@ async function evaluateJurgensDeliveryAvailability({
       postalCode,
       unavailableCode: "postal_code_unavailable",
       unavailableReason:
-        "Jurgens Energy delivery is not available for this postal code.",
+        "Jurgens Energy delivery is not available for this address.",
       zone: null,
     };
   }
@@ -483,7 +479,7 @@ async function evaluateJurgensDeliveryAvailability({
       postalCode,
       unavailableCode: "zone_configuration_conflict",
       unavailableReason:
-        "Jurgens Energy delivery pricing needs confirmation for this postal code. Please contact support so we can confirm delivery without guessing.",
+        "Jurgens Energy delivery pricing needs confirmation for this address. Please contact support so we can confirm delivery without guessing.",
       zone: null,
     };
   }
@@ -497,7 +493,7 @@ async function evaluateJurgensDeliveryAvailability({
       eligible: false,
       postalCode,
       unavailableCode: "minimum_order_not_met",
-      unavailableReason: `Jurgens Energy delivery for ${matchingZone.name} requires a minimum order of R ${formatMoney(matchingZone.minimumOrderAmount)}.`,
+      unavailableReason: `Jurgens Energy delivery requires a minimum order of R ${formatMoney(matchingZone.minimumOrderAmount)} for this address.`,
       zone: matchingZone,
     };
   }
@@ -514,7 +510,7 @@ async function evaluateJurgensDeliveryAvailability({
       eligible: false,
       postalCode,
       unavailableCode: "rate_not_configured",
-      unavailableReason: `Your address is within the Jurgens Energy delivery area, but no delivery price is available for an order total of R ${formatMoney(subtotal)}.`,
+      unavailableReason: `No Jurgens Energy delivery price is available for this address at an order total of R ${formatMoney(subtotal)}.`,
       zone: matchingZone,
     };
   }

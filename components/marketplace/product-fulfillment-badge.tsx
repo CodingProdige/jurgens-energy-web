@@ -24,7 +24,8 @@ export function MarketplaceProductFulfillmentBadge({
     >
       <TruckIcon className="size-2.5 shrink-0 sm:size-3" />
       <span className="truncate">
-        {label ?? (isJurgensFulfilled ? "Local" : "Courier")}
+        {label ??
+          (isJurgensFulfilled ? "Jurgens delivery" : "Courier delivery")}
       </span>
     </Badge>
   );

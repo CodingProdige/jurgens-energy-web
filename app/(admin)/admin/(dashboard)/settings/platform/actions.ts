@@ -113,10 +113,6 @@ const paymentMethodBadgesSchema = z
   );
 
 const socialLinksSchema = z.object({
-  contactAddress: z
-    .string()
-    .trim()
-    .max(300, "Contact address is too long."),
   contactEmail: z
     .string()
     .trim()
@@ -159,7 +155,6 @@ export async function updateMarketplaceSocialLinkSettings(
   await requireSettingsManageAccess();
 
   const parsed = socialLinksSchema.safeParse({
-    contactAddress: String(formData.get("contactAddress") ?? ""),
     contactEmail: String(formData.get("contactEmail") ?? ""),
     contactPhonePrimary: String(formData.get("contactPhonePrimary") ?? ""),
     contactPhoneSecondary: String(formData.get("contactPhoneSecondary") ?? ""),
@@ -186,6 +181,7 @@ export async function updateMarketplaceSocialLinkSettings(
   revalidatePath("/checkout");
   revalidatePath("/products");
   revalidatePath("/settings/platform");
+  revalidatePath("/", "layout");
 
   return result;
 }

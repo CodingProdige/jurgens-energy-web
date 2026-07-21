@@ -6,6 +6,7 @@ import {
   ClipboardListIcon,
   FileTextIcon,
   FolderTreeIcon,
+  InboxIcon,
   LayoutDashboardIcon,
   MessageCircleIcon,
   SettingsIcon,
@@ -63,6 +64,12 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
     href: "/whatsapp",
     icon: MessageCircleIcon,
     capability: "admin.orders.view",
+  },
+  {
+    label: "Contact inquiries",
+    href: "/contact-inquiries",
+    icon: InboxIcon,
+    capability: "admin.contact_inquiries.view",
   },
   {
     label: "Products",
