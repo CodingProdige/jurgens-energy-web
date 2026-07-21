@@ -23,16 +23,14 @@ function normalizeLegacyConfirmationText(value: string | null | undefined) {
     /^I confirm I have\s+(.+?)(?:\.)?$/i,
   );
 
-  if (!legacyConfirmation?.[1]) {
-    return normalizedValue;
+  if (
+    legacyConfirmation?.[1] ||
+    /^(?:bring|hand over)\b.*\bempty cylinders?\b/i.test(normalizedValue)
+  ) {
+    return null;
   }
 
-  const requirement = legacyConfirmation[1].replace(
-    /\s+to exchange on delivery$/i,
-    " for exchange when your order is delivered",
-  );
-
-  return `Bring ${requirement}.`;
+  return normalizedValue;
 }
 
 export function getExchangeRequirementText({
@@ -51,15 +49,15 @@ export function getExchangeRequirementText({
   const quantityText =
     normalizedQuantity === 1
       ? normalizedEmptySize
-        ? `a ${normalizedEmptySize}`
-        : "a compatible"
+        ? `your ${normalizedEmptySize}`
+        : "your compatible"
       : normalizedEmptySize
-        ? `${normalizedQuantity} ${normalizedEmptySize}`
-        : `${normalizedQuantity} compatible`;
+        ? `your ${normalizedQuantity} × ${normalizedEmptySize}`
+        : `your ${normalizedQuantity} compatible`;
   const cylinderText =
     normalizedQuantity === 1 ? "empty cylinder" : "empty cylinders";
 
-  return `Hand over ${quantityText} ${cylinderText} in acceptable condition when your order is delivered.`;
+  return `Supply us with ${quantityText} ${cylinderText} in acceptable condition when your order is delivered.`;
 }
 
 export function resolveCartLineExchangePolicy({

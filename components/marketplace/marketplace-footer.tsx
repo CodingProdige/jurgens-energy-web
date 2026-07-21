@@ -24,7 +24,7 @@ import { normalizePhoneNumber } from "@/src/modules/phone";
 import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { getMarketplaceShopMenuData } from "@/src/modules/marketplace/catalog";
-import { policyLinks } from "@/src/modules/marketplace/policies/documents";
+import { policyLinks } from "@/src/modules/marketplace/policies/links";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { findShopMenuCategory } from "@/src/modules/marketplace/shop-menu-categories";
 

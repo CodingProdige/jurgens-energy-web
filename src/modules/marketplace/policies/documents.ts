@@ -4,8 +4,13 @@ import {
   createPrivacyResponsiblePartyStatement,
   type PrivacyPolicyBusinessIdentity,
 } from "@/src/modules/marketplace/policies/privacy-operator";
+import {
+  policyLinks,
+  type PolicyKind,
+} from "@/src/modules/marketplace/policies/links";
 
-export type PolicyKind = "delivery" | "privacy" | "returns" | "terms";
+export { policyLinks };
+export type { PolicyKind };
 
 export type PolicySection = {
   bullets?: readonly string[];
@@ -23,35 +28,6 @@ export type PolicyDocument = {
   shortTitle: string;
   title: string;
 };
-
-export const policyLinks = [
-  {
-    description: "How we collect, use, protect, and share personal information.",
-    href: "/privacy-policy",
-    kind: "privacy",
-    label: "Privacy Policy",
-  },
-  {
-    description: "The rules that apply when you use our store or place an order.",
-    href: "/terms-and-conditions",
-    kind: "terms",
-    label: "Terms & Conditions",
-  },
-  {
-    description:
-      "Seven-day returns, return courier costs, defective goods, exchanges, and refunds.",
-    href: "/returns-and-refunds",
-    kind: "returns",
-    label: "Returns & Refunds Policy",
-  },
-  {
-    description:
-      "South Africa delivery, handling and shipping estimates, fees, handover, and order issues.",
-    href: "/delivery-information",
-    kind: "delivery",
-    label: "Shipping & Delivery Policy",
-  },
-] as const;
 
 export const privacyPolicy: PolicyDocument = {
   description:

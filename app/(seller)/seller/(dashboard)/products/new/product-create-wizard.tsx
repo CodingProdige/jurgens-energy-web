@@ -90,6 +90,7 @@ import {
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import { normalizeMediaSelectionIds } from "@/src/modules/media/selection";
 import { getVariantProfitability } from "@/src/modules/products/cost-price";
+import { generatedProductDescriptionTextToHtml } from "@/src/modules/products/product-description";
 import type {
   GoogleFulfillmentChannel,
   SellerCreateProductData,
@@ -642,24 +643,6 @@ function normalizeLookupValue(value: string) {
     .replace(/&/g, "and")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function generatedTextToHtml(value: string) {
-  return value
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
-    .join("");
 }
 
 function getEditorTextLength(value: string) {
@@ -2747,13 +2730,17 @@ export function ProductCreateWizard({
         categoryName: selectedCategoryLabel || undefined,
         kind,
         productName: name,
+        shortDescription:
+          kind === "long" ? description.trim() || undefined : undefined,
       }).then((result) => {
         if (result.ok && result.description) {
           if (kind === "short") {
             setDescription(result.description.slice(0, 400));
           } else {
             setLongDescription(
-              generatedTextToHtml(result.description.slice(0, 2000)),
+              generatedProductDescriptionTextToHtml(
+                result.description.slice(0, 2000),
+              ),
             );
           }
           setAiFeedback({

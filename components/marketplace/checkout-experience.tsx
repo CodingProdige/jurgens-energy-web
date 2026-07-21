@@ -8,6 +8,7 @@ import {
   CheckCircle2Icon,
   ChevronDownIcon,
   ChevronLeftIcon,
+  ChevronRightIcon,
   HomeIcon,
   LoaderCircleIcon,
   LockKeyholeIcon,
@@ -54,6 +55,13 @@ import type {
   CheckoutQuoteResponse,
   CheckoutSavedAddress,
 } from "@/src/modules/checkout/contracts";
+import {
+  CHECKOUT_STEPS,
+  getCheapestCheckoutShippingOption,
+  isCheckoutAddressStepReady,
+  isCheckoutShippingStepReady,
+  type CheckoutStep,
+} from "@/src/modules/checkout/flow";
 import { SOUTH_AFRICAN_PROVINCES } from "@/src/modules/marketplace/account/address-options";
 import { POLICY_EFFECTIVE_DATE_ISO } from "@/src/modules/marketplace/policies/constants";
 import {
@@ -82,6 +90,11 @@ const emptyAddress: CheckoutDeliveryAddress = {
 const fieldClass =
   "h-11 rounded-md border-[#d8d8d1] bg-white px-3 text-sm shadow-none focus-visible:border-[#ff5a1f] focus-visible:ring-[#ff5a1f]/15 dark:border-white/12 dark:bg-white/[0.04]";
 const differentAddressValue = "__different_address__";
+const checkoutStepLabels: Record<CheckoutStep, string> = {
+  address: "Address",
+  payment: "Payment",
+  shipping: "Shipping",
+};
 
 function RequiredMark() {
   return (
@@ -104,6 +117,18 @@ function formatZar(value: number) {
     currency: "ZAR",
     style: "currency",
   }).format(value);
+}
+
+function getShippingChargeLabel(groupKey: string) {
+  if (groupKey === "jurgens") {
+    return "Jurgens Energy shipping";
+  }
+
+  if (groupKey === "courier") {
+    return "Bob Go courier shipping";
+  }
+
+  return "Shipping";
 }
 
 function formatPreferredDeliveryDate(value: string) {
@@ -286,15 +311,18 @@ export function CheckoutExperience({
   const [isLoadingCart, setIsLoadingCart] = useState(true);
   const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  const [hasAcceptedPolicies, setHasAcceptedPolicies] = useState(false);
+  const [hasAcceptedPolicies, setHasAcceptedPolicies] = useState(true);
+  const [checkoutStep, setCheckoutStep] =
+    useState<CheckoutStep>("address");
+  const [furthestCheckoutStep, setFurthestCheckoutStep] = useState(0);
+  const [stepError, setStepError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [quoteRefreshNonce, setQuoteRefreshNonce] = useState(0);
+  const stepPanelRef = useRef<HTMLDivElement | null>(null);
   const cartAbortControllerRef = useRef<AbortController | null>(null);
   const quoteAbortControllerRef = useRef<AbortController | null>(null);
   const quoteRequestIdRef = useRef(0);
   const quotesRef = useRef<CheckoutQuoteResponse | null>(null);
-  const selectedQuoteByGroupRef = useRef<Record<string, string>>({});
   const jurgensDeliveryScheduleRef =
     useRef<CheckoutDeliverySchedule | null>(null);
   const trackedBeginCheckoutSignaturesRef = useRef(new Set<string>());
@@ -359,10 +387,13 @@ export function CheckoutExperience({
   );
 
   useEffect(() => {
+    stepPanelRef.current?.focus();
+  }, [checkoutStep]);
+
+  useEffect(() => {
     quotesRef.current = quotes;
-    selectedQuoteByGroupRef.current = selectedQuoteByGroup;
     jurgensDeliveryScheduleRef.current = jurgensDeliverySchedule;
-  }, [jurgensDeliverySchedule, quotes, selectedQuoteByGroup]);
+  }, [jurgensDeliverySchedule, quotes]);
 
   const checkoutItems = useMemo(() => toValidationItems(cartItems), [cartItems]);
   const requestedQuantityByVariantId = useMemo(
@@ -420,6 +451,8 @@ export function CheckoutExperience({
 
       selections.push({
         amountZar: option.amountZar,
+        deliveryInformation: option.deliveryInformation,
+        displayLabel: getShippingChargeLabel(group.groupKey),
         groupKey: group.groupKey,
         label: option.label,
         provider: option.provider,
@@ -455,6 +488,9 @@ export function CheckoutExperience({
     }, 0) ?? 0;
   const subtotal = cart?.subtotalZar ?? 0;
   const grandTotal = subtotal + shippingTotal;
+  const selectedProductCount =
+    cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
+  const checkoutStepIndex = CHECKOUT_STEPS.indexOf(checkoutStep);
   const allGroupsAvailable = Boolean(
     quotes &&
       quotes.groups.length > 0 &&
@@ -483,7 +519,6 @@ export function CheckoutExperience({
     : null;
   const jurgensScheduleIsValid =
     !jurgensDeliverySchedule || Boolean(selectedJurgensScheduleOption);
-  const hasFreeShipping = allGroupsAvailable && shippingTotal === 0;
   const normalizedCustomerPhone = normalizePhoneNumber(customer.phone, {
     defaultCountryCode: phoneCountryCode,
   });
@@ -534,18 +569,30 @@ export function CheckoutExperience({
       customer.email.includes("@") &&
       normalizedCustomerPhone,
   );
+  const normalizedBillingVatNumber = billingVatNumber.replace(/\s+/g, "");
+  const billingVatNumberValid =
+    !normalizedBillingVatNumber || /^\d{10}$/.test(normalizedBillingVatNumber);
   const billingComplete = Boolean(
     !useBusinessBilling ||
       (billingBusinessName.trim().length >= 2 &&
+        billingVatNumberValid &&
         (billingSameAsDelivery || isAddressComplete(billingAddress))),
   );
+  const addressStepReady = isCheckoutAddressStepReady({
+    addressBookChoiceComplete,
+    addressComplete: isAddressComplete(address),
+    customerComplete,
+  });
+  const shippingStepReady = isCheckoutShippingStepReady({
+    allGroupsAvailable,
+    hasQuoteError: Boolean(quoteError),
+    isLoadingQuotes,
+    scheduleValid: jurgensScheduleIsValid,
+  });
   const canCreateOrder =
-    allGroupsAvailable &&
-    customerComplete &&
+    shippingStepReady &&
+    addressStepReady &&
     billingComplete &&
-    isAddressComplete(address) &&
-    jurgensScheduleIsValid &&
-    addressBookChoiceComplete &&
     hasAcceptedPolicies &&
     !cartReviewRequired &&
     !isLoadingQuotes &&
@@ -612,7 +659,6 @@ export function CheckoutExperience({
     abortCheckoutRequest(quoteAbortControllerRef.current);
     quoteAbortControllerRef.current = null;
     quotesRef.current = null;
-    selectedQuoteByGroupRef.current = {};
     jurgensDeliveryScheduleRef.current = null;
     setIsLoadingQuotes(false);
     setQuoteError(null);
@@ -621,12 +667,19 @@ export function CheckoutExperience({
     setJurgensDeliverySchedule(null);
   }
 
+  function invalidateDeliverySelection() {
+    resetDeliverySelection();
+    setCheckoutStep("address");
+    setFurthestCheckoutStep(0);
+    setStepError(null);
+  }
+
   function updateAddress(
     field: keyof CheckoutDeliveryAddress,
     value: string,
   ) {
     setAddress((current) => ({ ...current, [field]: value }));
-    resetDeliverySelection();
+    invalidateDeliverySelection();
   }
 
   function updateBillingAddress(
@@ -653,7 +706,7 @@ export function CheckoutExperience({
     setSaveAddressToBook(false);
     setAddressLabel(savedAddress.label);
     setMakeDefaultAddress(savedAddress.isDefault);
-    resetDeliverySelection();
+    invalidateDeliverySelection();
   }
 
   function selectDifferentAddress() {
@@ -662,7 +715,7 @@ export function CheckoutExperience({
     setSaveAddressToBook(false);
     setAddressLabel("Home");
     setMakeDefaultAddress(initialAddresses.length === 0);
-    resetDeliverySelection();
+    invalidateDeliverySelection();
   }
 
   const requestDeliveryQuotes = useCallback(async ({
@@ -671,13 +724,11 @@ export function CheckoutExperience({
     preserveSelections?: boolean;
   } = {}) => {
     if (!quoteRequestBody) {
-      return;
+      return false;
     }
 
     const requestId = quoteRequestIdRef.current + 1;
     quoteRequestIdRef.current = requestId;
-    const previousQuotes = quotesRef.current;
-    const previousSelections = selectedQuoteByGroupRef.current;
     const previousSchedule = jurgensDeliveryScheduleRef.current;
 
     abortCheckoutRequest(quoteAbortControllerRef.current);
@@ -688,7 +739,6 @@ export function CheckoutExperience({
 
     if (!preserveSelections) {
       quotesRef.current = null;
-      selectedQuoteByGroupRef.current = {};
       jurgensDeliveryScheduleRef.current = null;
       setQuotes(null);
       setSelectedQuoteByGroup({});
@@ -715,36 +765,18 @@ export function CheckoutExperience({
         abortController.signal.aborted ||
         requestId !== quoteRequestIdRef.current
       ) {
-        return;
+        return false;
       }
 
       const nextSelections = Object.fromEntries(
         payload.groups.flatMap((group) => {
-          let nextQuoteId: string | undefined;
+          const automaticOption = getCheapestCheckoutShippingOption(
+            group.options,
+          );
 
-          if (preserveSelections && previousQuotes) {
-            const previousGroup = previousQuotes.groups.find(
-              (candidate) => candidate.groupKey === group.groupKey,
-            );
-            const previousOption = previousGroup?.options.find(
-              (candidate) =>
-                candidate.quoteId === previousSelections[group.groupKey],
-            );
-            const matchingOption = previousOption
-              ? group.options.find(
-                  (candidate) =>
-                    candidate.provider === previousOption.provider &&
-                    candidate.serviceLevel === previousOption.serviceLevel &&
-                    candidate.label === previousOption.label,
-                )
-              : null;
-
-            nextQuoteId = matchingOption?.quoteId;
-          }
-
-          nextQuoteId ??= group.options[0]?.quoteId;
-
-          return nextQuoteId ? [[group.groupKey, nextQuoteId]] : [];
+          return automaticOption
+            ? [[group.groupKey, automaticOption.quoteId]]
+            : [];
         }),
       );
       const nextSchedule =
@@ -759,21 +791,20 @@ export function CheckoutExperience({
           : null;
 
       quotesRef.current = payload;
-      selectedQuoteByGroupRef.current = nextSelections;
       jurgensDeliveryScheduleRef.current = nextSchedule;
       setQuotes(payload);
       setSelectedQuoteByGroup(nextSelections);
       setJurgensDeliverySchedule(nextSchedule);
+      return true;
     } catch (caughtError) {
       if (
         abortController.signal.aborted ||
         requestId !== quoteRequestIdRef.current
       ) {
-        return;
+        return false;
       }
 
       quotesRef.current = null;
-      selectedQuoteByGroupRef.current = {};
       jurgensDeliveryScheduleRef.current = null;
       setQuotes(null);
       setSelectedQuoteByGroup({});
@@ -783,6 +814,9 @@ export function CheckoutExperience({
           ? caughtError.message
           : "Delivery rates could not be calculated.",
       );
+      setCheckoutStep("shipping");
+      setFurthestCheckoutStep(1);
+      return false;
     } finally {
       if (
         !abortController.signal.aborted &&
@@ -794,24 +828,62 @@ export function CheckoutExperience({
     }
   }, [quoteRequestBody]);
 
-  useEffect(() => {
-    if (!quoteRequestBody) {
+  async function continueToShipping() {
+    setError(null);
+
+    if (!addressStepReady) {
+      setStepError(
+        "Complete the required contact and delivery address fields before continuing.",
+      );
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      void requestDeliveryQuotes();
-    }, 600);
+    setStepError(null);
+    setCheckoutStep("shipping");
+    setFurthestCheckoutStep((current) => Math.max(current, 1));
 
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    quoteRefreshNonce,
-    quoteRequestBody,
-    requestDeliveryQuotes,
-  ]);
+    await requestDeliveryQuotes({
+      preserveSelections: Boolean(quotesRef.current),
+    });
+  }
+
+  function continueToPayment() {
+    if (!shippingStepReady) {
+      return;
+    }
+
+    setStepError(null);
+    setError(null);
+    setCheckoutStep("payment");
+    setFurthestCheckoutStep(2);
+  }
+
+  function visitCheckoutStep(step: CheckoutStep) {
+    const stepIndex = CHECKOUT_STEPS.indexOf(step);
+
+    if (stepIndex > furthestCheckoutStep) {
+      return;
+    }
+
+    if (step !== "address" && !addressStepReady) {
+      return;
+    }
+
+    if (step === "payment" && !shippingStepReady) {
+      return;
+    }
+
+    setStepError(null);
+    setError(null);
+    setCheckoutStep(step);
+  }
 
   useEffect(() => {
-    if (!quoteRequestBody || !quotes?.expiresAt) {
+    if (
+      checkoutStep === "address" ||
+      !quoteRequestBody ||
+      !quotes?.expiresAt
+    ) {
       return;
     }
 
@@ -827,10 +899,19 @@ export function CheckoutExperience({
     );
 
     return () => window.clearTimeout(timeoutId);
-  }, [quoteRequestBody, quotes?.expiresAt, requestDeliveryQuotes]);
+  }, [
+    checkoutStep,
+    quoteRequestBody,
+    quotes?.expiresAt,
+    requestDeliveryQuotes,
+  ]);
 
   useEffect(() => {
-    if (!quoteRequestBody || !jurgensSchedulePolicyChangeAt) {
+    if (
+      checkoutStep === "address" ||
+      !quoteRequestBody ||
+      !jurgensSchedulePolicyChangeAt
+    ) {
       return;
     }
 
@@ -847,13 +928,19 @@ export function CheckoutExperience({
 
     return () => window.clearTimeout(timeoutId);
   }, [
+    checkoutStep,
     jurgensSchedulePolicyChangeAt,
     quoteRequestBody,
     requestDeliveryQuotes,
   ]);
 
   async function startHostedCheckout() {
-    if (!canCreateOrder || !quotes || !normalizedCustomerPhone) {
+    if (
+      checkoutStep !== "payment" ||
+      !canCreateOrder ||
+      !quotes ||
+      !normalizedCustomerPhone
+    ) {
       return;
     }
 
@@ -994,12 +1081,78 @@ export function CheckoutExperience({
   return (
     <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       <div className="grid min-w-0 gap-4">
+        <nav
+          aria-label="Checkout progress"
+          className="border-y border-[#e8e8e2] bg-white px-2 py-2 dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-5 sm:py-3"
+        >
+          <ol className="grid grid-cols-3 gap-1 sm:gap-2">
+            {CHECKOUT_STEPS.map((step, index) => {
+              const isCurrent = checkoutStep === step;
+              const canVisit = index <= furthestCheckoutStep;
+
+              return (
+                <li className="min-w-0" key={step}>
+                  <button
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={cn(
+                      "flex min-h-10 w-full min-w-0 items-center justify-center gap-1 rounded-md px-1 py-1.5 text-center transition sm:min-h-11 sm:justify-start sm:gap-2 sm:px-3 sm:py-2 sm:text-left",
+                      isCurrent
+                        ? "bg-[#fff1eb] text-[#b93809] dark:bg-[#ff5a1f]/12 dark:text-[#ff8a60]"
+                        : canVisit
+                          ? "text-[#555550] hover:bg-[#f7f7f2] dark:text-[#c8c8c0] dark:hover:bg-white/[0.04]"
+                          : "cursor-not-allowed text-[#aaa9a3] dark:text-[#666660]",
+                    )}
+                    disabled={!canVisit}
+                    onClick={() => visitCheckoutStep(step)}
+                    type="button"
+                  >
+                    <span
+                      className={cn(
+                        "grid size-5 shrink-0 place-items-center rounded-full border text-[9px] font-black sm:size-6 sm:text-[10px]",
+                        isCurrent
+                          ? "border-[#ff5a1f] bg-[#ff5a1f] text-white"
+                          : index < checkoutStepIndex
+                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            : "border-[#d8d8d1] bg-white dark:border-white/15 dark:bg-white/[0.04]",
+                      )}
+                    >
+                      {index < checkoutStepIndex ? (
+                        <CheckCircle2Icon className="size-3.5" />
+                      ) : (
+                        index + 1
+                      )}
+                    </span>
+                    <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-normal sm:text-xs sm:tracking-wide">
+                      {checkoutStepLabels[step]}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
+
         <section className="border-y border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border">
-          <div className="flex items-center gap-2 border-b border-[#e8e8e2] px-4 py-3 dark:border-white/10">
-            <PackageCheckIcon className="size-4 text-[#ff5a1f]" />
-            <h2 className="text-sm font-black uppercase">Selected products</h2>
-          </div>
-          <div className="divide-y divide-[#e8e8e2] dark:divide-white/10">
+          <details
+            className="group"
+            open={checkoutStep === "payment" ? true : undefined}
+          >
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/30 [&::-webkit-details-marker]:hidden">
+              <PackageCheckIcon className="size-4 shrink-0 text-[#ff5a1f]" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-black uppercase sm:text-sm">
+                  Order summary
+                </span>
+                <span className="mt-0.5 block text-[10px] text-[#777770] dark:text-[#aaa9a1]">
+                  {selectedProductCount} {selectedProductCount === 1 ? "item" : "items"} in your order
+                </span>
+              </span>
+              <strong className="shrink-0 text-xs tabular-nums sm:text-sm">
+                {formatZar(subtotal)}
+              </strong>
+              <ChevronDownIcon className="size-4 shrink-0 text-[#777770] transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="divide-y divide-[#e8e8e2] border-t border-[#e8e8e2] dark:divide-white/10 dark:border-white/10">
             {cart.items.map((item) => (
               <div
                 className="grid grid-cols-[3.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-3 sm:grid-cols-[3.75rem_minmax(0,1fr)_auto] sm:px-4"
@@ -1051,14 +1204,28 @@ export function CheckoutExperience({
                 </p>
               </div>
             ))}
-          </div>
+            </div>
+          </details>
         </section>
 
-        <section className="border-y border-[#e8e8e2] bg-white px-3 py-4 dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-5 sm:py-5">
+        <div
+          className="grid min-w-0 gap-4 outline-none"
+          ref={stepPanelRef}
+          tabIndex={-1}
+        >
+        {checkoutStep === "address" ? (
+        <form
+          className="border-y border-[#e8e8e2] bg-white px-3 py-4 dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-5 sm:py-5"
+          id="checkout-address-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void continueToShipping();
+          }}
+        >
           <div className="flex items-center gap-2">
             <MapPinIcon className="size-4 text-[#ff5a1f]" />
             <h2 className="text-sm font-black uppercase">
-              Contact and delivery
+              Contact and delivery address
             </h2>
           </div>
 
@@ -1361,50 +1528,162 @@ export function CheckoutExperience({
             </div>
           ) : null}
 
-          <div
-            aria-live="polite"
-            className={cn(
-              "mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-md border px-3 py-2 text-center text-xs font-semibold",
-              quoteError
-                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
-                : quotes
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300"
-                  : "border-[#e3e3dc] bg-[#f7f7f2] text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]",
-            )}
-          >
-            {isLoadingQuotes ? (
-              <>
-                <LoaderCircleIcon className="size-4 animate-spin text-[#ff5a1f]" />
-                Updating delivery options…
-              </>
-            ) : quoteError ? (
-              <>
-                <AlertCircleIcon className="size-4 shrink-0" />
-                <span>{quoteError}</span>
+          {stepError ? (
+            <p
+              className="mt-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-xs leading-5 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300"
+              role="alert"
+            >
+              <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
+              {stepError}
+            </p>
+          ) : null}
+        </form>
+        ) : null}
+
+        {checkoutStep === "payment" ? (
+        <>
+        <section className="border-y border-[#e8e8e2] bg-white px-3 py-4 dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-5 sm:py-5">
+          <div className="flex items-center gap-2">
+            <CheckCircle2Icon className="size-4 text-emerald-600" />
+            <h2 className="text-sm font-black uppercase">Review and confirm</h2>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
+            Confirm your contact, delivery, shipping, and billing details before
+            completing payment.
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <article className="rounded-md border border-[#e4e4de] bg-[#f7f7f2] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035] sm:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xs font-black uppercase">
+                  Contact and delivery
+                </h3>
                 <button
-                  className="shrink-0 rounded-md border border-current px-2 py-1 text-[10px] font-black uppercase transition hover:bg-red-100 dark:hover:bg-red-500/10"
-                  onClick={() => setQuoteRefreshNonce((current) => current + 1)}
+                  className="text-[10px] font-black uppercase text-[#d9430e] underline underline-offset-2 hover:text-[#ff5a1f] dark:text-[#ff8a60]"
+                  onClick={() => visitCheckoutStep("address")}
                   type="button"
                 >
-                  Try again
+                  Edit
                 </button>
-              </>
-            ) : quotes ? (
-              <>
-                <CheckCircle2Icon className="size-4 text-emerald-600" />
-                Delivery options updated automatically.
-              </>
-            ) : isAddressComplete(address) ? (
-              <>
-                <TruckIcon className="size-4" />
-                Delivery options will update automatically.
-              </>
-            ) : (
-              <>
-                <TruckIcon className="size-4" />
-                Complete the required address fields to see delivery options.
-              </>
-            )}
+              </div>
+              <div className="mt-3 grid gap-3 text-xs leading-5 text-[#555550] dark:text-[#c8c8c0] sm:grid-cols-2">
+                <div>
+                  <p className="font-bold text-[#080808] dark:text-white">
+                    {customer.name}
+                  </p>
+                  <p>{customer.email}</p>
+                  <p>{normalizedCustomerPhone ?? customer.phone}</p>
+                </div>
+                <address className="not-italic">
+                  <p className="font-bold text-[#080808] dark:text-white">
+                    Delivery address
+                  </p>
+                  <p>{address.addressLine1}</p>
+                  {address.addressLine2 ? <p>{address.addressLine2}</p> : null}
+                  <p>
+                    {[address.suburb, address.city].filter(Boolean).join(", ")}
+                  </p>
+                  <p>
+                    {address.province} {address.postalCode}
+                  </p>
+                  <p>South Africa</p>
+                </address>
+              </div>
+            </article>
+
+            <article className="rounded-md border border-[#e4e4de] bg-[#f7f7f2] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035]">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xs font-black uppercase">Shipping</h3>
+                <button
+                  className="text-[10px] font-black uppercase text-[#d9430e] underline underline-offset-2 hover:text-[#ff5a1f] dark:text-[#ff8a60]"
+                  onClick={() => visitCheckoutStep("shipping")}
+                  type="button"
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs leading-5 text-[#555550] dark:text-[#c8c8c0]">
+                {selectedShippingOptions?.map((option) => (
+                  <div
+                    className="flex items-start justify-between gap-3"
+                    key={option.groupKey}
+                  >
+                    <span>
+                      <strong className="block text-[#080808] dark:text-white">
+                        {option.displayLabel}
+                      </strong>
+                      <span className="block text-[10px] leading-4">
+                        {option.label}
+                      </span>
+                      {option.deliveryInformation ? (
+                        <span className="text-[10px] leading-4">
+                          {option.deliveryInformation}
+                        </span>
+                      ) : null}
+                    </span>
+                    <strong className="shrink-0 tabular-nums text-[#080808] dark:text-white">
+                      {option.amountZar === 0
+                        ? "FREE"
+                        : formatZar(option.amountZar)}
+                    </strong>
+                  </div>
+                ))}
+                {jurgensDeliverySchedule ? (
+                  <div className="border-t border-[#dfdfd8] pt-2 dark:border-white/10">
+                    <p>
+                      Preferred date:{" "}
+                      <strong className="text-[#080808] dark:text-white">
+                        {formatPreferredDeliveryDate(
+                          jurgensDeliverySchedule.date,
+                        )}
+                      </strong>
+                    </p>
+                    {jurgensDeliverySchedule.deliveryInstructions ? (
+                      <p className="mt-1">
+                        Notes: {jurgensDeliverySchedule.deliveryInstructions}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </article>
+
+            <article className="rounded-md border border-[#e4e4de] bg-[#f7f7f2] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035]">
+              <h3 className="text-xs font-black uppercase">Billing</h3>
+              <div className="mt-3 text-xs leading-5 text-[#555550] dark:text-[#c8c8c0]">
+                {useBusinessBilling ? (
+                  <>
+                    <p className="font-bold text-[#080808] dark:text-white">
+                      {billingBusinessName}
+                    </p>
+                    {normalizedBillingVatNumber ? (
+                      <p>VAT number: {normalizedBillingVatNumber}</p>
+                    ) : null}
+                    <p>
+                      {billingSameAsDelivery
+                        ? "Billing address matches the delivery address."
+                        : [
+                            billingAddress.addressLine1,
+                            billingAddress.addressLine2,
+                            billingAddress.suburb,
+                            billingAddress.city,
+                            billingAddress.province,
+                            billingAddress.postalCode,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold text-[#080808] dark:text-white">
+                      {customer.name}
+                    </p>
+                    <p>VAT invoice using the delivery address.</p>
+                  </>
+                )}
+              </div>
+            </article>
           </div>
         </section>
 
@@ -1480,6 +1759,16 @@ export function CheckoutExperience({
                       Customer VAT number (optional)
                     </Label>
                     <Input
+                      aria-describedby={
+                        billingVatNumber && !billingVatNumberValid
+                          ? "checkout-billing-vat-number-error"
+                          : undefined
+                      }
+                      aria-invalid={
+                        billingVatNumber && !billingVatNumberValid
+                          ? true
+                          : undefined
+                      }
                       className={fieldClass}
                       id="checkout-billing-vat-number"
                       maxLength={80}
@@ -1489,6 +1778,14 @@ export function CheckoutExperience({
                       placeholder="e.g. 4XXXXXXXXX"
                       value={billingVatNumber}
                     />
+                    {billingVatNumber && !billingVatNumberValid ? (
+                      <span
+                        className="text-[10px] leading-4 text-red-600 dark:text-red-300"
+                        id="checkout-billing-vat-number-error"
+                      >
+                        Enter a valid 10-digit South African VAT number.
+                      </span>
+                    ) : null}
                   </label>
 
                   <label className="flex cursor-pointer items-center gap-2 text-xs font-bold sm:col-span-2">
@@ -1620,102 +1917,127 @@ export function CheckoutExperience({
             </div>
           </details>
         </section>
+        </>
+        ) : null}
 
-        {quotes ? (
+        {checkoutStep === "shipping" ? (
           <section className="border-y border-[#e8e8e2] bg-white px-3 py-4 dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-5 sm:py-5">
             <div className="flex items-center gap-2">
               <TruckIcon className="size-4 text-[#ff5a1f]" />
-              <h2 className="text-sm font-black uppercase">Delivery options</h2>
+              <h2 className="text-sm font-black uppercase">Shipping breakdown</h2>
             </div>
+            <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
+              Shipping is selected automatically. We apply Jurgens Energy
+              delivery where applicable and the cheapest available Bob Go
+              courier rate.
+            </p>
+            {isLoadingQuotes ? (
+              <div
+                aria-live="polite"
+                className="mt-4 flex min-h-24 items-center justify-center gap-2 rounded-md border border-[#e3e3dc] bg-[#f7f7f2] px-4 text-sm font-semibold text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]"
+              >
+                <LoaderCircleIcon className="size-5 animate-spin text-[#ff5a1f]" />
+                Calculating shipping charges…
+              </div>
+            ) : quoteError ? (
+              <div
+                className="mt-4 flex flex-col items-start gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-4 text-sm leading-5 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 sm:flex-row sm:items-center sm:justify-between"
+                role="alert"
+              >
+                <span className="flex items-start gap-2">
+                  <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
+                  {quoteError}
+                </span>
+                <Button
+                  className="h-11 w-full border-red-300 bg-white text-red-700 hover:bg-red-100 sm:w-auto dark:border-red-500/30 dark:bg-transparent dark:text-red-300 dark:hover:bg-red-500/10"
+                  onClick={() => void requestDeliveryQuotes()}
+                  type="button"
+                  variant="outline"
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : quotes ? (
             <div className="mt-4 grid gap-5">
-              {quotes.groups.map((group) => (
-                <fieldset className="min-w-0" key={group.groupKey}>
-                  <legend className="text-xs font-bold">{group.label}</legend>
-                  {group.options.length > 0 ? (
-                    <div className="mt-2 grid gap-2">
-                      {group.options.map((option) => {
-                        const checked =
-                          selectedQuoteByGroup[group.groupKey] === option.quoteId;
-                        const isFree = option.amountZar === 0;
+              {quotes.groups.map((group) => {
+                const selectedQuoteId = selectedQuoteByGroup[group.groupKey];
+                const option = group.options.find(
+                  (candidate) => candidate.quoteId === selectedQuoteId,
+                );
 
-                        return (
-                          <label
-                            className={cn(
-                              "grid cursor-pointer grid-cols-[1.1rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md border px-3 py-3 transition",
-                              checked
-                                ? isFree
-                                  ? "border-emerald-400 bg-emerald-50 dark:border-emerald-500/40 dark:bg-emerald-500/10"
-                                  : "border-[#ff5a1f] bg-[#fff8f4] dark:bg-[#ff5a1f]/8"
-                                : "border-[#deded7] hover:border-[#ff5a1f]/60 dark:border-white/12",
-                            )}
-                            key={option.quoteId}
-                          >
-                            <input
-                              checked={checked}
-                              className={cn(
-                                "size-4",
-                                isFree
-                                  ? "accent-emerald-600"
-                                  : "accent-[#ff5a1f]",
-                              )}
-                              name={`delivery-${group.groupKey}`}
-                              onChange={() =>
-                                setSelectedQuoteByGroup((current) => ({
-                                  ...current,
-                                  [group.groupKey]: option.quoteId,
-                                }))
-                              }
-                              type="radio"
-                              value={option.quoteId}
-                            />
-                            <span className="min-w-0">
-                              <span className="block text-[12px] font-bold sm:text-sm">
-                                {option.label}
-                              </span>
-                              {option.deliveryInformation ? (
-                                <span className="mt-0.5 block text-[10px] leading-4 text-[#777770] dark:text-[#aaa9a1]">
-                                  {option.deliveryInformation}
-                                </span>
-                              ) : null}
+                return (
+                  <article className="min-w-0" key={group.groupKey}>
+                    {option ? (
+                      <div
+                        className={cn(
+                          "grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-md border px-3 py-3",
+                          option.amountZar === 0
+                            ? "border-emerald-300 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                            : "border-[#deded7] bg-[#f7f7f2] dark:border-white/12 dark:bg-white/[0.035]",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid size-8 place-items-center rounded-full",
+                            option.amountZar === 0
+                              ? "bg-emerald-600 text-white"
+                              : "bg-[#ff5a1f]/10 text-[#ff5a1f]",
+                          )}
+                        >
+                          <CheckCircle2Icon className="size-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <strong className="block text-[12px] font-bold sm:text-sm">
+                            {getShippingChargeLabel(group.groupKey)}
+                          </strong>
+                          <span className="mt-0.5 block text-[10px] font-semibold leading-4 text-[#666660] dark:text-[#aaa9a1]">
+                            {option.label}
+                            {group.groupKey === "courier"
+                              ? " · Cheapest available Bob Go rate"
+                              : " · Applied automatically"}
+                          </span>
+                          {option.deliveryInformation ? (
+                            <span className="mt-0.5 block text-[10px] leading-4 text-[#777770] dark:text-[#aaa9a1]">
+                              {option.deliveryInformation}
                             </span>
-                            <strong
-                              className={cn(
-                                "text-[12px] tabular-nums sm:text-sm",
-                                isFree &&
-                                  "text-emerald-700 dark:text-emerald-300",
-                              )}
-                            >
-                              {isFree ? "FREE" : formatZar(option.amountZar)}
-                            </strong>
-                          </label>
-                        );
-                      })}
-                      {group.options.some(
-                        (option) =>
-                          option.quoteId ===
-                            selectedQuoteByGroup[group.groupKey] &&
-                          option.amountZar === 0,
-                      ) ? (
-                        <p className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[11px] font-semibold leading-4 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300">
-                          <CheckCircle2Icon className="mt-0.5 size-3.5 shrink-0" />
-                          {group.groupKey === "jurgens"
-                            ? "Free Jurgens Energy delivery applies to this order."
-                            : `${group.label} is free for this order.`}
+                          ) : null}
+                        </span>
+                        <strong
+                          className={cn(
+                            "text-[12px] tabular-nums sm:text-sm",
+                            option.amountZar === 0 &&
+                              "text-emerald-700 dark:text-emerald-300",
+                          )}
+                        >
+                          {option.amountZar === 0
+                            ? "FREE"
+                            : formatZar(option.amountZar)}
+                        </strong>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs font-bold">
+                          {getShippingChargeLabel(group.groupKey)}
                         </p>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-[11px] leading-4 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
-                      {group.unavailableReason ?? "Delivery is unavailable."}
-                    </p>
-                  )}
-                </fieldset>
-              ))}
+                        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-[11px] leading-4 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                          {group.unavailableReason ?? "Delivery is unavailable."}
+                        </p>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
+            ) : (
+              <div className="mt-4 rounded-md border border-[#e3e3dc] bg-[#f7f7f2] px-4 py-4 text-sm text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]">
+                Shipping charges have not been calculated yet.
+              </div>
+            )}
           </section>
         ) : null}
 
-        {hasJurgensFulfilledProducts &&
+        {checkoutStep === "shipping" &&
+        hasJurgensFulfilledProducts &&
         jurgensSchedulingGroup?.scheduling &&
         jurgensScheduleOptions.length > 0 ? (
           <section className="border-y border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border">
@@ -1859,124 +2181,207 @@ export function CheckoutExperience({
           </section>
         ) : null}
 
-        {error ? (
+        {checkoutStep === "shipping" ? (
+          <div className="flex border-y border-[#e8e8e2] bg-white px-3 py-4 dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-5">
+            <Button
+              className="h-12 w-full sm:w-auto"
+              onClick={() => visitCheckoutStep("address")}
+              type="button"
+              variant="outline"
+            >
+              <ChevronLeftIcon className="size-4" />
+              Back to address
+            </Button>
+          </div>
+        ) : null}
+
+        {checkoutStep === "payment" ? (
+          <Button
+            className="h-12 w-full sm:w-fit"
+            onClick={() => visitCheckoutStep("shipping")}
+            type="button"
+            variant="outline"
+          >
+            <ChevronLeftIcon className="size-4" />
+            Back to shipping
+          </Button>
+        ) : null}
+
+        {checkoutStep === "payment" && error ? (
           <div className="flex items-start gap-2 border-y border-red-200 bg-red-50 px-4 py-3 text-xs leading-5 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 sm:rounded-md sm:border">
             <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
             {error}
           </div>
         ) : null}
+        </div>
       </div>
 
       <aside className="overflow-hidden border-y border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border lg:sticky lg:top-36">
         <div className="border-b border-[#e8e8e2] px-4 py-3 dark:border-white/10 sm:px-5">
-          <h2 className="text-sm font-black uppercase">Payment summary</h2>
+          <h2 className="text-sm font-black uppercase">Order summary</h2>
         </div>
         <div className="grid gap-3 px-4 py-4 text-sm sm:px-5 sm:py-5">
           <div className="flex justify-between gap-4 text-[#666660] dark:text-[#aaa9a1]">
             <span>Products</span>
             <span className="tabular-nums">{formatZar(subtotal)}</span>
           </div>
-          <div className="flex justify-between gap-4 text-[#666660] dark:text-[#aaa9a1]">
-            <span>Shipping</span>
-            <span
-              className={cn(
-                "tabular-nums",
-                hasFreeShipping &&
-                  "font-black text-emerald-700 dark:text-emerald-300",
-              )}
-            >
-              {isLoadingQuotes
-                ? "Updating…"
-                : hasFreeShipping
-                ? "FREE"
-                : allGroupsAvailable
-                  ? formatZar(shippingTotal)
-                  : quotes
+          {selectedShippingOptions?.length ? (
+            selectedShippingOptions.map((option) => (
+              <div
+                className="flex justify-between gap-4 text-[#666660] dark:text-[#aaa9a1]"
+                key={option.groupKey}
+              >
+                <span>{option.displayLabel}</span>
+                <span
+                  className={cn(
+                    "shrink-0 tabular-nums",
+                    option.amountZar === 0 &&
+                      "font-black text-emerald-700 dark:text-emerald-300",
+                  )}
+                >
+                  {option.amountZar === 0
+                    ? "FREE"
+                    : formatZar(option.amountZar)}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-between gap-4 text-[#666660] dark:text-[#aaa9a1]">
+              <span>Shipping</span>
+              <span className="tabular-nums">
+                {isLoadingQuotes
+                  ? "Calculating…"
+                  : quotes || quoteError
                     ? "Unavailable"
-                    : quoteError
-                      ? "Unavailable"
-                      : "Awaiting address"}
-            </span>
-          </div>
+                    : checkoutStep === "address"
+                      ? "Calculated next"
+                      : "Not calculated"}
+              </span>
+            </div>
+          )}
           <div className="mt-1 flex items-end justify-between gap-4 border-t border-[#e8e8e2] pt-4 dark:border-white/10">
-            <span className="font-bold">Total</span>
+            <span className="font-bold">
+              {allGroupsAvailable ? "Total" : "Subtotal"}
+            </span>
             <span className="text-xl font-black tabular-nums">
               {formatZar(grandTotal)}
             </span>
           </div>
-          <div className="mt-2 grid grid-cols-[1.1rem_minmax(0,1fr)] items-start gap-2.5 rounded-md border border-[#e4e4de] bg-[#f7f7f2] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035]">
-            <input
-              aria-required="true"
-              checked={hasAcceptedPolicies}
-              className="mt-0.5 size-4 accent-[#ff5a1f]"
-              id="checkout-policy-acceptance"
-              onChange={(event) => setHasAcceptedPolicies(event.target.checked)}
-              type="checkbox"
-            />
-            <label
-              className="text-[11px] leading-5 text-[#555550] dark:text-[#c8c8c0]"
-              htmlFor="checkout-policy-acceptance"
-            >
-              I agree to the{" "}
-              <Link
-                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
-                href="/terms-and-conditions"
-                rel="noreferrer"
-                target="_blank"
+          {checkoutStep === "payment" ? (
+            <>
+              <div className="mt-2 grid grid-cols-[1.1rem_minmax(0,1fr)] items-start gap-2.5 rounded-md border border-[#e4e4de] bg-[#f7f7f2] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035]">
+                <input
+                  aria-required="true"
+                  checked={hasAcceptedPolicies}
+                  className="mt-0.5 size-4 accent-[#ff5a1f]"
+                  id="checkout-policy-acceptance"
+                  onChange={(event) =>
+                    setHasAcceptedPolicies(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <label
+                  className="text-[11px] leading-5 text-[#555550] dark:text-[#c8c8c0]"
+                  htmlFor="checkout-policy-acceptance"
+                >
+                  I agree to the{" "}
+                  <Link
+                    className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                    href="/terms-and-conditions"
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Terms &amp; Conditions
+                  </Link>{" "}
+                  and acknowledge the{" "}
+                  <Link
+                    className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                    href="/privacy-policy"
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Privacy Policy
+                  </Link>,{" "}
+                  <Link
+                    className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                    href="/returns-and-refunds"
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Returns &amp; Refunds Policy
+                  </Link>, and{" "}
+                  <Link
+                    className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
+                    href="/delivery-information"
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Shipping &amp; Delivery Policy
+                  </Link>
+                  .
+                </label>
+              </div>
+              <Button
+                aria-busy={isCreatingOrder}
+                className="mt-2 h-12 rounded-md bg-[#ff5a1f] text-sm font-bold text-white hover:bg-[#e84c15]"
+                disabled={!canCreateOrder}
+                onClick={() => void startHostedCheckout()}
+                type="button"
               >
-                Terms &amp; Conditions
-              </Link>{" "}
-              and acknowledge the{" "}
-              <Link
-                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
-                href="/privacy-policy"
-                rel="noreferrer"
-                target="_blank"
-              >
-                Privacy Policy
-              </Link>,{" "}
-              <Link
-                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
-                href="/returns-and-refunds"
-                rel="noreferrer"
-                target="_blank"
-              >
-                Returns &amp; Refunds Policy
-              </Link>, and{" "}
-              <Link
-                className="font-bold text-[#080808] underline decoration-[#ff5a1f]/50 underline-offset-2 hover:text-[#ff5a1f] dark:text-white"
-                href="/delivery-information"
-                rel="noreferrer"
-                target="_blank"
-              >
-                Shipping &amp; Delivery Policy
-              </Link>
-              .
-            </label>
-          </div>
-          <Button
-            className="mt-2 h-12 rounded-md bg-[#ff5a1f] text-sm font-bold text-white hover:bg-[#e84c15]"
-            disabled={!canCreateOrder}
-            onClick={() => void startHostedCheckout()}
-            type="button"
-          >
-            {isCreatingOrder ? (
-              <LoaderCircleIcon className="size-4 animate-spin" />
-            ) : (
-              <LockKeyholeIcon className="size-4" />
-            )}
-            Continue to PayFast
-          </Button>
-          <div className="mt-1 grid gap-2 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
-            <p className="flex items-center gap-2">
-              <CheckCircle2Icon className="size-3.5 text-emerald-600" />
-              VAT included in product prices.
-            </p>
-            <p className="flex items-center gap-2">
-              <LockKeyholeIcon className="size-3.5 text-[#ff5a1f]" />
-              Pay securely on PayFast hosted checkout.
-            </p>
-          </div>
+                {isCreatingOrder ? (
+                  <LoaderCircleIcon className="size-4 animate-spin" />
+                ) : (
+                  <LockKeyholeIcon className="size-4" />
+                )}
+                Complete payment
+              </Button>
+              <div className="mt-1 grid gap-2 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
+                <p className="flex items-center gap-2">
+                  <CheckCircle2Icon className="size-3.5 text-emerald-600" />
+                  VAT included in product prices.
+                </p>
+                <p className="flex items-center gap-2">
+                  <LockKeyholeIcon className="size-3.5 text-[#ff5a1f]" />
+                  Pay securely on PayFast hosted checkout.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 flex items-start gap-2 rounded-md border border-[#e4e4de] bg-[#f7f7f2] px-3 py-3 text-[11px] leading-5 text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]">
+                {checkoutStep === "address" ? (
+                  <MapPinIcon className="mt-0.5 size-3.5 shrink-0 text-[#ff5a1f]" />
+                ) : (
+                  <TruckIcon className="mt-0.5 size-3.5 shrink-0 text-[#ff5a1f]" />
+                )}
+                {checkoutStep === "address"
+                  ? "Enter your delivery address to calculate shipping."
+                  : shippingStepReady
+                    ? "Review the automatically calculated shipping charges, then continue to payment."
+                    : "Shipping must be calculated before you can continue to payment."}
+              </p>
+              {checkoutStep === "address" ? (
+                <Button
+                  className="mt-2 h-12 w-full rounded-md bg-[#ff5a1f] text-sm font-bold text-white hover:bg-[#e84c15]"
+                  form="checkout-address-form"
+                  type="submit"
+                >
+                  Continue to shipping
+                  <ChevronRightIcon className="size-4" />
+                </Button>
+              ) : (
+                <Button
+                  className="mt-2 h-12 w-full rounded-md bg-[#ff5a1f] text-sm font-bold text-white hover:bg-[#e84c15]"
+                  disabled={!shippingStepReady}
+                  onClick={continueToPayment}
+                  type="button"
+                >
+                  Continue to payment
+                  <ChevronRightIcon className="size-4" />
+                </Button>
+              )}
+            </>
+          )}
         </div>
       </aside>
     </div>

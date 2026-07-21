@@ -185,7 +185,7 @@ export function LpgSafetyPage() {
             <ContentSectionHeading
               description="A cylinder exchange is also a safety handover. The replacement and the empty cylinder both need to meet the applicable product and supplier requirements."
               eyebrow="Cylinder exchange"
-              title="Bring the right empty cylinder."
+              title="Have the right empty cylinder ready."
             />
             <div className="grid gap-3">
               {[

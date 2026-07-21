@@ -6,7 +6,7 @@ import {
   resolveCartLineExchangePolicy,
 } from "../src/modules/cart/exchange-requirements.ts";
 
-test("turns legacy checkbox copy into a neutral exchange notice", () => {
+test("turns legacy checkbox copy into a delivery handover notice", () => {
   assert.equal(
     getExchangeRequirementText({
       emptySize: "9kg",
@@ -14,7 +14,7 @@ test("turns legacy checkbox copy into a neutral exchange notice", () => {
         "I confirm I have a 9kg empty cylinder in acceptable condition to exchange on delivery.",
       quantity: 1,
     }),
-    "Bring a 9kg empty cylinder in acceptable condition for exchange when your order is delivered.",
+    "Supply us with your 9kg empty cylinder in acceptable condition when your order is delivered.",
   );
 });
 
@@ -33,7 +33,19 @@ test("keeps custom notice copy and updates generated copy for quantity", () => {
       fallbackText: "The cylinder must be safe to handle.",
       quantity: 2,
     }),
-    "Hand over 2 9kg empty cylinders in acceptable condition when your order is delivered.",
+    "Supply us with your 2 × 9kg empty cylinders in acceptable condition when your order is delivered.",
+  );
+});
+
+test("replaces older bring or hand-over copy with delivery-specific wording", () => {
+  assert.equal(
+    getExchangeRequirementText({
+      emptySize: "14kg",
+      fallbackText:
+        "Bring a 14kg empty cylinder in acceptable condition for exchange.",
+      quantity: 1,
+    }),
+    "Supply us with your 14kg empty cylinder in acceptable condition when your order is delivered.",
   );
 });
 

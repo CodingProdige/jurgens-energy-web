@@ -19,7 +19,6 @@ import {
   ShoppingCartIcon,
   TruckIcon,
   XIcon,
-  ZapIcon,
   ZoomInIcon,
 } from "lucide-react";
 
@@ -50,7 +49,9 @@ import type {
   MarketplaceProductDetail,
   MarketplaceVariant,
 } from "@/src/modules/marketplace/catalog";
+import { policyLinks } from "@/src/modules/marketplace/policies/links";
 import { isExchangeVariant } from "@/src/modules/marketplace/product-variant-presentation";
+import { parseProductDescription } from "@/src/modules/products/product-description";
 
 export type MarketplaceProductDetailView = Omit<
   MarketplaceProductDetail,
@@ -73,6 +74,10 @@ type VariantMarkdownDisplay = {
 
 const previouslyViewedLimit = 16;
 const previouslyViewedStorageKey = "jurgens-energy:previously-viewed-products";
+const productPolicyLinks = [
+  policyLinks.find((link) => link.kind === "delivery"),
+  policyLinks.find((link) => link.kind === "returns"),
+].filter((link): link is NonNullable<typeof link> => Boolean(link));
 
 const exchangeSteps = [
   {
@@ -251,6 +256,7 @@ export function ProductDetailExperience({
   const deliveryPromise = getDeliveryPromise(product.fulfillmentMode);
   const deliveryLabel = deliveryPromise.label;
   const deliveryDetail = deliveryPromise.detail;
+  const deliveryFeeNotice = deliveryPromise.feeNotice;
   const sizeLabel = getSizeLabel(selectedVariant?.title ?? product.title);
   const isSelectedVariantExchange = isExchangeVariant(selectedVariant);
 
@@ -285,6 +291,7 @@ export function ProductDetailExperience({
         <ProductBuyBox
           currencyContext={currencyContext}
           deliveryDetail={deliveryDetail}
+          deliveryFeeNotice={deliveryFeeNotice}
           deliveryLabel={deliveryLabel}
           product={product}
           quantity={quantity}
@@ -595,6 +602,7 @@ function ProductImageLightbox({
 function ProductBuyBox({
   currencyContext,
   deliveryDetail,
+  deliveryFeeNotice,
   deliveryLabel,
   product,
   quantity,
@@ -606,6 +614,7 @@ function ProductBuyBox({
 }: {
   currencyContext: CurrencyContext;
   deliveryDetail: string;
+  deliveryFeeNotice: string;
   deliveryLabel: string;
   product: MarketplaceProductDetailView;
   quantity: number;
@@ -724,6 +733,7 @@ function ProductBuyBox({
       <MobileProductPurchaseSummary
         currencyContext={currencyContext}
         deliveryDetail={deliveryDetail}
+        deliveryFeeNotice={deliveryFeeNotice}
         deliveryLabel={deliveryLabel}
         isInStock={selectedVariant?.inStock ?? product.inStock}
         onOpenOptions={() => setIsOptionsDialogOpen(true)}
@@ -759,11 +769,16 @@ function ProductBuyBox({
             markdown={selectedPriceMarkdown}
             price={selectedPrice}
           />
-          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold leading-5 text-slate-600 dark:text-zinc-300 sm:text-sm">
-            <span>VAT included</span>
-            <span className="text-slate-400">•</span>
-            <DeliveryDetailInline detail={deliveryDetail} />
-          </p>
+          <div className="mt-3 grid gap-1 text-xs font-semibold leading-5 text-slate-600 dark:text-zinc-300 sm:text-sm">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>VAT included</span>
+              <span className="text-slate-400">•</span>
+              <DeliveryDetailInline detail={deliveryDetail} />
+            </p>
+            <p className="text-[11px] leading-5 text-slate-500 dark:text-zinc-400 sm:text-xs">
+              {deliveryFeeNotice}
+            </p>
+          </div>
         </div>
 
         {product.shortDescription ? (
@@ -843,15 +858,8 @@ function ProductBuyBox({
         </button>
       </div>
 
-      <button
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#ff5a1f] bg-white px-4 text-[13px] font-black uppercase leading-none text-[#ff5a1f] transition hover:bg-[#fff3ec] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/20 disabled:cursor-not-allowed disabled:border-[#cfcfca] disabled:bg-[#f7f7f2] disabled:text-slate-400 disabled:hover:bg-[#f7f7f2] dark:bg-white/[0.04] dark:hover:bg-[#ff5a1f]/10 dark:disabled:border-white/10 dark:disabled:bg-white/[0.03] dark:disabled:text-zinc-500"
-        disabled={!canAddToCart}
-        onClick={() => handleAddToCart()}
-        type="button"
-      >
-        <ZapIcon className="size-4 shrink-0" />
-        <span className="leading-none">Buy Now</span>
-      </button>
+      <ProductPolicyLinks />
+
       </aside>
 
       <ProductOptionsDialog
@@ -859,6 +867,7 @@ function ProductBuyBox({
         canAddToCart={canAddToCart}
         currencyContext={currencyContext}
         deliveryDetail={deliveryDetail}
+        deliveryFeeNotice={deliveryFeeNotice}
         exchangeAcceptedReturnBrands={exchangeAcceptedReturnBrands}
         exchangeEmptySize={exchangeEmptySize}
         exchangeRequirementText={exchangeRequirementText}
@@ -892,6 +901,7 @@ function ProductBuyBox({
 function MobileProductPurchaseSummary({
   currencyContext,
   deliveryDetail,
+  deliveryFeeNotice,
   deliveryLabel,
   isInStock,
   onOpenOptions,
@@ -905,6 +915,7 @@ function MobileProductPurchaseSummary({
 }: {
   currencyContext: CurrencyContext;
   deliveryDetail: string;
+  deliveryFeeNotice: string;
   deliveryLabel: string;
   isInStock: boolean;
   onOpenOptions: () => void;
@@ -954,16 +965,23 @@ function MobileProductPurchaseSummary({
             markdown={selectedPriceMarkdown}
             price={selectedPrice}
           />
-          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-semibold leading-4 text-slate-600 dark:text-zinc-300">
-            <span>VAT included</span>
-            <span className="text-slate-400">•</span>
-            <DeliveryDetailInline detail={deliveryDetail} />
-          </p>
+          <div className="grid gap-1 text-[11px] font-semibold leading-4 text-slate-600 dark:text-zinc-300">
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              <span>VAT included</span>
+              <span className="text-slate-400">•</span>
+              <DeliveryDetailInline detail={deliveryDetail} />
+            </p>
+            <p className="text-[10px] leading-4 text-slate-500 dark:text-zinc-400">
+              {deliveryFeeNotice}
+            </p>
+          </div>
         </div>
 
         {shortDescription ? (
           <MobileExpandableDescription text={shortDescription} />
         ) : null}
+
+        <ProductPolicyLinks />
       </section>
 
       <ProductVariantSelector
@@ -1173,11 +1191,42 @@ function DeliveryDetailInline({ detail }: { detail: string }) {
   return <span>{detail}</span>;
 }
 
+function ProductPolicyLinks({ className }: { className?: string }) {
+  return (
+    <nav
+      aria-label="Product shipping and returns policies"
+      className={cn(
+        "grid grid-cols-2 gap-2 border-t border-[#ecece6] pt-2.5 dark:border-white/10",
+        className,
+      )}
+    >
+      {productPolicyLinks.map((policy) => {
+        const Icon = policy.kind === "delivery" ? TruckIcon : RefreshCcwIcon;
+
+        return (
+          <Link
+            className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-md px-1 text-[11px] font-black leading-4 text-slate-700 transition hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/20 dark:text-zinc-200"
+            href={policy.href}
+            key={policy.kind}
+          >
+            <Icon
+              aria-hidden="true"
+              className="size-3.5 shrink-0 text-[#ff5a1f]"
+            />
+            <span>{policy.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function ProductOptionsDialog({
   added,
   canAddToCart,
   currencyContext,
   deliveryDetail,
+  deliveryFeeNotice,
   exchangeAcceptedReturnBrands,
   exchangeEmptySize,
   exchangeRequirementText,
@@ -1199,6 +1248,7 @@ function ProductOptionsDialog({
   canAddToCart: boolean;
   currencyContext: CurrencyContext;
   deliveryDetail: string;
+  deliveryFeeNotice: string;
   exchangeAcceptedReturnBrands: string[];
   exchangeEmptySize: string | null;
   exchangeRequirementText: string;
@@ -1264,9 +1314,10 @@ function ProductOptionsDialog({
               markdown={selectedPriceMarkdown}
               price={selectedPrice}
             />
-            <p className="mt-1 truncate text-xs font-semibold text-slate-500 dark:text-zinc-400">
-              VAT included. {deliveryDetail}.
-            </p>
+            <div className="mt-1 grid gap-0.5 text-[10px] font-semibold leading-4 text-slate-500 dark:text-zinc-400">
+              <p>VAT included • {deliveryDetail}</p>
+              <p>{deliveryFeeNotice}</p>
+            </div>
           </div>
           <DialogClose className="grid size-9 place-items-center rounded-full text-[#080808] transition hover:bg-[#f7f7f2] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/20 dark:text-[#f7f7f2] dark:hover:bg-white/10">
             <XIcon className="size-5" />
@@ -1301,6 +1352,8 @@ function ProductOptionsDialog({
               requirementText={exchangeRequirementText}
             />
           ) : null}
+
+          <ProductPolicyLinks className="mt-3" />
 
           <CompactTrustRow className="mt-3" deliveryLabel="Delivery options" />
 
@@ -1632,64 +1685,35 @@ function ExchangeRequirementNotice({
     <section
       aria-label="Empty cylinder required"
       className={cn(
-        "grid gap-2.5 rounded-lg border border-[#ff5a1f]/30 bg-[#fffaf6] p-2.5 shadow-[0_12px_28px_rgba(8,8,8,0.04)] dark:border-[#ff5a1f]/25 dark:bg-orange-500/10 sm:gap-4 sm:p-4",
+        "rounded-md border border-[#e8e8e2] border-l-2 border-l-[#ff5a1f] bg-[#f7f7f2]/60 px-3 py-2.5 dark:border-white/10 dark:border-l-[#ff5a1f] dark:bg-white/[0.03]",
         className,
       )}
       role="note"
     >
-      <span className="grid gap-2.5 sm:gap-3">
-        <span className="flex min-w-0 items-start gap-2.5 sm:gap-3 sm:items-center">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#ff5a1f] text-white shadow-sm sm:size-10">
-            <RefreshCcwIcon className="size-4 sm:size-5" />
-          </span>
-          <span className="grid min-w-0 gap-1">
-            <span className="text-[13px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2] sm:text-base">
-              Empty cylinder required
-            </span>
-            <span className="text-[10px] font-black leading-none text-[#ff5a1f] sm:text-xs">
-              Required for this exchange option
-            </span>
-          </span>
-        </span>
-        <span
-          aria-label={getExchangeEmptyCountLabel(quantity, emptySize)}
-          className="inline-flex min-h-9 w-full max-w-full items-center justify-center gap-2.5 rounded-md border border-[#ff5a1f]/25 bg-white px-2.5 py-1.5 text-[#ff5a1f] shadow-[0_8px_18px_rgba(8,8,8,0.08)] dark:border-[#ff5a1f]/30 dark:bg-white/10 sm:min-h-11 sm:gap-3 sm:rounded-lg sm:px-3 sm:py-2"
+      <div className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] gap-x-2 gap-y-1">
+        <RefreshCcwIcon
+          aria-hidden="true"
+          className="mt-0.5 size-4 text-[#ff5a1f]"
+        />
+        <p
+          aria-atomic="true"
+          aria-live="polite"
+          className="text-[12px] font-black leading-4 text-[#080808] dark:text-[#f7f7f2]"
         >
-          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-[#ff5a1f] text-xs font-black leading-none text-white sm:size-8 sm:text-sm">
-            {quantity}
-          </span>
-          <span className="min-w-0 text-[10px] font-black uppercase leading-tight sm:text-[12px]">
-            {getExchangeRequiredItemLabel(quantity, emptySize)}
-          </span>
-        </span>
-      </span>
-
-      <span className="text-[11px] leading-5 text-slate-700 dark:text-zinc-300 sm:text-sm sm:leading-6">
-        {requirementText}
-      </span>
-
-      {acceptedReturnBrands.length > 0 ? (
-        <span className="grid gap-1.5 border-t border-dashed border-[#e8e8e2] pt-2.5 dark:border-white/10 sm:gap-2 sm:pt-3">
-          <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-zinc-400 sm:gap-2 sm:text-[10px] sm:tracking-[0.14em]">
-            <span className="grid size-4 shrink-0 place-items-center rounded-full border border-[#ff5a1f]/20 bg-white text-[#ff5a1f] dark:bg-white/10 sm:size-5">
-              <CheckCircle2Icon className="size-3 sm:size-3.5" />
-            </span>
-            Accepted return brands
-          </span>
-          <span className="flex flex-wrap gap-1">
-            {acceptedReturnBrands.map((brand) => (
-              <Badge
-                className="h-5 max-w-full rounded-md border border-[#e8e8e2] bg-white px-1.5 py-0 text-[9px] font-black text-slate-700 shadow-[0_4px_10px_rgba(8,8,8,0.06)] dark:border-white/10 dark:bg-white/[0.06] dark:text-zinc-200 sm:h-7 sm:px-2.5 sm:text-[11px]"
-                key={brand}
-                variant="outline"
-              >
-                <CheckCircle2Icon className="!size-2.5 shrink-0 text-[#ff5a1f] sm:!size-3.5" />
-                {brand}
-              </Badge>
-            ))}
-          </span>
-        </span>
-      ) : null}
+          {getExchangeEmptyCountLabel(quantity, emptySize)}
+        </p>
+        <p className="col-start-2 text-[11px] leading-4 text-slate-600 dark:text-zinc-300">
+          {requirementText}
+        </p>
+        {acceptedReturnBrands.length > 0 ? (
+          <p className="col-start-2 mt-0.5 text-[10px] leading-4 text-slate-500 dark:text-zinc-400">
+            <span className="font-black text-slate-700 dark:text-zinc-200">
+              Accepted return brands:
+            </span>{" "}
+            {acceptedReturnBrands.join(", ")}
+          </p>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -1877,7 +1901,7 @@ function ProductDescriptionSection({
 }: {
   product: MarketplaceProductDetailView;
 }) {
-  const description = normalizeProductCopy(
+  const description = parseProductDescription(
     product.fullDescription ?? product.description ?? product.shortDescription,
   );
 
@@ -1889,7 +1913,60 @@ function ProductDescriptionSection({
 
       <div className="mt-4 grid gap-3 text-xs leading-6 text-slate-700 dark:text-zinc-300 sm:text-sm sm:leading-7">
         {description.length > 0 ? (
-          description.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
+          description.map((block, index) => {
+            if (block.type === "heading") {
+              const className =
+                block.level === 2
+                  ? "mt-1 text-sm font-black text-[#080808] first:mt-0 dark:text-[#f7f7f2] sm:text-base"
+                  : "mt-1 text-xs font-black uppercase tracking-[0.04em] text-[#080808] first:mt-0 dark:text-[#f7f7f2] sm:text-sm";
+
+              return block.level === 2 ? (
+                <h3 className={className} key={`${block.type}-${index}`}>
+                  {block.text}
+                </h3>
+              ) : (
+                <h4 className={className} key={`${block.type}-${index}`}>
+                  {block.text}
+                </h4>
+              );
+            }
+
+            if (
+              block.type === "ordered-list" ||
+              block.type === "unordered-list"
+            ) {
+              const className = cn(
+                "grid gap-1.5 pl-5 marker:font-black marker:text-[#ff5a1f]",
+                block.type === "ordered-list" ? "list-decimal" : "list-disc",
+              );
+              const items = block.items.map((item, itemIndex) => (
+                <li key={`${item}-${itemIndex}`}>{item}</li>
+              ));
+
+              return block.type === "ordered-list" ? (
+                <ol className={className} key={`${block.type}-${index}`}>
+                  {items}
+                </ol>
+              ) : (
+                <ul className={className} key={`${block.type}-${index}`}>
+                  {items}
+                </ul>
+              );
+            }
+
+            if (block.type === "blockquote") {
+              return (
+                <blockquote
+                  className="border-l-2 border-[#ff5a1f] pl-3 italic text-slate-600 dark:text-zinc-400"
+                  key={`${block.type}-${index}`}
+                >
+                  {block.text}
+                </blockquote>
+              );
+            }
+
+            return <p key={`${block.type}-${index}`}>{block.text}</p>;
+          })
         ) : (
           <p>No product details supplied yet.</p>
         )}
@@ -2038,30 +2115,21 @@ function getDeliveryPromise(
 ) {
   if (fulfillmentMode !== "piessang_fulfilled") {
     return {
-      detail:
-        "Estimated delivery in 1–4 business days; fees are shown at checkout",
+      detail: "Estimated delivery in 1–4 business days",
+      feeNotice: "Shipping calculated at checkout",
       label: "Delivery in South Africa",
     };
   }
 
   return {
-    detail:
-      "Estimated delivery in 1–4 business days; fees are shown at checkout",
+    detail: "Estimated delivery in 1–4 business days",
+    feeNotice: "Shipping calculated at checkout",
     label: "Delivery in South Africa",
   };
 }
 
 function getExchangeEmptyCountLabel(quantity: number, emptySize: string | null) {
-  return `${quantity}${emptySize ? ` ${emptySize}` : ""} empty ${
-    quantity === 1 ? "cylinder" : "cylinders"
-  } required`;
-}
-
-function getExchangeRequiredItemLabel(
-  quantity: number,
-  emptySize: string | null,
-) {
-  return `${emptySize ?? "Compatible"} empty ${
+  return `${quantity} × ${emptySize ? `${emptySize} ` : "compatible "}empty ${
     quantity === 1 ? "cylinder" : "cylinders"
   } required`;
 }

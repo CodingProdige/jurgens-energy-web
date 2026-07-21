@@ -26,6 +26,7 @@ import {
   optionalCostPriceInputSchema,
   resolveOptionalCostPriceForSave,
 } from "@/src/modules/products/cost-price";
+import { buildProductDescriptionGenerationPrompt } from "@/src/modules/products/product-description";
 import { reconcileProductVariantIdentities } from "@/src/modules/products/variant-reconciliation";
 import { fulfillmentModeSchema } from "@/src/modules/shipping";
 
@@ -34,6 +35,7 @@ const productDescriptionGenerationSchema = z.object({
   categoryName: z.string().trim().max(240).optional(),
   kind: z.enum(["short", "long"]),
   productName: z.string().trim().min(2).max(500),
+  shortDescription: z.string().trim().max(400).optional(),
 });
 const importedMediaSchema = z.object({
   images: z
@@ -505,6 +507,7 @@ export async function generateProductDescription(input: {
   categoryName?: string;
   kind: "long" | "short";
   productName: string;
+  shortDescription?: string;
 }) {
   const session = await requireCatalogManageSession();
 
@@ -534,26 +537,16 @@ export async function generateProductDescription(input: {
   }
 
   const isShort = parsed.data.kind === "short";
+  const generationPrompt = buildProductDescriptionGenerationPrompt(parsed.data);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       body: JSON.stringify({
-        input: [
-          `Product name: ${parsed.data.productName}`,
-          parsed.data.brandName ? `Brand: ${parsed.data.brandName}` : null,
-          parsed.data.categoryName ? `Category: ${parsed.data.categoryName}` : null,
-          isShort
-            ? "Write one direct marketplace product-card short description in one sentence under 240 characters."
-            : "Write a helpful marketplace product description under 2000 characters.",
-          "Keep it neutral, buyer-friendly, specific enough to be useful, and do not invent certifications, stock availability, delivery promises, discounts, warranties, dimensions, or ingredients.",
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        instructions:
-          "You write concise marketplace product copy for catalog listings. Return only the product description text.",
-        max_output_tokens: isShort ? 240 : 900,
+        input: generationPrompt.input,
+        instructions: generationPrompt.instructions,
+        max_output_tokens: generationPrompt.maxOutputTokens,
         model: openAiConfig.model,
       }),
       headers: {
