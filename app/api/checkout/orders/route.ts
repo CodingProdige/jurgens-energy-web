@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 import { createCheckoutOrderRequestSchema } from "@/src/modules/checkout/contracts";
 import { createHostedCheckoutOrder } from "@/src/modules/checkout/orders";
+import { getHostedPayFastForm } from "@/src/modules/checkout/payfast";
 import {
   CAMPAIGN_ATTRIBUTION_COOKIE_NAME,
   parseCampaignAttributionCookie,
@@ -62,10 +63,30 @@ export async function POST(request: Request) {
     const result = await createHostedCheckoutOrder(parsed.data, {
       campaignAttribution,
     });
+    const paymentForm = await getHostedPayFastForm(
+      result.orderId,
+      result.checkoutToken,
+    );
 
-    return Response.json(result, {
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    if (!paymentForm) {
+      throw new Error(
+        "Secure PayFast checkout could not be opened. Please try again.",
+      );
+    }
+
+    return Response.json(
+      {
+        orderId: result.orderId,
+        orderNumber: result.orderNumber,
+        paymentForm: {
+          fields: paymentForm.fields,
+          processUrl: paymentForm.processUrl,
+        },
+      },
+      {
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   } catch (error) {
     return Response.json(
       {

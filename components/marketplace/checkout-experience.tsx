@@ -77,6 +77,11 @@ type CustomerFields = {
   phone: string;
 };
 
+type HostedPayFastSubmission = {
+  fields: Array<{ name: string; value: string }>;
+  processUrl: string;
+};
+
 const emptyAddress: CheckoutDeliveryAddress = {
   addressLine1: "",
   addressLine2: "",
@@ -129,6 +134,30 @@ function getShippingChargeLabel(groupKey: string) {
   }
 
   return "Shipping";
+}
+
+function submitHostedPayFastForm({
+  fields,
+  processUrl,
+}: HostedPayFastSubmission) {
+  const form = document.createElement("form");
+
+  form.acceptCharset = "UTF-8";
+  form.action = processUrl;
+  form.method = "POST";
+  form.style.display = "none";
+
+  for (const field of fields) {
+    const input = document.createElement("input");
+
+    input.name = field.name;
+    input.type = "hidden";
+    input.value = field.value;
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+  HTMLFormElement.prototype.submit.call(form);
 }
 
 function formatPreferredDeliveryDate(value: string) {
@@ -1006,14 +1035,14 @@ export function CheckoutExperience({
       });
       const payload = (await response.json()) as {
         message?: string;
-        redirectUrl?: string;
+        paymentForm?: HostedPayFastSubmission;
       };
 
-      if (!response.ok || !payload.redirectUrl) {
+      if (!response.ok || !payload.paymentForm) {
         throw new Error(payload.message ?? "Checkout could not be started.");
       }
 
-      window.location.assign(payload.redirectUrl);
+      submitHostedPayFastForm(payload.paymentForm);
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -2329,11 +2358,16 @@ export function CheckoutExperience({
                 type="button"
               >
                 {isCreatingOrder ? (
-                  <LoaderCircleIcon className="size-4 animate-spin" />
+                  <>
+                    <LoaderCircleIcon className="size-4 animate-spin" />
+                    Opening PayFast…
+                  </>
                 ) : (
-                  <LockKeyholeIcon className="size-4" />
+                  <>
+                    <LockKeyholeIcon className="size-4" />
+                    Complete payment
+                  </>
                 )}
-                Complete payment
               </Button>
               <div className="mt-1 grid gap-2 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
                 <p className="flex items-center gap-2">
