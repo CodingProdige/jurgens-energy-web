@@ -91,7 +91,7 @@ services:
       ADMIN_HOSTNAME: ${ADMIN_HOSTNAME:-admin.localhost}
       SELLER_HOSTNAME: ${SELLER_HOSTNAME:-seller.localhost}
     volumes:
-      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./infra/caddy:/etc/caddy:ro
       - ${MEDIA_STORAGE_PATH:-./storage/jurgens-energy/media}:/srv/media:ro
       - caddy-data:/data
       - caddy-config:/config

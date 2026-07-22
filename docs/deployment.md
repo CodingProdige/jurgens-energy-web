@@ -145,5 +145,6 @@ without rebuilding it a second time. If
 profile.
 
 The deploy command explicitly reloads Caddy after Compose starts the release.
-The Caddyfile is bind-mounted, so a source-only proxy configuration change does
-not otherwise cause Compose to recreate the running Caddy container.
+The Caddy configuration directory is bind-mounted rather than the individual
+file so a Git checkout cannot leave the container attached to a replaced,
+outdated file inode.
