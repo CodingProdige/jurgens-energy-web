@@ -2,7 +2,12 @@
 	email {$CADDY_EMAIL:admin@example.com}
 }
 
-http://{$DOMAIN:localhost}, http://{$ADMIN_HOSTNAME:admin.localhost}, http://{$SELLER_HOSTNAME:seller.localhost} {
+http://{$DOMAIN:localhost}, http://www.{$DOMAIN:localhost}, http://{$ADMIN_HOSTNAME:admin.localhost}, http://{$SELLER_HOSTNAME:seller.localhost} {
+	# Keep one public hostname so customers and Merchant Center never land on
+	# a separate or missing www storefront.
+	@www_request host www.{$DOMAIN:localhost}
+	redir @www_request https://{$DOMAIN:localhost}{uri} permanent
+
 	# Cloudflare terminates TLS before forwarding requests through the private
 	# tunnel. Preserve a single canonical HTTPS entry point for public traffic.
 	@insecure_public_request header X-Forwarded-Proto http

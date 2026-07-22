@@ -28,7 +28,7 @@ export default async function AdminMarketingPage() {
   }
 
   const [brands, categories, mediaLibrary, storefrontPage] = await Promise.all([
-    getMarketplaceBrands(),
+    getMarketplaceBrands({ includeEmpty: true }),
     getMarketplaceCategories(),
     getAdminMediaLibrary(access.session.user.id),
     getStorefrontPageForAdmin(),

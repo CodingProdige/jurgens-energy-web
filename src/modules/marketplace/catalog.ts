@@ -19,6 +19,7 @@ import {
   type CurrencyContext,
 } from "@/src/modules/currency";
 import type { MarketplaceCatalogFilters } from "@/src/modules/marketplace/catalog-filters";
+import { isMarketplaceVariantOnSale } from "@/src/modules/marketplace/catalog-sale";
 import { filterPopulatedShopMenuCategories } from "@/src/modules/marketplace/shop-menu-categories";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 
@@ -71,6 +72,7 @@ export type MarketplaceShopMenuCategory = {
 export type MarketplaceShopMenuData = {
   categories: MarketplaceShopMenuCategory[];
   exchangeableLpgProducts: MarketplaceShopMenuProduct[];
+  hasCurrentDeals: boolean;
   totalProductCount: number;
 };
 
@@ -166,17 +168,7 @@ function getProductCardSaleData(
   variants: Array<{ compareAtPrice: string | null; price: string }>,
   currencyContext: CurrencyContext,
 ) {
-  const saleVariants = variants.filter((variant) => {
-    const price = Number(variant.price);
-    const compareAtPrice = Number(variant.compareAtPrice);
-
-    return (
-      Number.isFinite(price) &&
-      Number.isFinite(compareAtPrice) &&
-      price > 0 &&
-      compareAtPrice > price
-    );
-  });
+  const saleVariants = variants.filter(isMarketplaceVariantOnSale);
   const representativeVariant = [...variants]
     .filter((variant) => Number.isFinite(Number(variant.price)))
     .sort((first, second) => Number(first.price) - Number(second.price))[0];
@@ -509,11 +501,7 @@ function getRecordExchangeSupported(record: MarketplaceCatalogFilterRecord) {
 }
 
 function getRecordOnSale(record: MarketplaceCatalogFilterRecord) {
-  return record.variants.some(
-    (variant) =>
-      variant.compareAtPrice !== null &&
-      Number(variant.compareAtPrice) > Number(variant.price),
-  );
+  return record.variants.some(isMarketplaceVariantOnSale);
 }
 
 function matchesCatalogRecord({
@@ -997,6 +985,8 @@ async function readMarketplaceShopMenuData(): Promise<MarketplaceShopMenuData> {
       getPublicProductsBaseRows(),
       db
         .select({
+          compareAtPrice: productVariants.compareAtPrice,
+          price: productVariants.price,
           productId: productVariants.productId,
           requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
         })
@@ -1013,6 +1003,12 @@ async function readMarketplaceShopMenuData(): Promise<MarketplaceShopMenuData> {
   );
   const productRows = publicProductRows.filter((product) =>
     visibleProductIds.has(product.id),
+  );
+  const publicProductIds = new Set(productRows.map((product) => product.id));
+  const hasCurrentDeals = activeVariantRows.some(
+    (variant) =>
+      publicProductIds.has(variant.productId) &&
+      isMarketplaceVariantOnSale(variant),
   );
   const coverByProductId = await getCoverUrlsByProductId(
     productRows.map((row) => row.id),
@@ -1198,6 +1194,7 @@ async function readMarketplaceShopMenuData(): Promise<MarketplaceShopMenuData> {
   return {
     categories: rootCategories,
     exchangeableLpgProducts,
+    hasCurrentDeals,
     totalProductCount: productRows.length,
   };
 }
@@ -1280,10 +1277,12 @@ export async function getMarketplaceSitemapEntries(): Promise<MarketplaceSitemap
   };
 }
 
-export async function getMarketplaceBrands(): Promise<
-  MarketplaceBrandSummary[]
-> {
-  const [brandRows, productRows] = await Promise.all([
+export async function getMarketplaceBrands({
+  includeEmpty = false,
+}: {
+  includeEmpty?: boolean;
+} = {}): Promise<MarketplaceBrandSummary[]> {
+  const [brandRows, productRows, activeVariantRows] = await Promise.all([
     db
       .select({
         id: brands.id,
@@ -1297,16 +1296,31 @@ export async function getMarketplaceBrands(): Promise<
       .where(eq(brands.status, "active"))
       .orderBy(asc(brands.name)),
     getPublicProductsBaseRows(),
+    db
+      .select({ productId: productVariants.productId })
+      .from(productVariants)
+      .where(
+        and(
+          eq(productVariants.isActive, true),
+          eq(productVariants.status, "active"),
+        ),
+      ),
   ]);
+  const visibleProductIds = new Set(
+    activeVariantRows.map((variant) => variant.productId),
+  );
+  const visibleProductRows = productRows.filter((product) =>
+    visibleProductIds.has(product.id),
+  );
   const coverByProductId = await getCoverUrlsByProductId(
-    productRows.map((row) => row.id),
+    visibleProductRows.map((row) => row.id),
   );
   const productMetaByBrandId = new Map<
     string,
     { firstProductImageUrl: string | null; productCount: number }
   >();
 
-  for (const row of productRows) {
+  for (const row of visibleProductRows) {
     if (!row.brandId) {
       continue;
     }
@@ -1324,7 +1338,7 @@ export async function getMarketplaceBrands(): Promise<
     });
   }
 
-  return brandRows.map((row) => {
+  const brandSummaries = brandRows.map((row) => {
     const productMeta = productMetaByBrandId.get(row.id);
 
     return {
@@ -1336,6 +1350,10 @@ export async function getMarketplaceBrands(): Promise<
       slug: row.slug,
     };
   });
+
+  return includeEmpty
+    ? brandSummaries
+    : brandSummaries.filter((brand) => brand.productCount > 0);
 }
 
 export async function getMarketplaceProductBySlug(

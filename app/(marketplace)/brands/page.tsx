@@ -54,9 +54,9 @@ export default async function BrandsPage() {
                     Brands you know. LPG products you can trust.
                   </h1>
                   <p className="mt-5 max-w-2xl text-[15px] font-medium leading-7 text-white/68 sm:text-[17px] sm:leading-8">
-                    Browse every active brand in our store, then explore its
-                    available cylinders, appliances, regulators, and
-                    accessories.
+                    Browse brands with products currently available in our
+                    store, then explore their cylinders, appliances,
+                    regulators, and accessories.
                   </p>
                 </div>
 

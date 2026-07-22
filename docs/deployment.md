@@ -143,3 +143,7 @@ dependency stage for migrations and catalog seed data, and restarts the stack
 without rebuilding it a second time. If
 `CLOUDFLARE_TUNNEL_TOKEN` is present in `.env`, it also starts the tunnel
 profile.
+
+The deploy command explicitly reloads Caddy after Compose starts the release.
+The Caddyfile is bind-mounted, so a source-only proxy configuration change does
+not otherwise cause Compose to recreate the running Caddy container.

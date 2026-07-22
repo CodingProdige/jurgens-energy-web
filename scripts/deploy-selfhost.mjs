@@ -52,6 +52,21 @@ if (hasTunnelToken) {
 upArgs.push("up", "--no-build", "-d");
 
 run("docker", upArgs);
+// Caddy's configuration is bind-mounted, so Compose does not recreate the
+// container when only the Caddyfile changes. Reload it explicitly on every
+// release to ensure redirects and response headers take effect immediately.
+run("docker", [
+  ...composeBaseArgs,
+  "exec",
+  "-T",
+  "caddy",
+  "caddy",
+  "reload",
+  "--config",
+  "/etc/caddy/Caddyfile",
+  "--adapter",
+  "caddyfile",
+]);
 run("docker", [
   ...composeBaseArgs,
   ...(hasTunnelToken ? ["--profile", "tunnel"] : []),

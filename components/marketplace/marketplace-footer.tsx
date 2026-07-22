@@ -215,7 +215,9 @@ export async function MarketplaceFooter() {
                     ],
                   ] as const)
                 : []),
-              ["Deals", "/products?sale=1"],
+              ...(shopMenuData.hasCurrentDeals
+                ? ([["Deals", "/products?sale=1"]] as const)
+                : []),
               ["Brands", "/brands"],
             ]}
             title="Shop"

@@ -20,6 +20,9 @@ CLOUDFLARE_TUNNEL_TOKEN=your-token
 Hostname: jurgensenergy.com
 Service:  http://caddy:80
 
+Hostname: www.jurgensenergy.com
+Service:  http://caddy:80
+
 Hostname: admin.jurgensenergy.com
 Service:  http://caddy:80
 

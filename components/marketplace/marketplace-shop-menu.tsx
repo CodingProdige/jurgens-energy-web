@@ -303,14 +303,16 @@ export function MarketplaceShopMenu({
                   <RefreshCcwIcon className="size-3.5 text-[#ff5a1f]" />
                   Cylinder exchange
                 </Link>
-                <Link
-                  className="flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-[11px] font-bold uppercase text-white/80 transition hover:border-[#ff5a1f] hover:text-white"
-                  href="/products?sale=1"
-                  onClick={closeMenu}
-                >
-                  <TagsIcon className="size-3.5 text-[#ff5a1f]" />
-                  Shop current deals
-                </Link>
+                {data.hasCurrentDeals ? (
+                  <Link
+                    className="flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-[11px] font-bold uppercase text-white/80 transition hover:border-[#ff5a1f] hover:text-white"
+                    href="/products?sale=1"
+                    onClick={closeMenu}
+                  >
+                    <TagsIcon className="size-3.5 text-[#ff5a1f]" />
+                    Shop current deals
+                  </Link>
+                ) : null}
               </div>
             </section>
 
