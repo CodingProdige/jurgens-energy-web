@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  CheckIcon,
   HeadphonesIcon,
   type LucideIcon,
   MailIcon,
@@ -167,28 +166,14 @@ export async function MarketplaceFooter() {
               About Jurgens Energy
             </h2>
             <p className="mt-2 max-w-sm text-[15px] font-black leading-5 text-[#1a1a1a] dark:text-[#f7f7f2]">
-              {settings.footerTagline.trim() ||
-                "South African online store for LPG cylinders, exchanges and gas accessories."}
+              JurgensEnergy.com is a South African online store for new LPG
+              cylinders, eligible cylinder exchanges and gas accessories.
             </p>
             <p className="mt-3 max-w-sm text-[12px] leading-5 text-[#696963] dark:text-[#a8a89f]">
-              Browse new LPG cylinders, exchange options and gas accessories,
-              pay online, and arrange eligible delivery across South Africa.
-              We operate online without a walk-in retail location.
+              Customers shop and pay online, then receive eligible orders at
+              their delivery address. We deliver across South Africa and do
+              not operate a physical walk-in store.
             </p>
-            <ul className="mt-4 grid max-w-sm gap-2 text-[11px] font-bold text-[#4f4f49] dark:text-[#c8c8c0]">
-              {[
-                "Online ordering and payment",
-                "Clear cylinder exchange guidance",
-                "Support before and after delivery",
-              ].map((item) => (
-                <li className="flex items-center gap-2" key={item}>
-                  <span className="grid size-4 shrink-0 place-items-center rounded-full bg-[#ff5a1f]/10 text-[#ff5a1f]">
-                    <CheckIcon className="size-3 stroke-[2.5]" />
-                  </span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
             <Link
               className="mt-4 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-[0.08em] text-[#ff5a1f] transition hover:text-[#e44c15]"
               href="/about"
