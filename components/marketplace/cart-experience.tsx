@@ -609,7 +609,10 @@ export function CartExperience() {
         </div>
       </aside>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#deded7] bg-white/96 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#101010]/96 lg:hidden">
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[#deded7] bg-white/96 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#101010]/96 lg:hidden"
+        data-marketplace-mobile-dock
+      >
         <div className="mx-auto grid max-w-lg grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
             <p className="text-[10px] text-[#777770] dark:text-[#aaa9a1]">

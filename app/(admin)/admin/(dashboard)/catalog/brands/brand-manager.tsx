@@ -198,6 +198,7 @@ function BrandForm({
                 altText: `${brand.name} logo`,
                 byteSize: 0,
                 createdAt: brand.createdAt,
+                digitalSourceType: null,
                 durationMs: null,
                 folderId: null,
                 folderIds: [],

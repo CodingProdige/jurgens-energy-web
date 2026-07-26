@@ -32,6 +32,7 @@ import {
   RefreshCwIcon,
   SearchIcon,
   SlidersHorizontalIcon,
+  SparklesIcon,
   Trash2Icon,
   UploadIcon,
   Volume2Icon,
@@ -48,8 +49,12 @@ import {
   updateAdminMediaMetadata,
   type MediaMetadataState,
 } from "@/app/(admin)/admin/(dashboard)/media/actions";
-import { deleteOwnerMediaAsset } from "@/components/media/actions";
+import {
+  deleteOwnerMediaAsset,
+  updateOwnerMediaMetadata,
+} from "@/components/media/actions";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,6 +85,7 @@ import {
   normalizeMediaSelectionIds,
   toggleMediaPickerSelection,
 } from "@/src/modules/media/selection";
+import { trainedAlgorithmicMediaCode } from "@/src/modules/media/digital-source";
 
 type MediaManagerDialogProps = {
   acceptedMediaTypes?: MediaType[];
@@ -2395,6 +2401,7 @@ function MediaUploadForm({
   surface: MediaManagerSurface;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const acceptsImages = acceptedMediaTypes.includes("image");
   const acceptsVideos = acceptedMediaTypes.includes("video");
@@ -2430,9 +2437,15 @@ function MediaUploadForm({
     onUploadStart(uploads);
 
     uploads.forEach((upload, index) => {
+      const file = files[index];
+
       uploadFileWithProgress({
         acceptedMediaTypes,
-        file: files[index],
+        digitalSourceType:
+          isAiGenerated && getFileMediaType(file) === "image"
+            ? trainedAlgorithmicMediaCode
+            : undefined,
+        file,
         id: upload.id,
         onComplete: onUploadComplete,
         onError: onUploadError,
@@ -2480,6 +2493,27 @@ function MediaUploadForm({
         }
       />
 
+      {acceptsImages ? (
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left dark:border-white/10 dark:bg-white/[0.03]">
+          <Checkbox
+            aria-label="Mark uploaded images as created using generative AI"
+            checked={isAiGenerated}
+            className="mt-0.5"
+            onCheckedChange={(checked) => setIsAiGenerated(checked === true)}
+          />
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-sm font-bold text-zinc-950 dark:text-white">
+              <SparklesIcon className="size-4 text-primary" />
+              Created using generative AI
+            </span>
+            <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Embeds Google&apos;s required IPTC DigitalSourceType metadata in
+              each uploaded image and its optimized thumbnail.
+            </span>
+          </span>
+        </label>
+      ) : null}
+
       <p
         aria-live="polite"
         className={cn(
@@ -2519,12 +2553,20 @@ function MediaDetails({
   surface?: MediaManagerSurface;
 }) {
   const accent = mediaManagerAccentClasses[surface];
+  const metadataAction =
+    surface === "admin"
+      ? updateAdminMediaMetadata
+      : updateOwnerMediaMetadata;
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const appliedAssetUpdateRef = useRef<string | null>(null);
   const [state, action, isPending] = useActionState(
-    updateAdminMediaMetadata,
+    metadataAction,
     initialMetadataState,
   );
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [isAiGenerated, setIsAiGenerated] = useState(
+    asset?.digitalSourceType === trainedAlgorithmicMediaCode,
+  );
   const [isReplacing, setIsReplacing] = useState(false);
   const [isMoveOpen, setIsMoveOpen] = useState(false);
   const [mediaActionMessage, setMediaActionMessage] = useState<string | null>(
@@ -2533,9 +2575,32 @@ function MediaDetails({
 
   useEffect(() => {
     setCopiedUrl(false);
+    setIsAiGenerated(
+      asset?.digitalSourceType === trainedAlgorithmicMediaCode,
+    );
     setIsMoveOpen(false);
     setMediaActionMessage(null);
-  }, [asset?.id]);
+  }, [asset?.digitalSourceType, asset?.id]);
+
+  useEffect(() => {
+    if (!state.asset) {
+      return;
+    }
+
+    const updateKey = [
+      state.asset.id,
+      state.asset.publicUrl,
+      state.asset.altText ?? "",
+      state.asset.digitalSourceType ?? "",
+    ].join(":");
+
+    if (appliedAssetUpdateRef.current === updateKey) {
+      return;
+    }
+
+    appliedAssetUpdateRef.current = updateKey;
+    onAssetUpdated(state.asset);
+  }, [onAssetUpdated, state.asset]);
 
   useEffect(() => {
     if (!copiedUrl) {
@@ -2577,6 +2642,12 @@ function MediaDetails({
 
     uploadFileWithProgress({
       acceptedMediaTypes,
+      digitalSourceType:
+        mediaType === "image"
+          ? isAiGenerated
+            ? trainedAlgorithmicMediaCode
+            : null
+          : null,
       file,
       id: `replace-${asset.id}`,
       onComplete: ({ asset: updatedAsset }) => {
@@ -2662,6 +2733,12 @@ function MediaDetails({
             ? `In use by ${asset.usageCount} platform ${asset.usageCount === 1 ? "record" : "records"}`
             : "Not used anywhere yet"}
         </p>
+        {asset.digitalSourceType === trainedAlgorithmicMediaCode ? (
+          <p className="ml-2 mt-2 inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-1 text-xs font-bold text-violet-700 dark:text-violet-300">
+            <SparklesIcon className="size-3" />
+            AI-generated metadata embedded
+          </p>
+        ) : null}
       </div>
       <div className="grid min-w-0 gap-2">
         <Label className="text-zinc-950 dark:text-white">URL</Label>
@@ -2698,6 +2775,15 @@ function MediaDetails({
       </div>
       <form action={action} className="grid min-w-0 gap-3">
         <input type="hidden" name="id" value={asset.id} />
+        <input
+          name="digitalSourceType"
+          type="hidden"
+          value={
+            isAiGenerated && asset.mimeType.startsWith("image/")
+              ? trainedAlgorithmicMediaCode
+              : ""
+          }
+        />
         <div className="grid gap-2">
           <Label className="text-zinc-950 dark:text-white" htmlFor={`altText-${asset.id}`}>Alt text</Label>
           <Input
@@ -2710,6 +2796,25 @@ function MediaDetails({
             className="min-w-0 border-slate-200 bg-white text-zinc-950 placeholder:text-slate-400 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:placeholder:text-slate-500"
           />
         </div>
+        {asset.mimeType.startsWith("image/") ? (
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <Checkbox
+              aria-label="Created using generative AI"
+              checked={isAiGenerated}
+              className="mt-0.5"
+              onCheckedChange={(checked) => setIsAiGenerated(checked === true)}
+            />
+            <span className="min-w-0">
+              <span className="block text-xs font-bold text-zinc-950 dark:text-white">
+                Created using generative AI
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Saves IPTC DigitalSourceType: TrainedAlgorithmicMedia inside
+                the image file.
+              </span>
+            </span>
+          </label>
+        ) : null}
         <Button
           className={cn(
             "h-9 justify-center rounded-lg border-0",
@@ -3330,6 +3435,7 @@ function CircularProgress({
 
 function uploadFileWithProgress({
   acceptedMediaTypes,
+  digitalSourceType,
   file,
   id,
   onComplete,
@@ -3339,6 +3445,7 @@ function uploadFileWithProgress({
   surface,
 }: {
   acceptedMediaTypes: MediaType[];
+  digitalSourceType?: typeof trainedAlgorithmicMediaCode | null;
   file: File;
   id: string;
   onComplete: (input: { asset: AdminMediaAsset; id: string }) => void;
@@ -3372,6 +3479,9 @@ function uploadFileWithProgress({
   );
   if (replaceAssetId) {
     formData.append("replaceAssetId", replaceAssetId);
+  }
+  if (digitalSourceType !== undefined) {
+    formData.append("digitalSourceType", digitalSourceType ?? "");
   }
   formData.append("file", file);
 

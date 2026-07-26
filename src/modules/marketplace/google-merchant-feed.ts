@@ -11,8 +11,10 @@ import {
 } from "@/src/db/schema";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import {
+  getGoogleMerchantCustomLabel0,
   getGoogleMerchantDestinationControls,
   type GoogleMerchantDestination,
+  type GoogleMerchantShippingLabel,
 } from "@/src/modules/marketplace/google-feed-utils";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 
@@ -36,6 +38,7 @@ export type GoogleMerchantFeedItem = {
   availability: "in_stock" | "out_of_stock";
   brand: string;
   canonicalLink: string;
+  customLabel0: GoogleMerchantShippingLabel;
   description: string;
   excludedDestinations: GoogleMerchantDestination[];
   gtin: string | null;
@@ -50,7 +53,7 @@ export type GoogleMerchantFeedItem = {
   productType: string | null;
   returnPolicyLabel: string | null;
   salePrice: string | null;
-  shippingLabel: "local_lpg" | "national_courier";
+  shippingLabel: GoogleMerchantShippingLabel;
   title: string;
   variantOptions: GoogleMerchantVariantOption[];
 };
@@ -230,6 +233,7 @@ export async function getGoogleMerchantFeedItems() {
       row.googleFulfillmentChannel,
       row.productFulfillmentMode,
     );
+    const customLabel0 = getGoogleMerchantCustomLabel0(shippingLabel);
     const destinations = getGoogleMerchantDestinationControls(shippingLabel);
 
     return [
@@ -248,6 +252,7 @@ export async function getGoogleMerchantFeedItems() {
           firstCleanProductText([row.brandName]) ?? "Jurgens Energy"
         ).slice(0, 70),
         canonicalLink,
+        customLabel0,
         description: description.slice(0, googleFeedDescriptionLimit),
         excludedDestinations: destinations.excluded,
         gtin,
@@ -323,6 +328,7 @@ function renderGoogleMerchantFeedItem(item: GoogleMerchantFeedItem) {
         `      <g:excluded_destination>${destination}</g:excluded_destination>`,
     ),
     `      <g:shipping_label>${escapeXml(item.shippingLabel)}</g:shipping_label>`,
+    `      <g:custom_label_0>${escapeXml(item.customLabel0)}</g:custom_label_0>`,
     ...(item.returnPolicyLabel
       ? [
           `      <g:return_policy_label>${escapeXml(item.returnPolicyLabel)}</g:return_policy_label>`,

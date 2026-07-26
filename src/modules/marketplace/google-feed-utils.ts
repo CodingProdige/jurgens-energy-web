@@ -9,8 +9,16 @@ export type GoogleMerchantDestinationControls = {
   included: GoogleMerchantDestination[];
 };
 
+export type GoogleMerchantShippingLabel = "local_lpg" | "national_courier";
+
+export function getGoogleMerchantCustomLabel0(
+  channel: GoogleMerchantShippingLabel,
+): GoogleMerchantShippingLabel {
+  return channel;
+}
+
 export function getGoogleMerchantDestinationControls(
-  channel: "local_lpg" | "national_courier",
+  channel: GoogleMerchantShippingLabel,
 ): GoogleMerchantDestinationControls {
   switch (channel) {
     case "local_lpg":

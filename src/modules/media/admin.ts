@@ -22,6 +22,12 @@ import {
   getMediaPublicUrl,
   normalizeRelativeMediaPath,
 } from "@/src/modules/media/paths";
+import {
+  extractMediaDigitalSourceType,
+  trainedAlgorithmicMediaCode,
+  updateDigitalSourceTypeXmp,
+  type MediaDigitalSourceType,
+} from "@/src/modules/media/digital-source";
 
 const acceptedImageTypes = new Set([
   "image/avif",
@@ -44,6 +50,7 @@ export type AdminMediaAsset = {
   altText: string | null;
   byteSize: number;
   createdAt: Date;
+  digitalSourceType: MediaDigitalSourceType | null;
   height: number | null;
   folderId: string | null;
   folderIds: string[];
@@ -149,6 +156,7 @@ export async function getScopedMediaLibrary(scope: MediaLibraryScope) {
       altText: media.altText,
       byteSize: media.byteSize,
       createdAt: media.createdAt,
+      digitalSourceType: media.digitalSourceType,
       height: media.height,
       id: media.id,
       folderId: media.folderId,
@@ -219,6 +227,7 @@ async function getScopedMediaFolders(
 
 export async function processAndStoreImageUpload(input: {
   altText?: string;
+  digitalSourceType?: MediaDigitalSourceType | null;
   excludeAssetId?: string;
   file: File;
   ownerUserId?: string;
@@ -239,6 +248,12 @@ export async function processAndStoreImageUpload(input: {
   const sourceHash = createHash("sha256").update(sourceBuffer).digest("hex");
   const image = sharp(sourceBuffer, { failOn: "none" }).rotate();
   const metadata = await image.metadata();
+  const sourceXmp = metadata.xmpAsString;
+  const digitalSourceType =
+    input.digitalSourceType === undefined
+      ? extractMediaDigitalSourceType(sourceXmp)
+      : input.digitalSourceType;
+  const outputXmp = updateDigitalSourceTypeXmp(null, digitalSourceType);
   const width = metadata.width ?? null;
   const height = metadata.height ?? null;
   const outputRelativePath = createMediaRelativePath({
@@ -249,80 +264,91 @@ export async function processAndStoreImageUpload(input: {
     mimeType: "image/webp",
     scope: `${input.scope}-thumbs`,
   });
-  const outputBuffer = await image
+  const outputPipeline = image
     .resize({
       fit: "inside",
       width: settings.maxImageWidth,
       withoutEnlargement: true,
     })
-    .webp({ effort: 5, quality: settings.imageCompressionQuality })
-    .toBuffer();
-  const thumbnailBuffer = await sharp(sourceBuffer, { failOn: "none" })
+    .webp({ effort: 5, quality: settings.imageCompressionQuality });
+  const thumbnailPipeline = sharp(sourceBuffer, { failOn: "none" })
     .rotate()
     .resize({ fit: "cover", height: 360, width: 480 })
-    .webp({ effort: 4, quality: 72 })
-    .toBuffer();
+    .webp({ effort: 4, quality: 72 });
 
-  await writeMediaFile(outputRelativePath, outputBuffer);
-  await writeMediaFile(thumbnailRelativePath, thumbnailBuffer);
+  if (outputXmp) {
+    outputPipeline.withXmp(outputXmp);
+    thumbnailPipeline.withXmp(outputXmp);
+  }
+
+  const [outputBuffer, thumbnailBuffer] = await Promise.all([
+    outputPipeline.toBuffer(),
+    thumbnailPipeline.toBuffer(),
+  ]);
+
+  await assertStorageQuotaAfterOptimization({
+    excludeAssetId: input.excludeAssetId,
+    fileCount: 1,
+    optimizedBytes: outputBuffer.byteLength,
+    ownerUserId: input.ownerUserId,
+    scope: input.scope,
+    settings,
+  });
 
   try {
-    await assertStorageQuotaAfterOptimization({
-      excludeAssetId: input.excludeAssetId,
-      fileCount: 1,
-      optimizedBytes: outputBuffer.byteLength,
-      ownerUserId: input.ownerUserId,
-      scope: input.scope,
-      settings,
-    });
+    await writeMediaFile(outputRelativePath, outputBuffer);
+    await writeMediaFile(thumbnailRelativePath, thumbnailBuffer);
+
+    const [asset] = await db
+      .insert(media)
+      .values({
+        altText: input.altText?.trim() || null,
+        byteSize: outputBuffer.byteLength,
+        contentHash: sourceHash,
+        digitalSourceType,
+        height,
+        isPublic: true,
+        mimeType: "image/webp",
+        originalByteSize: input.file.size,
+        originalFileName: sanitizeFileName(input.file.name),
+        originalMimeType: input.file.type,
+        ownerUserId: input.ownerUserId,
+        relativePath: outputRelativePath,
+        thumbnailRelativePath,
+        updatedAt: new Date(),
+        width,
+      })
+      .returning({
+        altText: media.altText,
+        byteSize: media.byteSize,
+        createdAt: media.createdAt,
+        digitalSourceType: media.digitalSourceType,
+        durationMs: media.durationMs,
+        height: media.height,
+        id: media.id,
+        folderId: media.folderId,
+        mimeType: media.mimeType,
+        originalByteSize: media.originalByteSize,
+        originalFileName: media.originalFileName,
+        relativePath: media.relativePath,
+        tags: media.tags,
+        thumbnailRelativePath: media.thumbnailRelativePath,
+        width: media.width,
+      });
+
+    return toAdminMediaAsset(asset);
   } catch (error) {
-    await Promise.all([
+    await Promise.allSettled([
       removeMediaFile(outputRelativePath),
       removeMediaFile(thumbnailRelativePath),
     ]);
     throw error;
   }
-
-  const [asset] = await db
-    .insert(media)
-    .values({
-      altText: input.altText?.trim() || null,
-      byteSize: outputBuffer.byteLength,
-      contentHash: sourceHash,
-      height,
-      isPublic: true,
-      mimeType: "image/webp",
-      originalByteSize: input.file.size,
-      originalFileName: sanitizeFileName(input.file.name),
-      originalMimeType: input.file.type,
-      ownerUserId: input.ownerUserId,
-      relativePath: outputRelativePath,
-      thumbnailRelativePath,
-      updatedAt: new Date(),
-      width,
-    })
-    .returning({
-      altText: media.altText,
-      byteSize: media.byteSize,
-      createdAt: media.createdAt,
-      durationMs: media.durationMs,
-      height: media.height,
-      id: media.id,
-      folderId: media.folderId,
-      mimeType: media.mimeType,
-      originalByteSize: media.originalByteSize,
-      originalFileName: media.originalFileName,
-      relativePath: media.relativePath,
-      tags: media.tags,
-      thumbnailRelativePath: media.thumbnailRelativePath,
-      width: media.width,
-    });
-
-  return toAdminMediaAsset(asset);
 }
 
 export async function processAndStoreMediaUpload(input: {
   altText?: string;
+  digitalSourceType?: MediaDigitalSourceType | null;
   excludeAssetId?: string;
   file: File;
   ownerUserId?: string;
@@ -330,6 +356,10 @@ export async function processAndStoreMediaUpload(input: {
 }) {
   if (acceptedImageTypes.has(input.file.type)) {
     return processAndStoreImageUpload(input);
+  }
+
+  if (input.digitalSourceType) {
+    throw new Error("AI source metadata can only be added to images.");
   }
 
   if (acceptedVideoTypes.has(input.file.type)) {
@@ -403,6 +433,7 @@ export async function processAndStoreDocumentUpload(input: {
       altText: media.altText,
       byteSize: media.byteSize,
       createdAt: media.createdAt,
+      digitalSourceType: media.digitalSourceType,
       durationMs: media.durationMs,
       height: media.height,
       id: media.id,
@@ -553,6 +584,7 @@ export async function processAndStoreVideoUpload(input: {
         altText: media.altText,
         byteSize: media.byteSize,
         createdAt: media.createdAt,
+        digitalSourceType: media.digitalSourceType,
         durationMs: media.durationMs,
         height: media.height,
         id: media.id,
@@ -576,7 +608,8 @@ function toAdminMediaAsset(row: {
   altText: string | null;
   byteSize: number;
   createdAt: Date;
-    height: number | null;
+  digitalSourceType: string | null;
+  height: number | null;
   folderId: string | null;
   folderIds?: string[];
   durationMs?: number | null;
@@ -594,6 +627,10 @@ function toAdminMediaAsset(row: {
     altText: row.altText,
     byteSize: row.byteSize,
     createdAt: row.createdAt,
+    digitalSourceType:
+      row.digitalSourceType === trainedAlgorithmicMediaCode
+        ? trainedAlgorithmicMediaCode
+        : null,
     height: row.height,
     folderId: row.folderId,
     folderIds: row.folderIds ?? legacyFolderIds(row.folderId),
@@ -678,12 +715,14 @@ function legacyFolderIds(folderId: string | null) {
 
 export async function replaceStoredMediaAsset(input: {
   assetId: string;
+  digitalSourceType?: MediaDigitalSourceType | null;
   file: File;
   ownerUserId: string;
   scope: string;
 }) {
   const [currentAsset] = await db
     .select({
+      digitalSourceType: media.digitalSourceType,
       folderId: media.folderId,
       id: media.id,
       relativePath: media.relativePath,
@@ -698,6 +737,12 @@ export async function replaceStoredMediaAsset(input: {
   }
 
   const replacement = await processAndStoreMediaUpload({
+    digitalSourceType:
+      input.digitalSourceType === undefined
+        ? currentAsset.digitalSourceType === trainedAlgorithmicMediaCode
+          ? trainedAlgorithmicMediaCode
+          : undefined
+        : input.digitalSourceType,
     excludeAssetId: currentAsset.id,
     file: input.file,
     ownerUserId: input.ownerUserId,
@@ -708,6 +753,7 @@ export async function replaceStoredMediaAsset(input: {
     .select({
       byteSize: media.byteSize,
       contentHash: media.contentHash,
+      digitalSourceType: media.digitalSourceType,
       durationMs: media.durationMs,
       height: media.height,
       mimeType: media.mimeType,
@@ -731,6 +777,7 @@ export async function replaceStoredMediaAsset(input: {
     .set({
       byteSize: replacementRow.byteSize,
       contentHash: replacementRow.contentHash,
+      digitalSourceType: replacementRow.digitalSourceType,
       durationMs: replacementRow.durationMs,
       height: replacementRow.height,
       mimeType: replacementRow.mimeType,
@@ -756,6 +803,7 @@ export async function replaceStoredMediaAsset(input: {
       altText: media.altText,
       byteSize: media.byteSize,
       createdAt: media.createdAt,
+      digitalSourceType: media.digitalSourceType,
       durationMs: media.durationMs,
       folderId: media.folderId,
       height: media.height,
@@ -773,6 +821,188 @@ export async function replaceStoredMediaAsset(input: {
     .limit(1);
 
   return toAdminMediaAsset(updatedAsset);
+}
+
+export async function updateStoredMediaMetadata(input: {
+  altText?: string;
+  assetId: string;
+  digitalSourceType: MediaDigitalSourceType | null;
+  ownerUserId: string;
+}) {
+  const [currentAsset] = await db
+    .select({
+      altText: media.altText,
+      byteSize: media.byteSize,
+      createdAt: media.createdAt,
+      digitalSourceType: media.digitalSourceType,
+      durationMs: media.durationMs,
+      folderId: media.folderId,
+      height: media.height,
+      id: media.id,
+      mimeType: media.mimeType,
+      originalByteSize: media.originalByteSize,
+      originalFileName: media.originalFileName,
+      relativePath: media.relativePath,
+      tags: media.tags,
+      thumbnailRelativePath: media.thumbnailRelativePath,
+      width: media.width,
+    })
+    .from(media)
+    .where(
+      and(
+        eq(media.id, input.assetId),
+        eq(media.ownerUserId, input.ownerUserId),
+      ),
+    )
+    .limit(1);
+
+  if (!currentAsset) {
+    throw new Error("Media asset was not found.");
+  }
+
+  if (
+    input.digitalSourceType &&
+    !currentAsset.mimeType.startsWith("image/")
+  ) {
+    throw new Error("AI source metadata can only be added to images.");
+  }
+
+  const currentDigitalSourceType =
+    currentAsset.digitalSourceType === trainedAlgorithmicMediaCode
+      ? trainedAlgorithmicMediaCode
+      : null;
+  const shouldRewriteImage =
+    currentAsset.mimeType.startsWith("image/") &&
+    currentDigitalSourceType !== input.digitalSourceType;
+  let nextByteSize = currentAsset.byteSize;
+  let nextMimeType = currentAsset.mimeType;
+  let nextRelativePath = currentAsset.relativePath;
+  let nextThumbnailRelativePath = currentAsset.thumbnailRelativePath;
+
+  if (shouldRewriteImage) {
+    const settings = await getMediaStorageSettings();
+    const primaryBuffer = await readMediaFile(currentAsset.relativePath);
+    const primaryScope = getMediaScope(currentAsset.relativePath);
+    const nextPrimaryPath = createMediaRelativePath({
+      mimeType: "image/webp",
+      scope: primaryScope,
+    });
+    const nextPrimaryBuffer = await rewriteImageDigitalSourceMetadata({
+      buffer: primaryBuffer,
+      digitalSourceType: input.digitalSourceType,
+    });
+
+    let nextThumbnailBuffer: Buffer | null = null;
+    let nextThumbnailPath: string | null = null;
+    if (currentAsset.thumbnailRelativePath) {
+      const thumbnailBuffer = await readMediaFile(
+        currentAsset.thumbnailRelativePath,
+      );
+      nextThumbnailPath = createMediaRelativePath({
+        mimeType: "image/webp",
+        scope: getMediaScope(currentAsset.thumbnailRelativePath),
+      });
+      nextThumbnailBuffer = await rewriteImageDigitalSourceMetadata({
+        buffer: thumbnailBuffer,
+        digitalSourceType: input.digitalSourceType,
+      });
+    }
+
+    await assertStorageQuotaAfterOptimization({
+      excludeAssetId: currentAsset.id,
+      fileCount: 1,
+      optimizedBytes: nextPrimaryBuffer.byteLength,
+      ownerUserId: input.ownerUserId,
+      scope: primaryScope,
+      settings,
+    });
+
+    const nextPaths = [nextPrimaryPath, nextThumbnailPath].filter(
+      (relativePath): relativePath is string => Boolean(relativePath),
+    );
+
+    try {
+      await writeMediaFile(nextPrimaryPath, nextPrimaryBuffer);
+      if (nextThumbnailPath && nextThumbnailBuffer) {
+        await writeMediaFile(nextThumbnailPath, nextThumbnailBuffer);
+      }
+
+      const updatedRows = await db
+        .update(media)
+        .set({
+          altText: input.altText?.trim() || null,
+          byteSize: nextPrimaryBuffer.byteLength,
+          digitalSourceType: input.digitalSourceType,
+          mimeType: "image/webp",
+          relativePath: nextPrimaryPath,
+          thumbnailRelativePath:
+            nextThumbnailPath ?? currentAsset.thumbnailRelativePath,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(media.id, input.assetId),
+            eq(media.ownerUserId, input.ownerUserId),
+            eq(media.relativePath, currentAsset.relativePath),
+          ),
+        )
+        .returning({ id: media.id });
+
+      if (updatedRows.length !== 1) {
+        throw new Error(
+          "The media file changed while its metadata was being updated. Try again.",
+        );
+      }
+    } catch (error) {
+      await Promise.allSettled(
+        nextPaths.map((relativePath) => removeMediaFile(relativePath)),
+      );
+      throw error;
+    }
+
+    nextByteSize = nextPrimaryBuffer.byteLength;
+    nextMimeType = "image/webp";
+    nextRelativePath = nextPrimaryPath;
+    nextThumbnailRelativePath =
+      nextThumbnailPath ?? currentAsset.thumbnailRelativePath;
+
+    await Promise.allSettled(
+      [currentAsset.relativePath, currentAsset.thumbnailRelativePath]
+        .filter((relativePath): relativePath is string => Boolean(relativePath))
+        .map((relativePath) => removeMediaFile(relativePath)),
+    );
+  } else {
+    await db
+      .update(media)
+      .set({
+        altText: input.altText?.trim() || null,
+        digitalSourceType: input.digitalSourceType,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(media.id, input.assetId),
+          eq(media.ownerUserId, input.ownerUserId),
+        ),
+      );
+  }
+
+  const folderIdsByAssetId = await getFolderIdsByAssetId([currentAsset.id]);
+  const usageCountByAssetId = await getMediaUsageCounts([currentAsset.id]);
+
+  return toAdminMediaAsset({
+    ...currentAsset,
+    altText: input.altText?.trim() || null,
+    byteSize: nextByteSize,
+    digitalSourceType: input.digitalSourceType,
+    folderIds:
+      folderIdsByAssetId.get(currentAsset.id) ??
+      legacyFolderIds(currentAsset.folderId),
+    mimeType: nextMimeType,
+    relativePath: nextRelativePath,
+    thumbnailRelativePath: nextThumbnailRelativePath,
+    usageCount: usageCountByAssetId.get(currentAsset.id) ?? 0,
+  });
 }
 
 async function assertStorageQuotaAfterOptimization(input: {
@@ -833,15 +1063,39 @@ async function getUsedStorageBytes(input: {
 }
 
 async function removeMediaFile(relativePath: string) {
-  const normalizedPath = normalizeRelativeMediaPath(relativePath);
-  const mediaRoot = path.resolve(env.MEDIA_ROOT);
-  const absolutePath = path.resolve(mediaRoot, normalizedPath);
+  await rm(resolveMediaAbsolutePath(relativePath), { force: true });
+}
 
-  if (!absolutePath.startsWith(mediaRoot)) {
-    return;
+async function readMediaFile(relativePath: string) {
+  return readFile(resolveMediaAbsolutePath(relativePath));
+}
+
+function getMediaScope(relativePath: string) {
+  const [scope] = normalizeRelativeMediaPath(relativePath).split("/");
+
+  if (!scope) {
+    throw new Error("Media scope could not be resolved.");
   }
 
-  await rm(absolutePath, { force: true });
+  return scope;
+}
+
+async function rewriteImageDigitalSourceMetadata(input: {
+  buffer: Buffer;
+  digitalSourceType: MediaDigitalSourceType | null;
+}) {
+  const image = sharp(input.buffer, { failOn: "none" });
+  const outputXmp = updateDigitalSourceTypeXmp(null, input.digitalSourceType);
+  const output = image.webp({
+    effort: 6,
+    lossless: true,
+  });
+
+  if (outputXmp) {
+    output.withXmp(outputXmp);
+  }
+
+  return output.toBuffer();
 }
 
 async function probeVideo(inputPath: string) {
@@ -934,16 +1188,28 @@ function canExecute(command: string) {
 }
 
 async function writeMediaFile(relativePath: string, buffer: Buffer) {
-  const normalizedPath = normalizeRelativeMediaPath(relativePath);
-  const absolutePath = path.resolve(env.MEDIA_ROOT, normalizedPath);
-  const mediaRoot = path.resolve(env.MEDIA_ROOT);
-
-  if (!absolutePath.startsWith(mediaRoot)) {
-    throw new Error("Media path escaped the media root.");
-  }
+  const absolutePath = resolveMediaAbsolutePath(relativePath);
 
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, buffer);
+}
+
+function resolveMediaAbsolutePath(relativePath: string) {
+  const normalizedPath = normalizeRelativeMediaPath(relativePath);
+  const mediaRoot = path.resolve(env.MEDIA_ROOT);
+  const absolutePath = path.resolve(mediaRoot, normalizedPath);
+  const pathFromMediaRoot = path.relative(mediaRoot, absolutePath);
+
+  if (
+    !pathFromMediaRoot ||
+    pathFromMediaRoot === ".." ||
+    pathFromMediaRoot.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(pathFromMediaRoot)
+  ) {
+    throw new Error("Media path escaped the media root.");
+  }
+
+  return absolutePath;
 }
 
 function sanitizeFileName(fileName: string) {

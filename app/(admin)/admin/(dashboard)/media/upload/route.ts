@@ -13,12 +13,19 @@ import {
   processAndStoreMediaUpload,
   replaceStoredMediaAsset,
 } from "@/src/modules/media/admin";
+import { trainedAlgorithmicMediaCode } from "@/src/modules/media/digital-source";
 
 const uploadSchema = z.object({
   acceptedMediaTypes: z
     .array(z.enum(["document", "image", "video"]))
     .min(1)
     .default(["image", "video"]),
+  digitalSourceType: z
+    .enum(["", trainedAlgorithmicMediaCode])
+    .optional()
+    .transform((value) =>
+      value === "" ? null : value,
+    ),
   replaceAssetId: z.string().uuid().optional(),
   scope: z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/),
 });
@@ -111,6 +118,10 @@ export async function POST(request: Request) {
     const file = formData.get("file");
     const parsed = uploadSchema.safeParse({
       acceptedMediaTypes: formData.getAll("acceptedMediaTypes"),
+      digitalSourceType:
+        formData.get("digitalSourceType") === null
+          ? undefined
+          : String(formData.get("digitalSourceType")),
       replaceAssetId: formData.get("replaceAssetId") || undefined,
       scope: String(formData.get("scope") ?? "admin-media"),
     });
@@ -147,11 +158,13 @@ export async function POST(request: Request) {
     const asset = parsed.data.replaceAssetId
       ? await replaceStoredMediaAsset({
           assetId: parsed.data.replaceAssetId,
+          digitalSourceType: parsed.data.digitalSourceType,
           file,
           ownerUserId: session.user.id,
           scope: "admin-media",
         })
       : await processAndStoreMediaUpload({
+          digitalSourceType: parsed.data.digitalSourceType ?? undefined,
           file,
           ownerUserId: session.user.id,
           scope: "admin-media",

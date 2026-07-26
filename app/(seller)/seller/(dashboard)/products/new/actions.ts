@@ -1125,6 +1125,7 @@ function toImportedMediaAsset(row: {
   altText: string | null;
   byteSize: number;
   createdAt: Date;
+  digitalSourceType: string | null;
   durationMs: number | null;
   folderId: string | null;
   height: number | null;
@@ -1141,6 +1142,10 @@ function toImportedMediaAsset(row: {
     altText: row.altText,
     byteSize: row.byteSize,
     createdAt: row.createdAt,
+    digitalSourceType:
+      row.digitalSourceType === "trainedAlgorithmicMedia"
+        ? "trainedAlgorithmicMedia"
+        : null,
     durationMs: row.durationMs,
     folderId: row.folderId,
     folderIds: row.folderId ? [row.folderId] : [],
@@ -1194,6 +1199,7 @@ export async function importProductLinkMedia(
           altText: media.altText,
           byteSize: media.byteSize,
           createdAt: media.createdAt,
+          digitalSourceType: media.digitalSourceType,
           durationMs: media.durationMs,
           folderId: media.folderId,
           height: media.height,

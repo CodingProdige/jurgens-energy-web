@@ -762,6 +762,13 @@ h6:not([class]) {
   }
 }
 
+@media (max-width: 63.999rem) {
+  body:has([data-marketplace-mobile-dock])
+    [data-marketplace-whatsapp-button] {
+    bottom: calc(env(safe-area-inset-bottom) + 6.25rem);
+  }
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

@@ -69,6 +69,7 @@ export function MarketplaceWhatsAppButton({
     <Link
       aria-label="Order LPG gas on WhatsApp"
       className="group fixed bottom-5 right-5 z-[45] inline-flex h-14 items-center gap-2.5 overflow-hidden rounded-full bg-[#080808] px-5 text-sm font-normal uppercase text-white shadow-[0_14px_30px_rgba(8,8,8,0.24),0_0_16px_rgba(37,211,102,0.12)] ring-1 ring-[#25d366]/10 transition hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#25d366]/25 dark:ring-[#25d366]/15 max-[520px]:bottom-4 max-[520px]:right-4 max-[520px]:size-14 max-[520px]:justify-center max-[520px]:px-0"
+      data-marketplace-whatsapp-button
       href={whatsappHref}
       rel="noreferrer"
       target="_blank"

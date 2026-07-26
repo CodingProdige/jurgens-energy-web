@@ -484,6 +484,13 @@
       "when": 1785319200000,
       "tag": "0068_jurgens_password_reset_branding",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1785405600000,
+      "tag": "0069_media_digital_source_type",
+      "breakpoints": true
     }
   ]
 }

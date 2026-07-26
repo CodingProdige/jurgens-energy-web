@@ -3,13 +3,20 @@
 import { rm } from "node:fs/promises";
 import path from "node:path";
 
+import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 
 import { auth } from "@/auth";
 import { env } from "@/src/config/env";
 import { db } from "@/src/db";
 import { media } from "@/src/db/schema";
-import { getMediaUsageCount } from "@/src/modules/media/admin";
+import {
+  getMediaUsageCount,
+  updateStoredMediaMetadata,
+  type AdminMediaAsset,
+} from "@/src/modules/media/admin";
+import { trainedAlgorithmicMediaCode } from "@/src/modules/media/digital-source";
 import { normalizeRelativeMediaPath } from "@/src/modules/media/paths";
 
 export type OwnerMediaDeleteState = {
@@ -17,6 +24,62 @@ export type OwnerMediaDeleteState = {
   message?: string;
   ok?: boolean;
 };
+
+export type OwnerMediaMetadataState = {
+  asset?: AdminMediaAsset;
+  message?: string;
+  ok?: boolean;
+};
+
+const ownerMetadataSchema = z.object({
+  altText: z.string().trim().max(240).optional(),
+  digitalSourceType: z
+    .enum(["", trainedAlgorithmicMediaCode])
+    .transform((value) =>
+      value === trainedAlgorithmicMediaCode ? trainedAlgorithmicMediaCode : null,
+    ),
+  id: z.string().uuid(),
+});
+
+export async function updateOwnerMediaMetadata(
+  _state: OwnerMediaMetadataState,
+  formData: FormData,
+): Promise<OwnerMediaMetadataState> {
+  const session = await auth();
+
+  if (!session?.user) {
+    return { ok: false, message: "Sign in before managing media." };
+  }
+
+  const parsed = ownerMetadataSchema.safeParse({
+    altText: String(formData.get("altText") ?? ""),
+    digitalSourceType: String(formData.get("digitalSourceType") ?? ""),
+    id: String(formData.get("id") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: "Check the media details." };
+  }
+
+  try {
+    const asset = await updateStoredMediaMetadata({
+      altText: parsed.data.altText,
+      assetId: parsed.data.id,
+      digitalSourceType: parsed.data.digitalSourceType,
+      ownerUserId: session.user.id,
+    });
+
+    revalidatePath("/feeds/google-merchant.xml");
+
+    return { asset, ok: true, message: "Media details saved." };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Could not save media details.",
+    };
+  }
+}
 
 export async function deleteOwnerMediaAsset(
   id: string,

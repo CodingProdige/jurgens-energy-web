@@ -1766,7 +1766,10 @@ function MobileStickyPurchaseBar({
   selectedPrice: string;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8e8e2] bg-white px-3 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2 shadow-[0_-12px_30px_rgba(8,8,8,0.12)] dark:border-white/10 dark:bg-[#101010] lg:hidden">
+    <div
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e8e8e2] bg-white px-3 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2 shadow-[0_-12px_30px_rgba(8,8,8,0.12)] dark:border-white/10 dark:bg-[#101010] lg:hidden"
+      data-marketplace-mobile-dock
+    >
       <div className="mx-auto grid w-full max-w-4xl gap-1.5">
         <p className="flex min-w-0 items-center justify-center gap-1.5 text-center text-[11px] font-semibold text-[#080808] dark:text-[#f7f7f2]">
           {hasExchangeRequirement ? (

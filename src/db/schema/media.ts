@@ -52,6 +52,7 @@ export const media = pgTable(
     contentHash: varchar("content_hash", { length: 128 }),
     altText: text("alt_text"),
     tags: text("tags"),
+    digitalSourceType: varchar("digital_source_type", { length: 80 }),
     isPublic: boolean("is_public").notNull().default(true),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),

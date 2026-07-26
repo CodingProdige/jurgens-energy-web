@@ -14,7 +14,10 @@ import { requireAdminAccess } from "@/src/modules/auth/permissions";
 import {
   getMediaUsageCount,
   processAndStoreMediaUpload,
+  updateStoredMediaMetadata,
+  type AdminMediaAsset,
 } from "@/src/modules/media/admin";
+import { trainedAlgorithmicMediaCode } from "@/src/modules/media/digital-source";
 import { normalizeRelativeMediaPath } from "@/src/modules/media/paths";
 
 export type MediaUploadState = {
@@ -25,6 +28,7 @@ export type MediaUploadState = {
 };
 
 export type MediaMetadataState = {
+  asset?: AdminMediaAsset;
   message?: string;
   ok?: boolean;
 };
@@ -59,11 +63,17 @@ const uploadSchema = z.object({
     .array(z.enum(["document", "image", "video"]))
     .min(1)
     .default(["image", "video"]),
+  digitalSourceType: z.literal(trainedAlgorithmicMediaCode).optional(),
   scope: z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/),
 });
 
 const metadataSchema = z.object({
   altText: z.string().trim().max(240).optional(),
+  digitalSourceType: z
+    .enum(["", trainedAlgorithmicMediaCode])
+    .transform((value) =>
+      value === trainedAlgorithmicMediaCode ? trainedAlgorithmicMediaCode : null,
+    ),
   id: z.string().uuid(),
 });
 
@@ -124,6 +134,7 @@ export async function uploadAdminMedia(
   const parsed = uploadSchema.safeParse({
     acceptedMediaTypes: formData.getAll("acceptedMediaTypes"),
     altText: String(formData.get("altText") ?? ""),
+    digitalSourceType: formData.get("digitalSourceType") || undefined,
     scope: String(formData.get("scope") ?? "admin-media"),
   });
 
@@ -160,6 +171,10 @@ export async function uploadAdminMedia(
       assets.push(
         await processAndStoreMediaUpload({
           altText: parsed.data.altText,
+          digitalSourceType:
+            getFileMediaType(file) === "image"
+              ? parsed.data.digitalSourceType
+              : undefined,
           file,
           ownerUserId: session.user.id,
           scope: "admin-media",
@@ -197,6 +212,7 @@ export async function updateAdminMediaMetadata(
 
   const parsed = metadataSchema.safeParse({
     altText: String(formData.get("altText") ?? ""),
+    digitalSourceType: String(formData.get("digitalSourceType") ?? ""),
     id: String(formData.get("id") ?? ""),
   });
 
@@ -204,19 +220,25 @@ export async function updateAdminMediaMetadata(
     return { ok: false, message: "Check the media details." };
   }
 
-  await db
-    .update(media)
-    .set({
-      altText: parsed.data.altText || null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(eq(media.id, parsed.data.id), eq(media.ownerUserId, session.user.id)),
-    );
+  try {
+    const asset = await updateStoredMediaMetadata({
+      altText: parsed.data.altText,
+      assetId: parsed.data.id,
+      digitalSourceType: parsed.data.digitalSourceType,
+      ownerUserId: session.user.id,
+    });
 
-  revalidatePath("/catalog/brands");
+    revalidatePath("/catalog/brands");
+    revalidatePath("/feeds/google-merchant.xml");
 
-  return { ok: true, message: "Media details saved." };
+    return { asset, ok: true, message: "Media details saved." };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Could not save media details.",
+    };
+  }
 }
 
 export async function deleteAdminMediaAsset(
