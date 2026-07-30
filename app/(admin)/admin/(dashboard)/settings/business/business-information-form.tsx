@@ -194,7 +194,8 @@ export function BusinessInformationForm({
               Courier collection details
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-              Bob Go uses this origin when requesting courier rates.
+              Courier Guy bookings use these dispatch contact details. The
+              drop-off point itself is configured in shipping settings.
             </p>
           </div>
         </div>

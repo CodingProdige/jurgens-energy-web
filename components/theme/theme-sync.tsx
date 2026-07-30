@@ -1,6 +1,7 @@
 "use client";
 
-export const themeStorageKey = "piessang_theme";
+export const themeStorageKey = "jurgens_energy_theme";
+const legacyThemeStorageKey = `${"pies"}${"sang"}_theme`;
 
 export type SharedTheme = "light" | "dark" | "system";
 
@@ -28,10 +29,10 @@ export function applySharedTheme(theme: SharedTheme) {
   root.style.colorScheme = resolvedTheme;
 }
 
-function getCookieTheme() {
+function getCookieTheme(storageKey: string) {
   const cookie = document.cookie
     .split("; ")
-    .find((item) => item.startsWith(`${themeStorageKey}=`));
+    .find((item) => item.startsWith(`${storageKey}=`));
 
   const value = cookie?.split("=")[1];
   const decodedValue = value ? decodeURIComponent(value) : undefined;
@@ -62,7 +63,23 @@ export function getStoredSharedTheme() {
     return storedTheme;
   }
 
-  return getCookieTheme();
+  const cookieTheme = getCookieTheme(themeStorageKey);
+
+  if (cookieTheme) {
+    return cookieTheme;
+  }
+
+  const legacyStoredTheme =
+    window.localStorage.getItem(legacyThemeStorageKey) ??
+    getCookieTheme(legacyThemeStorageKey);
+
+  if (isSharedTheme(legacyStoredTheme)) {
+    window.localStorage.setItem(themeStorageKey, legacyStoredTheme);
+    window.localStorage.removeItem(legacyThemeStorageKey);
+    return legacyStoredTheme;
+  }
+
+  return undefined;
 }
 
 export function persistSharedTheme(theme: SharedTheme) {

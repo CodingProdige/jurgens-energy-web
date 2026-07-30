@@ -44,7 +44,7 @@ export function AboutPage({
     <article>
       <ContentHero
         breadcrumbLabel="About us"
-        description="JurgensEnergy.com is a South African online store for LPG cylinders, cylinder exchange options and gas accessories. Customers can browse, order and pay online for delivery within South Africa."
+        description="JurgensEnergy.com is a South African online store for LPG cylinders, cylinder exchange options and gas accessories. Customers can browse, order and pay online. Delivery is available to eligible addresses within South Africa, as confirmed at checkout."
         eyebrow="About Jurgens Energy"
         icon={FlameIcon}
         title="JurgensEnergy.com is a South African online store."
@@ -87,14 +87,15 @@ export function AboutPage({
             </span>
             <div className="min-w-0">
               <h3 className="text-[15px] font-black uppercase leading-tight">
-                Delivery in South Africa
+                Delivery availability
               </h3>
               <p className="mt-1 text-[13px] leading-6 text-[#62625c] dark:text-[#bdbdb5]">
                 Jurgens Energy does not operate a customer-facing physical
-                store. Eligible orders are delivered within South Africa.
-                Handling takes 0–1 business day after payment confirmation, with
-                a 2:00 PM SAST order cut-off. Shipping takes 1–3 business days
-                after dispatch, for an estimated total of 1–4 business days.
+                store. Delivery is available to eligible addresses within South
+                Africa, as confirmed at checkout. Handling takes 0–1 business
+                day after payment confirmation, with a 2:00 PM SAST order
+                cut-off. Transit timing after dispatch depends on the
+                destination, parcel and delivery service.
               </p>
             </div>
           </div>

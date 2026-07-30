@@ -1,10 +1,18 @@
 import type { StorefrontSection } from "./storefront-types";
 
+const eligibleAddressHeroCopy =
+  "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.";
+const eligibleAddressFeatureTitle = "Delivery availability";
+const eligibleAddressFeatureText =
+  "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.";
+
 const legacyHeroCopyReplacements: Readonly<Record<string, string>> = {
   "Safe, certified and delivered to your home or business.":
-    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
+    eligibleAddressHeroCopy,
   "LPG cylinders, exchange options and local delivery where available.":
-    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
+    eligibleAddressHeroCopy,
+  "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.":
+    eligibleAddressHeroCopy,
 };
 
 const legacyFeatureGridTitleReplacements: Readonly<Record<string, string>> = {
@@ -19,19 +27,20 @@ const legacyFeatureGridEyebrowReplacements: Readonly<Record<string, string>> = {
 const legacyFeatureTitleReplacements: Readonly<Record<string, string>> = {
   "Certified cylinders": "Safety-first handling",
   "Ready to cook": "Clear product details",
-  "Same day delivery": "Delivery in South Africa",
-  "Local delivery": "Delivery in South Africa",
+  "Same day delivery": eligibleAddressFeatureTitle,
+  "Local delivery": eligibleAddressFeatureTitle,
+  "Delivery in South Africa": eligibleAddressFeatureTitle,
 };
 
 const legacyFeatureTextReplacements: Readonly<Record<string, string>> = {
   "Every cylinder is checked and handled with care.":
     "Cylinder eligibility and handover checks apply where required.",
-  "Fast local delivery for homes and businesses.":
-    "Estimated delivery in 1–4 business days.",
+  "Fast local delivery for homes and businesses.": eligibleAddressFeatureText,
   "Local delivery options for eligible addresses.":
-    "Estimated delivery in 1–4 business days.",
+    eligibleAddressFeatureText,
   "Estimated delivery in 1–3 business days after payment confirmation.":
-    "Estimated delivery in 1–4 business days.",
+    eligibleAddressFeatureText,
+  "Estimated delivery in 1–4 business days.": eligibleAddressFeatureText,
   "Full cylinders arrive ready for safe connection.":
     "Review the product details and connection requirements before use.",
 };

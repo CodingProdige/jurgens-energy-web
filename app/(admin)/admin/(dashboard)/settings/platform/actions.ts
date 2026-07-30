@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
+  maxWhatsappEmailNotificationRecipients,
   openAiReasoningEfforts,
   updateMarketplaceComingSoonSettings,
   updateMarketplaceFooterSettings,
@@ -460,28 +461,90 @@ export async function updatePayFastPaymentSettings(
 }
 
 const shippingSettingsSchema = z.object({
-  bobgoApiKey: z.string().trim().optional().transform((value) => value || undefined),
-  bobgoBookingMode: z.enum(["disabled", "quote_only", "quote_and_book"]),
-  bobgoEnabled: z.coerce.boolean().default(false),
-  bobgoLiveApiKey: z.string().trim().optional().transform((value) => value || undefined),
-  bobgoLiveWebhookSecret: z.string().trim().optional().transform((value) => value || undefined),
-  bobgoMode: z.enum(["live", "sandbox"]).default("sandbox"),
-  bobgoSandboxApiKey: z.string().trim().optional().transform((value) => value || undefined),
-  bobgoSandboxWebhookSecret: z.string().trim().optional().transform((value) => value || undefined),
-  bobgoWebhookFulfillmentCreated: z.coerce.boolean().default(false),
-  bobgoWebhookSecret: z.string().trim().optional().transform((value) => value || undefined),
-  bobgoWebhookShipmentChargedAmountChanged: z.coerce.boolean().default(false),
-  bobgoWebhookShipmentChargedWeightChanged: z.coerce.boolean().default(false),
-  bobgoWebhookShipmentHealthStatusUpdated: z.coerce.boolean().default(false),
-  bobgoWebhookShipmentSubmissionStatusUpdated: z.coerce.boolean().default(false),
-  bobgoWebhookTrackingUpdated: z.coerce.boolean().default(false),
+  courierGuyDefaultServiceCode: z
+    .string()
+    .trim()
+    .max(64)
+    .optional()
+    .transform((value) => value || undefined),
+  courierGuyDropoffPickupPointId: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((value) => value || undefined),
+  courierGuyDropoffPickupPointLabel: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .transform((value) => value || undefined),
+  courierGuyDropoffProvider: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .default("tcg-locker"),
+  courierGuyDropoffType: z.enum([
+    "generic_kiosk",
+    "generic_locker",
+    "specific_pickup_point",
+  ]),
+  courierGuyEnabled: z.coerce.boolean().default(false),
+  courierGuyLiveAccountCode: z.preprocess(
+    (value) =>
+      value === "" || value === null || value === undefined ? null : value,
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .nullable(),
+  ),
+  courierGuyLiveApiKey: z
+    .string()
+    .trim()
+    .max(1000)
+    .optional()
+    .transform((value) => value || undefined),
+  courierGuyMode: z.enum(["live", "sandbox"]).default("sandbox"),
+  courierGuySandboxAccountCode: z.preprocess(
+    (value) =>
+      value === "" || value === null || value === undefined ? null : value,
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .nullable(),
+  ),
+  courierGuySandboxApiKey: z
+    .string()
+    .trim()
+    .max(1000)
+    .optional()
+    .transform((value) => value || undefined),
+  courierGuyWebhookToken: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine(
+      (value) => !value || value.length >= 24,
+      "Courier Guy webhook tokens must be at least 24 characters.",
+    )
+    .optional()
+    .transform((value) => value || undefined),
   jurgensDeliveryCutoffTime: z
     .string()
     .trim()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a valid cutoff time."),
-  shippingBufferBps: z.coerce.number().int().min(0).max(10000),
   shippingEnabled: z.coerce.boolean().default(false),
-  shippingMarginBps: z.coerce.number().int().min(0).max(10000),
+  shippingFlatRate: z.coerce.number().finite().min(0).max(1_000_000),
+  shippingFreeOverAmount: z.preprocess(
+    (value) =>
+      value === "" || value === null || value === undefined ? null : value,
+    z.coerce.number().finite().positive().max(1_000_000).nullable(),
+  ),
 });
 
 const whatsappOptionalTimeSchema = z
@@ -491,99 +554,165 @@ const whatsappOptionalTimeSchema = z
   .optional()
   .or(z.literal("").transform(() => undefined));
 
-const whatsappSettingsSchema = z.object({
-  apiKey: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine((value) => !value || value.length <= 500, "API key is too long."),
-  businessPhoneNumber: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) =>
-        !value ||
-        Boolean(normalizePhoneNumber(value, { defaultCountryCode: "ZA" })),
-      "Use a valid WhatsApp business phone number.",
-    )
-    .transform((value) =>
-      value
-        ? normalizePhoneNumber(value, { defaultCountryCode: "ZA" }) ?? value
-        : undefined,
+const whatsappEmailNotificationRecipientsSchema = z
+  .string()
+  .max(5000, "WhatsApp notification recipients are too long.")
+  .transform((value) =>
+    Array.from(
+      new Set(
+        value
+          .split(/[\n,]+/g)
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean),
+      ),
     ),
-  enabled: z.coerce.boolean().default(false),
-  followUpDefaultMessage: z
-    .string()
-    .trim()
-    .min(10, "Default follow-up message is too short.")
-    .max(1000, "Default follow-up message must be 1000 characters or less."),
-  followUpDelayMinutes: z.coerce.number().int().min(5).max(1440),
-  followUpDraftMessage: z
-    .string()
-    .trim()
-    .min(10, "Draft follow-up message is too short.")
-    .max(1000, "Draft follow-up message must be 1000 characters or less."),
-  followUpMaxCount: z.coerce.number().int().min(1).max(5),
-  followUpQuietHoursEnabled: z.boolean(),
-  followUpQuietHoursEnd: whatsappOptionalTimeSchema.transform(
-    (value) => value ?? null,
-  ),
-  followUpQuietHoursStart: whatsappOptionalTimeSchema.transform(
-    (value) => value ?? null,
-  ),
-  followUpSupportMessage: z
-    .string()
-    .trim()
-    .min(10, "Support follow-up message is too short.")
-    .max(1000, "Support follow-up message must be 1000 characters or less."),
-  followUpsEnabled: z.coerce.boolean().default(false),
-  messageUrl: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.startsWith("https://"),
-      "Use the full https:// 360dialog API URL.",
-    )
-    .refine((value) => !value || value.length <= 500, "API URL is too long."),
-  provider: z.literal("360dialog"),
-  webhookSigningSecret: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.length >= 16,
-      "Webhook signing secret must be at least 16 characters.",
-    )
-    .refine(
-      (value) => !value || value.length <= 255,
-      "Webhook signing secret is too long.",
+  )
+  .pipe(
+    z
+      .array(
+        z
+          .string()
+          .email("Use a valid WhatsApp notification email address.")
+          .max(254, "A WhatsApp notification email address is too long."),
+      )
+      .max(
+        maxWhatsappEmailNotificationRecipients,
+        `Add no more than ${maxWhatsappEmailNotificationRecipients} WhatsApp notification recipients.`,
+      ),
+  );
+
+const whatsappSettingsSchema = z
+  .object({
+    apiKey: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined)
+      .refine((value) => !value || value.length <= 500, "API key is too long."),
+    businessPhoneNumber: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined)
+      .refine(
+        (value) =>
+          !value ||
+          Boolean(normalizePhoneNumber(value, { defaultCountryCode: "ZA" })),
+        "Use a valid WhatsApp business phone number.",
+      )
+      .transform((value) =>
+        value
+          ? normalizePhoneNumber(value, { defaultCountryCode: "ZA" }) ?? value
+          : undefined,
+      ),
+    emailNotificationRecipients: whatsappEmailNotificationRecipientsSchema,
+    emailNotificationsEnabled: z.coerce.boolean().default(false),
+    emailNotifyInboundMessage: z.coerce.boolean().default(false),
+    emailNotifyNewConversation: z.coerce.boolean().default(false),
+    enabled: z.coerce.boolean().default(false),
+    followUpDefaultMessage: z
+      .string()
+      .trim()
+      .min(10, "Default follow-up message is too short.")
+      .max(1000, "Default follow-up message must be 1000 characters or less."),
+    followUpDelayMinutes: z.coerce.number().int().min(5).max(1440),
+    followUpDraftMessage: z
+      .string()
+      .trim()
+      .min(10, "Draft follow-up message is too short.")
+      .max(1000, "Draft follow-up message must be 1000 characters or less."),
+    followUpMaxCount: z.coerce.number().int().min(1).max(5),
+    followUpQuietHoursEnabled: z.boolean(),
+    followUpQuietHoursEnd: whatsappOptionalTimeSchema.transform(
+      (value) => value ?? null,
     ),
-  webhookVerifyToken: z
-    .string()
-    .trim()
-    .optional()
-    .transform((value) => value || undefined)
-    .refine(
-      (value) => !value || value.length <= 255,
-      "Webhook verify token is too long.",
+    followUpQuietHoursStart: whatsappOptionalTimeSchema.transform(
+      (value) => value ?? null,
     ),
-});
+    followUpSupportMessage: z
+      .string()
+      .trim()
+      .min(10, "Support follow-up message is too short.")
+      .max(1000, "Support follow-up message must be 1000 characters or less."),
+    followUpsEnabled: z.coerce.boolean().default(false),
+    messageUrl: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined)
+      .refine(
+        (value) => !value || value.startsWith("https://"),
+        "Use the full https:// 360dialog API URL.",
+      )
+      .refine((value) => !value || value.length <= 500, "API URL is too long."),
+    provider: z.literal("360dialog"),
+    webhookSigningSecret: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined)
+      .refine(
+        (value) => !value || value.length >= 16,
+        "Webhook signing secret must be at least 16 characters.",
+      )
+      .refine(
+        (value) => !value || value.length <= 255,
+        "Webhook signing secret is too long.",
+      ),
+    webhookVerifyToken: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined)
+      .refine(
+        (value) => !value || value.length <= 255,
+        "Webhook verify token is too long.",
+      ),
+  })
+  .superRefine((settings, context) => {
+    if (
+      settings.emailNotificationsEnabled &&
+      settings.emailNotificationRecipients.length === 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Add at least one notification email address before enabling email alerts.",
+        path: ["emailNotificationRecipients"],
+      });
+    }
+
+    if (
+      settings.emailNotificationsEnabled &&
+      !settings.emailNotifyNewConversation &&
+      !settings.emailNotifyInboundMessage
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Choose at least one WhatsApp email alert type.",
+        path: ["emailNotifyNewConversation"],
+      });
+    }
+  });
 
 export async function updateWhatsappOrderingSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireSettingsManageAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = whatsappSettingsSchema.safeParse({
     apiKey: String(formData.get("apiKey") ?? ""),
     businessPhoneNumber: String(formData.get("businessPhoneNumber") ?? ""),
+    emailNotificationRecipients: String(
+      formData.get("emailNotificationRecipients") ?? "",
+    ),
+    emailNotificationsEnabled:
+      formData.get("emailNotificationsEnabled") === "on",
+    emailNotifyInboundMessage:
+      formData.get("emailNotifyInboundMessage") === "on",
+    emailNotifyNewConversation:
+      formData.get("emailNotifyNewConversation") === "on",
     enabled: formData.get("enabled") === "on",
     followUpDefaultMessage: String(formData.get("followUpDefaultMessage") ?? ""),
     followUpDelayMinutes: String(formData.get("followUpDelayMinutes") ?? "30"),
@@ -623,7 +752,10 @@ export async function updateWhatsappOrderingSettings(
     };
   }
 
-  const result = await updateMarketplaceWhatsappSettings(parsed.data);
+  const result = await updateMarketplaceWhatsappSettings({
+    ...parsed.data,
+    actorUserId: session.user.id,
+  });
 
   revalidatePath("/");
   revalidatePath("/settings/platform");
@@ -635,38 +767,45 @@ export async function updateShippingIntegrationSettings(
   _state: AdminSettingsState,
   formData: FormData,
 ): Promise<AdminSettingsState> {
-  await requireSettingsManageAccess();
+  const session = await requireSettingsManageAccess();
 
   const parsed = shippingSettingsSchema.safeParse({
-    bobgoApiKey: String(formData.get("bobgoApiKey") ?? ""),
-    bobgoBookingMode: String(formData.get("bobgoBookingMode") ?? "disabled"),
-    bobgoEnabled: formData.get("bobgoEnabled") === "on",
-    bobgoLiveApiKey: String(formData.get("bobgoLiveApiKey") ?? ""),
-    bobgoLiveWebhookSecret: String(formData.get("bobgoLiveWebhookSecret") ?? ""),
-    bobgoMode: String(formData.get("bobgoMode") ?? "sandbox"),
-    bobgoSandboxApiKey: String(formData.get("bobgoSandboxApiKey") ?? ""),
-    bobgoSandboxWebhookSecret: String(
-      formData.get("bobgoSandboxWebhookSecret") ?? "",
+    courierGuyDefaultServiceCode: String(
+      formData.get("courierGuyDefaultServiceCode") ?? "",
     ),
-    bobgoWebhookFulfillmentCreated:
-      formData.get("bobgoWebhookFulfillmentCreated") === "on",
-    bobgoWebhookSecret: String(formData.get("bobgoWebhookSecret") ?? ""),
-    bobgoWebhookShipmentChargedAmountChanged:
-      formData.get("bobgoWebhookShipmentChargedAmountChanged") === "on",
-    bobgoWebhookShipmentChargedWeightChanged:
-      formData.get("bobgoWebhookShipmentChargedWeightChanged") === "on",
-    bobgoWebhookShipmentHealthStatusUpdated:
-      formData.get("bobgoWebhookShipmentHealthStatusUpdated") === "on",
-    bobgoWebhookShipmentSubmissionStatusUpdated:
-      formData.get("bobgoWebhookShipmentSubmissionStatusUpdated") === "on",
-    bobgoWebhookTrackingUpdated:
-      formData.get("bobgoWebhookTrackingUpdated") === "on",
+    courierGuyDropoffPickupPointId: String(
+      formData.get("courierGuyDropoffPickupPointId") ?? "",
+    ),
+    courierGuyDropoffPickupPointLabel: String(
+      formData.get("courierGuyDropoffPickupPointLabel") ?? "",
+    ),
+    courierGuyDropoffProvider: String(
+      formData.get("courierGuyDropoffProvider") ?? "tcg-locker",
+    ),
+    courierGuyDropoffType: String(
+      formData.get("courierGuyDropoffType") ?? "generic_kiosk",
+    ),
+    courierGuyEnabled: formData.get("courierGuyEnabled") === "on",
+    courierGuyLiveAccountCode: formData.get("courierGuyLiveAccountCode"),
+    courierGuyLiveApiKey: String(
+      formData.get("courierGuyLiveApiKey") ?? "",
+    ),
+    courierGuyMode: String(formData.get("courierGuyMode") ?? "sandbox"),
+    courierGuySandboxAccountCode: formData.get(
+      "courierGuySandboxAccountCode",
+    ),
+    courierGuySandboxApiKey: String(
+      formData.get("courierGuySandboxApiKey") ?? "",
+    ),
+    courierGuyWebhookToken: String(
+      formData.get("courierGuyWebhookToken") ?? "",
+    ),
     jurgensDeliveryCutoffTime: String(
       formData.get("jurgensDeliveryCutoffTime") ?? "14:00",
     ),
-    shippingBufferBps: formData.get("shippingBufferBps"),
     shippingEnabled: formData.get("shippingEnabled") === "on",
-    shippingMarginBps: formData.get("shippingMarginBps"),
+    shippingFlatRate: formData.get("shippingFlatRate"),
+    shippingFreeOverAmount: formData.get("shippingFreeOverAmount"),
   });
 
   if (!parsed.success) {
@@ -676,21 +815,20 @@ export async function updateShippingIntegrationSettings(
     };
   }
 
-  const result = await updateMarketplaceShippingSettings(parsed.data);
+  const result = await updateMarketplaceShippingSettings({
+    ...parsed.data,
+    actorUserId: session.user.id,
+  });
 
+  revalidatePath("/");
+  revalidatePath("/delivery-information");
+  revalidatePath("/faq");
+  revalidatePath("/feeds/google-merchant.xml");
+  revalidatePath("/lpg-delivery");
   revalidatePath("/settings/platform");
 
   return result;
 }
-
-const jurgensDeliveryRateSchema = z.object({
-  fromAmount: z.coerce.number().finite().min(0).max(1_000_000),
-  price: z.coerce.number().finite().min(0).max(1_000_000),
-  upToAmount: z.preprocess(
-    (value) => (value === "" || value === null || value === undefined ? null : value),
-    z.coerce.number().finite().min(0).max(1_000_000).nullable(),
-  ),
-});
 
 const jurgensDeliveryZoneSchema = z.object({
   deliveryInformation: z
@@ -706,7 +844,6 @@ const jurgensDeliveryZoneSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   isActive: z.coerce.boolean().default(false),
-  minimumOrderAmount: z.coerce.number().finite().min(0).max(1_000_000),
   name: z
     .string()
     .trim()
@@ -723,22 +860,7 @@ const jurgensDeliveryZoneSchema = z.object({
         .map((item) => item.trim())
         .filter(Boolean),
     ),
-  rates: z.array(jurgensDeliveryRateSchema).min(1),
 });
-
-function parseJurgensDeliveryRates(value: FormDataEntryValue | null) {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(value) as unknown;
-
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 export async function saveJurgensDeliveryZoneSettings(
   _state: AdminSettingsState,
@@ -750,10 +872,8 @@ export async function saveJurgensDeliveryZoneSettings(
     deliveryInformation: String(formData.get("deliveryInformation") ?? ""),
     id: String(formData.get("zoneId") ?? ""),
     isActive: formData.get("isActive") === "on",
-    minimumOrderAmount: formData.get("minimumOrderAmount"),
     name: String(formData.get("name") ?? ""),
     postalCodes: String(formData.get("postalCodes") ?? ""),
-    rates: parseJurgensDeliveryRates(formData.get("ratesJson")),
   });
 
   if (!parsed.success) {
@@ -764,7 +884,9 @@ export async function saveJurgensDeliveryZoneSettings(
     };
   }
 
-  const result = await upsertJurgensDeliveryZone(parsed.data);
+  const result = await upsertJurgensDeliveryZone({
+    ...parsed.data,
+  });
 
   revalidatePath("/settings/platform");
 

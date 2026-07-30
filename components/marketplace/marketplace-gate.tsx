@@ -8,6 +8,7 @@ import { MarketplaceWhatsAppButton } from "@/components/marketplace/marketplace-
 import {
   getMarketplaceSettings,
   isMarketplacePreviewTokenValid,
+  legacyMarketplaceComingSoonCookieName,
   marketplaceComingSoonCookieName,
 } from "@/src/modules/marketplace/settings";
 
@@ -34,7 +35,9 @@ export async function MarketplaceGate({ children }: MarketplaceGateProps) {
   }
 
   const cookieStore = await cookies();
-  const previewToken = cookieStore.get(marketplaceComingSoonCookieName)?.value;
+  const previewToken =
+    cookieStore.get(marketplaceComingSoonCookieName)?.value ??
+    cookieStore.get(legacyMarketplaceComingSoonCookieName)?.value;
   const hasPreviewAccess = await isMarketplacePreviewTokenValid(previewToken);
 
   if (hasPreviewAccess) {

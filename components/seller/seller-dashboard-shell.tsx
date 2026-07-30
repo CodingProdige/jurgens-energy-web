@@ -62,7 +62,7 @@ export function SellerDashboardShell({
     <DashboardSurfaceShell
       accent="green"
       attentionHrefs={attentionHrefs}
-      brandAriaLabel="Piessang seller dashboard"
+      brandAriaLabel="Jurgens Energy seller dashboard"
       currencyPreference={currencyPreference}
       navItems={navItems}
       notificationCenter={notificationCenter}

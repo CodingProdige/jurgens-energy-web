@@ -44,9 +44,11 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            We deliver eligible online-store orders within South Africa.
-            Enter your complete delivery address during checkout to confirm the
-            available option and fee for the selected products. Read the full{" "}
+            Courier-eligible products can be delivered nationwide within South
+            Africa. Products marked for Jurgens delivery require a postcode in an
+            active Jurgens service area. Enter your complete delivery address at
+            checkout to confirm eligibility. The postcode check does not change
+            the order-level delivery fee. Read the full{" "}
             <Link
               className="font-bold text-[#ff5a1f] hover:underline"
               href="/delivery-information"
@@ -61,14 +63,27 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
+            Checkout applies one configured VAT-inclusive flat delivery fee per
+            eligible order, not separate Jurgens and courier fees. When an active
+            free-shipping rule applies and the qualifying product subtotal reaches
+            its threshold, the delivery fee is reduced to zero. The courier&apos;s
+            charge to Jurgens Energy is private and does not change the fee shown
+            to you before payment.
+          </>
+        ),
+        question: "How is the delivery fee calculated?",
+      },
+      {
+        answer: (
+          <>
             Handling takes 0–1 business day after payment confirmation. Our order
             cutoff is 2:00 PM SAST on business days, and an order placed after the
             cutoff begins processing on the next business day. Handling does not
-            begin before payment is confirmed. Shipping then takes an estimated
-            1–3 business days after dispatch, giving an estimated total delivery
-            time of 1–4 business days. These times are estimates; stock, courier or
-            vehicle capacity, weather, traffic, access and LPG safety requirements
-            can affect them.
+            begin before payment is confirmed. Transit time after dispatch depends
+            on the destination, parcel and delivery service. Any available estimate
+            is communicated in the order updates or tracking details. Stock,
+            courier or vehicle capacity, weather, traffic, access and LPG safety
+            requirements can affect timing.
           </>
         ),
         question: "How quickly will my order arrive?",
@@ -109,10 +124,10 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Check the exact exchange requirement shown on the product. Size, type,
-            brand or ownership rules and condition may affect eligibility. Confirm
-            the requirement before checkout rather than assuming that any empty
-            cylinder can be exchanged.
+            Check the exact exchange requirement shown on the product. Size, type
+            and condition may affect eligibility. Confirm the requirement before
+            checkout rather than assuming that any empty cylinder can be
+            exchanged.
           </>
         ),
         question: "Which empty cylinder can I exchange?",
@@ -198,9 +213,9 @@ const faqGroups: FaqGroup[] = [
         answer: (
           <>
             Store product prices are VAT-inclusive unless a product clearly states
-            otherwise. Delivery, handling, deposit, exchange or other applicable
-            charges are displayed separately before the order is confirmed where
-            they apply.
+            otherwise. The order-level delivery fee is also VAT-inclusive.
+            Delivery, handling, deposit, exchange or other applicable charges are
+            displayed separately before the order is confirmed where they apply.
           </>
         ),
         question: "Do displayed prices include VAT?",
@@ -266,12 +281,17 @@ export const faqStructuredDataItems = [
   {
     question: "Where do you deliver?",
     answer:
-      "Jurgens Energy delivers eligible online-store orders within South Africa. Enter the complete delivery address during checkout to confirm the available option and fee for the selected products.",
+      "Courier-eligible products can be delivered nationwide within South Africa. Products marked for Jurgens delivery require a postcode in an active Jurgens service area. Checkout uses the complete delivery address to confirm eligibility, but the postcode check does not change the order-level delivery fee.",
+  },
+  {
+    question: "How is the delivery fee calculated?",
+    answer:
+      "Checkout applies one configured VAT-inclusive flat delivery fee per eligible order, not separate Jurgens and courier fees. If an active free-shipping rule applies and the qualifying product subtotal reaches its threshold, the delivery fee is reduced to zero. A courier provider's charge to Jurgens Energy does not change the customer fee shown before payment.",
   },
   {
     question: "How quickly will my order arrive?",
     answer:
-      "Handling takes 0–1 business day after payment confirmation. The order cutoff is 2:00 PM SAST on business days, and an order placed after the cutoff begins processing on the next business day. Handling does not begin before payment is confirmed. Shipping takes an estimated 1–3 business days after dispatch, giving an estimated total delivery time of 1–4 business days. Stock, transport capacity, weather, traffic, access and LPG safety requirements can affect timing.",
+      "Handling normally takes 0–1 business day after payment confirmation. Transit time after dispatch depends on the destination, parcel and delivery service. Any available estimate is communicated in the order updates or tracking details. Stock, transport capacity, weather, traffic, access and LPG safety requirements can affect timing.",
   },
   {
     question: "How does a cylinder exchange work?",
@@ -281,7 +301,7 @@ export const faqStructuredDataItems = [
   {
     question: "Do displayed prices include VAT?",
     answer:
-      "Store product prices are VAT-inclusive unless a product clearly states otherwise. Applicable delivery, handling, deposit, exchange or other charges are displayed separately before the order is confirmed.",
+      "Store product prices are VAT-inclusive unless a product clearly states otherwise. The order-level delivery fee is also VAT-inclusive. Applicable delivery, handling, deposit, exchange or other charges are displayed separately before the order is confirmed.",
   },
   {
     question: "How do returns and refunds work?",
@@ -290,7 +310,42 @@ export const faqStructuredDataItems = [
   },
 ] as const;
 
-export function FaqPage() {
+export function createFaqStructuredDataItems(
+  deliveryFeeDescription: string,
+) {
+  return faqStructuredDataItems.map((item) =>
+    item.question === "How is the delivery fee calculated?"
+      ? {
+          ...item,
+          answer: `${deliveryFeeDescription} A courier provider's charge to Jurgens Energy does not change the customer fee shown before payment.`,
+        }
+      : item,
+  );
+}
+
+export function FaqPage({
+  deliveryFeeDescription,
+}: {
+  deliveryFeeDescription: string;
+}) {
+  const resolvedFaqGroups = faqGroups.map((group) => ({
+    ...group,
+    items: group.items.map((item) =>
+      item.question === "How is the delivery fee calculated?"
+        ? {
+            ...item,
+            answer: (
+              <>
+                {deliveryFeeDescription} The courier&apos;s charge to Jurgens
+                Energy is private and does not change the fee shown before
+                payment.
+              </>
+            ),
+          }
+        : item,
+    ),
+  }));
+
   return (
     <article>
       <ContentHero
@@ -313,7 +368,7 @@ export function FaqPage() {
                 Browse questions
               </p>
               <div className="mt-1 grid gap-1">
-                {faqGroups.map((group) => (
+                {resolvedFaqGroups.map((group) => (
                   <a
                     className="rounded-md px-3 py-2.5 text-[12px] font-bold text-[#62625c] transition hover:bg-[#f7f7f2] hover:text-[#080808] dark:text-[#bdbdb5] dark:hover:bg-white/[0.06] dark:hover:text-white"
                     href={`#${group.id}`}
@@ -327,7 +382,7 @@ export function FaqPage() {
           </aside>
 
           <div className="min-w-0 space-y-11 sm:space-y-14">
-            {faqGroups.map((group) => (
+            {resolvedFaqGroups.map((group) => (
               <section
                 className="scroll-mt-[140px]"
                 id={group.id}

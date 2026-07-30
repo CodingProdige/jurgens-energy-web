@@ -69,7 +69,7 @@ export type SellerEditableProductData = {
   exchangeConfirmationText: string;
   exchangeEmptyCylinderSize: string;
   exchangeRequiresEmpty: boolean;
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
   googleFulfillmentChannel: GoogleFulfillmentChannel;
   googleReturnPolicyLabel: string;
   hasVariants: boolean;

@@ -478,7 +478,7 @@ export async function processAndStoreVideoUpload(input: {
 
   const sourceBuffer = Buffer.from(await input.file.arrayBuffer());
   const sourceHash = createHash("sha256").update(sourceBuffer).digest("hex");
-  const tempDir = path.join(os.tmpdir(), `piessang-media-${randomUUID()}`);
+  const tempDir = path.join(os.tmpdir(), `jurgens-energy-media-${randomUUID()}`);
   const inputPath = path.join(tempDir, sanitizeFileName(input.file.name));
   const outputPath = path.join(tempDir, "optimized.mp4");
   const posterPath = path.join(tempDir, "poster.jpg");

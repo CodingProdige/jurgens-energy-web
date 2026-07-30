@@ -10,8 +10,8 @@ if (!databaseUrl) {
 const email = process.env.SELLER_EMAIL ?? "seller@example.com";
 const password = process.env.SELLER_PASSWORD ?? process.env.ADMIN_PASSWORD;
 const name = process.env.SELLER_NAME ?? "Internal Test Seller";
-const storeName = process.env.SELLER_STORE_NAME ?? "Piessang Test Seller";
-const storeSlug = process.env.SELLER_STORE_SLUG ?? "piessang-test-seller";
+const storeName = process.env.SELLER_STORE_NAME ?? "Jurgens Energy Test Seller";
+const storeSlug = process.env.SELLER_STORE_SLUG ?? "jurgens-energy-test-seller";
 
 if (!password || password.length < 8) {
   throw new Error("SELLER_PASSWORD or ADMIN_PASSWORD must be at least 8 characters.");

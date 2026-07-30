@@ -1,6 +1,6 @@
-# Piessang Notification System
+# Jurgens Energy Notification System
 
-Piessang treats notifications as platform events. A single event can produce an
+Jurgens Energy treats notifications as platform events. A single event can produce an
 in-app notification, an email, and a web push notification.
 
 ## Event entry point

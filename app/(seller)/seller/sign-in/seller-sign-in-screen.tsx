@@ -196,7 +196,7 @@ function SellerSignInForm({
       </form>
 
       <p className="mt-6 text-center text-[13px] font-medium text-[#596176] dark:text-zinc-300">
-        Want to sell on Piessang?{" "}
+        Want to sell on Jurgens Energy?{" "}
         <Link
           href="/register"
           className="font-extrabold text-[#11952f] transition hover:text-[#086d22]"

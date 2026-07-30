@@ -29,7 +29,7 @@ export const shippingParcelSchema = z.object({
 
 export const fulfillmentModeSchema = z.enum([
   "seller_fulfilled",
-  "piessang_fulfilled",
+  "jurgens_fulfilled",
 ]);
 
 export const shippingMoneySettingsSchema = z.object({

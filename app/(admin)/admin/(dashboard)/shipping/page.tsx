@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
+import { CourierGuyShipmentActions } from "@/app/(admin)/admin/(dashboard)/shipping/shipment-actions";
 import {
   DashboardCompactMetrics,
   type DashboardMetricDefinition,
@@ -29,12 +30,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { hasAdminCapability } from "@/src/modules/admin/staff";
 import { getAdminShippingData } from "@/src/modules/admin/shipping";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
 export const metadata: Metadata = {
   title: "Admin Shipping",
-  description: "Monitor Jurgens Energy shipping, BobGo quotes, and webhook events.",
+  description:
+    "Book Courier Guy shipments, create waybills, and monitor delivery events.",
   robots: {
     follow: false,
     index: false,
@@ -59,7 +62,15 @@ function formatDate(value: Date) {
 }
 
 function statusClass(status: string) {
-  if (["booked", "ready_for_collection", "waybill_ready"].includes(status)) {
+  if (
+    [
+      "booking",
+      "booked",
+      "cancelling",
+      "ready_for_collection",
+      "waybill_ready",
+    ].includes(status)
+  ) {
     return "bg-amber-500/12 text-amber-700 dark:text-amber-300";
   }
 
@@ -67,7 +78,11 @@ function statusClass(status: string) {
     return "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300";
   }
 
-  if (["cancelled", "failed_delivery", "returned"].includes(status)) {
+  if (
+    ["cancelled", "failed_delivery", "returned", "undeliverable"].includes(
+      status,
+    )
+  ) {
     return "bg-red-500/12 text-red-700 dark:text-red-300";
   }
 
@@ -85,6 +100,10 @@ export default async function AdminShippingPage() {
     return <RestrictedAdminPage />;
   }
 
+  const canManageShipments = hasAdminCapability(
+    access.session.user.adminCapabilities,
+    "admin.orders.manage",
+  );
   const data = await getAdminShippingData();
   const metrics: DashboardMetricDefinition[] = [
     {
@@ -124,14 +143,14 @@ export default async function AdminShippingPage() {
     },
     {
       color: "#ff5a1f",
-      description: "BobGo rate quote rows captured by checkout.",
-      id: "bobgo_quotes",
-      label: "BobGo quotes",
-      value: data.metrics.bobgoQuotes,
+      description: "New shipments fulfilled through The Courier Guy.",
+      id: "courier_guy_shipments",
+      label: "Courier Guy",
+      value: data.metrics.courierGuyShipments,
     },
     {
       color: "slate",
-      description: "Recent BobGo webhook rows and shipment event rows.",
+      description: "Recent Courier Guy webhook rows and shipment events.",
       id: "webhooks",
       label: "Events",
       value: data.metrics.webhookEvents,
@@ -152,11 +171,11 @@ export default async function AdminShippingPage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-950 dark:text-white">
-                BobGo integration
+                The Courier Guy integration
               </p>
               <p className="mt-1 text-sm text-slate-600 dark:text-zinc-400">
-                Checkout can quote rates when shipping, BobGo, booking mode, and
-                the active API key are configured.
+                Customer prices stay fixed. Provider rates are used privately
+                when an administrator books each packed drop-off shipment.
               </p>
             </div>
             <Link
@@ -166,16 +185,29 @@ export default async function AdminShippingPage() {
               Shipping settings
             </Link>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
             {[
-              ["Shipping", data.bobgo.shippingEnabled ? "Enabled" : "Disabled"],
-              ["BobGo", data.bobgo.enabled ? "Enabled" : "Disabled"],
-              ["Mode", data.bobgo.mode],
-              ["Booking", labelize(data.bobgo.bookingMode)],
-              ["API key", data.bobgo.hasActiveApiKey ? "Set" : "Missing"],
               [
-                "Webhook secret",
-                data.bobgo.hasActiveWebhookSecret ? "Set" : "Missing",
+                "Customer delivery",
+                data.courierGuy.shippingEnabled ? "Enabled" : "Disabled",
+              ],
+              [
+                "Courier Guy",
+                data.courierGuy.enabled ? "Enabled" : "Disabled",
+              ],
+              ["Mode", data.courierGuy.mode],
+              ["Drop-off", labelize(data.courierGuy.dropoffType)],
+              [
+                "Account code",
+                data.courierGuy.hasActiveAccountCode ? "Set" : "Missing",
+              ],
+              [
+                "API key",
+                data.courierGuy.hasActiveApiKey ? "Set" : "Missing",
+              ],
+              [
+                "Webhook token",
+                data.courierGuy.hasWebhookToken ? "Set" : "Missing",
               ],
             ].map(([label, value]) => (
               <div
@@ -208,7 +240,8 @@ export default async function AdminShippingPage() {
                 <TableHead className={dashboardTableHeadClass}>Order</TableHead>
                 <TableHead className={dashboardTableHeadClass}>Provider</TableHead>
                 <TableHead className={dashboardTableHeadClass}>Tracking</TableHead>
-                <TableHead className={dashboardTableHeadClass}>Parcels</TableHead>
+                <TableHead className={dashboardTableHeadClass}>Cost</TableHead>
+                <TableHead className={dashboardTableHeadClass}>Actions</TableHead>
                 <TableHead className={dashboardTableHeadClass}>Updated</TableHead>
               </TableRow>
             </TableHeader>
@@ -217,7 +250,7 @@ export default async function AdminShippingPage() {
                 <TableRow className={dashboardTableRowClass}>
                   <TableCell
                     className={cn("h-28 text-center", dashboardTableCellClass)}
-                    colSpan={6}
+                    colSpan={7}
                   >
                     <span className={dashboardTableMutedTextClass}>
                       No shipments have been created yet.
@@ -235,11 +268,25 @@ export default async function AdminShippingPage() {
                         <p className={dashboardTableSecondaryTextClass}>
                           {shipment.providerShipmentId ?? shipment.id.slice(0, 8)}
                         </p>
+                        {shipment.providerEnvironment ? (
+                          <p className={dashboardTableSecondaryTextClass}>
+                            {shipment.providerEnvironment}
+                            {shipment.providerAccountCode
+                              ? ` · account ${shipment.providerAccountCode}`
+                              : ""}
+                          </p>
+                        ) : null}
+                        {shipment.status === "booking" ? (
+                          <p className="max-w-60 text-[11px] leading-4 text-amber-700 dark:text-amber-300">
+                            Reconcile in The Courier Guy portal with reference{" "}
+                            {shipment.bookingReference}.
+                          </p>
+                        ) : null}
                       </div>
                     </TableCell>
                     <TableCell className={dashboardTableCellClass}>
                       <span className={dashboardTablePrimaryTextClass}>
-                        #{shipment.orderId.slice(0, 8).toUpperCase()}
+                        {shipment.orderNumber}
                       </span>
                     </TableCell>
                     <TableCell className={dashboardTableCellClass}>
@@ -252,25 +299,72 @@ export default async function AdminShippingPage() {
                         <p className={dashboardTableMutedTextClass}>
                           {shipment.waybillNumber ?? shipment.trackingNumber ?? "No tracking yet"}
                         </p>
-                        {shipment.trackingUrl ? (
-                          <Link
-                            className={dashboardTableSecondaryTextClass}
-                            href={shipment.trackingUrl}
-                            target="_blank"
-                          >
-                            Open tracking
-                          </Link>
+                        {shipment.trackingUrl ||
+                        (shipment.provider === "courier_guy" &&
+                          shipment.providerShipmentId &&
+                          canManageShipments) ? (
+                          <div className="flex flex-wrap gap-x-3 gap-y-1">
+                            {shipment.trackingUrl ? (
+                              <Link
+                                className={dashboardTableSecondaryTextClass}
+                                href={shipment.trackingUrl}
+                                rel="noopener noreferrer"
+                                target="_blank"
+                              >
+                                Open tracking
+                              </Link>
+                            ) : null}
+                            {shipment.provider === "courier_guy" &&
+                            shipment.providerShipmentId &&
+                            canManageShipments ? (
+                              <Link
+                                className={dashboardTableSecondaryTextClass}
+                                href={`/shipping/${shipment.id}/waybill`}
+                                rel="noopener noreferrer"
+                                target="_blank"
+                              >
+                                Generate fresh waybill
+                              </Link>
+                            ) : null}
+                          </div>
                         ) : (
                           <p className={dashboardTableSecondaryTextClass}>
-                            Waybill {shipment.waybillUrl ? "ready" : "not ready"}
+                            Waybill not ready
                           </p>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className={dashboardTableCellClass}>
-                      <span className={dashboardTableMutedTextClass}>
-                        {shipment.parcelCount}
-                      </span>
+                      <div>
+                        <p className={dashboardTableMutedTextClass}>
+                          {shipment.providerCostAmount
+                            ? formatMoney(shipment.providerCostAmount)
+                            : "Not quoted"}
+                        </p>
+                        <p className={dashboardTableSecondaryTextClass}>
+                          {shipment.parcelCount} parcel
+                          {shipment.parcelCount === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className={dashboardTableCellClass}>
+                      {shipment.provider === "courier_guy" &&
+                      canManageShipments ? (
+                        <CourierGuyShipmentActions
+                          bookingReference={shipment.bookingReference}
+                          shipmentId={shipment.id}
+                          status={shipment.status}
+                          trackingNumber={shipment.trackingNumber}
+                        />
+                      ) : shipment.provider === "courier_guy" ? (
+                        <span className={dashboardTableSecondaryTextClass}>
+                          Read only
+                        </span>
+                      ) : (
+                        <span className={dashboardTableSecondaryTextClass}>
+                          Managed locally
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className={dashboardTableCellClass}>
                       <span className={dashboardTableMutedTextClass}>
@@ -288,10 +382,11 @@ export default async function AdminShippingPage() {
           <section className={cn("overflow-hidden", dashboardPanelClass, dashboardTableContainerClass)}>
             <div className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
               <p className="text-sm font-semibold text-zinc-950 dark:text-white">
-                Recent rate quotes
+                Customer delivery quotes
               </p>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
-                BobGo checkout quote history
+                Fixed order-level checkout pricing; carrier costs are stored on
+                booked shipments above.
               </p>
             </div>
             <Table className="table-fixed md:min-w-[680px]">
@@ -310,7 +405,9 @@ export default async function AdminShippingPage() {
                       <div className="min-w-0">
                         <p className={dashboardTablePrimaryTextClass}>{quote.serviceName}</p>
                         <p className={dashboardTableSecondaryTextClass}>
-                          Provider {formatMoney(quote.providerAmount)}
+                          {quote.provider === "manual"
+                            ? "Customer policy"
+                            : `Historical ${labelize(quote.provider)} record`}
                         </p>
                       </div>
                     </TableCell>
@@ -335,7 +432,7 @@ export default async function AdminShippingPage() {
                   <TableRow className={dashboardTableRowClass}>
                     <TableCell className="h-24 text-center" colSpan={4}>
                       <span className={dashboardTableMutedTextClass}>
-                        No BobGo quotes have been captured yet.
+                        No customer delivery quotes have been captured yet.
                       </span>
                     </TableCell>
                   </TableRow>
@@ -347,7 +444,7 @@ export default async function AdminShippingPage() {
           <section className={cn("overflow-hidden", dashboardPanelClass, dashboardTableContainerClass)}>
             <div className="border-b border-slate-200 px-5 py-4 dark:border-white/10">
               <p className="text-sm font-semibold text-zinc-950 dark:text-white">
-                BobGo webhook events
+                Courier Guy webhook events
               </p>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
                 Latest signed webhook payloads received
@@ -364,11 +461,19 @@ export default async function AdminShippingPage() {
               </TableHeader>
               <TableBody>
                 {data.webhookEvents.map((event) => (
-                  <TableRow className={dashboardTableRowClass} key={event.providerEventId}>
+                  <TableRow
+                    className={dashboardTableRowClass}
+                    key={`${event.providerEnvironment}:${event.providerEventId}`}
+                  >
                     <TableCell className={dashboardTableCellClass}>
-                      <span className={dashboardTablePrimaryTextClass}>
-                        {event.topic}
-                      </span>
+                      <div>
+                        <p className={dashboardTablePrimaryTextClass}>
+                          {event.topic}
+                        </p>
+                        <p className={dashboardTableSecondaryTextClass}>
+                          {event.providerEnvironment}
+                        </p>
+                      </div>
                     </TableCell>
                     <TableCell className={dashboardTableCellClass}>
                       <Badge className={cn("rounded-md border-0 capitalize", statusClass(event.status))}>
@@ -391,7 +496,7 @@ export default async function AdminShippingPage() {
                   <TableRow className={dashboardTableRowClass}>
                     <TableCell className="h-24 text-center" colSpan={4}>
                       <span className={dashboardTableMutedTextClass}>
-                        No BobGo webhook events have been received yet.
+                        No Courier Guy webhook events have been received yet.
                       </span>
                     </TableCell>
                   </TableRow>

@@ -45,7 +45,7 @@ const accentStyles = {
 
 export function PushNotificationPrompt({
   accent = "amber",
-  brandName = "Piessang",
+  brandName = "Jurgens Energy",
   className,
   onDismiss,
   onEnable,

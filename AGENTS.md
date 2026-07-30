@@ -10,7 +10,7 @@ Before making code changes, read and follow `docs/engineering-principles.md`.
 
 Environment configuration is documented in `docs/environment.md`. Keep only one root `.env` file; do not add additional `.env.example`, `.env.local`, `.env.production`, or similar root env files unless explicitly requested.
 
-Brand rules are documented in `docs/brand.md`. Use the Piessang palette and prefer shadcn/ui components before creating custom UI.
+Brand rules are documented in `docs/brand.md`. Use the Jurgens Energy palette and prefer shadcn/ui components before creating custom UI.
 
 The short version:
 

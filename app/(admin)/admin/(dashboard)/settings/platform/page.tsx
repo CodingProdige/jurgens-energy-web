@@ -30,12 +30,13 @@ import {
   GoogleMarketingSettingsForm,
   MediaStorageSettingsForm,
   NotificationSettingsForm,
+  NationwideShippingSettingsForm,
   PayFastSettingsForm,
   SocialLinksForm,
-  ShippingSettingsForm,
   WhatsappOrderingSettingsForm,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/settings-form";
 import { getAdminMediaLibrary } from "@/src/modules/media/admin";
+import { hasAdminCapability } from "@/src/modules/admin/staff";
 import { getAdminNotificationSettings } from "@/src/modules/notifications/templates";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
@@ -60,7 +61,7 @@ const settingSections = [
     key: "shipping",
     title: "Shipping",
     description:
-      "Manage Jurgens Energy shipping margins and encrypted Bob Go provider credentials.",
+      "Manage nationwide pricing, Jurgens postcode eligibility, and Courier Guy fulfillment.",
     icon: TruckIcon,
   },
   {
@@ -163,11 +164,15 @@ export default async function AdminSettingsPage({
     : resolvedSearchParams.notification;
   const selectedConfig = getSectionConfig(selectedSection);
   const settings = await getMarketplaceSettings();
+  const canManageSettings = hasAdminCapability(
+    session.user.adminCapabilities,
+    "admin.settings.manage",
+  );
   const secrets =
-    selectedSection === "payfast-payments" ||
-    selectedSection === "shipping" ||
-    selectedSection === "whatsapp-ordering" ||
-    selectedSection === "chatgpt-integration"
+    canManageSettings &&
+    (selectedSection === "payfast-payments" ||
+      selectedSection === "whatsapp-ordering" ||
+      selectedSection === "chatgpt-integration")
       ? await getMarketplaceAdminSecrets()
       : null;
   const notificationSettings =
@@ -310,41 +315,37 @@ function SettingsSection({
     return (
       <DashboardPanel
         title="Shipping"
-        description="Manage Jurgens Energy shipping controls and encrypted Bob Go credentials."
+        description="Manage nationwide customer pricing, Jurgens delivery eligibility, and encrypted Courier Guy credentials."
       >
-        <ShippingSettingsForm
-          bobgoBookingMode={settings.bobgoBookingMode}
-          bobgoEnabled={settings.bobgoEnabled}
-          bobgoMode={settings.bobgoMode}
-          bobgoWebhookFulfillmentCreated={
-            settings.bobgoWebhookFulfillmentCreated
+        <NationwideShippingSettingsForm
+          courierGuyDefaultServiceCode={
+            settings.courierGuyDefaultServiceCode
           }
-          bobgoWebhookShipmentChargedAmountChanged={
-            settings.bobgoWebhookShipmentChargedAmountChanged
+          courierGuyDropoffPickupPointId={
+            settings.courierGuyDropoffPickupPointId
           }
-          bobgoWebhookShipmentChargedWeightChanged={
-            settings.bobgoWebhookShipmentChargedWeightChanged
+          courierGuyDropoffPickupPointLabel={
+            settings.courierGuyDropoffPickupPointLabel
           }
-          bobgoWebhookShipmentHealthStatusUpdated={
-            settings.bobgoWebhookShipmentHealthStatusUpdated
+          courierGuyDropoffProvider={settings.courierGuyDropoffProvider}
+          courierGuyDropoffType={settings.courierGuyDropoffType}
+          courierGuyEnabled={settings.courierGuyEnabled}
+          courierGuyLiveAccountCode={settings.courierGuyLiveAccountCode}
+          courierGuyLiveApiKey={null}
+          courierGuyMode={settings.courierGuyMode}
+          courierGuySandboxAccountCode={
+            settings.courierGuySandboxAccountCode
           }
-          bobgoWebhookShipmentSubmissionStatusUpdated={
-            settings.bobgoWebhookShipmentSubmissionStatusUpdated
-          }
-          bobgoWebhookTrackingUpdated={settings.bobgoWebhookTrackingUpdated}
-          hasBobgoLiveApiKey={settings.hasBobgoLiveApiKey}
-          hasBobgoLiveWebhookSecret={settings.hasBobgoLiveWebhookSecret}
-          hasBobgoSandboxApiKey={settings.hasBobgoSandboxApiKey}
-          hasBobgoSandboxWebhookSecret={settings.hasBobgoSandboxWebhookSecret}
-          bobgoLiveApiKey={secrets?.bobgoLiveApiKey ?? null}
-          bobgoLiveWebhookSecret={secrets?.bobgoLiveWebhookSecret ?? null}
-          bobgoSandboxApiKey={secrets?.bobgoSandboxApiKey ?? null}
-          bobgoSandboxWebhookSecret={secrets?.bobgoSandboxWebhookSecret ?? null}
+          courierGuySandboxApiKey={null}
+          courierGuyWebhookUrl={settings.courierGuyWebhookUrl}
+          hasCourierGuyLiveApiKey={settings.hasCourierGuyLiveApiKey}
+          hasCourierGuySandboxApiKey={settings.hasCourierGuySandboxApiKey}
+          hasCourierGuyWebhookToken={settings.hasCourierGuyWebhookToken}
           jurgensDeliveryCutoffTime={settings.jurgensDeliveryCutoffTime}
           jurgensDeliveryZones={jurgensDeliveryZones}
-          shippingBufferBps={settings.shippingBufferBps}
           shippingEnabled={settings.shippingEnabled}
-          shippingMarginBps={settings.shippingMarginBps}
+          shippingFlatRate={settings.shippingFlatRate}
+          shippingFreeOverAmount={settings.shippingFreeOverAmount}
         />
       </DashboardPanel>
     );
@@ -366,6 +367,18 @@ function SettingsSection({
           }
           whatsappApiKey={secrets?.whatsappApiKey ?? null}
           whatsappBusinessPhoneNumber={settings.whatsappBusinessPhoneNumber}
+          whatsappEmailNotificationRecipients={
+            settings.whatsappEmailNotificationRecipients
+          }
+          whatsappEmailNotificationsEnabled={
+            settings.whatsappEmailNotificationsEnabled
+          }
+          whatsappEmailNotifyInboundMessage={
+            settings.whatsappEmailNotifyInboundMessage
+          }
+          whatsappEmailNotifyNewConversation={
+            settings.whatsappEmailNotifyNewConversation
+          }
           whatsappFollowUpDefaultMessage={
             settings.whatsappFollowUpDefaultMessage
           }
@@ -511,7 +524,7 @@ function SettingsSection({
         <div className="rounded-xl border border-admin-primary/25 bg-admin-primary/10 p-4 dark:bg-admin-primary/10">
           <LayersIcon className="size-5 text-admin-primary" />
           <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
-            PayFast mode, Bob Go credentials, WhatsApp ordering credentials,
+            PayFast mode, Courier Guy credentials, WhatsApp ordering credentials,
             Google tags, media limits, compression defaults, storage
             allocations, footer details, and social links are shared platform settings used
             wherever those systems appear.

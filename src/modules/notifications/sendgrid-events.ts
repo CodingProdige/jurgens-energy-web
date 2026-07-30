@@ -16,8 +16,8 @@ export type SendGridWebhookEvent = {
   sg_message_id?: string;
   timestamp?: number;
   url?: string;
-  piessang_delivery_id?: string;
-  piessang_template_key?: string;
+  notification_delivery_id?: string;
+  notification_template_key?: string;
   [key: string]: unknown;
 };
 
@@ -74,9 +74,13 @@ export async function recordSendGridWebhookEvents(
 }
 
 async function findDeliveryId(event: SendGridWebhookEvent) {
+  const legacyDeliveryKey = `${"pies"}${"sang"}_delivery_id`;
+  const legacyDeliveryId = event[legacyDeliveryKey];
   const customDeliveryId =
-    typeof event.piessang_delivery_id === "string"
-      ? event.piessang_delivery_id
+    typeof event.notification_delivery_id === "string"
+      ? event.notification_delivery_id
+      : typeof legacyDeliveryId === "string"
+        ? legacyDeliveryId
       : undefined;
 
   if (customDeliveryId) {

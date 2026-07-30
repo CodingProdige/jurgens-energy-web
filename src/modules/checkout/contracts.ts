@@ -155,7 +155,7 @@ export type CheckoutDeliveryOption = {
   amountZar: number;
   deliveryInformation: string | null;
   label: string;
-  provider: "bobgo" | "piessang_local";
+  provider: "manual";
   quoteId: string;
   serviceLevel: string | null;
 };

@@ -1,11 +1,15 @@
+import { after } from "next/server";
+
 import { env } from "@/src/config/env";
 import {
   send360DialogMediaMessage,
   send360DialogTextMessage,
 } from "@/src/modules/whatsapp-ordering/360dialog";
 import { getWhatsappIntegrationConfig } from "@/src/modules/marketplace/settings";
+import { dispatchWhatsappInboundAdminNotifications } from "@/src/modules/notifications/whatsapp-admin";
 import {
   processWhatsappInboundMessage,
+  type WhatsappAcceptedInboundMessage,
   type WhatsappAssistantMedia,
   type WhatsappInboundMessage,
 } from "@/src/modules/whatsapp-ordering/service";
@@ -136,7 +140,16 @@ export async function POST(request: Request) {
   }
 
   const parsed: WhatsappInboundMessage = payloadResult.message;
-  const result = await processWhatsappInboundMessage(parsed);
+  let acceptedInboundMessage: WhatsappAcceptedInboundMessage | null = null;
+  const result = await processWhatsappInboundMessage(parsed, {
+    onInboundAccepted(message) {
+      acceptedInboundMessage = message;
+    },
+  });
+
+  if (acceptedInboundMessage) {
+    scheduleWhatsappAdminEmailNotifications(acceptedInboundMessage);
+  }
 
   if (result.skipReply) {
     return Response.json(
@@ -177,6 +190,21 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "private, no-store" },
     },
   );
+}
+
+function scheduleWhatsappAdminEmailNotifications(
+  message: WhatsappAcceptedInboundMessage,
+) {
+  try {
+    after(async () => {
+      await dispatchWhatsappInboundAdminNotifications(message);
+    });
+  } catch (error) {
+    console.error(
+      "Failed to schedule WhatsApp admin email notifications",
+      error,
+    );
+  }
 }
 
 async function sendWhatsappReply({

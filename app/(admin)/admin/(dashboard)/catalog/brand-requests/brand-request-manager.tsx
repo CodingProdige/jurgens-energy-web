@@ -353,7 +353,7 @@ export function BrandRequestDashboard({
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `piessang-brand-requests-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.download = `jurgens-energy-brand-requests-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -368,7 +368,7 @@ export function BrandRequestDashboard({
       <div className="grid gap-4">
         <DashboardCompactMetrics
           metrics={requestMetrics}
-          storageKey="piessang:admin:catalog-brand-request-metrics"
+          storageKey="jurgens-energy:admin:catalog-brand-request-metrics"
         />
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

@@ -33,7 +33,7 @@ import { getSellerDashboardOverview } from "@/src/modules/sellers/dashboard";
 export const metadata: Metadata = {
   title: "Seller Dashboard",
   description:
-    "Protected Piessang seller dashboard for products, orders, fulfillment, payouts, and seller settings.",
+    "Protected Jurgens Energy seller dashboard for products, orders, fulfillment, payouts, and seller settings.",
   robots: {
     index: false,
     follow: false,
@@ -105,7 +105,7 @@ export default async function SellerDashboardPage() {
         <DashboardPanel
           accent="green"
           title="Seller setup guide"
-          description="Complete these steps to make your seller dashboard ready for orders, shipping quotes, and collection bookings."
+          description="Complete these steps to make your seller dashboard ready for orders, Courier Guy handoffs, and waybills."
         >
           <ol className="grid gap-3">
             {overview.setup.steps.map((step, index) => (
@@ -155,21 +155,21 @@ export default async function SellerDashboardPage() {
         <DashboardPanel
           accent="green"
           title="Fulfillment readiness"
-          description="The seller dashboard starts with the workflows needed for Bob Go-backed fulfillment."
+          description="Prepare courier-eligible products for nationwide South African delivery through The Courier Guy."
         >
           <div className="grid gap-3">
             {[
               {
                 icon: BoxesIcon,
                 label: "Product parcel data",
-                text: "Every shippable variant needs weight, length, width, and height before checkout quoting.",
+                text: "Every courier-eligible variant needs packed weight and dimensions for private carrier booking. Checkout uses the marketplace shipping price rules.",
               },
               {
                 icon: TruckIcon,
-                label: "Collection details",
+                label: "Dispatch details",
                 text: overview.fulfillmentProfile?.isVerified
-                  ? "Collection profile is verified for shipment booking."
-                  : "Collection profile still needs verification before shipment booking.",
+                  ? "Dispatch profile is verified for Courier Guy shipment booking."
+                  : "Dispatch profile still needs verification before Courier Guy shipment booking.",
               },
               {
                 icon: PackageCheckIcon,
@@ -221,7 +221,7 @@ export default async function SellerDashboardPage() {
                 {[
                   ["Orders", "Ready", "Seller order queue and SLA status"],
                   ["Products", "Ready", "Listing readiness and parcel data"],
-                  ["Shipping", "Planned", "Bob Go quotes, bookings, and waybills"],
+                  ["Shipping", "Planned", "Courier Guy bookings, tracking, and waybills"],
                   ["Payouts", "Planned", "Balances, batches, and statements"],
                 ].map(([workflow, status, focus]) => (
                   <TableRow key={workflow}>

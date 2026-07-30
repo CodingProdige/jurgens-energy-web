@@ -24,12 +24,11 @@ export type ValidatedCartItem = {
   continueSellingOutOfStock: boolean;
   displayLineTotal: number;
   displayUnitPrice: number;
-  exchangeAcceptedReturnBrands: string[];
   exchangeConfirmationMissing: boolean;
   exchangeConfirmationText: string | null;
   exchangeEmptyConfirmed: boolean;
   exchangeRequiredEmptyCylinderSize: string | null;
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
   heightMm: number | null;
   imageUrl: string | null;
   inStock: boolean;

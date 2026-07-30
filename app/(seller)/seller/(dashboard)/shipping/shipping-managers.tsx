@@ -108,7 +108,12 @@ function exportRows(fileName: string, headers: string[], rows: Array<Array<strin
 
 function StatusBadge({ status }: { status: string }) {
   const isDone = ["delivered", "collected"].includes(status);
-  const isProblem = ["failed_delivery", "returned", "cancelled"].includes(status);
+  const isProblem = [
+    "cancelled",
+    "failed_delivery",
+    "returned",
+    "undeliverable",
+  ].includes(status);
 
   return (
     <Badge
@@ -465,7 +470,18 @@ function ShipmentTable({
                     <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>{formatDate(shipment.bookedAt)}</TableCell>
                     <TableCell className={cn(dashboardTableCellClass, "hidden md:table-cell")}>{formatDate(shipment.collectedAt)}</TableCell>
                     <TableCell className={dashboardTableActionCellClass}>
-                      {shipment.waybillUrl ? (
+                      {shipment.provider === "courier_guy" &&
+                      shipment.trackingUrl ? (
+                        <a
+                          className="text-sm text-emerald-700"
+                          href={shipment.trackingUrl}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Tracking
+                        </a>
+                      ) : shipment.provider !== "courier_guy" &&
+                        shipment.waybillUrl ? (
                         <a className="text-sm text-emerald-700" href={shipment.waybillUrl} rel="noreferrer" target="_blank">Waybill</a>
                       ) : (
                         <span className="text-xs text-slate-500">Pending</span>

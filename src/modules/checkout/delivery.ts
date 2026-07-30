@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 
-import { getBusinessCollectionAddress } from "@/src/modules/business-information";
 import type { CartLineInput } from "@/src/modules/cart/contracts";
 import { validateCartLines } from "@/src/modules/cart/server";
 import {
@@ -10,10 +9,11 @@ import {
   type CheckoutQuoteRequest,
   type CheckoutQuoteResponse,
 } from "@/src/modules/checkout/contracts";
+import { CHECKOUT_DELIVERY_GROUP_KEY } from "@/src/modules/checkout/flow";
 import type { CurrencyContext } from "@/src/modules/currency";
 import { getJurgensDeliveryScheduleAvailability } from "@/src/modules/delivery-scheduling/jurgens";
-import { getBobGoCheckoutRates } from "@/src/modules/shipping/bobgo-client";
-import { getJurgensDeliveryCheckoutRates } from "@/src/modules/shipping/jurgens-delivery";
+import { evaluateCustomerDelivery } from "@/src/modules/shipping/customer-delivery-evaluation";
+import { createCustomerShippingQuote } from "@/src/modules/shipping/customer-shipping-quote";
 
 const zarCurrencyContext: CurrencyContext = {
   country: "ZA",
@@ -76,12 +76,12 @@ function toProviderAddress(address: CheckoutDeliveryAddress) {
   };
 }
 
-function getGroupKey(item: {
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+export function getCheckoutFulfillmentProvider(item: {
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
 }) {
-  return item.fulfillmentMode === "piessang_fulfilled"
-    ? "jurgens"
-    : "courier";
+  return item.fulfillmentMode === "jurgens_fulfilled"
+    ? ("jurgens_local" as const)
+    : ("courier_guy" as const);
 }
 
 export async function getCheckoutDeliveryQuotes(
@@ -115,221 +115,93 @@ export async function getCheckoutDeliveryQuotes(
   }
 
   const fingerprint = createCheckoutFingerprint(parsed);
-  const itemsByGroup = new Map<string, typeof cart.items>();
-
-  for (const item of cart.items) {
-    const groupKey = getGroupKey(item);
-    const groupItems = itemsByGroup.get(groupKey) ?? [];
-    groupItems.push(item);
-    itemsByGroup.set(groupKey, groupItems);
-  }
-
-  const businessCollectionAddress = itemsByGroup.has("courier")
-    ? await getBusinessCollectionAddress()
-    : null;
-  const groups: CheckoutDeliveryGroup[] = [];
-  const expiryTimes: number[] = [];
-
-  for (const [groupKey, groupItems] of itemsByGroup) {
-    if (groupKey === "jurgens") {
-      try {
-        const result = await getJurgensDeliveryCheckoutRates({
-          checkoutFingerprint: fingerprint,
-          declaredValue: groupItems.reduce(
-            (total, item) => total + item.lineTotalZar,
-            0,
-          ),
-          deliveryAddress: toProviderAddress(parsed.deliveryAddress),
-          items: groupItems.map((item) => ({
-            description: `${item.productTitle} - ${item.variantTitle}`,
-            heightMm: item.heightMm ?? undefined,
-            lengthMm: item.lengthMm ?? undefined,
-            price: item.unitPriceZar,
-            quantity: item.quantity,
-            weightGrams: item.weightGrams ?? undefined,
-            widthMm: item.widthMm ?? undefined,
-          })),
-          sellerId: null,
-        });
-        const scheduleAvailability = result.eligible
-          ? await getJurgensDeliveryScheduleAvailability()
-          : null;
-
-        if (result.expiresAt) {
-          expiryTimes.push(new Date(result.expiresAt).getTime());
-        }
-
-        groups.push({
-          groupKey,
-          label: "Jurgens Energy delivery",
-          options: result.rates.flatMap((rate) =>
-            rate.quoteId
-              ? [
-                  {
-                    amountZar: rate.customerAmount,
-                    deliveryInformation: rate.deliveryInformation,
-                    label: rate.serviceName,
-                    provider: "piessang_local" as const,
-                    quoteId: rate.quoteId,
-                    serviceLevel: rate.serviceLevel,
-                  },
-                ]
-              : [],
-          ),
-          scheduling: scheduleAvailability
-            ? {
-                cutoffTime: scheduleAvailability.cutoffTime,
-                cutoffTimeZone: scheduleAvailability.cutoffTimeZone,
-                nextPolicyChangeAt:
-                  scheduleAvailability.nextPolicyChangeAt,
-                options: scheduleAvailability.options,
-                required: false,
-              }
-            : null,
-          sellerId: null,
-          unavailableReason: result.eligible
-            ? null
-            : (result.unavailableReason ?? "Delivery is unavailable."),
-        });
-      } catch (error) {
-        groups.push({
-          groupKey,
-          label: "Jurgens Energy delivery",
-          options: [],
-          scheduling: null,
-          sellerId: null,
-          unavailableReason:
-            error instanceof Error ? error.message : "Delivery is unavailable.",
-        });
-      }
-
-      continue;
-    }
-
-    const label = "Courier delivery";
-
-    if (!businessCollectionAddress) {
-      groups.push({
-        groupKey,
-        label,
-        options: [],
-        scheduling: null,
-        sellerId: null,
-        unavailableReason:
-          "The Jurgens Energy courier collection address is not configured yet.",
-      });
-      continue;
-    }
-
-    const missingParcel = groupItems.some(
-      (item) =>
-        !item.heightMm ||
-        !item.lengthMm ||
-        !item.weightGrams ||
-        !item.widthMm,
-    );
-
-    if (missingParcel) {
-      groups.push({
-        groupKey,
-        label,
-        options: [],
-        scheduling: null,
-        sellerId: null,
-        unavailableReason:
-          "A selected product is missing parcel measurements required for courier delivery.",
-      });
-      continue;
-    }
-
-    try {
-      const result = await getBobGoCheckoutRates({
-        checkoutFingerprint: fingerprint,
-        collectionAddress: {
-          city: businessCollectionAddress.city,
-          code: businessCollectionAddress.postalCode,
-          company: businessCollectionAddress.company,
-          country: businessCollectionAddress.countryCode,
-          local_area:
-            businessCollectionAddress.suburb || businessCollectionAddress.city,
-          street_address: [
-            businessCollectionAddress.addressLine1,
-            businessCollectionAddress.addressLine2,
-          ]
-            .filter(Boolean)
-            .join(", "),
-          zone: businessCollectionAddress.province,
-        },
-        declaredValue: groupItems.reduce(
-          (total, item) => total + item.lineTotalZar,
-          0,
-        ),
-        deliveryAddress: toProviderAddress(parsed.deliveryAddress),
-        handlingTime: 2,
-        items: groupItems.map((item) => ({
-          description: `${item.productTitle} - ${item.variantTitle}`,
-          heightMm: item.heightMm!,
-          lengthMm: item.lengthMm!,
-          price: item.unitPriceZar,
-          quantity: item.quantity,
-          weightGrams: item.weightGrams!,
-          widthMm: item.widthMm!,
-        })),
-        sellerId: null,
-      });
-
-      expiryTimes.push(new Date(result.expiresAt).getTime());
-      groups.push({
-        groupKey,
-        label,
-        options: result.rates
-          .flatMap((rate) =>
-            rate.quoteId
-              ? [
-                  {
-                    amountZar: rate.customerAmount,
-                    deliveryInformation: null,
-                    label: rate.serviceName,
-                    provider: "bobgo" as const,
-                    quoteId: rate.quoteId,
-                    serviceLevel: rate.serviceLevel,
-                  },
-                ]
-              : [],
-          )
-          .sort((first, second) => first.amountZar - second.amountZar),
-        sellerId: null,
-        unavailableReason:
-          result.rates.length > 0
-            ? null
-            : "No courier rates are available for this address.",
-        scheduling: null,
-      });
-    } catch (error) {
-      groups.push({
-        groupKey,
-        label,
-        options: [],
-        scheduling: null,
-        sellerId: null,
-        unavailableReason:
-          error instanceof Error ? error.message : "Courier delivery is unavailable.",
-      });
-    }
-  }
-
-  return {
-    expiresAt:
-      expiryTimes.length > 0
-        ? new Date(Math.min(...expiryTimes)).toISOString()
-        : null,
+  const normalizedAddress = normalizeAddress(parsed.deliveryAddress);
+  const unavailable = (reason: string): CheckoutQuoteResponse => ({
+    expiresAt: null,
     fingerprint,
-    groups,
-  };
+    groups: [
+      {
+        groupKey: CHECKOUT_DELIVERY_GROUP_KEY,
+        label: "Delivery",
+        options: [],
+        scheduling: null,
+        sellerId: null,
+        unavailableReason: reason,
+      },
+    ],
+  });
+
+  const evaluation = await evaluateCustomerDelivery({
+    deliveryAddress: {
+      ...parsed.deliveryAddress,
+      countryCode: normalizedAddress.countryCode,
+      postalCode: normalizedAddress.postalCode,
+    },
+    items: cart.items,
+    orderSubtotal: cart.subtotalZar,
+  });
+
+  if (!evaluation.eligible) {
+    return unavailable(evaluation.unavailableReason);
+  }
+
+  try {
+    const quote = await createCustomerShippingQuote({
+      checkoutFingerprint: fingerprint,
+      deliveryAddress: {
+        ...toProviderAddress(parsed.deliveryAddress),
+        country: "ZA",
+      },
+      items: cart.items.map((item) => ({
+        description: `${item.productTitle} - ${item.variantTitle}`,
+        fulfillmentMode: getCheckoutFulfillmentProvider(item),
+        heightMm: item.heightMm ?? undefined,
+        lengthMm: item.lengthMm ?? undefined,
+        price: item.unitPriceZar,
+        quantity: item.quantity,
+        sellerId: item.sellerId,
+        variantId: item.variantId,
+        weightGrams: item.weightGrams ?? undefined,
+        widthMm: item.widthMm ?? undefined,
+      })),
+      jurgensZoneId: evaluation.jurgensZoneId,
+      price: evaluation.price,
+    });
+    const scheduleAvailability = evaluation.hasJurgensItems
+      ? await getJurgensDeliveryScheduleAvailability()
+      : null;
+    const groups: CheckoutDeliveryGroup[] = [
+      {
+        groupKey: CHECKOUT_DELIVERY_GROUP_KEY,
+        label: "Delivery",
+        options: [quote.option],
+        scheduling: scheduleAvailability
+          ? {
+              cutoffTime: scheduleAvailability.cutoffTime,
+              cutoffTimeZone: scheduleAvailability.cutoffTimeZone,
+              nextPolicyChangeAt: scheduleAvailability.nextPolicyChangeAt,
+              options: scheduleAvailability.options,
+              required: false,
+            }
+          : null,
+        sellerId: null,
+        unavailableReason: null,
+      },
+    ];
+
+    return {
+      expiresAt: quote.expiresAt.toISOString(),
+      fingerprint,
+      groups,
+    };
+  } catch {
+    return unavailable("Delivery is temporarily unavailable. Please try again.");
+  }
 }
 
 export function getCheckoutDeliveryGroupKey(item: {
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
 }) {
-  return getGroupKey(item);
+  void item;
+  return CHECKOUT_DELIVERY_GROUP_KEY;
 }

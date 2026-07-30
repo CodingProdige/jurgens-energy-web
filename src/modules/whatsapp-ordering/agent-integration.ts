@@ -172,7 +172,7 @@ export async function runJurgensWhatsappAgentTurn({
       AgentAuthorizationContext
     >({
       description:
-        "Retrieve the verified country-level delivery policy for eligible online-store orders within South Africa. Exact product eligibility and delivery fees are confirmed at checkout from the customer's complete delivery address.",
+        "Retrieve the verified nationwide South African delivery policy, the single order-level flat fee/free-shipping rule, and postcode eligibility for Jurgens-delivered products.",
       execute: ({ value }) =>
         execute(() => adapters.checkDeliveryArea(value)),
       name: "check_delivery_area",
@@ -339,9 +339,10 @@ export async function runJurgensWhatsappAgentTurn({
     tools,
     trustedBusinessInstructions: [
       "Jurgens Energy is the sole seller in this store.",
-      "Jurgens Energy is an online store that delivers eligible online-store orders within South Africa.",
-      "For delivery questions, state the South Africa policy first: handling takes 0–1 business day after payment confirmation; the order cutoff is 2:00 PM SAST, with after-cutoff orders starting processing on the next business day; shipping takes 1–3 business days after dispatch; and the combined estimated delivery time is 1–4 business days. Delivery fees are shown at checkout.",
-      "Do not describe postal-code zones, subregions, local-delivery areas or configured rate tiers. Exact product eligibility is confirmed at checkout from the complete South African delivery address.",
+      "Courier-eligible products can be delivered nationwide within South Africa.",
+      "Products marked for Jurgens delivery require an eligible delivery postcode.",
+      "One configured VAT-inclusive flat delivery fee applies per eligible order. An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches its threshold.",
+      "Carrier rates and carrier costs are private operational data. Never quote or expose them, and never imply they can change the amount charged after checkout.",
       "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
       "For a cylinder order, use propose_order rather than writing an offer from memory.",
       "Set repeat_last_order true only when the customer explicitly refers to the same, usual or previous order; refill, replace, replacement or top-up alone is an exchange request, not a repeat-order instruction.",

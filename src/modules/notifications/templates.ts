@@ -1004,8 +1004,8 @@ export async function sendNotificationEmail({
     personalizations: [
       {
         custom_args: {
-          piessang_delivery_id: delivery.id,
-          piessang_template_key: templateKey,
+          notification_delivery_id: delivery.id,
+          notification_template_key: templateKey,
         },
         subject,
         to: [{ email: normalizedEmail }],
@@ -1113,8 +1113,8 @@ export async function sendNotificationTemplateTest({
     personalizations: [
       {
         custom_args: {
-          piessang_delivery_id: delivery.id,
-          piessang_template_key: templateKey,
+          notification_delivery_id: delivery.id,
+          notification_template_key: templateKey,
         },
         subject: renderedSubject,
         to: [{ email: normalizedEmail }],
@@ -1731,7 +1731,7 @@ function sampleVariableValue(variable: string) {
   return `Example ${variable}`;
 }
 
-function buildSurfaceUrl(surface: "admin" | "seller") {
+export function buildSurfaceUrl(surface: "admin" | "seller") {
   const appUrl = new URL(process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000");
   const isLocalhost =
     appUrl.hostname === "localhost" || appUrl.hostname.endsWith(".localhost");

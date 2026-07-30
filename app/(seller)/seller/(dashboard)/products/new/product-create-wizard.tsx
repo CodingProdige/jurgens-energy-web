@@ -110,7 +110,6 @@ type GeneratedVariant = {
   compareAtPrice: string;
   costPrice: string;
   continueSellingOutOfStock: boolean;
-  exchangeAcceptedReturnBrandsInput: string;
   exchangeConfirmationText: string;
   exchangeEmptyCylinderSize: string;
   exchangeRequiresEmpty: boolean;
@@ -270,12 +269,12 @@ const googleFulfillmentChannelConfig: Record<
   },
   local_lpg: {
     description:
-      "Use for LPG and exchange offers delivered by Jurgens Energy within South Africa.",
+      "Use for LPG and exchange offers delivered by Jurgens Energy to eligible South African addresses confirmed at checkout.",
     label: "Jurgens Energy delivery",
   },
   national_courier: {
     description:
-      "Use when this exact variant can be sent by an approved courier within South Africa.",
+      "Use when this exact variant is eligible for nationwide South African delivery through The Courier Guy.",
     label: "South Africa courier",
   },
 };
@@ -614,19 +613,6 @@ function generateSkuFromName(value: string) {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
 
   return `${base || "PROD"}-${suffix}`;
-}
-
-function formatExchangeBrandInput(brands: string[]) {
-  return brands.join(", ");
-}
-
-function parseExchangeBrandInput(value: string) {
-  const brands = value
-    .split(/[\n,]/)
-    .map((brand) => brand.trim())
-    .filter(Boolean);
-
-  return [...new Set(brands)];
 }
 
 function getDefaultExchangeRequirementText(size: string) {
@@ -1058,7 +1044,7 @@ function PackageSizePreview({
         Package preview
         <InfoHint
           label="Package preview"
-          text="A proportional parcel shape based on length, width, and height. Courier rates still use the exact values entered."
+          text="A proportional parcel shape based on length, width, and height. The exact values are used privately for carrier booking, not to set the customer shipping price."
         />
       </div>
       <div
@@ -1102,22 +1088,18 @@ function PackageSizePreview({
 }
 
 function ExchangeRulesFields({
-  acceptedBrandsInput,
   confirmationText,
   disabled,
   emptyCylinderSize,
   enabled,
-  onAcceptedBrandsInputChange,
   onConfirmationTextChange,
   onEmptyCylinderSizeChange,
   onEnabledChange,
 }: {
-  acceptedBrandsInput: string;
   confirmationText: string;
   disabled: boolean;
   emptyCylinderSize: string;
   enabled: boolean;
-  onAcceptedBrandsInputChange: (value: string) => void;
   onConfirmationTextChange: (value: string) => void;
   onEmptyCylinderSizeChange: (value: string) => void;
   onEnabledChange: (value: boolean) => void;
@@ -1157,14 +1139,14 @@ function ExchangeRulesFields({
           </span>
           <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
             Use this on exchange variants to show the required empty-cylinder
-            size and accepted return brands to customers.
+            size and handover notice to customers.
           </span>
         </span>
       </label>
 
       {enabled ? (
         <div className="grid gap-4 rounded-lg border border-orange-200 bg-orange-50/40 p-3 dark:border-orange-400/20 dark:bg-orange-500/10">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4">
             <label className="grid gap-1.5">
               <FieldLabel info="The empty cylinder size the customer must hand over, for example 9kg, 14kg, 19kg, or 48kg.">
                 Required empty size
@@ -1177,20 +1159,6 @@ function ExchangeRulesFields({
                 }
                 placeholder="9kg"
                 value={emptyCylinderSize}
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <FieldLabel info="Accepted returnable cylinder brands. Separate brands with commas or new lines.">
-                Accepted return brands
-              </FieldLabel>
-              <Textarea
-                className={cn(textareaClass, "min-h-20")}
-                disabled={disabled}
-                onChange={(event) =>
-                  onAcceptedBrandsInputChange(event.target.value)
-                }
-                placeholder="Jurgens Energy, Afrox, Totalgaz"
-                value={acceptedBrandsInput}
               />
             </label>
           </div>
@@ -1206,9 +1174,9 @@ function ExchangeRulesFields({
             />
           </label>
           <p className="text-xs leading-5 text-slate-600 dark:text-zinc-300">
-            Checkout snapshots the accepted brands and exchange notice on the
-            order item so future catalog changes do not alter the fulfilment
-            requirements.
+            Checkout snapshots the required empty size and exchange notice on
+            the order item so future catalog changes do not alter the
+            fulfilment requirements.
           </p>
         </div>
       ) : null}
@@ -1685,19 +1653,13 @@ export function ProductCreateWizard({
   const [exchangeEmptyCylinderSize, setExchangeEmptyCylinderSize] = useState(
     initialProduct?.exchangeEmptyCylinderSize ?? "",
   );
-  const [exchangeAcceptedReturnBrandsInput, setExchangeAcceptedReturnBrandsInput] =
-    useState(
-      formatExchangeBrandInput(
-        initialProduct?.exchangeAcceptedReturnBrands ?? [],
-      ),
-    );
   const [exchangeConfirmationText, setExchangeConfirmationText] = useState(
     initialProduct?.exchangeConfirmationText ?? "",
   );
   const [googleFulfillmentChannel, setGoogleFulfillmentChannel] =
     useState<GoogleFulfillmentChannel>(
       initialProduct?.googleFulfillmentChannel ??
-        (initialProduct?.fulfillmentMode === "piessang_fulfilled"
+        (initialProduct?.fulfillmentMode === "jurgens_fulfilled"
           ? "local_lpg"
           : "national_courier"),
     );
@@ -1715,9 +1677,6 @@ export function ProductCreateWizard({
     initialProduct?.variants.map((variant) => ({
       ...variant,
       costPrice: initialPrivateCosts?.variantCostPricesById[variant.id] ?? "",
-      exchangeAcceptedReturnBrandsInput: formatExchangeBrandInput(
-        variant.exchangeAcceptedReturnBrands,
-      ),
       id: makeId("variant"),
       persistedVariantId: variant.id,
     })) ?? [],
@@ -1753,7 +1712,7 @@ export function ProductCreateWizard({
   const [widthMm, setWidthMm] = useState(initialProduct?.widthMm ?? "");
   const [heightMm, setHeightMm] = useState(initialProduct?.heightMm ?? "");
   const [fulfillmentMode, setFulfillmentMode] = useState<
-    "seller_fulfilled" | "piessang_fulfilled"
+    "seller_fulfilled" | "jurgens_fulfilled"
   >(initialProduct?.fulfillmentMode ?? "seller_fulfilled");
   const [isGeneratingDescription, startDescriptionTransition] =
     useTransition();
@@ -1930,7 +1889,7 @@ export function ProductCreateWizard({
     .map((variant) => `${variant.id}:${variant.sku}`)
     .join("|");
   const pricingBreakdown = getPricingBreakdown(price, compareAtPrice);
-  const isJurgensDelivery = fulfillmentMode === "piessang_fulfilled";
+  const isJurgensDelivery = fulfillmentMode === "jurgens_fulfilled";
   const listingChecklistItems = useMemo<ListingChecklistItem[]>(() => {
     const priceNumber = parsePositiveNumber(price);
     const compareAtNumber = parsePositiveNumber(compareAtPrice);
@@ -2021,15 +1980,16 @@ export function ProductCreateWizard({
       },
       {
         complete: shippingReady,
-        detail: "Provide packed weight and dimensions for accurate shipping rates.",
+        detail:
+          "Provide packed weight and dimensions for Courier Guy booking. Customer shipping is set by the marketplace rules.",
         title: "Parcel data",
       },
       {
         complete: true,
         detail:
-          fulfillmentMode === "piessang_fulfilled"
+          fulfillmentMode === "jurgens_fulfilled"
             ? "Jurgens Energy delivery is selected for this listing."
-            : "Bob Go courier delivery is selected for this listing.",
+            : "Nationwide Courier Guy delivery is selected for this listing.",
         title: "Delivery method",
       },
       {
@@ -2669,7 +2629,6 @@ export function ProductCreateWizard({
         compareAtPrice,
         costPrice,
         continueSellingOutOfStock,
-        exchangeAcceptedReturnBrandsInput: "",
         exchangeConfirmationText: "",
         exchangeEmptyCylinderSize: "",
         exchangeRequiresEmpty: false,
@@ -2769,9 +2728,7 @@ export function ProductCreateWizard({
       ...(enablePrivateCostPricing ? { costPrice } : {}),
       continueSellingOutOfStock,
       description,
-      exchangeAcceptedReturnBrands: parseExchangeBrandInput(
-        exchangeAcceptedReturnBrandsInput,
-      ),
+      exchangeAcceptedReturnBrands: [],
       exchangeConfirmationText,
       exchangeEmptyCylinderSize,
       exchangeRequiresEmpty,
@@ -2812,9 +2769,7 @@ export function ProductCreateWizard({
               ? { costPrice: variant.costPrice }
               : {}),
             continueSellingOutOfStock: variant.continueSellingOutOfStock,
-            exchangeAcceptedReturnBrands: parseExchangeBrandInput(
-              variant.exchangeAcceptedReturnBrandsInput,
-            ),
+            exchangeAcceptedReturnBrands: [],
             exchangeConfirmationText: variant.exchangeConfirmationText,
             exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
             exchangeRequiresEmpty: variant.exchangeRequiresEmpty,
@@ -3601,7 +3556,7 @@ export function ProductCreateWizard({
 
           <Panel
             title="Shipping"
-            description="Parcel data is required before checkout can quote accurate rates. Inaccurate weight or dimensions may cause courier adjustment fees."
+            description="Packed parcel data is used for private Courier Guy booking and waybills. Checkout charges the marketplace shipping rule, so carrier rate differences or adjustments do not change the customer price."
           >
             <div className="grid min-w-0 gap-4">
               <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -3671,7 +3626,7 @@ export function ProductCreateWizard({
               <div className="grid min-w-0 gap-4">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product weight in grams. Required for accurate courier rates.">
+                    <FieldLabel info="The packed product weight in grams. Required for carrier booking and the private operational rate, not the customer shipping charge.">
                       Weight (g) *
                     </FieldLabel>
                     <Input
@@ -3688,7 +3643,7 @@ export function ProductCreateWizard({
                     />
                   </label>
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product length in millimetres. Required for accurate courier rates.">
+                    <FieldLabel info="The packed product length in millimetres. Required for carrier booking, not customer pricing.">
                       Length (mm) *
                     </FieldLabel>
                     <Input
@@ -3705,7 +3660,7 @@ export function ProductCreateWizard({
                     />
                   </label>
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product width in millimetres. Required for accurate courier rates.">
+                    <FieldLabel info="The packed product width in millimetres. Required for carrier booking, not customer pricing.">
                       Width (mm) *
                     </FieldLabel>
                     <Input
@@ -3722,7 +3677,7 @@ export function ProductCreateWizard({
                     />
                   </label>
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product height in millimetres. Required for accurate courier rates.">
+                    <FieldLabel info="The packed product height in millimetres. Required for carrier booking, not customer pricing.">
                       Height (mm) *
                     </FieldLabel>
                     <Input
@@ -3956,10 +3911,11 @@ export function ProductCreateWizard({
                 disabled={fullListingControlsDisabled}
                 type="button"
               >
-                <span className="font-semibold">Bob Go courier</span>
+                <span className="font-semibold">The Courier Guy</span>
                 <span className="mt-1 block text-sm text-slate-600 dark:text-zinc-300">
-                  Pack the order and use Bob Go to quote and book the courier.
-                  Customers see courier rates at checkout.
+                  Mark this product as eligible for nationwide South African
+                  courier delivery. The carrier rate stays private; customers
+                  pay the marketplace&apos;s configured shipping price.
                 </span>
               </button>
               <button
@@ -3972,15 +3928,16 @@ export function ProductCreateWizard({
                 disabled={fullListingControlsDisabled}
                 onClick={() => {
                   if (!fullListingControlsDisabled) {
-                    setFulfillmentMode("piessang_fulfilled");
+                    setFulfillmentMode("jurgens_fulfilled");
                   }
                 }}
                 type="button"
               >
                 <span className="font-semibold">Jurgens Energy delivery</span>
                 <span className="mt-1 block text-sm text-slate-600 dark:text-zinc-300">
-                  Deliver this product through Jurgens Energy&apos;s own local
-                  delivery route instead of quoting a Bob Go courier rate.
+                  Use Jurgens Energy&apos;s own delivery route. Checkout
+                  cross-references the customer&apos;s postcode for eligibility
+                  without calculating a postcode-based customer price.
                 </span>
               </button>
             </div>
@@ -4986,16 +4943,14 @@ export function ProductCreateWizard({
                 </h3>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
                   When enabled, customers see the required empty-cylinder size
-                  and accepted return brands for this variant.
+                  and handover notice for this variant.
                 </p>
               </div>
               <ExchangeRulesFields
-                acceptedBrandsInput={exchangeAcceptedReturnBrandsInput}
                 confirmationText={exchangeConfirmationText}
                 disabled={fullListingControlsDisabled}
                 emptyCylinderSize={exchangeEmptyCylinderSize}
                 enabled={exchangeRequiresEmpty}
-                onAcceptedBrandsInputChange={setExchangeAcceptedReturnBrandsInput}
                 onConfirmationTextChange={setExchangeConfirmationText}
                 onEmptyCylinderSizeChange={setExchangeEmptyCylinderSize}
                 onEnabledChange={setExchangeRequiresEmpty}
@@ -5588,18 +5543,10 @@ export function ProductCreateWizard({
                     Cylinder exchange
                   </h3>
                   <ExchangeRulesFields
-                    acceptedBrandsInput={
-                      activeExpandedVariant.exchangeAcceptedReturnBrandsInput
-                    }
                     confirmationText={activeExpandedVariant.exchangeConfirmationText}
                     disabled={fullListingControlsDisabled}
                     emptyCylinderSize={activeExpandedVariant.exchangeEmptyCylinderSize}
                     enabled={activeExpandedVariant.exchangeRequiresEmpty}
-                    onAcceptedBrandsInputChange={(value) =>
-                      updateGeneratedVariant(activeExpandedVariant.id, {
-                        exchangeAcceptedReturnBrandsInput: value,
-                      })
-                    }
                     onConfirmationTextChange={(value) =>
                       updateGeneratedVariant(activeExpandedVariant.id, {
                         exchangeConfirmationText: value,

@@ -30,7 +30,7 @@ export async function getPrimarySellerForUser(userId: string) {
     .select({
       id: sellers.id,
       displayName: sellers.displayName,
-      isPiessangFulfillmentEnabled: sellers.isPiessangFulfillmentEnabled,
+      isJurgensFulfillmentEnabled: sellers.isJurgensFulfillmentEnabled,
       slug: sellers.slug,
       status: sellers.status,
     })
@@ -46,7 +46,7 @@ export async function getPrimarySellerForUser(userId: string) {
     .select({
       id: sellers.id,
       displayName: sellers.displayName,
-      isPiessangFulfillmentEnabled: sellers.isPiessangFulfillmentEnabled,
+      isJurgensFulfillmentEnabled: sellers.isJurgensFulfillmentEnabled,
       slug: sellers.slug,
       status: sellers.status,
     })
@@ -130,7 +130,7 @@ export async function getSellerDashboardOverview(userId: string) {
         displayName: "Seller",
         slug: "seller",
         status: "pending",
-        isPiessangFulfillmentEnabled: false,
+        isJurgensFulfillmentEnabled: false,
       },
       fulfillmentProfile: null,
       products: { total: 0, active: 0, drafts: 0 },
@@ -176,6 +176,7 @@ export async function getSellerDashboardOverview(userId: string) {
           ne(shipments.status, "delivered"),
           ne(shipments.status, "failed_delivery"),
           ne(shipments.status, "returned"),
+          ne(shipments.status, "undeliverable"),
           ne(shipments.status, "cancelled"),
         ),
       ),

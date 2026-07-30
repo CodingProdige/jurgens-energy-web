@@ -409,7 +409,7 @@ function EmailGate({
           <Store className="size-9" />
         </div>
         <h1 className="m-0 text-[22px] font-extrabold leading-tight text-[#070b16] dark:text-white">
-          Apply to sell on Piessang
+          Apply to sell on Jurgens Energy
         </h1>
         <p className="mx-auto mt-3 max-w-[330px] text-[14px] leading-5 text-[#596176] dark:text-zinc-300 lg:mx-0">
           Start with your email so we can check your account status.
@@ -491,7 +491,7 @@ function EmailStatus({ state }: { state: SellerEmailCheckState }) {
       <div className="mt-6">
         <StatusPanel
           title="Account found"
-          description="This email already belongs to a Piessang account. Sign in first, then we will continue your seller application from there."
+          description="This email already belongs to a Jurgens Energy account. Sign in first, then we will continue your seller application from there."
           tone="warning"
         />
         <Link
@@ -908,7 +908,7 @@ function ApplicationForm({
       <div className="w-full max-w-[390px]">
         <StatusPanel
           title="Application submitted"
-          description="Thank you for applying to sell on Piessang. We have received your application and will review it before activating seller access."
+          description="Thank you for applying to sell on Jurgens Energy. We have received your application and will review it before activating seller access."
           tone="success"
         />
         <Link
@@ -1268,7 +1268,7 @@ function ApplicationForm({
             }}
             className="mt-0.5 size-4 rounded border-[#cbd2df]"
           />
-          I confirm that this information is accurate and I agree to Piessang&apos;s
+          I confirm that this information is accurate and I agree to Jurgens Energy&apos;s
           seller review process.
           <RequiredMark />
         </label>
@@ -1379,11 +1379,11 @@ export function SellerRegisterScreen({
 
           <div className="mt-[112px]">
             <h2 className="max-w-[390px] text-[34px] font-extrabold leading-[1.08] xl:text-[36px]">
-              Join Piessang as a{" "}
+              Join Jurgens Energy as a{" "}
               <span style={{ color: sellerGreen }}>Seller</span>
             </h2>
             <p className="mt-5 max-w-[385px] text-[14px] font-medium leading-6 text-white/88">
-              Start your journey and grow your business with Piessang Marketplace.
+              Start your journey and grow your business with Jurgens Energy.
             </p>
           </div>
 

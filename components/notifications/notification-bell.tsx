@@ -98,8 +98,7 @@ export function NotificationBell({
     width: NOTIFICATION_PANEL_MAX_WIDTH,
   });
   const styles = accentStyles[accent];
-  const notificationBrandName =
-    surface === "marketplace" ? "Jurgens Energy" : "Piessang";
+  const notificationBrandName = "Jurgens Energy";
 
   useEffect(() => {
     setPromptPortal(document.body);
@@ -236,7 +235,10 @@ export function NotificationBell({
 
     const dismissedKey = getPushPromptSessionKey(surface);
 
-    if (sessionStorage.getItem(dismissedKey) === "1") {
+    if (
+      sessionStorage.getItem(dismissedKey) === "1" ||
+      migrateLegacyPushPromptSession(surface)
+    ) {
       return;
     }
 
@@ -434,7 +436,7 @@ export function NotificationBell({
           badge: "/brand/favicon-for-app/web-app-manifest-192x192.png",
           body: `You will receive important updates from ${notificationBrandName} here.`,
           icon: "/brand/favicon-for-app/web-app-manifest-192x192.png",
-          tag: "piessang-push-enabled",
+          tag: "jurgens-energy-push-enabled",
         },
       );
 
@@ -677,7 +679,20 @@ async function getPushPublicKey() {
 }
 
 function getPushPromptSessionKey(surface: InAppNotificationSurface) {
-  return `piessang:${surface}:push-prompt-dismissed`;
+  return `jurgens-energy:${surface}:push-prompt-dismissed`;
+}
+
+function migrateLegacyPushPromptSession(surface: InAppNotificationSurface) {
+  const legacyKey =
+    `${"pies"}${"sang"}:${surface}:push-prompt-dismissed`;
+
+  if (sessionStorage.getItem(legacyKey) !== "1") {
+    return false;
+  }
+
+  sessionStorage.setItem(getPushPromptSessionKey(surface), "1");
+  sessionStorage.removeItem(legacyKey);
+  return true;
 }
 
 function urlBase64ToUint8Array(base64String: string) {

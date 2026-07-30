@@ -160,12 +160,14 @@ function FulfillmentBadge({
     <Badge
       className={cn(
         "h-6 rounded-md border-0 px-2 text-xs font-semibold",
-        mode === "piessang_fulfilled"
+        mode === "jurgens_fulfilled"
           ? "bg-emerald-100 text-emerald-700"
           : "bg-slate-100 text-slate-700",
       )}
     >
-      {mode === "piessang_fulfilled" ? "Jurgens delivery" : "Bob Go courier"}
+      {mode === "jurgens_fulfilled"
+        ? "Jurgens delivery"
+        : "The Courier Guy"}
     </Badge>
   );
 }
@@ -504,9 +506,10 @@ export function ProductReviewManager({
       },
       {
         color: "#8b5cf6",
-        description: "Submitted products delivered through Bob Go courier bookings.",
+        description:
+          "Submitted products eligible for nationwide Courier Guy fulfillment.",
         id: "in-house-fulfillment",
-        label: "Bob Go",
+        label: "Courier Guy",
         value: metrics.inHouseFulfilled,
       },
       {

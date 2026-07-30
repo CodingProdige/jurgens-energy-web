@@ -30,9 +30,9 @@ import { findShopMenuCategory } from "@/src/modules/marketplace/shop-menu-catego
 const footerServices = [
   {
     description:
-      "Eligible orders: estimated delivery in 1–4 business days.",
+      "Availability is confirmed at checkout; transit timing depends on the delivery service.",
     icon: TruckIcon,
-    title: "South Africa Delivery",
+    title: "Delivery Availability",
   },
   {
     description: "Eligibility and cylinder handover checks apply where required.",
@@ -170,9 +170,10 @@ export async function MarketplaceFooter() {
               cylinders, eligible cylinder exchanges and gas accessories.
             </p>
             <p className="mt-3 max-w-sm text-[12px] leading-5 text-[#696963] dark:text-[#a8a89f]">
-              Customers shop and pay online, then receive eligible orders at
-              their delivery address. We deliver across South Africa and do
-              not operate a physical walk-in store.
+              Customers shop and pay online. We deliver to eligible addresses
+              within South Africa, with availability and shipping costs
+              confirmed at checkout. We do not operate a physical walk-in
+              store.
             </p>
             <Link
               className="mt-4 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-[0.08em] text-[#ff5a1f] transition hover:text-[#e44c15]"

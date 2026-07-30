@@ -89,11 +89,11 @@ export function ThemeProvider({
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-export function usePiessangTheme() {
+export function useJurgensEnergyTheme() {
   const value = useContext(ThemeContext);
 
   if (!value) {
-    throw new Error("usePiessangTheme must be used within ThemeProvider.");
+    throw new Error("useJurgensEnergyTheme must be used within ThemeProvider.");
   }
 
   return value;

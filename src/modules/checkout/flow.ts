@@ -1,4 +1,5 @@
 export const CHECKOUT_STEPS = ["address", "shipping", "payment"] as const;
+export const CHECKOUT_DELIVERY_GROUP_KEY = "delivery";
 
 export type CheckoutStep = (typeof CHECKOUT_STEPS)[number];
 
@@ -14,6 +15,32 @@ export function getCheapestCheckoutShippingOption<
   }
 
   return cheapestOption;
+}
+
+export function getSingleOrderShippingTotal(
+  groups: ReadonlyArray<{
+    groupKey: string;
+    options: ReadonlyArray<{ amountZar: number; quoteId: string }>;
+  }>,
+  selectedQuoteByGroup: Readonly<Record<string, string>>,
+) {
+  if (groups.length > 1) {
+    throw new Error(
+      "Checkout must expose exactly one order-level delivery group.",
+    );
+  }
+
+  const group = groups[0];
+
+  if (!group) {
+    return 0;
+  }
+
+  const quoteId = selectedQuoteByGroup[group.groupKey];
+
+  return (
+    group.options.find((option) => option.quoteId === quoteId)?.amountZar ?? 0
+  );
 }
 
 export function isCheckoutAddressStepReady({

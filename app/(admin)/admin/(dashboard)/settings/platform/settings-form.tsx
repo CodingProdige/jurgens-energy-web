@@ -1,5 +1,6 @@
 "use client";
 
+import { Combobox } from "@base-ui/react/combobox";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -10,6 +11,7 @@ import {
   type RefObject,
   useActionState,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -17,8 +19,11 @@ import {
   BarChart3Icon,
   BellIcon,
   BracesIcon,
+  CheckIcon,
+  ChevronsUpDownIcon,
   Code2Icon,
   ClipboardIcon,
+  Clock3Icon,
   CreditCardIcon,
   EyeOffIcon,
   EyeIcon,
@@ -27,9 +32,11 @@ import {
   ImageIcon,
   KeyRoundIcon,
   LinkIcon,
+  LoaderCircleIcon,
   LockIcon,
   MailCheckIcon,
   MessageCircleIcon,
+  MapPinIcon,
   MonitorIcon,
   MousePointerClickIcon,
   PencilIcon,
@@ -77,7 +84,6 @@ import {
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
 import type { JurgensDeliveryZone } from "@/src/modules/shipping/jurgens-delivery";
 import { findJurgensDeliveryPostalCodeConflicts } from "@/src/modules/shipping/jurgens-delivery-postal-rules";
-import { getJurgensImplicitFreeDeliveryThreshold } from "@/src/modules/shipping/jurgens-delivery-pricing";
 import type {
   AdminMediaAsset,
   getAdminMediaLibrary,
@@ -163,7 +169,9 @@ function SecretTextInput({
   return (
     <div className="relative">
       {icon === "key" ? (
-        <KeyRoundIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+          <KeyRoundIcon className="size-4 text-zinc-400" />
+        </span>
       ) : null}
       <Input
         id={id}
@@ -183,16 +191,18 @@ function SecretTextInput({
         placeholder={placeholder}
         className={cn(icon === "key" ? "pl-10 pr-12" : "pr-12", className)}
       />
-      <Button
-        aria-label={isVisible ? "Hide value" : "Show value"}
-        className="absolute right-2 top-1/2 size-7 -translate-y-1/2 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
-        onClick={() => setIsVisible((current) => !current)}
-        size="icon-sm"
-        type="button"
-        variant="ghost"
-      >
-        <Icon className="size-4" />
-      </Button>
+      <span className="absolute inset-y-0 right-2 flex items-center">
+        <Button
+          aria-label={isVisible ? "Hide value" : "Show value"}
+          className="size-7 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+          onClick={() => setIsVisible((current) => !current)}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <Icon className="size-4" />
+        </Button>
+      </span>
     </div>
   );
 }
@@ -1473,6 +1483,10 @@ type WhatsappOrderingSettingsFormProps = {
   hasWhatsappWebhookVerifyToken: boolean;
   whatsappApiKey: string | null;
   whatsappBusinessPhoneNumber: string | null;
+  whatsappEmailNotificationRecipients: string[];
+  whatsappEmailNotificationsEnabled: boolean;
+  whatsappEmailNotifyInboundMessage: boolean;
+  whatsappEmailNotifyNewConversation: boolean;
   whatsappFollowUpDefaultMessage: string;
   whatsappFollowUpDelayMinutes: number;
   whatsappFollowUpDraftMessage: string;
@@ -1494,6 +1508,10 @@ export function WhatsappOrderingSettingsForm({
   hasWhatsappWebhookVerifyToken,
   whatsappApiKey,
   whatsappBusinessPhoneNumber,
+  whatsappEmailNotificationRecipients,
+  whatsappEmailNotificationsEnabled,
+  whatsappEmailNotifyInboundMessage,
+  whatsappEmailNotifyNewConversation,
   whatsappFollowUpDefaultMessage,
   whatsappFollowUpDelayMinutes,
   whatsappFollowUpDraftMessage,
@@ -1513,6 +1531,8 @@ export function WhatsappOrderingSettingsForm({
     whatsappBusinessPhoneNumber ?? "",
   );
   const [messageUrlValue, setMessageUrlValue] = useState(whatsappMessageUrl);
+  const [emailNotificationsEnabledValue, setEmailNotificationsEnabledValue] =
+    useState(whatsappEmailNotificationsEnabled);
   const [followUpsEnabledValue, setFollowUpsEnabledValue] = useState(
     whatsappFollowUpsEnabled,
   );
@@ -1836,6 +1856,106 @@ export function WhatsappOrderingSettingsForm({
         </div>
       </div>
 
+      <div
+        id="whatsapp-email-alerts"
+        className="scroll-mt-24 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]"
+      >
+        <div className="mb-5 flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#ff5a1f]/10 text-[#ff5a1f]">
+            <MailCheckIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Email alerts
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Notify the right team members when a customer starts or continues
+              a WhatsApp conversation.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <div className="grid content-start gap-3">
+            <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+              <Checkbox
+                checked={emailNotificationsEnabledValue}
+                name="emailNotificationsEnabled"
+                onCheckedChange={(checked) =>
+                  setEmailNotificationsEnabledValue(checked === true)
+                }
+              />
+              <span className="grid gap-1">
+                <span className="font-semibold text-zinc-950 dark:text-white">
+                  Enable WhatsApp email alerts
+                </span>
+                <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  The event choices and recipient list below are used only while
+                  this switch is enabled.
+                </span>
+              </span>
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+              <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+                <Checkbox
+                  defaultChecked={whatsappEmailNotifyNewConversation}
+                  name="emailNotifyNewConversation"
+                />
+                <span className="grid gap-1">
+                  <span className="font-semibold text-zinc-950 dark:text-white">
+                    New conversation
+                  </span>
+                  <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                    Alert when the first inbound customer message starts a
+                    conversation.
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+                <Checkbox
+                  defaultChecked={whatsappEmailNotifyInboundMessage}
+                  name="emailNotifyInboundMessage"
+                />
+                <span className="grid gap-1">
+                  <span className="font-semibold text-zinc-950 dark:text-white">
+                    New inbound message
+                  </span>
+                  <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                    Alert for later customer messages in an existing
+                    conversation.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="grid content-start gap-2">
+            <Label htmlFor="emailNotificationRecipients">
+              Notification recipients
+            </Label>
+            <Textarea
+              id="emailNotificationRecipients"
+              name="emailNotificationRecipients"
+              defaultValue={whatsappEmailNotificationRecipients.join("\n")}
+              rows={6}
+              className="min-h-36 resize-y"
+              placeholder={"orders@jurgensenergy.com\nsupport@jurgensenergy.com"}
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Add up to 20 email addresses, separated by new lines or commas.
+              Duplicate addresses are removed automatically.
+            </p>
+            <p className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300">
+              Each alert includes the customer name or phone number, the inbound
+              message, when it was received, and a direct link to open the
+              conversation in the admin dashboard.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
         <div className="mb-5 flex items-start gap-3">
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#ff5a1f]/10 text-[#ff5a1f]">
@@ -2010,126 +2130,528 @@ export function WhatsappOrderingSettingsForm({
   );
 }
 
-type ShippingSettingsFormProps = {
-  bobgoLiveApiKey: string | null;
-  bobgoLiveWebhookSecret: string | null;
-  bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
-  bobgoEnabled: boolean;
-  bobgoMode: "live" | "sandbox";
-  bobgoSandboxApiKey: string | null;
-  bobgoSandboxWebhookSecret: string | null;
-  bobgoWebhookFulfillmentCreated: boolean;
-  bobgoWebhookShipmentChargedAmountChanged: boolean;
-  bobgoWebhookShipmentChargedWeightChanged: boolean;
-  bobgoWebhookShipmentHealthStatusUpdated: boolean;
-  bobgoWebhookShipmentSubmissionStatusUpdated: boolean;
-  bobgoWebhookTrackingUpdated: boolean;
-  hasBobgoLiveApiKey: boolean;
-  hasBobgoLiveWebhookSecret: boolean;
-  hasBobgoSandboxApiKey: boolean;
-  hasBobgoSandboxWebhookSecret: boolean;
-  jurgensDeliveryCutoffTime: string;
-  jurgensDeliveryZones: JurgensDeliveryZone[];
-  shippingBufferBps: number;
-  shippingEnabled: boolean;
-  shippingMarginBps: number;
+type CourierGuyPickupPointOption = {
+  address: string | null;
+  label: string;
+  latitude: number | null;
+  longitude: number | null;
+  name: string;
+  pickupPointId: string;
+  pickupPointProvider: string;
+  status: string | null;
+  tradingHours: string | null;
+  type: string | null;
+  value: string;
 };
 
-export function ShippingSettingsForm({
-  bobgoLiveApiKey,
-  bobgoLiveWebhookSecret,
-  bobgoBookingMode,
-  bobgoEnabled,
-  bobgoMode,
-  bobgoSandboxApiKey,
-  bobgoSandboxWebhookSecret,
-  bobgoWebhookFulfillmentCreated,
-  bobgoWebhookShipmentChargedAmountChanged,
-  bobgoWebhookShipmentChargedWeightChanged,
-  bobgoWebhookShipmentHealthStatusUpdated,
-  bobgoWebhookShipmentSubmissionStatusUpdated,
-  bobgoWebhookTrackingUpdated,
-  hasBobgoLiveApiKey,
-  hasBobgoLiveWebhookSecret,
-  hasBobgoSandboxApiKey,
-  hasBobgoSandboxWebhookSecret,
+type CourierGuyPickupPointSearchResponse = {
+  message?: string;
+  ok?: boolean;
+  pickupPoints?: Array<
+    Omit<CourierGuyPickupPointOption, "label" | "value">
+  >;
+};
+
+function toCourierGuyPickupPointOption(
+  pickupPoint: Omit<CourierGuyPickupPointOption, "label" | "value">,
+): CourierGuyPickupPointOption {
+  return {
+    ...pickupPoint,
+    label: [pickupPoint.name, pickupPoint.address]
+      .filter(Boolean)
+      .join(" — ")
+      .slice(0, 500),
+    value: `${pickupPoint.pickupPointProvider}:${pickupPoint.pickupPointId}`,
+  };
+}
+
+function isCourierGuyPickupPoint(
+  value: unknown,
+): value is Omit<CourierGuyPickupPointOption, "label" | "value"> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<CourierGuyPickupPointOption>;
+
+  return (
+    typeof candidate.name === "string" &&
+    typeof candidate.pickupPointId === "string" &&
+    typeof candidate.pickupPointProvider === "string"
+  );
+}
+
+function CourierGuyPickupPointCombobox({
+  enabled,
+  hasSavedApiKey,
+  initialMode,
+  initialPickupPointId,
+  initialPickupPointLabel,
+  initialPickupPointProvider,
+  mode,
+}: {
+  enabled: boolean;
+  hasSavedApiKey: boolean;
+  initialMode: "live" | "sandbox";
+  initialPickupPointId: string | null;
+  initialPickupPointLabel: string | null;
+  initialPickupPointProvider: string;
+  mode: "live" | "sandbox";
+}) {
+  const initialSelection = useMemo<CourierGuyPickupPointOption | null>(() => {
+    if (!initialPickupPointId) {
+      return null;
+    }
+
+    const label =
+      initialPickupPointLabel ??
+      `Saved Courier Guy pickup point · ${initialPickupPointId}`;
+
+    return {
+      address: null,
+      label,
+      latitude: null,
+      longitude: null,
+      name: label,
+      pickupPointId: initialPickupPointId,
+      pickupPointProvider: initialPickupPointProvider,
+      status: null,
+      tradingHours: null,
+      type: null,
+      value: `${initialPickupPointProvider}:${initialPickupPointId}`,
+    };
+  }, [
+    initialPickupPointId,
+    initialPickupPointLabel,
+    initialPickupPointProvider,
+  ]);
+  const [selectedPoint, setSelectedPoint] =
+    useState<CourierGuyPickupPointOption | null>(initialSelection);
+  const [selectedMode, setSelectedMode] = useState<
+    "live" | "sandbox" | null
+  >(initialSelection ? initialMode : null);
+  const [searchValue, setSearchValue] = useState("");
+  const [searchResults, setSearchResults] = useState<
+    CourierGuyPickupPointOption[]
+  >([]);
+  const [searchResultsMode, setSearchResultsMode] = useState<
+    "live" | "sandbox"
+  >(mode);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const previousModeRef = useRef(mode);
+  const trimmedSearchValue = searchValue.trim();
+  const activeSelection = selectedMode === mode ? selectedPoint : null;
+  const activeSearchResults = useMemo(
+    () => (searchResultsMode === mode ? searchResults : []),
+    [mode, searchResults, searchResultsMode],
+  );
+  const items = useMemo(() => {
+    if (
+      !activeSelection ||
+      activeSearchResults.some(
+        (pickupPoint) => pickupPoint.value === activeSelection.value,
+      )
+    ) {
+      return activeSearchResults;
+    }
+
+    return [...activeSearchResults, activeSelection];
+  }, [activeSearchResults, activeSelection]);
+
+  useEffect(() => {
+    if (previousModeRef.current === mode) {
+      return;
+    }
+
+    previousModeRef.current = mode;
+    setIsSearching(false);
+    setSearchError(null);
+    setSearchResults([]);
+    setSearchResultsMode(mode);
+    setSearchValue("");
+  }, [mode]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      !hasSavedApiKey ||
+      trimmedSearchValue.length < 2
+    ) {
+      setIsSearching(false);
+      setSearchError(null);
+      setSearchResults([]);
+      setSearchResultsMode(mode);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setIsSearching(true);
+      setSearchError(null);
+
+      try {
+        const query = new URLSearchParams({
+          limit: "20",
+          mode,
+          q: trimmedSearchValue,
+        });
+        const response = await fetch(
+          `/settings/platform/courier-guy-pickup-points?${query.toString()}`,
+          {
+            cache: "no-store",
+            credentials: "same-origin",
+            signal: controller.signal,
+          },
+        );
+        const result =
+          (await response.json()) as CourierGuyPickupPointSearchResponse;
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        if (!response.ok || !result.ok) {
+          setSearchResults([]);
+          setSearchResultsMode(mode);
+          setSearchError(
+            result.message ??
+              "Courier Guy pickup points could not be searched.",
+          );
+          return;
+        }
+
+        setSearchResults(
+          (result.pickupPoints ?? [])
+            .filter(isCourierGuyPickupPoint)
+            .map(toCourierGuyPickupPointOption),
+        );
+        setSearchResultsMode(mode);
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          setSearchResults([]);
+          setSearchResultsMode(mode);
+          setSearchError(
+            "Courier Guy pickup points could not be searched.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [enabled, hasSavedApiKey, mode, trimmedSearchValue]);
+
+  let statusMessage: string | null = null;
+
+  if (isSearching) {
+    statusMessage = "Searching Courier Guy pickup points…";
+  } else if (searchError) {
+    statusMessage = searchError;
+  } else if (trimmedSearchValue.length < 2) {
+    statusMessage = "Enter at least two characters to search.";
+  } else if (activeSearchResults.length === 0) {
+    statusMessage = `No pickup points found for “${trimmedSearchValue}”.`;
+  }
+
+  return (
+    <div
+      className={cn(
+        "grid min-w-0 gap-2",
+        !enabled && "hidden",
+      )}
+    >
+      <Label htmlFor="courierGuyDropoffPickupPointSearch">
+        Courier Guy pickup point
+      </Label>
+      <input
+        type="hidden"
+        name="courierGuyDropoffPickupPointId"
+        value={activeSelection?.pickupPointId ?? ""}
+      />
+      <input
+        type="hidden"
+        name="courierGuyDropoffPickupPointLabel"
+        value={activeSelection?.label ?? ""}
+      />
+      <input
+        type="hidden"
+        name="courierGuyDropoffProvider"
+        value={activeSelection?.pickupPointProvider ?? "tcg-locker"}
+      />
+      <Combobox.Root
+        key={mode}
+        autoHighlight
+        disabled={!enabled || !hasSavedApiKey}
+        filter={null}
+        isItemEqualToValue={(item, value) => item.value === value.value}
+        items={items}
+        itemToStringLabel={(item) => item.label}
+        onInputValueChange={(nextSearchValue, details) => {
+          if (details.reason !== "item-press") {
+            setSearchValue(nextSearchValue);
+          }
+        }}
+        onValueChange={(nextSelectedPoint) => {
+          setSelectedPoint(nextSelectedPoint);
+          setSelectedMode(nextSelectedPoint ? mode : null);
+          setSearchError(null);
+          setSearchResults(nextSelectedPoint ? [nextSelectedPoint] : []);
+          setSearchResultsMode(mode);
+          setSearchValue("");
+        }}
+        value={activeSelection}
+      >
+        <Combobox.InputGroup className="relative min-w-0">
+          <span className="pointer-events-none absolute inset-y-0 left-2.5 z-10 flex items-center">
+            <SearchIcon className="size-4 text-zinc-400" />
+          </span>
+          <Combobox.Input
+            id="courierGuyDropoffPickupPointSearch"
+            autoComplete="off"
+            className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent py-1 pr-9 pl-8 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80"
+            disabled={!enabled || !hasSavedApiKey}
+            placeholder={
+              hasSavedApiKey
+                ? "Search by name, suburb, city or postcode"
+                : `Save the ${mode} bearer token first`
+            }
+            spellCheck={false}
+          />
+          <Combobox.Trigger
+            aria-label="Open Courier Guy pickup points"
+            className="absolute inset-y-0 right-0 flex w-8 items-center justify-center rounded-r-lg text-zinc-500 outline-none hover:text-zinc-900 focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none dark:hover:text-white"
+            disabled={!enabled || !hasSavedApiKey}
+          >
+            {isSearching ? (
+              <LoaderCircleIcon className="size-4 animate-spin" />
+            ) : (
+              <ChevronsUpDownIcon className="size-4" />
+            )}
+          </Combobox.Trigger>
+        </Combobox.InputGroup>
+        <Combobox.Portal>
+          <Combobox.Positioner
+            align="start"
+            className="isolate z-50"
+            collisionPadding={12}
+            positionMethod="fixed"
+            sideOffset={4}
+          >
+            <Combobox.Popup
+              aria-busy={isSearching || undefined}
+              className="max-h-[min(22rem,var(--available-height))] w-[var(--anchor-width)] max-w-[calc(100vw-1.5rem)] min-w-64 overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10"
+            >
+              {statusMessage ? (
+                <Combobox.Status className="border-b border-border px-3 py-2 text-xs leading-5 text-muted-foreground">
+                  {statusMessage}
+                </Combobox.Status>
+              ) : null}
+              <Combobox.List className="max-h-72 overflow-y-auto p-1">
+                {items.map((pickupPoint, index) => (
+                  <Combobox.Item
+                    key={pickupPoint.value}
+                    className="relative grid cursor-default gap-1 rounded-md py-2 pr-9 pl-2 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                    index={index}
+                    value={pickupPoint}
+                  >
+                    <span className="font-semibold text-zinc-950 dark:text-white">
+                      {pickupPoint.name}
+                    </span>
+                    {pickupPoint.address ? (
+                      <span className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+                        <span className="flex h-5 shrink-0 items-center">
+                          <MapPinIcon className="size-3.5" />
+                        </span>
+                        <span className="min-w-0">{pickupPoint.address}</span>
+                      </span>
+                    ) : null}
+                    {pickupPoint.tradingHours ? (
+                      <span className="flex min-w-0 items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+                        <span className="flex h-5 shrink-0 items-center">
+                          <Clock3Icon className="size-3.5" />
+                        </span>
+                        <span className="min-w-0">
+                          {pickupPoint.tradingHours}
+                        </span>
+                      </span>
+                    ) : null}
+                    <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                      {pickupPoint.type ?? "pickup point"} ·{" "}
+                      {pickupPoint.pickupPointId}
+                    </span>
+                    <Combobox.ItemIndicator className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                      <CheckIcon className="size-4 text-admin-primary" />
+                    </Combobox.ItemIndicator>
+                  </Combobox.Item>
+                ))}
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Positioner>
+        </Combobox.Portal>
+      </Combobox.Root>
+      <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+        {hasSavedApiKey
+          ? activeSelection
+            ? `Selected for ${mode}: ${activeSelection.label}`
+            : `Search the ${mode} Courier Guy directory and choose where parcels will be handed in.`
+          : `Save the ${mode} account code and bearer token, then return here to search.`}
+      </p>
+    </div>
+  );
+}
+
+type NationwideShippingSettingsFormProps = {
+  courierGuyDefaultServiceCode: string | null;
+  courierGuyDropoffPickupPointId: string | null;
+  courierGuyDropoffPickupPointLabel: string | null;
+  courierGuyDropoffProvider: string;
+  courierGuyDropoffType:
+    | "generic_kiosk"
+    | "generic_locker"
+    | "specific_pickup_point";
+  courierGuyEnabled: boolean;
+  courierGuyLiveAccountCode: string | null;
+  courierGuyLiveApiKey: string | null;
+  courierGuyMode: "live" | "sandbox";
+  courierGuySandboxAccountCode: string | null;
+  courierGuySandboxApiKey: string | null;
+  courierGuyWebhookUrl: string;
+  hasCourierGuyLiveApiKey: boolean;
+  hasCourierGuySandboxApiKey: boolean;
+  hasCourierGuyWebhookToken: boolean;
+  jurgensDeliveryCutoffTime: string;
+  jurgensDeliveryZones: JurgensDeliveryZone[];
+  shippingEnabled: boolean;
+  shippingFlatRate: number;
+  shippingFreeOverAmount: number | null;
+};
+
+export function NationwideShippingSettingsForm({
+  courierGuyDefaultServiceCode,
+  courierGuyDropoffPickupPointId,
+  courierGuyDropoffPickupPointLabel,
+  courierGuyDropoffProvider,
+  courierGuyDropoffType,
+  courierGuyEnabled,
+  courierGuyLiveAccountCode,
+  courierGuyLiveApiKey,
+  courierGuyMode,
+  courierGuySandboxAccountCode,
+  courierGuySandboxApiKey,
+  courierGuyWebhookUrl,
+  hasCourierGuyLiveApiKey,
+  hasCourierGuySandboxApiKey,
+  hasCourierGuyWebhookToken,
   jurgensDeliveryCutoffTime,
   jurgensDeliveryZones,
-  shippingBufferBps,
   shippingEnabled,
-  shippingMarginBps,
-}: ShippingSettingsFormProps) {
-  const [bookingMode, setBookingMode] = useState<
-    "disabled" | "quote_only" | "quote_and_book"
-  >(
-    bobgoBookingMode === "quote_only" ||
-      bobgoBookingMode === "quote_and_book"
-      ? bobgoBookingMode
-      : "disabled",
-  );
+  shippingFlatRate,
+  shippingFreeOverAmount,
+}: NationwideShippingSettingsFormProps) {
   const [apiMode, setApiMode] = useState<"live" | "sandbox">(
-    bobgoMode === "live" ? "live" : "sandbox",
+    courierGuyMode,
   );
-  const [isBobgoEnabled, setIsBobgoEnabled] = useState(bobgoEnabled);
-  const [isShippingEnabled, setIsShippingEnabled] = useState(shippingEnabled);
-  const [shippingBufferValue, setShippingBufferValue] = useState(
-    String(shippingBufferBps),
-  );
-  const [shippingMarginValue, setShippingMarginValue] = useState(
-    String(shippingMarginBps),
-  );
-  const [webhookTopics, setWebhookTopics] = useState({
-    bobgoWebhookFulfillmentCreated,
-    bobgoWebhookShipmentChargedAmountChanged,
-    bobgoWebhookShipmentChargedWeightChanged,
-    bobgoWebhookShipmentHealthStatusUpdated,
-    bobgoWebhookShipmentSubmissionStatusUpdated,
-    bobgoWebhookTrackingUpdated,
-  });
+  const [dropoffType, setDropoffType] = useState<
+    NationwideShippingSettingsFormProps["courierGuyDropoffType"]
+  >(courierGuyDropoffType);
+  const [courierGuyWebhookTokenValue, setCourierGuyWebhookTokenValue] =
+    useState("");
+  const [courierGuyWebhookUrlCopied, setCourierGuyWebhookUrlCopied] =
+    useState(false);
   const [state, formAction, isPending] = useActionState(
     updateShippingIntegrationSettings,
     initialState,
   );
+  const courierGuyWebhookSubscriptionUrl = (() => {
+    const url = new URL(courierGuyWebhookUrl);
+
+    url.searchParams.set("environment", apiMode);
+
+    if (courierGuyWebhookTokenValue.trim()) {
+      url.searchParams.set("token", courierGuyWebhookTokenValue.trim());
+    }
+
+    return url.toString();
+  })();
 
   return (
     <div className="grid gap-6">
-    <form action={formAction} className="grid gap-5">
-      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="mb-5 flex items-start gap-3">
-          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
-            <TruckIcon className="size-4" />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-              Jurgens Energy shipping controls
-            </h3>
-            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Choose whether checkout can quote shipping, whether Jurgens Energy can
-              book Bob Go shipments, and how much margin or buffer is added to
-              provider rates.
-            </p>
+      <form action={formAction} className="grid gap-5">
+        <section className="grid gap-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+              <TruckIcon className="size-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                Nationwide customer delivery price
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Checkout charges one VAT-inclusive fee per eligible South
+                African order. Courier Guy rates remain private; Jurgens Energy
+                absorbs any difference.
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <label className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
-            <Checkbox
-              checked={isShippingEnabled}
-              name="shippingEnabled"
-              onCheckedChange={(checked) =>
-                setIsShippingEnabled(checked === true)
-              }
-            />
-            Show shipping rates at checkout
+
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox name="shippingEnabled" defaultChecked={shippingEnabled} />
+            <span>
+              <span className="block font-semibold text-zinc-950 dark:text-white">
+                Enable online delivery
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Applies the policy below throughout South Africa. Jurgens-only
+                products must also match an active postcode eligibility zone.
+              </span>
+            </span>
           </label>
-          <label className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
-            <Checkbox
-              checked={isBobgoEnabled}
-              name="bobgoEnabled"
-              onCheckedChange={(checked) => setIsBobgoEnabled(checked === true)}
-            />
-            Enable Bob Go provider integration
-          </label>
-          <div className="grid gap-2 lg:col-span-2">
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="shippingFlatRate">
+                Standard delivery fee (VAT included)
+              </Label>
+              <Input
+                id="shippingFlatRate"
+                name="shippingFlatRate"
+                type="number"
+                min={0}
+                max={1_000_000}
+                step="0.01"
+                defaultValue={shippingFlatRate}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="shippingFreeOverAmount">
+                Free shipping from order subtotal
+              </Label>
+              <Input
+                id="shippingFreeOverAmount"
+                name="shippingFreeOverAmount"
+                type="number"
+                min="0.01"
+                max={1_000_000}
+                step="0.01"
+                defaultValue={shippingFreeOverAmount ?? ""}
+                placeholder="Leave blank to disable"
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                The fee becomes R0.00 when the qualifying product subtotal
+                reaches this amount.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
             <Label htmlFor="jurgensDeliveryCutoffTime">
               Jurgens preferred-date cutoff
             </Label>
@@ -2139,372 +2661,321 @@ export function ShippingSettingsForm({
               type="time"
               defaultValue={jurgensDeliveryCutoffTime}
             />
-            <p className="text-xs leading-5 text-slate-500">
-              Controls whether today is offered as an optional preferred date
-              for Jurgens-delivered items. This does not guarantee delivery on
-              the selected date. Bob Go courier items use their quoted service.
-            </p>
           </div>
-          <div className="grid gap-2 lg:col-span-2">
-            <Label htmlFor="bobgoMode">API environment</Label>
-            <Select
-              name="bobgoMode"
-              value={apiMode}
-              onValueChange={(value) => {
-                if (value === "live" || value === "sandbox") {
-                  setApiMode(value);
-                }
-              }}
-            >
-              <SelectTrigger id="bobgoMode" className="w-full">
-                <SelectValue placeholder="Select API environment" />
-              </SelectTrigger>
-              <SelectContent
-                align="start"
-                className="min-w-[240px] max-w-[calc(100vw-2rem)]"
-              >
-                <SelectItem value="sandbox" className="whitespace-nowrap">
-                  Sandbox API
-                </SelectItem>
-                <SelectItem value="live" className="whitespace-nowrap">
-                  Live API
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs leading-5 text-slate-500">
-              Sandbox uses https://api.sandbox.bobgo.co.za/v2/. Production uses
-              https://api.bobgo.co.za/v2/. The selected environment controls
-              which bearer token and webhook secret Jurgens Energy uses.
-            </p>
-          </div>
-          <div className="grid gap-2 lg:col-span-2">
-            <Label htmlFor="bobgoBookingMode">Booking mode</Label>
-            <Select
-              name="bobgoBookingMode"
-              value={bookingMode}
-              onValueChange={(value) => {
-                if (
-                  value === "disabled" ||
-                  value === "quote_only" ||
-                  value === "quote_and_book"
-                ) {
-                  setBookingMode(value);
-                }
-              }}
-            >
-              <SelectTrigger id="bobgoBookingMode" className="w-full">
-                <SelectValue placeholder="Select booking mode" />
-              </SelectTrigger>
-              <SelectContent
-                align="start"
-                className="min-w-[240px] max-w-[calc(100vw-2rem)]"
-              >
-                <SelectItem value="disabled" className="whitespace-nowrap">
-                  Disabled
-                </SelectItem>
-                <SelectItem value="quote_only" className="whitespace-nowrap">
-                  Quote only
-                </SelectItem>
-                <SelectItem value="quote_and_book">
-                  Quote and book shipments
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs leading-5 text-slate-500">
-              Quote only lets checkout request rates without creating shipments.
-              Quote and book lets paid orders create Bob Go shipments and
-              waybills.
-            </p>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="shippingMarginBps">Shipping margin (bps)</Label>
-            <Input
-              id="shippingMarginBps"
-              name="shippingMarginBps"
-              type="number"
-              min={0}
-              max={10000}
-              value={shippingMarginValue}
-              onChange={(event) => setShippingMarginValue(event.target.value)}
-            />
-            <p className="text-xs leading-5 text-slate-500">
-              Markup applied to the courier rate before customers see it. 100
-              bps = 1%.
-            </p>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="shippingBufferBps">Shipping buffer (bps)</Label>
-            <Input
-              id="shippingBufferBps"
-              name="shippingBufferBps"
-              type="number"
-              min={0}
-              max={10000}
-              value={shippingBufferValue}
-              onChange={(event) => setShippingBufferValue(event.target.value)}
-            />
-            <p className="text-xs leading-5 text-slate-500">
-              Extra buffer for adjustment risk before margin is applied. 100 bps
-              = 1%.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <BobGoCredentialPanel
-          active={apiMode === "sandbox"}
-          apiBaseUrl="https://api.sandbox.bobgo.co.za/v2/"
-          apiKey={bobgoSandboxApiKey}
-          description="Used with your Bob Go sandbox account for development, rate checks, booking tests, and webhook testing."
-          hasApiKey={hasBobgoSandboxApiKey}
-          hasWebhookSecret={hasBobgoSandboxWebhookSecret}
-          mode="sandbox"
-          title="Sandbox credentials"
-          webhookSecret={bobgoSandboxWebhookSecret}
-        />
+          <Alert>
+            <TriangleAlertIcon />
+            <AlertTitle>Keep Google Merchant Center in sync</AlertTitle>
+            <AlertDescription>
+              Configure one account-level Standard shipping service for South
+              Africa with this same flat fee and free-shipping threshold. Do
+              not enable carrier-calculated rates—the checkout amount is the
+              customer-facing source of truth.
+            </AlertDescription>
+          </Alert>
+        </section>
 
-        <BobGoCredentialPanel
-          active={apiMode === "live"}
-          apiBaseUrl="https://api.bobgo.co.za/v2/"
-          apiKey={bobgoLiveApiKey}
-          description="Used for real checkout rates, real shipment bookings, waybills, tracking, and webhook processing."
-          hasApiKey={hasBobgoLiveApiKey}
-          hasWebhookSecret={hasBobgoLiveWebhookSecret}
-          mode="live"
-          title="Production credentials"
-          webhookSecret={bobgoLiveWebhookSecret}
-        />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
-          <div className="mb-5 flex items-start gap-3">
+        <section className="grid gap-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="flex items-start gap-3">
             <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
-              <BellIcon className="size-4" />
+              <KeyRoundIcon className="size-4" />
             </span>
             <div>
               <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-                Required webhook topics
+                The Courier Guy
               </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                Create Bob Go subscriptions for these events and point each one
-                to /api/webhooks/bobgo.
+                Used privately to confirm courier serviceability, then after
+                payment for costing, shipment booking, waybills, and tracking.
+                Packages are handed in at the configured pickup point; no
+                collection is requested.
               </p>
             </div>
           </div>
-          <div className="grid gap-2">
-            <BobGoWebhookCheckbox
-              checked={webhookTopics.bobgoWebhookTrackingUpdated}
-              name="bobgoWebhookTrackingUpdated"
-              label="Tracking updated"
-              onCheckedChange={(checked) =>
-                setWebhookTopics((current) => ({
-                  ...current,
-                  bobgoWebhookTrackingUpdated: checked,
-                }))
-              }
+
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              name="courierGuyEnabled"
+              defaultChecked={courierGuyEnabled}
             />
-            <BobGoWebhookCheckbox
-              checked={webhookTopics.bobgoWebhookFulfillmentCreated}
-              name="bobgoWebhookFulfillmentCreated"
-              label="Fulfillment created"
-              onCheckedChange={(checked) =>
-                setWebhookTopics((current) => ({
-                  ...current,
-                  bobgoWebhookFulfillmentCreated: checked,
-                }))
+            <span className="font-semibold text-zinc-950 dark:text-white">
+              Enable new Courier Guy bookings
+            </span>
+          </label>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyMode">API environment</Label>
+              <Select
+                name="courierGuyMode"
+                value={apiMode}
+                onValueChange={(value) => {
+                  if (value === "live" || value === "sandbox") {
+                    setApiMode(value);
+                  }
+                }}
+              >
+                <SelectTrigger id="courierGuyMode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sandbox">Sandbox</SelectItem>
+                  <SelectItem value="live">Live</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Nationwide customer checkout requires Live. Sandbox can only be
+                saved while online shipping is disabled.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyDefaultServiceCode">
+                Preferred service code
+              </Label>
+              <Input
+                id="courierGuyDefaultServiceCode"
+                name="courierGuyDefaultServiceCode"
+                defaultValue={courierGuyDefaultServiceCode ?? ""}
+                placeholder="Optional; cheapest available when blank"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuySandboxAccountCode">
+                Sandbox account code
+              </Label>
+              <Input
+                id="courierGuySandboxAccountCode"
+                name="courierGuySandboxAccountCode"
+                maxLength={64}
+                defaultValue={courierGuySandboxAccountCode ?? ""}
+                placeholder="For example, JUR001"
+                type="text"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuySandboxApiKey">
+                Sandbox bearer token
+              </Label>
+              <SecretTextInput
+                id="courierGuySandboxApiKey"
+                name="courierGuySandboxApiKey"
+                icon="key"
+                defaultValue={courierGuySandboxApiKey}
+                placeholder={
+                  hasCourierGuySandboxApiKey
+                    ? "Saved — leave blank to keep it"
+                    : "Paste sandbox API token"
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyLiveAccountCode">
+                Live account code
+              </Label>
+              <Input
+                id="courierGuyLiveAccountCode"
+                name="courierGuyLiveAccountCode"
+                maxLength={64}
+                defaultValue={courierGuyLiveAccountCode ?? ""}
+                placeholder="For example, JUR082"
+                type="text"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyLiveApiKey">
+                Live bearer token
+              </Label>
+              <SecretTextInput
+                id="courierGuyLiveApiKey"
+                name="courierGuyLiveApiKey"
+                icon="key"
+                defaultValue={courierGuyLiveApiKey}
+                placeholder={
+                  hasCourierGuyLiveApiKey
+                    ? "Saved — leave blank to keep it"
+                    : "Paste live API token"
+                }
+              />
+            </div>
+          </div>
+          <p className="-mt-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Enter the account code shown in each Courier Guy environment. The
+            bearer token scopes API requests to that account; the code is kept
+            for configuration checks and shipment audit history. Account codes
+            and tokens cannot be rotated while that environment has active
+            shipments.
+          </p>
+
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyDropoffType">Drop-off method</Label>
+              <Select
+                name="courierGuyDropoffType"
+                value={dropoffType}
+                onValueChange={(value) => {
+                  if (
+                    value === "generic_kiosk" ||
+                    value === "generic_locker" ||
+                    value === "specific_pickup_point"
+                  ) {
+                    setDropoffType(value);
+                  }
+                }}
+              >
+                <SelectTrigger id="courierGuyDropoffType">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="generic_kiosk">
+                    Any Courier Guy kiosk
+                  </SelectItem>
+                  <SelectItem value="generic_locker">
+                    Any Courier Guy locker
+                  </SelectItem>
+                  <SelectItem value="specific_pickup_point">
+                    Specific pickup point
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <CourierGuyPickupPointCombobox
+              enabled={dropoffType === "specific_pickup_point"}
+              hasSavedApiKey={
+                apiMode === "live"
+                  ? hasCourierGuyLiveApiKey
+                  : hasCourierGuySandboxApiKey
               }
-            />
-            <BobGoWebhookCheckbox
-              checked={
-                webhookTopics.bobgoWebhookShipmentSubmissionStatusUpdated
+              initialMode={courierGuyMode}
+              initialPickupPointId={
+                courierGuyDropoffType === "specific_pickup_point"
+                  ? courierGuyDropoffPickupPointId
+                  : null
               }
-              name="bobgoWebhookShipmentSubmissionStatusUpdated"
-              label="Shipment submission status updated"
-              onCheckedChange={(checked) =>
-                setWebhookTopics((current) => ({
-                  ...current,
-                  bobgoWebhookShipmentSubmissionStatusUpdated: checked,
-                }))
+              initialPickupPointLabel={
+                courierGuyDropoffType === "specific_pickup_point"
+                  ? courierGuyDropoffPickupPointLabel
+                  : null
               }
-            />
-            <BobGoWebhookCheckbox
-              checked={webhookTopics.bobgoWebhookShipmentChargedAmountChanged}
-              name="bobgoWebhookShipmentChargedAmountChanged"
-              label="Shipment charged amount changed"
-              onCheckedChange={(checked) =>
-                setWebhookTopics((current) => ({
-                  ...current,
-                  bobgoWebhookShipmentChargedAmountChanged: checked,
-                }))
-              }
-            />
-            <BobGoWebhookCheckbox
-              checked={webhookTopics.bobgoWebhookShipmentChargedWeightChanged}
-              name="bobgoWebhookShipmentChargedWeightChanged"
-              label="Shipment charged weight changed"
-              onCheckedChange={(checked) =>
-                setWebhookTopics((current) => ({
-                  ...current,
-                  bobgoWebhookShipmentChargedWeightChanged: checked,
-                }))
-              }
-            />
-            <BobGoWebhookCheckbox
-              checked={webhookTopics.bobgoWebhookShipmentHealthStatusUpdated}
-              name="bobgoWebhookShipmentHealthStatusUpdated"
-              label="Shipment health status updated"
-              onCheckedChange={(checked) =>
-                setWebhookTopics((current) => ({
-                  ...current,
-                  bobgoWebhookShipmentHealthStatusUpdated: checked,
-                }))
-              }
+              initialPickupPointProvider={courierGuyDropoffProvider}
+              mode={apiMode}
             />
           </div>
-        </div>
-      </div>
-      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300">
-        Keep Bob Go tracking emails disabled where possible. Bob Go should send
-        Jurgens Energy webhook events, then Jurgens Energy sends customer
-        notifications through our notification templates.
-      </div>
-      {state.message ? (
-        <p
-          className={
-            state.ok
-              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
-              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
-          }
-        >
-          {state.message}
-        </p>
-      ) : null}
-      <Button type="submit" disabled={isPending} className="w-fit gap-2">
-        <SaveIcon className="size-4" />
-        {isPending ? "Saving..." : "Save shipping settings"}
-      </Button>
-    </form>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyWebhookToken">
+                Webhook shared token
+              </Label>
+              <SecretTextInput
+                id="courierGuyWebhookToken"
+                name="courierGuyWebhookToken"
+                icon="key"
+                minLength={24}
+                value={courierGuyWebhookTokenValue}
+                onValueChange={(value) => {
+                  setCourierGuyWebhookTokenValue(value);
+                  setCourierGuyWebhookUrlCopied(false);
+                }}
+                placeholder={
+                  hasCourierGuyWebhookToken
+                    ? "Saved — leave blank to keep it"
+                  : "Create a strong shared token"
+                }
+              />
+              <Button
+                className="w-fit gap-2"
+                onClick={() => {
+                  setCourierGuyWebhookTokenValue(
+                    window.crypto.randomUUID().replaceAll("-", ""),
+                  );
+                  setCourierGuyWebhookUrlCopied(false);
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <RotateCcwIcon className="size-3.5" />
+                {hasCourierGuyWebhookToken
+                  ? "Generate replacement"
+                  : "Generate token"}
+              </Button>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyWebhookUrl">
+                Webhook subscription URL
+              </Label>
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                <Input
+                  id="courierGuyWebhookUrl"
+                  className="min-w-0 font-mono text-xs"
+                  readOnly
+                  value={courierGuyWebhookSubscriptionUrl}
+                />
+                <Button
+                  className="h-10 shrink-0 gap-2"
+                  disabled={!courierGuyWebhookTokenValue.trim()}
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(
+                      courierGuyWebhookSubscriptionUrl,
+                    );
+                    setCourierGuyWebhookUrlCopied(true);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  <ClipboardIcon className="size-4" />
+                  {courierGuyWebhookUrlCopied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Enter a new token to generate the full subscription URL, then
+                select an API environment above, and copy the resulting URL
+                into that environment&apos;s ShipLogic portal under Settings →
+                Webhook subscriptions using the Tracking event topic. Repeat
+                for the other environment after switching the selector. Saved
+                tokens are never sent back to the browser; rotate the token if
+                either URL must be configured again.
+              </p>
+            </div>
+          </div>
+
+          <Alert>
+            <TriangleAlertIcon />
+            <AlertTitle>Restricted goods stay with Jurgens delivery</AlertTitle>
+            <AlertDescription>
+              Filled LPG and every product marked for Jurgens fulfillment are
+              excluded from Courier Guy booking. Do not change a restricted
+              product to courier fulfillment without the carrier&apos;s written
+              approval.
+            </AlertDescription>
+          </Alert>
+        </section>
+
+        {state.message ? (
+          <p
+            className={
+              state.ok
+                ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+                : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+            }
+          >
+            {state.message}
+          </p>
+        ) : null}
+
+        <Button type="submit" disabled={isPending} className="w-fit gap-2">
+          <SaveIcon className="size-4" />
+          {isPending ? "Saving..." : "Save shipping settings"}
+        </Button>
+      </form>
+
       <JurgensDeliveryZonesManager zones={jurgensDeliveryZones} />
     </div>
   );
 }
-
-function BobGoCredentialPanel({
-  active,
-  apiBaseUrl,
-  apiKey,
-  description,
-  hasApiKey,
-  hasWebhookSecret,
-  mode,
-  title,
-  webhookSecret,
-}: {
-  active: boolean;
-  apiBaseUrl: string;
-  apiKey: string | null;
-  description: string;
-  hasApiKey: boolean;
-  hasWebhookSecret: boolean;
-  mode: "live" | "sandbox";
-  title: string;
-  webhookSecret: string | null;
-}) {
-  const prefix = mode === "live" ? "bobgoLive" : "bobgoSandbox";
-
-  return (
-    <div
-      className={cn(
-        "rounded-xl border p-4 transition-colors",
-        active
-          ? "border-admin-primary/45 bg-admin-primary/8 dark:border-admin-primary/60 dark:bg-admin-primary/10"
-          : "border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.04]",
-      )}
-    >
-      <div className="mb-5 flex items-start gap-3">
-        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
-          <KeyRoundIcon className="size-4" />
-        </span>
-        <div>
-          <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-            {title}
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-            {description}
-          </p>
-          <p className="mt-2 rounded-md bg-zinc-100 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-white/10 dark:text-zinc-300">
-            {apiBaseUrl}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor={`${prefix}ApiKey`}>Bearer token</Label>
-          <SecretTextInput
-            id={`${prefix}ApiKey`}
-            name={`${prefix}ApiKey`}
-            icon="key"
-            defaultValue={apiKey}
-            placeholder={
-              hasApiKey
-                ? "Saved - leave blank to keep current token"
-                : "Paste Bob Go bearer token"
-            }
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor={`${prefix}WebhookSecret`}>
-            Webhook signing secret
-          </Label>
-          <SecretTextInput
-            id={`${prefix}WebhookSecret`}
-            name={`${prefix}WebhookSecret`}
-            icon="key"
-            defaultValue={webhookSecret}
-            placeholder={
-              hasWebhookSecret
-                ? "Saved - leave blank to keep current secret"
-                : "Paste webhook signing secret"
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BobGoWebhookCheckbox({
-  checked,
-  label,
-  name,
-  onCheckedChange,
-}: {
-  checked: boolean;
-  label: string;
-  name: string;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
-      <Checkbox
-        checked={checked}
-        name={name}
-        onCheckedChange={(nextChecked) => onCheckedChange(nextChecked === true)}
-      />
-      {label}
-    </label>
-  );
-}
-
-type JurgensDeliveryRateDraft = {
-  fromAmount: string;
-  key: string;
-  price: string;
-  upToAmount: string;
-};
 
 function JurgensDeliveryZonesManager({
   zones,
@@ -2541,8 +3012,9 @@ function JurgensDeliveryZonesManager({
               Jurgens Energy delivery zones
             </h3>
             <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Set the postal codes Jurgens Energy delivers to directly, then
-              add minimum order rules and conditional local delivery prices.
+              These postal-code groups determine only whether an item marked
+              for Jurgens delivery can ship to the customer. The nationwide
+              order-level price policy above applies separately.
             </p>
           </div>
         </div>
@@ -2564,7 +3036,7 @@ function JurgensDeliveryZonesManager({
           <AlertDescription className="grid gap-2">
             <p>
               Checkout will refuse the ambiguous postal codes below instead of
-              guessing which price applies. Edit or deactivate a zone so every
+              guessing eligibility. Edit or deactivate a zone so every
               postal code belongs to only one active zone.
             </p>
             <ul className="grid list-disc gap-1 pl-5">
@@ -2604,9 +3076,8 @@ function JurgensDeliveryZonesManager({
                   </div>
                   <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
                     {zone.postalCodes.length} postal code
-                    {zone.postalCodes.length === 1 ? "" : "s"} · minimum order{" "}
-                    {formatZar(zone.minimumOrderAmount)} ·{" "}
-                    {summarizeJurgensDeliveryRates(zone)}
+                    {zone.postalCodes.length === 1 ? "" : "s"} · eligibility
+                    only
                   </p>
                   {zone.deliveryInformation ? (
                     <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600 dark:text-zinc-300">
@@ -2673,44 +3144,7 @@ function JurgensDeliveryZoneDialog({
     saveJurgensDeliveryZoneSettings,
     initialState,
   );
-  const [rates, setRates] = useState<JurgensDeliveryRateDraft[]>(() =>
-    getInitialRateDrafts(zone),
-  );
   const dialogId = zone?.id ?? "new";
-
-  function updateRate(
-    key: string,
-    field: keyof Omit<JurgensDeliveryRateDraft, "key">,
-    value: string,
-  ) {
-    setRates((current) =>
-      current.map((rate) =>
-        rate.key === key ? { ...rate, [field]: value } : rate,
-      ),
-    );
-  }
-
-  function addRate() {
-    setRates((current) => {
-      const previous = current[current.length - 1];
-
-      return [
-        ...current,
-        {
-          fromAmount: previous?.upToAmount || previous?.fromAmount || "0",
-          key: createDeliveryRateKey(),
-          price: "0",
-          upToAmount: "",
-        },
-      ];
-    });
-  }
-
-  function removeRate(key: string) {
-    setRates((current) =>
-      current.length === 1 ? current : current.filter((rate) => rate.key !== key),
-    );
-  }
 
   return (
     <Dialog>
@@ -2727,11 +3161,6 @@ function JurgensDeliveryZoneDialog({
 
           <DialogBody className="grid gap-5">
             <input type="hidden" name="zoneId" value={zone?.id ?? ""} />
-            <input
-              type="hidden"
-              name="ratesJson"
-              value={JSON.stringify(toRatePayload(rates))}
-            />
 
             <div className="grid gap-2">
               <Label htmlFor={`jurgens-zone-name-${dialogId}`}>Zone name</Label>
@@ -2779,118 +3208,6 @@ function JurgensDeliveryZoneDialog({
                 Separate codes with commas or new lines. Use ranges like
                 7600-7699, or prefix wildcards like 76*.
               </p>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor={`jurgens-zone-minimum-${dialogId}`}>
-                Minimum order price
-              </Label>
-              <Input
-                id={`jurgens-zone-minimum-${dialogId}`}
-                name="minimumOrderAmount"
-                type="number"
-                min={0}
-                step="0.01"
-                defaultValue={zone?.minimumOrderAmount ?? 0}
-                required
-              />
-            </div>
-
-            <div className="grid gap-3 rounded-xl border border-zinc-200 p-3 dark:border-white/10">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-zinc-950 dark:text-white">
-                    Conditional pricing
-                  </h4>
-                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                    Match the direct-delivery subtotal to a local delivery price.
-                    The “Up to” amount is exclusive. If the final payable tier
-                    has a cap and no later tier, Jurgens delivery is free from
-                    that zone-specific cap upward. Leave it blank to keep
-                    charging the last tier with no upper limit.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-fit gap-2"
-                  onClick={addRate}
-                >
-                  <PlusIcon className="size-3.5" />
-                  Add tier
-                </Button>
-              </div>
-
-              <div className="grid gap-2">
-                {rates.map((rate, index) => (
-                  <div
-                    key={rate.key}
-                    className="grid gap-2 rounded-lg border border-zinc-200 p-3 dark:border-white/10 lg:grid-cols-[1fr_1fr_1fr_auto]"
-                  >
-                    <div className="grid gap-1.5">
-                      <Label htmlFor={`rate-from-${dialogId}-${rate.key}`}>
-                        Orders from
-                      </Label>
-                      <Input
-                        id={`rate-from-${dialogId}-${rate.key}`}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={rate.fromAmount}
-                        onChange={(event) =>
-                          updateRate(rate.key, "fromAmount", event.target.value)
-                        }
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-1.5">
-                      <Label htmlFor={`rate-up-to-${dialogId}-${rate.key}`}>
-                        Up to
-                      </Label>
-                      <Input
-                        id={`rate-up-to-${dialogId}-${rate.key}`}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={rate.upToAmount}
-                        onChange={(event) =>
-                          updateRate(rate.key, "upToAmount", event.target.value)
-                        }
-                        placeholder="No limit"
-                      />
-                    </div>
-                    <div className="grid gap-1.5">
-                      <Label htmlFor={`rate-price-${dialogId}-${rate.key}`}>
-                        Delivery price
-                      </Label>
-                      <Input
-                        id={`rate-price-${dialogId}-${rate.key}`}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={rate.price}
-                        onChange={(event) =>
-                          updateRate(rate.key, "price", event.target.value)
-                        }
-                        required
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Remove delivery tier ${index + 1}`}
-                        disabled={rates.length === 1}
-                        onClick={() => removeRate(rate.key)}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             <div className="grid gap-2">
@@ -2962,72 +3279,6 @@ function DeleteJurgensDeliveryZoneButton({
       </Button>
     </form>
   );
-}
-
-function getInitialRateDrafts(
-  zone: JurgensDeliveryZone | undefined,
-): JurgensDeliveryRateDraft[] {
-  if (!zone || zone.rates.length === 0) {
-    return [
-      {
-        fromAmount: "0",
-        key: createDeliveryRateKey(),
-        price: "0",
-        upToAmount: "",
-      },
-    ];
-  }
-
-  return zone.rates.map((rate) => ({
-    fromAmount: String(rate.fromAmount),
-    key: rate.id,
-    price: String(rate.price),
-    upToAmount: rate.upToAmount === null ? "" : String(rate.upToAmount),
-  }));
-}
-
-function createDeliveryRateKey() {
-  return `rate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function toRatePayload(rates: JurgensDeliveryRateDraft[]) {
-  return rates.map((rate) => ({
-    fromAmount: rate.fromAmount,
-    price: rate.price,
-    upToAmount: rate.upToAmount.trim() ? rate.upToAmount : null,
-  }));
-}
-
-function summarizeJurgensDeliveryRates(zone: JurgensDeliveryZone) {
-  if (zone.rates.length === 0) {
-    return "no price tiers";
-  }
-
-  const summaries = zone.rates.map((rate) => {
-    const price = rate.price === 0 ? "free delivery" : formatZar(rate.price);
-    const range = rate.upToAmount === null
-      ? `from ${formatZar(rate.fromAmount)} with no upper limit`
-      : `from ${formatZar(rate.fromAmount)} to below ${formatZar(rate.upToAmount)}`;
-
-    return `${price} ${range}`;
-  });
-  const freeDeliveryThreshold = getJurgensImplicitFreeDeliveryThreshold(
-    zone.rates,
-  );
-
-  if (freeDeliveryThreshold !== null) {
-    summaries.push(`free delivery from ${formatZar(freeDeliveryThreshold)}`);
-  }
-
-  if (summaries.length <= 2) {
-    return summaries.join(" · ");
-  }
-
-  return `${zone.rates.length} price tiers · ${summaries[0]} · ${summaries.at(-1)}`;
-}
-
-function formatZar(value: number) {
-  return `R ${value.toFixed(2)}`;
 }
 
 type NotificationSettingsFormProps = {
@@ -4246,7 +4497,7 @@ function NotificationTemplateEditor({
     target: "subject" | "preview" | "text" | "html",
   ) {
     event.preventDefault();
-    const variable = event.dataTransfer.getData("text/piessang-variable");
+    const variable = event.dataTransfer.getData("text/jurgens-energy-variable");
 
     if (variable) {
       insertVariable(variable, target);
@@ -4373,7 +4624,7 @@ function NotificationTemplateEditor({
                 onClick={() => insertVariable(variable)}
                 onDragStart={(event) => {
                   event.dataTransfer.setData(
-                    "text/piessang-variable",
+                    "text/jurgens-energy-variable",
                     variable,
                   );
                   event.dataTransfer.effectAllowed = "copy";
@@ -4405,7 +4656,7 @@ function NotificationTemplateEditor({
                   onClick={() => insertVariable(variable.key)}
                   onDragStart={(event) => {
                     event.dataTransfer.setData(
-                      "text/piessang-variable",
+                      "text/jurgens-energy-variable",
                       variable.key,
                     );
                     event.dataTransfer.effectAllowed = "copy";
@@ -4729,7 +4980,7 @@ function InAppNotificationTemplateEditor({
     target: "title" | "body" | "actionLabel" | "actionUrl",
   ) {
     event.preventDefault();
-    const variable = event.dataTransfer.getData("text/piessang-variable");
+    const variable = event.dataTransfer.getData("text/jurgens-energy-variable");
 
     if (variable) {
       insertVariable(variable, target);
@@ -4823,7 +5074,7 @@ function InAppNotificationTemplateEditor({
                   onClick={() => insertVariable(variable)}
                   onDragStart={(event) => {
                     event.dataTransfer.setData(
-                      "text/piessang-variable",
+                      "text/jurgens-energy-variable",
                       variable,
                     );
                     event.dataTransfer.effectAllowed = "copy";
@@ -4855,7 +5106,7 @@ function InAppNotificationTemplateEditor({
                     onClick={() => insertVariable(variable.key)}
                     onDragStart={(event) => {
                       event.dataTransfer.setData(
-                        "text/piessang-variable",
+                        "text/jurgens-energy-variable",
                         variable.key,
                       );
                       event.dataTransfer.effectAllowed = "copy";

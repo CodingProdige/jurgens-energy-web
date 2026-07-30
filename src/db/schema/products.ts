@@ -35,7 +35,7 @@ export const productStatus = pgEnum("product_status", [
 
 export const productFulfillmentMode = pgEnum("product_fulfillment_mode", [
   "seller_fulfilled",
-  "piessang_fulfilled",
+  "jurgens_fulfilled",
 ]);
 
 export const googleFulfillmentChannel = pgEnum("google_fulfillment_channel", [

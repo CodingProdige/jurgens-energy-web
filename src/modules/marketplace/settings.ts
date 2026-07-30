@@ -1,16 +1,38 @@
 import crypto from "node:crypto";
 
-import { eq, inArray } from "drizzle-orm";
+import {
+  and,
+  eq,
+  inArray,
+  isNull,
+  notInArray,
+  or,
+} from "drizzle-orm";
 import { cache } from "react";
 
 import { db } from "@/src/db";
-import { marketplaceSettings, media } from "@/src/db/schema";
+import {
+  auditLogs,
+  marketplaceSettings,
+  media,
+  shipments,
+} from "@/src/db/schema";
 import { env } from "@/src/config/env";
 import { hashPassword, verifyPassword } from "@/src/modules/auth/service";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import { decryptSecret, encryptSecret } from "@/src/modules/security/secrets";
+import {
+  COURIER_GUY_LIVE_API_BASE_URL,
+  COURIER_GUY_SANDBOX_API_BASE_URL,
+  createCourierGuyClient,
+} from "@/src/modules/shipping/courier-guy-client";
+import { hasCourierGuyCredentialsForIdentity } from "@/src/modules/shipping/courier-guy-operations";
+import { normalizeFreeShippingThreshold } from "@/src/modules/shipping/customer-shipping-policy";
 
-export const marketplaceComingSoonCookieName = "piessang_marketplace_preview";
+export const marketplaceComingSoonCookieName =
+  "jurgens_energy_marketplace_preview";
+export const legacyMarketplaceComingSoonCookieName =
+  `${"pies"}${"sang"}_marketplace_preview`;
 
 const defaultWhatsappMessageUrl = "https://waba-v2.360dialog.io";
 const defaultFooterPaymentMethodLabels = [
@@ -38,6 +60,7 @@ export const defaultWhatsappFollowUpMessages = {
   support:
     "Hi, just checking in. Did you still need help with delivery, a gas order, or anything else from Jurgens Energy?",
 } as const;
+export const maxWhatsappEmailNotificationRecipients = 20;
 
 function getWhatsappWebhookUrl() {
   return new URL("/api/webhooks/whatsapp", env.APP_URL).toString();
@@ -144,6 +167,54 @@ function serializePaymentMethodBadges(
   );
 }
 
+function normalizeWhatsappNotificationRecipient(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const email = value.trim().toLowerCase();
+
+  return email || null;
+}
+
+function parseWhatsappEmailNotificationRecipients(
+  value: unknown,
+) {
+  let recipients: unknown[] = [];
+
+  if (Array.isArray(value)) {
+    recipients = value;
+  } else if (typeof value === "string" && value.trim()) {
+    const trimmedValue = value.trim();
+    let parsedJsonArray = false;
+
+    if (trimmedValue.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmedValue) as unknown;
+
+        if (Array.isArray(parsed)) {
+          recipients = parsed;
+          parsedJsonArray = true;
+        }
+      } catch {
+        // Fall through to the legacy newline/comma format.
+      }
+    }
+
+    if (!parsedJsonArray) {
+      recipients = value.split(/[\n,]+/g);
+    }
+  }
+
+  return Array.from(
+    new Set(
+      recipients
+        .map(normalizeWhatsappNotificationRecipient)
+        .filter((email): email is string => Boolean(email)),
+    ),
+  ).slice(0, maxWhatsappEmailNotificationRecipients);
+}
+
 async function resolvePaymentMethodBadges(
   value: string | null | undefined,
 ): Promise<MarketplacePaymentMethodBadge[]> {
@@ -190,6 +261,19 @@ async function resolvePaymentMethodBadges(
 
 export type MarketplaceSettings = {
   bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
+  courierGuyDefaultServiceCode: string | null;
+  courierGuyDropoffPickupPointId: string | null;
+  courierGuyDropoffPickupPointLabel: string | null;
+  courierGuyDropoffProvider: string;
+  courierGuyDropoffType:
+    | "generic_kiosk"
+    | "generic_locker"
+    | "specific_pickup_point";
+  courierGuyEnabled: boolean;
+  courierGuyLiveAccountCode: string | null;
+  courierGuyMode: "live" | "sandbox";
+  courierGuySandboxAccountCode: string | null;
+  courierGuyWebhookUrl: string;
   comingSoonEnabled: boolean;
   comingSoonPasswordHash: string | null;
   contactEmail: string;
@@ -223,6 +307,9 @@ export type MarketplaceSettings = {
   hasBobgoLiveWebhookSecret: boolean;
   hasBobgoSandboxApiKey: boolean;
   hasBobgoSandboxWebhookSecret: boolean;
+  hasCourierGuyLiveApiKey: boolean;
+  hasCourierGuySandboxApiKey: boolean;
+  hasCourierGuyWebhookToken: boolean;
   jurgensDeliveryCutoffTime: string;
   bobgoWebhookFulfillmentCreated: boolean;
   bobgoWebhookShipmentChargedAmountChanged: boolean;
@@ -232,6 +319,8 @@ export type MarketplaceSettings = {
   bobgoWebhookTrackingUpdated: boolean;
   shippingBufferBps: number;
   shippingEnabled: boolean;
+  shippingFlatRate: number;
+  shippingFreeOverAmount: number | null;
   shippingMarginBps: number;
   payfastLiveMerchantId: string | null;
   payfastMode: "live" | "sandbox";
@@ -259,6 +348,10 @@ export type MarketplaceSettings = {
   hasWhatsappWebhookSigningSecret: boolean;
   hasWhatsappWebhookVerifyToken: boolean;
   whatsappBusinessPhoneNumber: string | null;
+  whatsappEmailNotificationRecipients: string[];
+  whatsappEmailNotificationsEnabled: boolean;
+  whatsappEmailNotifyInboundMessage: boolean;
+  whatsappEmailNotifyNewConversation: boolean;
   whatsappFollowUpDefaultMessage: string;
   whatsappFollowUpDelayMinutes: number;
   whatsappFollowUpDraftMessage: string;
@@ -288,11 +381,7 @@ export type WhatsappFollowUpSettings = Pick<
 >;
 
 export type MarketplaceAdminSecrets = {
-  bobgoLiveApiKey: string | null;
-  bobgoLiveWebhookSecret: string | null;
   openAiApiKey: string | null;
-  bobgoSandboxApiKey: string | null;
-  bobgoSandboxWebhookSecret: string | null;
   payfastLiveMerchantKey: string | null;
   payfastLivePassphrase: string | null;
   payfastSandboxMerchantKey: string | null;
@@ -307,6 +396,19 @@ export type MarketplaceAdminSecrets = {
 
 const defaultSettings: MarketplaceSettings = {
   bobgoBookingMode: "disabled",
+  courierGuyDefaultServiceCode: null,
+  courierGuyDropoffPickupPointId: "K0000",
+  courierGuyDropoffPickupPointLabel: null,
+  courierGuyDropoffProvider: "tcg-locker",
+  courierGuyDropoffType: "generic_kiosk",
+  courierGuyEnabled: false,
+  courierGuyLiveAccountCode: null,
+  courierGuyMode: "sandbox",
+  courierGuySandboxAccountCode: null,
+  courierGuyWebhookUrl: new URL(
+    "/api/webhooks/courier-guy",
+    env.APP_URL,
+  ).toString(),
   comingSoonEnabled: false,
   comingSoonPasswordHash: null,
   contactEmail: "",
@@ -341,6 +443,9 @@ const defaultSettings: MarketplaceSettings = {
   hasBobgoLiveWebhookSecret: false,
   hasBobgoSandboxApiKey: false,
   hasBobgoSandboxWebhookSecret: false,
+  hasCourierGuyLiveApiKey: false,
+  hasCourierGuySandboxApiKey: false,
+  hasCourierGuyWebhookToken: false,
   jurgensDeliveryCutoffTime: "14:00",
   bobgoWebhookFulfillmentCreated: true,
   bobgoWebhookShipmentChargedAmountChanged: true,
@@ -350,6 +455,8 @@ const defaultSettings: MarketplaceSettings = {
   bobgoWebhookTrackingUpdated: true,
   shippingBufferBps: 0,
   shippingEnabled: false,
+  shippingFlatRate: 0,
+  shippingFreeOverAmount: null,
   shippingMarginBps: 0,
   payfastLiveMerchantId: null,
   payfastMode: "sandbox",
@@ -382,6 +489,10 @@ const defaultSettings: MarketplaceSettings = {
   ),
   hasWhatsappWebhookVerifyToken: Boolean(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
   whatsappBusinessPhoneNumber: env.WHATSAPP_ORDERING_PHONE_NUMBER ?? null,
+  whatsappEmailNotificationRecipients: [],
+  whatsappEmailNotificationsEnabled: false,
+  whatsappEmailNotifyInboundMessage: true,
+  whatsappEmailNotifyNewConversation: true,
   whatsappFollowUpDefaultMessage: defaultWhatsappFollowUpMessages.default,
   whatsappFollowUpDelayMinutes: 30,
   whatsappFollowUpDraftMessage: defaultWhatsappFollowUpMessages.draft,
@@ -458,8 +569,31 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
         marketplaceSettings.bobgoWebhookShipmentSubmissionStatusUpdated,
       bobgoWebhookTrackingUpdated:
         marketplaceSettings.bobgoWebhookTrackingUpdated,
+      courierGuyDefaultServiceCode:
+        marketplaceSettings.courierGuyDefaultServiceCode,
+      courierGuyDropoffPickupPointId:
+        marketplaceSettings.courierGuyDropoffPickupPointId,
+      courierGuyDropoffPickupPointLabel:
+        marketplaceSettings.courierGuyDropoffPickupPointLabel,
+      courierGuyDropoffProvider:
+        marketplaceSettings.courierGuyDropoffProvider,
+      courierGuyDropoffType: marketplaceSettings.courierGuyDropoffType,
+      courierGuyEnabled: marketplaceSettings.courierGuyEnabled,
+      courierGuyLiveAccountCode:
+        marketplaceSettings.courierGuyLiveAccountCode,
+      courierGuyLiveApiKeyEncrypted:
+        marketplaceSettings.courierGuyLiveApiKeyEncrypted,
+      courierGuyMode: marketplaceSettings.courierGuyMode,
+      courierGuySandboxAccountCode:
+        marketplaceSettings.courierGuySandboxAccountCode,
+      courierGuySandboxApiKeyEncrypted:
+        marketplaceSettings.courierGuySandboxApiKeyEncrypted,
+      courierGuyWebhookTokenEncrypted:
+        marketplaceSettings.courierGuyWebhookTokenEncrypted,
       shippingBufferBps: marketplaceSettings.shippingBufferBps,
       shippingEnabled: marketplaceSettings.shippingEnabled,
+      shippingFlatRate: marketplaceSettings.shippingFlatRate,
+      shippingFreeOverAmount: marketplaceSettings.shippingFreeOverAmount,
       shippingMarginBps: marketplaceSettings.shippingMarginBps,
       jurgensDeliveryCutoffTime: marketplaceSettings.jurgensDeliveryCutoffTime,
       payfastLiveMerchantId: marketplaceSettings.payfastLiveMerchantId,
@@ -494,6 +628,14 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
       whatsappBusinessPhoneNumber:
         marketplaceSettings.whatsappBusinessPhoneNumber,
+      whatsappEmailNotificationRecipients:
+        marketplaceSettings.whatsappEmailNotificationRecipients,
+      whatsappEmailNotificationsEnabled:
+        marketplaceSettings.whatsappEmailNotificationsEnabled,
+      whatsappEmailNotifyInboundMessage:
+        marketplaceSettings.whatsappEmailNotifyInboundMessage,
+      whatsappEmailNotifyNewConversation:
+        marketplaceSettings.whatsappEmailNotifyNewConversation,
       whatsappFollowUpDefaultMessage:
         marketplaceSettings.whatsappFollowUpDefaultMessage,
       whatsappFollowUpDelayMinutes:
@@ -558,6 +700,46 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       settings.bobgoSandboxWebhookSecretEncrypted ??
         settings.bobgoWebhookSecretEncrypted,
     ),
+    courierGuyDefaultServiceCode:
+      settings.courierGuyDefaultServiceCode?.trim() || null,
+    courierGuyDropoffPickupPointId:
+      settings.courierGuyDropoffPickupPointId?.trim() || null,
+    courierGuyDropoffPickupPointLabel:
+      settings.courierGuyDropoffPickupPointLabel?.trim() || null,
+    courierGuyDropoffProvider:
+      settings.courierGuyDropoffProvider?.trim() || "tcg-locker",
+    courierGuyDropoffType:
+      settings.courierGuyDropoffType === "generic_locker" ||
+      settings.courierGuyDropoffType === "specific_pickup_point"
+        ? settings.courierGuyDropoffType
+        : "generic_kiosk",
+    courierGuyEnabled: settings.courierGuyEnabled ?? false,
+    courierGuyLiveAccountCode:
+      settings.courierGuyLiveAccountCode?.trim() || null,
+    courierGuyMode:
+      settings.courierGuyMode === "live" ? "live" : "sandbox",
+    courierGuySandboxAccountCode:
+      settings.courierGuySandboxAccountCode?.trim() || null,
+    courierGuyWebhookUrl: new URL(
+      "/api/webhooks/courier-guy",
+      env.APP_URL,
+    ).toString(),
+    hasCourierGuyLiveApiKey: Boolean(
+      settings.courierGuyLiveApiKeyEncrypted,
+    ),
+    hasCourierGuySandboxApiKey: Boolean(
+      settings.courierGuySandboxApiKeyEncrypted,
+    ),
+    hasCourierGuyWebhookToken: Boolean(
+      settings.courierGuyWebhookTokenEncrypted,
+    ),
+    shippingFlatRate: Math.max(0, Number(settings.shippingFlatRate) || 0),
+    shippingFreeOverAmount:
+      settings.shippingFreeOverAmount === null ||
+      settings.shippingFreeOverAmount === undefined ||
+      Number(settings.shippingFreeOverAmount) <= 0
+        ? null
+        : Number(settings.shippingFreeOverAmount),
     hasOpenAiApiKey: Boolean(
       settings.openAiApiKeyEncrypted ?? env.OPENAI_API_KEY,
     ),
@@ -604,6 +786,16 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       settings.whatsappBusinessPhoneNumber ??
       env.WHATSAPP_ORDERING_PHONE_NUMBER ??
       null,
+    whatsappEmailNotificationRecipients:
+      parseWhatsappEmailNotificationRecipients(
+        settings.whatsappEmailNotificationRecipients,
+      ),
+    whatsappEmailNotificationsEnabled:
+      settings.whatsappEmailNotificationsEnabled ?? false,
+    whatsappEmailNotifyInboundMessage:
+      settings.whatsappEmailNotifyInboundMessage ?? true,
+    whatsappEmailNotifyNewConversation:
+      settings.whatsappEmailNotifyNewConversation ?? true,
     whatsappFollowUpDefaultMessage:
       settings.whatsappFollowUpDefaultMessage ??
       defaultWhatsappFollowUpMessages.default,
@@ -757,149 +949,395 @@ export async function updateMarketplacePayFastSettings({
 }
 
 export async function updateMarketplaceShippingSettings({
-  bobgoApiKey,
-  bobgoBookingMode,
-  bobgoEnabled,
-  bobgoLiveApiKey,
-  bobgoLiveWebhookSecret,
-  bobgoMode,
-  bobgoSandboxApiKey,
-  bobgoSandboxWebhookSecret,
-  bobgoWebhookFulfillmentCreated,
-  bobgoWebhookSecret,
-  bobgoWebhookShipmentChargedAmountChanged,
-  bobgoWebhookShipmentChargedWeightChanged,
-  bobgoWebhookShipmentHealthStatusUpdated,
-  bobgoWebhookShipmentSubmissionStatusUpdated,
-  bobgoWebhookTrackingUpdated,
+  actorUserId,
+  courierGuyDefaultServiceCode,
+  courierGuyDropoffPickupPointId,
+  courierGuyDropoffPickupPointLabel,
+  courierGuyDropoffProvider,
+  courierGuyDropoffType,
+  courierGuyEnabled,
+  courierGuyLiveAccountCode,
+  courierGuyLiveApiKey,
+  courierGuyMode,
+  courierGuySandboxAccountCode,
+  courierGuySandboxApiKey,
+  courierGuyWebhookToken,
   jurgensDeliveryCutoffTime,
-  shippingBufferBps,
   shippingEnabled,
-  shippingMarginBps,
+  shippingFlatRate,
+  shippingFreeOverAmount,
 }: {
-  bobgoApiKey?: string;
-  bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
-  bobgoEnabled: boolean;
-  bobgoLiveApiKey?: string;
-  bobgoLiveWebhookSecret?: string;
-  bobgoMode: "live" | "sandbox";
-  bobgoSandboxApiKey?: string;
-  bobgoSandboxWebhookSecret?: string;
-  bobgoWebhookFulfillmentCreated: boolean;
-  bobgoWebhookSecret?: string;
-  bobgoWebhookShipmentChargedAmountChanged: boolean;
-  bobgoWebhookShipmentChargedWeightChanged: boolean;
-  bobgoWebhookShipmentHealthStatusUpdated: boolean;
-  bobgoWebhookShipmentSubmissionStatusUpdated: boolean;
-  bobgoWebhookTrackingUpdated: boolean;
+  actorUserId: string;
+  courierGuyDefaultServiceCode?: string;
+  courierGuyDropoffPickupPointId?: string;
+  courierGuyDropoffPickupPointLabel?: string;
+  courierGuyDropoffProvider: string;
+  courierGuyDropoffType:
+    | "generic_kiosk"
+    | "generic_locker"
+    | "specific_pickup_point";
+  courierGuyEnabled: boolean;
+  courierGuyLiveAccountCode: string | null;
+  courierGuyLiveApiKey?: string;
+  courierGuyMode: "live" | "sandbox";
+  courierGuySandboxAccountCode: string | null;
+  courierGuySandboxApiKey?: string;
+  courierGuyWebhookToken?: string;
   jurgensDeliveryCutoffTime: string;
-  shippingBufferBps: number;
   shippingEnabled: boolean;
-  shippingMarginBps: number;
+  shippingFlatRate: number;
+  shippingFreeOverAmount: number | null;
 }) {
-  if (shippingMarginBps < 0 || shippingMarginBps > 10000) {
+  const normalizedDropoffProvider = courierGuyDropoffProvider.trim();
+  const normalizedSubmittedPickupPointLabel =
+    courierGuyDropoffPickupPointLabel?.replace(/\s+/g, " ").trim() || null;
+
+  if (normalizedDropoffProvider !== "tcg-locker") {
     return {
       ok: false,
-      message: "Shipping margin must be between 0% and 100%.",
+      message:
+        "Courier Guy drop-off bookings must use the tcg-locker pickup-point provider.",
     };
   }
 
-  if (shippingBufferBps < 0 || shippingBufferBps > 10000) {
+  if (
+    normalizedSubmittedPickupPointLabel &&
+    normalizedSubmittedPickupPointLabel.length > 500
+  ) {
     return {
       ok: false,
-      message: "Shipping buffer must be between 0% and 100%.",
+      message: "Courier Guy pickup-point labels must be 500 characters or less.",
+    };
+  }
+
+  if (
+    courierGuyWebhookToken &&
+    courierGuyWebhookToken.trim().length < 24
+  ) {
+    return {
+      ok: false,
+      message: "Courier Guy webhook tokens must be at least 24 characters.",
+    };
+  }
+
+  if (
+    !Number.isFinite(shippingFlatRate) ||
+    shippingFlatRate < 0 ||
+    shippingFlatRate > 1_000_000
+  ) {
+    return {
+      ok: false,
+      message: "Flat shipping must be between R0 and R1,000,000.",
+    };
+  }
+
+  let normalizedFreeShippingAmount: number | null = null;
+
+  try {
+    normalizedFreeShippingAmount = normalizeFreeShippingThreshold(
+      shippingFreeOverAmount,
+    );
+  } catch {
+    return {
+      ok: false,
+      message:
+        "The free-shipping threshold must round to at least R0.01.",
+    };
+  }
+
+  if (
+    normalizedFreeShippingAmount !== null &&
+    normalizedFreeShippingAmount > 1_000_000
+  ) {
+    return {
+      ok: false,
+      message:
+        "The free-shipping threshold must be no more than R1,000,000.",
+    };
+  }
+
+  const normalizedLiveAccountCode =
+    courierGuyLiveAccountCode?.trim() || null;
+  const normalizedSandboxAccountCode =
+    courierGuySandboxAccountCode?.trim() || null;
+
+  if (
+    [normalizedLiveAccountCode, normalizedSandboxAccountCode].some(
+      (accountCode) => accountCode !== null && accountCode.length > 64,
+    )
+  ) {
+    return {
+      ok: false,
+      message: "Courier Guy account codes must be 64 characters or less.",
     };
   }
 
   const existing = await getRawMarketplaceSettings();
-  const nextBobgoApiKey =
-    bobgoApiKey && bobgoApiKey.length > 0
-      ? encryptSecret(bobgoApiKey)
-      : (existing?.bobgoApiKeyEncrypted ??
-        existing?.bobgoSandboxApiKeyEncrypted);
-  const nextBobgoWebhookSecret =
-    bobgoWebhookSecret && bobgoWebhookSecret.length > 0
-      ? encryptSecret(bobgoWebhookSecret)
-      : (existing?.bobgoWebhookSecretEncrypted ??
-        existing?.bobgoSandboxWebhookSecretEncrypted);
-  const nextBobgoLiveApiKey =
-    bobgoLiveApiKey && bobgoLiveApiKey.length > 0
-      ? encryptSecret(bobgoLiveApiKey)
-      : existing?.bobgoLiveApiKeyEncrypted;
-  const nextBobgoLiveWebhookSecret =
-    bobgoLiveWebhookSecret && bobgoLiveWebhookSecret.length > 0
-      ? encryptSecret(bobgoLiveWebhookSecret)
-      : existing?.bobgoLiveWebhookSecretEncrypted;
-  const nextBobgoSandboxApiKey =
-    bobgoSandboxApiKey && bobgoSandboxApiKey.length > 0
-      ? encryptSecret(bobgoSandboxApiKey)
-      : (existing?.bobgoSandboxApiKeyEncrypted ??
-        existing?.bobgoApiKeyEncrypted);
-  const nextBobgoSandboxWebhookSecret =
-    bobgoSandboxWebhookSecret && bobgoSandboxWebhookSecret.length > 0
-      ? encryptSecret(bobgoSandboxWebhookSecret)
-      : (existing?.bobgoSandboxWebhookSecretEncrypted ??
-        existing?.bobgoWebhookSecretEncrypted);
+  const existingLiveApiKey = decryptOptionalSecret(
+    existing?.courierGuyLiveApiKeyEncrypted,
+  );
+  const existingSandboxApiKey = decryptOptionalSecret(
+    existing?.courierGuySandboxApiKeyEncrypted,
+  );
+  const protectedCredentialEnvironments: Array<"live" | "sandbox"> = [];
+  const liveCredentialsChanged =
+    normalizedLiveAccountCode !==
+      (existing?.courierGuyLiveAccountCode?.trim() || null) ||
+    (courierGuyLiveApiKey !== undefined &&
+      courierGuyLiveApiKey !== existingLiveApiKey);
+  const sandboxCredentialsChanged =
+    normalizedSandboxAccountCode !==
+      (existing?.courierGuySandboxAccountCode?.trim() || null) ||
+    (courierGuySandboxApiKey !== undefined &&
+      courierGuySandboxApiKey !== existingSandboxApiKey);
+  const activeCredentialsChanged =
+    courierGuyMode === "live"
+      ? liveCredentialsChanged
+      : sandboxCredentialsChanged;
 
-  await db
-    .insert(marketplaceSettings)
-    .values({
-      id: 1,
-      bobgoApiKeyEncrypted: nextBobgoApiKey ?? null,
-      bobgoBookingMode,
-      bobgoEnabled,
-      bobgoLiveApiKeyEncrypted: nextBobgoLiveApiKey ?? null,
-      bobgoLiveWebhookSecretEncrypted: nextBobgoLiveWebhookSecret ?? null,
-      bobgoMode,
-      bobgoWebhookSecretEncrypted: nextBobgoWebhookSecret ?? null,
-      bobgoWebhookFulfillmentCreated,
-      bobgoWebhookShipmentChargedAmountChanged,
-      bobgoWebhookShipmentChargedWeightChanged,
-      bobgoWebhookShipmentHealthStatusUpdated,
-      bobgoWebhookShipmentSubmissionStatusUpdated,
-      bobgoWebhookTrackingUpdated,
-      bobgoSandboxApiKeyEncrypted: nextBobgoSandboxApiKey ?? null,
-      bobgoSandboxWebhookSecretEncrypted:
-        nextBobgoSandboxWebhookSecret ?? null,
-      jurgensDeliveryCutoffTime,
-      shippingBufferBps,
-      shippingEnabled,
-      shippingMarginBps,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: marketplaceSettings.id,
-      set: {
-        bobgoApiKeyEncrypted: nextBobgoApiKey ?? null,
-        bobgoBookingMode,
-        bobgoEnabled,
-        bobgoLiveApiKeyEncrypted: nextBobgoLiveApiKey ?? null,
-        bobgoLiveWebhookSecretEncrypted: nextBobgoLiveWebhookSecret ?? null,
-        bobgoMode,
-        bobgoWebhookSecretEncrypted: nextBobgoWebhookSecret ?? null,
-        bobgoWebhookFulfillmentCreated,
-        bobgoWebhookShipmentChargedAmountChanged,
-        bobgoWebhookShipmentChargedWeightChanged,
-        bobgoWebhookShipmentHealthStatusUpdated,
-        bobgoWebhookShipmentSubmissionStatusUpdated,
-        bobgoWebhookTrackingUpdated,
-        bobgoSandboxApiKeyEncrypted: nextBobgoSandboxApiKey ?? null,
-        bobgoSandboxWebhookSecretEncrypted:
-          nextBobgoSandboxWebhookSecret ?? null,
-        jurgensDeliveryCutoffTime,
-        shippingBufferBps,
+  if (liveCredentialsChanged) {
+    protectedCredentialEnvironments.push("live");
+  }
+
+  if (sandboxCredentialsChanged) {
+    protectedCredentialEnvironments.push("sandbox");
+  }
+
+  if (protectedCredentialEnvironments.length > 0) {
+    const [blockingShipment] = await db
+      .select({
+        environment: shipments.providerEnvironment,
+      })
+      .from(shipments)
+      .where(
+        and(
+          eq(shipments.provider, "courier_guy"),
+          or(
+            inArray(
+              shipments.providerEnvironment,
+              protectedCredentialEnvironments,
+            ),
+            and(
+              eq(shipments.status, "booking"),
+              isNull(shipments.providerEnvironment),
+            ),
+          ),
+          notInArray(shipments.status, [
+            "cancelled",
+            "delivered",
+            "returned",
+            "undeliverable",
+          ]),
+        ),
+      )
+      .limit(1);
+
+    if (blockingShipment) {
+      return {
+        ok: false,
+        message: blockingShipment.environment
+          ? `The ${blockingShipment.environment} Courier Guy account code or bearer token cannot be changed while active ${blockingShipment.environment} shipments still need tracking, waybills, or cancellation. Complete or cancel those shipments first.`
+          : "Courier Guy credentials cannot be changed while a booking is in progress. Wait for it to finish, then try again.",
+      };
+    }
+  }
+
+  const nextLiveApiKeyPlain = courierGuyLiveApiKey ?? existingLiveApiKey;
+  const nextSandboxApiKeyPlain =
+    courierGuySandboxApiKey ?? existingSandboxApiKey;
+  const nextLiveApiKeyEncrypted = courierGuyLiveApiKey
+    ? encryptSecret(courierGuyLiveApiKey)
+    : existing?.courierGuyLiveApiKeyEncrypted;
+  const nextSandboxApiKeyEncrypted = courierGuySandboxApiKey
+    ? encryptSecret(courierGuySandboxApiKey)
+    : existing?.courierGuySandboxApiKeyEncrypted;
+  const nextWebhookToken = courierGuyWebhookToken
+    ? encryptSecret(courierGuyWebhookToken)
+    : existing?.courierGuyWebhookTokenEncrypted;
+  const activeApiKey =
+    courierGuyMode === "live"
+      ? nextLiveApiKeyPlain
+      : nextSandboxApiKeyPlain;
+  const activeAccountCode =
+    courierGuyMode === "live"
+      ? normalizedLiveAccountCode
+      : normalizedSandboxAccountCode;
+  const resolvedPickupPointId =
+    courierGuyDropoffType === "generic_kiosk"
+      ? "K0000"
+      : courierGuyDropoffType === "generic_locker"
+        ? "CG0000"
+        : courierGuyDropoffPickupPointId?.trim() || null;
+  let resolvedPickupPointLabel: string | null = null;
+
+  if (
+    courierGuyDropoffType === "specific_pickup_point" &&
+    resolvedPickupPointId
+  ) {
+    const existingPickupPointId =
+      existing?.courierGuyDropoffPickupPointId?.trim() || null;
+    const existingPickupPointProvider =
+      existing?.courierGuyDropoffProvider?.trim() || "tcg-locker";
+    const existingPickupPointLabel =
+      existing?.courierGuyDropoffPickupPointLabel?.trim() || null;
+    const existingMode =
+      existing?.courierGuyMode === "live" ? "live" : "sandbox";
+    const pickupPointChanged =
+      resolvedPickupPointId !== existingPickupPointId ||
+      normalizedDropoffProvider !== existingPickupPointProvider ||
+      courierGuyMode !== existingMode ||
+      !existingPickupPointLabel ||
+      activeCredentialsChanged ||
+      (courierGuyEnabled && existing?.courierGuyEnabled !== true);
+
+    if (pickupPointChanged) {
+      if (!activeApiKey) {
+        return {
+          ok: false,
+          message: `Save the ${courierGuyMode} Courier Guy bearer token before choosing a specific pickup point.`,
+        };
+      }
+
+      try {
+        const client = createCourierGuyClient({
+          apiBaseUrl:
+            courierGuyMode === "live"
+              ? COURIER_GUY_LIVE_API_BASE_URL
+              : COURIER_GUY_SANDBOX_API_BASE_URL,
+          apiKey: activeApiKey,
+        });
+        const result = await client.getPickupPoints({
+          limit: 5,
+          pickupPointId: resolvedPickupPointId,
+          pickupPointProvider: normalizedDropoffProvider,
+        });
+        const verifiedPickupPoint = result.pickupPoints.find(
+          (pickupPoint) =>
+            pickupPoint.pickupPointId === resolvedPickupPointId &&
+            pickupPoint.pickupPointProvider === normalizedDropoffProvider,
+        );
+
+        if (!verifiedPickupPoint) {
+          return {
+            ok: false,
+            message:
+              "That Courier Guy pickup point is unavailable. Search for and choose another point.",
+          };
+        }
+
+        resolvedPickupPointLabel = [
+          verifiedPickupPoint.name,
+          verifiedPickupPoint.address,
+        ]
+          .filter(Boolean)
+          .join(" — ")
+          .slice(0, 500);
+      } catch {
+        return {
+          ok: false,
+          message:
+            "Courier Guy could not verify that pickup point. Try searching again before saving.",
+        };
+      }
+    } else {
+      resolvedPickupPointLabel =
+        existingPickupPointLabel ??
+        normalizedSubmittedPickupPointLabel ??
+        resolvedPickupPointId;
+    }
+  }
+
+  if (courierGuyEnabled && !activeApiKey) {
+    return {
+      ok: false,
+      message: `Add the ${courierGuyMode} Courier Guy API key before enabling the integration.`,
+    };
+  }
+
+  if (courierGuyEnabled && !activeAccountCode) {
+    return {
+      ok: false,
+      message: `Add the ${courierGuyMode} Courier Guy account code before enabling the integration.`,
+    };
+  }
+
+  if (shippingEnabled && courierGuyEnabled && courierGuyMode !== "live") {
+    return {
+      ok: false,
+      message:
+        "Switch The Courier Guy to live mode before enabling nationwide customer checkout. Sandbox mode is for configuration and testing only.",
+    };
+  }
+
+  if (courierGuyEnabled && !resolvedPickupPointId) {
+    return {
+      ok: false,
+      message: "Choose or enter the Courier Guy drop-off pickup point.",
+    };
+  }
+
+  const now = new Date();
+  const values = {
+    bobgoBookingMode: "disabled" as const,
+    bobgoEnabled: false,
+    courierGuyDefaultServiceCode:
+      courierGuyDefaultServiceCode?.trim() || null,
+    courierGuyDropoffPickupPointId: resolvedPickupPointId,
+    courierGuyDropoffPickupPointLabel: resolvedPickupPointLabel,
+    courierGuyDropoffProvider: normalizedDropoffProvider,
+    courierGuyDropoffType,
+    courierGuyEnabled,
+    courierGuyLiveAccountCode: normalizedLiveAccountCode,
+    courierGuyLiveApiKeyEncrypted: nextLiveApiKeyEncrypted ?? null,
+    courierGuyMode,
+    courierGuySandboxAccountCode: normalizedSandboxAccountCode,
+    courierGuySandboxApiKeyEncrypted: nextSandboxApiKeyEncrypted ?? null,
+    courierGuyWebhookTokenEncrypted: nextWebhookToken ?? null,
+    jurgensDeliveryCutoffTime,
+    shippingBufferBps: 0,
+    shippingEnabled,
+    shippingFlatRate: Number(shippingFlatRate.toFixed(2)),
+    shippingFreeOverAmount: normalizedFreeShippingAmount,
+    shippingMarginBps: 0,
+    updatedAt: now,
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({ id: 1, ...values })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: values,
+      });
+
+    await tx.insert(auditLogs).values({
+      action: "marketplace.shipping_settings.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({
+        courierGuyDropoffType,
+        courierGuyEnabled,
+        courierGuyLiveAccountCode: normalizedLiveAccountCode,
+        courierGuyMode,
+        courierGuySandboxAccountCode: normalizedSandboxAccountCode,
+        freeShippingEnabled: shippingFreeOverAmount !== null,
         shippingEnabled,
-        shippingMarginBps,
-        updatedAt: new Date(),
-      },
+      }),
     });
+  });
 
   return { ok: true, message: "Shipping settings saved." };
 }
 
 export async function updateMarketplaceWhatsappSettings({
+  actorUserId,
   apiKey,
   businessPhoneNumber,
+  emailNotificationRecipients,
+  emailNotificationsEnabled,
+  emailNotifyInboundMessage,
+  emailNotifyNewConversation,
   enabled,
   followUpDefaultMessage,
   followUpDelayMinutes,
@@ -915,8 +1353,13 @@ export async function updateMarketplaceWhatsappSettings({
   webhookSigningSecret,
   webhookVerifyToken,
 }: {
+  actorUserId: string;
   apiKey?: string;
   businessPhoneNumber?: string;
+  emailNotificationRecipients: string[];
+  emailNotificationsEnabled: boolean;
+  emailNotifyInboundMessage: boolean;
+  emailNotifyNewConversation: boolean;
   enabled: boolean;
   followUpDefaultMessage: string;
   followUpDelayMinutes: number;
@@ -967,37 +1410,43 @@ export async function updateMarketplaceWhatsappSettings({
     };
   }
 
-  await db
-    .insert(marketplaceSettings)
-    .values({
-      id: 1,
-      whatsappApiKeyEncrypted: nextApiKey,
-      whatsappBusinessPhoneNumber: businessPhoneNumber || null,
-      whatsappFollowUpDefaultMessage: followUpDefaultMessage,
-      whatsappFollowUpDelayMinutes: followUpDelayMinutes,
-      whatsappFollowUpDraftMessage: followUpDraftMessage,
-      whatsappFollowUpMaxCount: followUpMaxCount,
-      whatsappFollowUpQuietHoursEnabled: followUpQuietHoursEnabled,
-      whatsappFollowUpQuietHoursEnd: followUpQuietHoursEnabled
-        ? followUpQuietHoursEnd
-        : null,
-      whatsappFollowUpQuietHoursStart: followUpQuietHoursEnabled
-        ? followUpQuietHoursStart
-        : null,
-      whatsappFollowUpSupportMessage: followUpSupportMessage,
-      whatsappFollowUpsEnabled: followUpsEnabled,
-      whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
-      whatsappOrderingEnabled: enabled,
-      whatsappProvider: provider,
-      whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
-      whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: marketplaceSettings.id,
-      set: {
+  const normalizedEmailNotificationRecipients =
+    parseWhatsappEmailNotificationRecipients(emailNotificationRecipients);
+
+  if (
+    emailNotificationsEnabled &&
+    normalizedEmailNotificationRecipients.length === 0
+  ) {
+    return {
+      ok: false,
+      message:
+        "Add at least one notification email address before enabling email alerts.",
+    };
+  }
+
+  if (
+    emailNotificationsEnabled &&
+    !emailNotifyNewConversation &&
+    !emailNotifyInboundMessage
+  ) {
+    return {
+      ok: false,
+      message: "Choose at least one WhatsApp email alert type.",
+    };
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({
+        id: 1,
         whatsappApiKeyEncrypted: nextApiKey,
         whatsappBusinessPhoneNumber: businessPhoneNumber || null,
+        whatsappEmailNotificationRecipients:
+          normalizedEmailNotificationRecipients,
+        whatsappEmailNotificationsEnabled: emailNotificationsEnabled,
+        whatsappEmailNotifyInboundMessage: emailNotifyInboundMessage,
+        whatsappEmailNotifyNewConversation: emailNotifyNewConversation,
         whatsappFollowUpDefaultMessage: followUpDefaultMessage,
         whatsappFollowUpDelayMinutes: followUpDelayMinutes,
         whatsappFollowUpDraftMessage: followUpDraftMessage,
@@ -1017,10 +1466,71 @@ export async function updateMarketplaceWhatsappSettings({
         whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
         whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
         updatedAt: new Date(),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: {
+          whatsappApiKeyEncrypted: nextApiKey,
+          whatsappBusinessPhoneNumber: businessPhoneNumber || null,
+          whatsappEmailNotificationRecipients:
+            normalizedEmailNotificationRecipients,
+          whatsappEmailNotificationsEnabled: emailNotificationsEnabled,
+          whatsappEmailNotifyInboundMessage: emailNotifyInboundMessage,
+          whatsappEmailNotifyNewConversation: emailNotifyNewConversation,
+          whatsappFollowUpDefaultMessage: followUpDefaultMessage,
+          whatsappFollowUpDelayMinutes: followUpDelayMinutes,
+          whatsappFollowUpDraftMessage: followUpDraftMessage,
+          whatsappFollowUpMaxCount: followUpMaxCount,
+          whatsappFollowUpQuietHoursEnabled: followUpQuietHoursEnabled,
+          whatsappFollowUpQuietHoursEnd: followUpQuietHoursEnabled
+            ? followUpQuietHoursEnd
+            : null,
+          whatsappFollowUpQuietHoursStart: followUpQuietHoursEnabled
+            ? followUpQuietHoursStart
+            : null,
+          whatsappFollowUpSupportMessage: followUpSupportMessage,
+          whatsappFollowUpsEnabled: followUpsEnabled,
+          whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
+          whatsappOrderingEnabled: enabled,
+          whatsappProvider: provider,
+          whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
+          whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
+          updatedAt: new Date(),
+        },
+      });
 
-  return { ok: true, message: "WhatsApp ordering settings saved." };
+    await tx.insert(auditLogs).values({
+      action: "marketplace.whatsapp_settings.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({
+        emailNotificationsEnabled,
+        emailNotifyInboundMessage,
+        emailNotifyNewConversation,
+        followUpsEnabled,
+        orderingEnabled: enabled,
+        recipientCount: normalizedEmailNotificationRecipients.length,
+      }),
+    });
+  });
+
+  return { ok: true, message: "WhatsApp settings saved." };
+}
+
+export async function getWhatsappEmailNotificationSettings(): Promise<{
+  enabled: boolean;
+  notifyInboundMessage: boolean;
+  notifyNewConversation: boolean;
+  recipients: string[];
+}> {
+  const settings = await getMarketplaceSettings();
+
+  return {
+    enabled: settings.whatsappEmailNotificationsEnabled,
+    notifyInboundMessage: settings.whatsappEmailNotifyInboundMessage,
+    notifyNewConversation: settings.whatsappEmailNotifyNewConversation,
+    recipients: settings.whatsappEmailNotificationRecipients,
+  };
 }
 
 export async function getWhatsappFollowUpSettings(): Promise<WhatsappFollowUpSettings> {
@@ -1079,6 +1589,96 @@ export async function getBobGoIntegrationConfig() {
     shippingEnabled: settings.shippingEnabled,
     shippingMarginBps: settings.shippingMarginBps,
   };
+}
+
+export async function getCourierGuyWebhookToken() {
+  const rawSettings = await getRawMarketplaceSettings();
+
+  return decryptOptionalSecret(rawSettings?.courierGuyWebhookTokenEncrypted);
+}
+
+export async function getCourierGuyPickupPointLookupConfig(
+  mode: "live" | "sandbox",
+) {
+  const rawSettings = await getRawMarketplaceSettings();
+  const encryptedApiKey =
+    mode === "live"
+      ? rawSettings?.courierGuyLiveApiKeyEncrypted
+      : rawSettings?.courierGuySandboxApiKeyEncrypted;
+
+  return {
+    apiBaseUrl:
+      mode === "live"
+        ? COURIER_GUY_LIVE_API_BASE_URL
+        : COURIER_GUY_SANDBOX_API_BASE_URL,
+    apiKey: decryptOptionalSecret(encryptedApiKey),
+    mode,
+  };
+}
+
+type CourierGuyOperationalConfigInput = {
+  accountCode: string | null;
+  mode: "live" | "sandbox" | null;
+};
+
+async function resolveCourierGuyIntegrationConfig(
+  shipmentIdentity: CourierGuyOperationalConfigInput | null,
+  requireEnabledDropoff: boolean,
+) {
+  const [rawSettings, settings] = await Promise.all([
+    getRawMarketplaceSettings(),
+    getMarketplaceSettings(),
+  ]);
+  const mode = shipmentIdentity?.mode ?? settings.courierGuyMode;
+  const encryptedApiKey =
+    mode === "live"
+      ? rawSettings?.courierGuyLiveApiKeyEncrypted
+      : rawSettings?.courierGuySandboxApiKeyEncrypted;
+  const apiKey = decryptOptionalSecret(encryptedApiKey);
+  const configuredAccountCode =
+    mode === "live"
+      ? settings.courierGuyLiveAccountCode?.trim() || null
+      : settings.courierGuySandboxAccountCode?.trim() || null;
+  const hasCredentials =
+    hasCourierGuyCredentialsForIdentity({
+      configuredAccountCode,
+      hasApiKey: Boolean(apiKey),
+      ...(shipmentIdentity
+        ? { shipmentIdentity }
+        : {}),
+    });
+
+  return {
+    accountCode: configuredAccountCode,
+    apiBaseUrl:
+      mode === "live"
+        ? COURIER_GUY_LIVE_API_BASE_URL
+        : COURIER_GUY_SANDBOX_API_BASE_URL,
+    apiKey,
+    defaultServiceCode: settings.courierGuyDefaultServiceCode,
+    dropoffPickupPointId: settings.courierGuyDropoffPickupPointId,
+    dropoffProvider: settings.courierGuyDropoffProvider,
+    dropoffType: settings.courierGuyDropoffType,
+    enabled: settings.courierGuyEnabled,
+    hasCredentials,
+    isConfigured: Boolean(
+      hasCredentials &&
+        (!requireEnabledDropoff ||
+          (settings.courierGuyEnabled &&
+            settings.courierGuyDropoffPickupPointId)),
+    ),
+    mode,
+  };
+}
+
+export async function getCourierGuyIntegrationConfig() {
+  return resolveCourierGuyIntegrationConfig(null, true);
+}
+
+export async function getCourierGuyOperationalConfig(
+  input: CourierGuyOperationalConfigInput,
+) {
+  return resolveCourierGuyIntegrationConfig(input, false);
 }
 
 export async function getPayFastIntegrationConfig() {
@@ -1189,22 +1789,10 @@ export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecr
   const rawSettings = await getRawMarketplaceSettings();
 
   return {
-    bobgoLiveApiKey: decryptOptionalSecret(rawSettings?.bobgoLiveApiKeyEncrypted),
-    bobgoLiveWebhookSecret: decryptOptionalSecret(
-      rawSettings?.bobgoLiveWebhookSecretEncrypted,
-    ),
     openAiApiKey:
       decryptOptionalSecret(rawSettings?.openAiApiKeyEncrypted) ??
       env.OPENAI_API_KEY ??
       null,
-    bobgoSandboxApiKey: decryptOptionalSecret(
-      rawSettings?.bobgoSandboxApiKeyEncrypted ??
-        rawSettings?.bobgoApiKeyEncrypted,
-    ),
-    bobgoSandboxWebhookSecret: decryptOptionalSecret(
-      rawSettings?.bobgoSandboxWebhookSecretEncrypted ??
-        rawSettings?.bobgoWebhookSecretEncrypted,
-    ),
     payfastLiveMerchantKey: decryptOptionalSecret(
       rawSettings?.payfastLiveMerchantKeyEncrypted,
     ),
@@ -1253,6 +1841,24 @@ async function getRawMarketplaceSettings() {
         marketplaceSettings.bobgoSandboxWebhookSecretEncrypted,
       bobgoWebhookSecretEncrypted:
         marketplaceSettings.bobgoWebhookSecretEncrypted,
+      courierGuyLiveAccountCode:
+        marketplaceSettings.courierGuyLiveAccountCode,
+      courierGuyLiveApiKeyEncrypted:
+        marketplaceSettings.courierGuyLiveApiKeyEncrypted,
+      courierGuyDropoffPickupPointId:
+        marketplaceSettings.courierGuyDropoffPickupPointId,
+      courierGuyDropoffPickupPointLabel:
+        marketplaceSettings.courierGuyDropoffPickupPointLabel,
+      courierGuyDropoffProvider:
+        marketplaceSettings.courierGuyDropoffProvider,
+      courierGuyEnabled: marketplaceSettings.courierGuyEnabled,
+      courierGuyMode: marketplaceSettings.courierGuyMode,
+      courierGuySandboxAccountCode:
+        marketplaceSettings.courierGuySandboxAccountCode,
+      courierGuySandboxApiKeyEncrypted:
+        marketplaceSettings.courierGuySandboxApiKeyEncrypted,
+      courierGuyWebhookTokenEncrypted:
+        marketplaceSettings.courierGuyWebhookTokenEncrypted,
       payfastLiveMerchantKeyEncrypted:
         marketplaceSettings.payfastLiveMerchantKeyEncrypted,
       payfastLivePassphraseEncrypted:

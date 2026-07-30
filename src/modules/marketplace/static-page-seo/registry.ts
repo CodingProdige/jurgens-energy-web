@@ -28,13 +28,13 @@ export type StaticSeoPageRegistryEntry = {
 export const STATIC_SEO_PAGE_REGISTRY = {
   home: {
     defaultDescription:
-      "Shop LPG cylinders, cylinder exchange options and gas accessories at JurgensEnergy.com, a South African online store delivering within South Africa.",
+      "Shop LPG cylinders, exchange options and gas accessories at JurgensEnergy.com. Delivery is available to eligible South African addresses confirmed at checkout.",
     defaultTitle: "South African Online LPG Store",
     key: "home",
     label: "Homepage",
     path: "/",
     scanFocus:
-      "The online LPG storefront, core product range, cylinder exchange options and South Africa delivery information.",
+      "The online LPG storefront, core product range, cylinder exchange options and checkout-confirmed delivery to eligible South African addresses.",
   },
   products: {
     defaultDescription:
@@ -68,13 +68,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   about: {
     defaultDescription:
-      "JurgensEnergy.com is a South African online store for LPG cylinders, cylinder exchange options and gas accessories, delivering within South Africa.",
+      "JurgensEnergy.com is a South African online store for LPG cylinders and gas accessories. Delivery to eligible addresses is confirmed at checkout.",
     defaultTitle: "About Our Online LPG Store",
     key: "about",
     label: "About us",
     path: "/about",
     scanFocus:
-      "Verified business identity, the online-store model, LPG products, cylinder exchanges and South Africa delivery information shown on the page.",
+      "Verified business identity, the online-store model, LPG products, cylinder exchanges and checkout-confirmed delivery to eligible South African addresses.",
   },
   contact: {
     defaultDescription:
@@ -98,13 +98,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "lpg-delivery": {
     defaultDescription:
-      "Shop LPG online for delivery within South Africa, with 0–1 day handling, a 2:00 PM SAST cut-off, 1–3 day shipping and a 1–4 business day total estimate.",
+      "Shop LPG online for delivery to eligible South African addresses confirmed at checkout. Transit timing depends on the destination and delivery service.",
     defaultTitle: "LPG Delivery in South Africa",
     key: "lpg-delivery",
     label: "LPG delivery",
     path: "/lpg-delivery",
     scanFocus:
-      "The online ordering flow, South Africa delivery coverage, published timing estimate, fees and safe cylinder-exchange handover requirements.",
+      "The online ordering flow, checkout-confirmed delivery to eligible South African addresses, published timing, shipping costs and cylinder-exchange handover requirements.",
   },
   "lpg-safety": {
     defaultDescription:
@@ -118,7 +118,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "delivery-information": {
     defaultDescription:
-      "Read our South Africa Shipping & Delivery Policy: 0–1 day handling, the 2:00 PM SAST cut-off, 1–3 day shipping and a 1–4 business day total estimate.",
+      "Read our South Africa Shipping & Delivery Policy, including handling, delivery fees, address eligibility and service-dependent transit timing.",
     defaultTitle: "Shipping & Delivery Policy",
     key: "delivery-information",
     label: "Shipping & delivery policy",

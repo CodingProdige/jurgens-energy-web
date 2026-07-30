@@ -106,9 +106,9 @@ customer-service action must be handled explicitly by staff.
 
 - Complete the legal name, VAT number, invoice contact details, and registered
   address in Business information.
-- Confirm the courier collection contact and origin on the same page. Bob Go
-  uses this single Jurgens origin; the first deployment copies the legacy
-  collection profile into it when one exists.
+- Confirm the Jurgens Energy courier contact details on the same page. Courier
+  Guy bookings use that contact for parcels handed in at the configured kiosk,
+  locker, or pickup point; the integration does not request collection.
 - Configure SendGrid for invoice email delivery.
 - Configure live PayFast credentials under **Admin → Settings → Platform →
   PayFast payments**. The Refunds API is intentionally unavailable in sandbox

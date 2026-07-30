@@ -41,12 +41,6 @@ function roundMoney(value: number) {
   return Number(value.toFixed(2));
 }
 
-function normalizeStringList(value: unknown) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-
 export async function validateCartLines(
   input: CartValidationRequest,
   currencyContext: CurrencyContext,
@@ -73,8 +67,6 @@ export async function validateCartLines(
       brandName: brands.name,
       compareAtPrice: productVariants.compareAtPrice,
       continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
-      exchangeAcceptedReturnBrands:
-        productVariants.exchangeAcceptedReturnBrands,
       exchangeConfirmationText: productVariants.exchangeConfirmationText,
       exchangeEmptyCylinderSize: productVariants.exchangeEmptyCylinderSize,
       fulfillmentMode: products.fulfillmentMode,
@@ -201,9 +193,6 @@ export async function validateCartLines(
         continueSellingOutOfStock: row.continueSellingOutOfStock,
         displayLineTotal,
         displayUnitPrice,
-        exchangeAcceptedReturnBrands: normalizeStringList(
-          row.exchangeAcceptedReturnBrands,
-        ),
         exchangeConfirmationMissing: exchangePolicy.exchangeConfirmationMissing,
         exchangeConfirmationText: exchangeRequirementText,
         exchangeEmptyConfirmed: requested.exchangeEmptyConfirmed,

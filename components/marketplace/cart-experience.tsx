@@ -213,9 +213,6 @@ function CartLine({
                 ? `: ${item.exchangeRequiredEmptyCylinderSize}`
                 : ""}
               .
-              {item.exchangeAcceptedReturnBrands.length > 0
-                ? ` Accepted return brands: ${item.exchangeAcceptedReturnBrands.join(", ")}.`
-                : ""}
             </p>
           </div>
         ) : null}
@@ -582,7 +579,8 @@ export function CartExperience() {
               <span className="text-xl font-black tabular-nums">{subtotalLabel}</span>
             </div>
             <p className="mt-1 text-[11px] leading-4 text-[#777770] dark:text-[#aaa9a1]">
-              Delivery is calculated from your address at checkout.
+              Delivery eligibility and one VAT-inclusive order fee are confirmed
+              at checkout.
             </p>
           </div>
           <Link
@@ -603,7 +601,7 @@ export function CartExperience() {
             </p>
             <p className="flex items-center gap-2">
               <TruckIcon className="size-4 text-[#ff5a1f]" />
-              Jurgens and courier delivery calculated separately
+              One delivery fee per order; free-shipping rules may apply
             </p>
           </div>
         </div>

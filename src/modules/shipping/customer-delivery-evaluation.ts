@@ -1,0 +1,159 @@
+import "server-only";
+
+import type { ValidatedCartItem } from "@/src/modules/cart/contracts";
+import type { CheckoutDeliveryAddress } from "@/src/modules/checkout/contracts";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import {
+  countCourierGuyUnits,
+  MAX_COURIER_GUY_UNITS_PER_ORDER,
+} from "@/src/modules/shipping/courier-guy-limits";
+import {
+  checkCourierGuyServiceability,
+  type CourierGuyServiceabilityItem,
+} from "@/src/modules/shipping/courier-guy-serviceability";
+import {
+  calculateCustomerShippingPrice,
+  type CustomerShippingPrice,
+} from "@/src/modules/shipping/customer-shipping-policy";
+import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
+
+export type CustomerDeliveryEvaluation =
+  | {
+      eligible: true;
+      hasCourierItems: boolean;
+      hasJurgensItems: boolean;
+      jurgensZoneId: string | null;
+      price: CustomerShippingPrice;
+    }
+  | {
+      eligible: false;
+      unavailableReason: string;
+    };
+
+function courierServiceabilityItems(
+  items: ValidatedCartItem[],
+): CourierGuyServiceabilityItem[] | null {
+  const courierItems = items.filter(
+    (item) => item.fulfillmentMode === "seller_fulfilled",
+  );
+  const invalidItem = courierItems.find(
+    (item) =>
+      !item.heightMm ||
+      !item.lengthMm ||
+      !item.weightGrams ||
+      !item.widthMm,
+  );
+
+  if (invalidItem) {
+    return null;
+  }
+
+  return courierItems.map((item) => ({
+    description: `${item.productTitle} - ${item.variantTitle}`,
+    heightMm: item.heightMm!,
+    lengthMm: item.lengthMm!,
+    weightGrams: item.weightGrams!,
+    widthMm: item.widthMm!,
+  }));
+}
+
+export async function evaluateCustomerDelivery({
+  deliveryAddress,
+  items,
+  orderSubtotal,
+}: {
+  deliveryAddress: CheckoutDeliveryAddress;
+  items: ValidatedCartItem[];
+  orderSubtotal: number;
+}): Promise<CustomerDeliveryEvaluation> {
+  if (deliveryAddress.countryCode.trim().toUpperCase() !== "ZA") {
+    return {
+      eligible: false,
+      unavailableReason:
+        "Delivery is currently available within South Africa only.",
+    };
+  }
+
+  const settings = await getMarketplaceSettings();
+
+  if (!settings.shippingEnabled) {
+    return {
+      eligible: false,
+      unavailableReason: "Online delivery is temporarily unavailable.",
+    };
+  }
+
+  const hasCourierItems = items.some(
+    (item) => item.fulfillmentMode === "seller_fulfilled",
+  );
+  const hasJurgensItems = items.some(
+    (item) => item.fulfillmentMode === "jurgens_fulfilled",
+  );
+  const courierUnitCount = countCourierGuyUnits(items);
+
+  if (courierUnitCount > MAX_COURIER_GUY_UNITS_PER_ORDER) {
+    return {
+      eligible: false,
+      unavailableReason: `Courier delivery supports up to ${MAX_COURIER_GUY_UNITS_PER_ORDER} parcels per online order. Reduce the courier-product quantities or contact us for a bulk order.`,
+    };
+  }
+
+  const courierItems = courierServiceabilityItems(items);
+
+  if (hasCourierItems && !courierItems) {
+    return {
+      eligible: false,
+      unavailableReason:
+        "A selected product is missing parcel measurements required for nationwide courier delivery.",
+    };
+  }
+
+  if (courierItems?.length) {
+    const courierAvailability = await checkCourierGuyServiceability({
+      deliveryAddress,
+      items: courierItems,
+    });
+
+    if (!courierAvailability.eligible) {
+      return courierAvailability;
+    }
+  }
+
+  let jurgensZoneId: string | null = null;
+
+  if (hasJurgensItems) {
+    const eligibility = await checkJurgensDeliveryAvailability({
+      postalCode: deliveryAddress.postalCode,
+    });
+
+    if (!eligibility.eligible) {
+      return {
+        eligible: false,
+        unavailableReason:
+          eligibility.unavailableReason ??
+          "A Jurgens-delivered item cannot be delivered to this postal code.",
+      };
+    }
+
+    jurgensZoneId = eligibility.zone.id;
+  }
+
+  try {
+    return {
+      eligible: true,
+      hasCourierItems,
+      hasJurgensItems,
+      jurgensZoneId,
+      price: calculateCustomerShippingPrice({
+        flatRate: settings.shippingFlatRate,
+        freeOverAmount: settings.shippingFreeOverAmount,
+        orderSubtotal,
+      }),
+    };
+  } catch {
+    return {
+      eligible: false,
+      unavailableReason: "Online delivery is temporarily unavailable.",
+    };
+  }
+}

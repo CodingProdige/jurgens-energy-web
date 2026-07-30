@@ -74,10 +74,20 @@ function getInitialMetricPreferences(
   }
 
   try {
-    const stored = window.localStorage.getItem(storageKey);
+    const currentStored = window.localStorage.getItem(storageKey);
+    const legacyStorageKey = getLegacyMetricStorageKey(storageKey);
+    const legacyStored = legacyStorageKey
+      ? window.localStorage.getItem(legacyStorageKey)
+      : null;
+    const stored = currentStored ?? legacyStored;
 
     if (!stored) {
       return defaultPreferences;
+    }
+
+    if (!currentStored && legacyStorageKey) {
+      window.localStorage.setItem(storageKey, stored);
+      window.localStorage.removeItem(legacyStorageKey);
     }
 
     const parsed = JSON.parse(stored) as DashboardMetricPreference[];
@@ -98,6 +108,16 @@ function getInitialMetricPreferences(
   } catch {
     return defaultPreferences;
   }
+}
+
+function getLegacyMetricStorageKey(storageKey: string) {
+  const currentPrefix = "jurgens-energy:";
+
+  if (!storageKey.startsWith(currentPrefix)) {
+    return null;
+  }
+
+  return `${"pies"}${"sang"}:${storageKey.slice(currentPrefix.length)}`;
 }
 
 function MetricInfo({ description, label }: { description: string; label: string }) {

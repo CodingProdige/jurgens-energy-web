@@ -18,6 +18,10 @@ import {
   NumberedStep,
 } from "@/src/modules/marketplace/content/content-page";
 import { getMarketplaceCatalog } from "@/src/modules/marketplace/catalog";
+import {
+  getPublicDeliveryFeeDescription,
+  publicDeliveryTimingDescription,
+} from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import {
   createBreadcrumbStructuredData,
@@ -26,28 +30,28 @@ import {
   MarketplaceJsonLd,
 } from "@/src/modules/marketplace/structured-data";
 
-const deliveryFaqItems = [
+function createDeliveryFaqItems(deliveryFeeDescription: string) {
+  return [
   {
     question: "Where does Jurgens Energy deliver?",
     answer:
-      "Jurgens Energy delivers eligible online-store orders within South Africa. Delivery availability for the products in your order is confirmed at checkout.",
+      "Courier-eligible products can be delivered nationwide within South Africa. Products marked for Jurgens delivery require a postcode in an active Jurgens service area. Checkout confirms eligibility from the complete delivery address.",
   },
   {
     question: "How long does delivery take?",
-    answer:
-      "Handling takes 0–1 business day after payment confirmation, with a 2:00 PM SAST order cut-off. Shipping takes 1–3 business days after dispatch, for an estimated total of 1–4 business days.",
+    answer: publicDeliveryTimingDescription,
   },
   {
     question: "How much does delivery cost?",
-    answer:
-      "Any delivery fee is shown at checkout before payment and depends on the products and fulfilment required for your order.",
+    answer: `${deliveryFeeDescription} Courier-provider costs do not change the customer fee.`,
   },
   {
     question: "Can I exchange an empty LPG cylinder during delivery?",
     answer:
-      "Yes, when the selected option supports exchanges and the empty cylinder meets the displayed size, type, brand, ownership and condition requirements.",
+      "Yes, when the selected option supports exchanges and the empty cylinder meets the displayed size, type and condition requirements.",
   },
-] as const;
+  ] as const;
+}
 
 export async function LocalDeliveryPage() {
   const currencyContext = await getCurrencyContext();
@@ -56,17 +60,21 @@ export async function LocalDeliveryPage() {
     getMarketplaceSettings(),
   ]);
   const deliveryProducts = catalog.products
-    .filter((product) => product.fulfillmentMode === "piessang_fulfilled")
+    .filter((product) => product.fulfillmentMode === "jurgens_fulfilled")
     .slice(0, 8);
   const whatsappHref = settings.whatsappOrderingEnabled
     ? createMarketplaceWhatsAppHref(settings.whatsappBusinessPhoneNumber)
     : null;
+  const deliveryFeeDescription = getPublicDeliveryFeeDescription(settings);
+  const deliveryFaqItems = createDeliveryFaqItems(deliveryFeeDescription);
+  const shippingStructuredData =
+    createDeliveryServiceStructuredData(settings);
 
   return (
     <article>
       <MarketplaceJsonLd
         data={[
-          createDeliveryServiceStructuredData(),
+          ...(shippingStructuredData ? [shippingStructuredData] : []),
           createBreadcrumbStructuredData([
             { name: "Home", path: "/" },
             { name: "LPG delivery", path: "/lpg-delivery" },
@@ -77,10 +85,10 @@ export async function LocalDeliveryPage() {
 
       <ContentHero
         breadcrumbLabel="LPG delivery"
-        description="Shop eligible LPG cylinders, exchange options and gas accessories online for delivery within South Africa. Estimated total delivery is 1–4 business days."
+        description="Shop eligible LPG cylinders, exchange options and gas accessories online. Courier-eligible goods can ship nationwide within South Africa; Jurgens-delivered products are confirmed from the delivery postcode at checkout. Transit time depends on the destination and delivery service."
         eyebrow="South Africa delivery"
         icon={TruckIcon}
-        title="Online LPG delivery in South Africa."
+        title="South African delivery, confirmed at checkout."
       />
 
       <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-7 sm:py-12 lg:px-10 lg:py-16">
@@ -97,12 +105,13 @@ export async function LocalDeliveryPage() {
               accessory you need.
             </NumberedStep>
             <NumberedStep number="02" title="Review delivery">
-              Enter a valid South African delivery address and confirm the
-              available option and fee before payment.
+              Enter your complete South African delivery address and confirm
+              product eligibility and the single order-level delivery fee before
+              payment.
             </NumberedStep>
             <NumberedStep number="03" title="Receive your order">
-              Handling takes 0–1 business day. Shipping then takes 1–3 business
-              days after dispatch, subject to stock and safe fulfilment.
+              Handling normally takes 0–1 business day. Transit time and tracking
+              depend on the destination and delivery service.
             </NumberedStep>
           </div>
         </section>
@@ -110,14 +119,14 @@ export async function LocalDeliveryPage() {
         <section className="mt-14 grid gap-4 border-y border-[#deded7] py-10 dark:border-white/10 sm:mt-20 sm:grid-cols-2 sm:py-14 lg:grid-cols-4">
           {[
             {
-              copy: "Eligible online-store orders are delivered within South Africa.",
+              copy: "Courier-eligible goods can ship nationwide; a Jurgens-delivered product requires an eligible delivery postcode.",
               icon: MapPinnedIcon,
-              title: "South Africa delivery",
+              title: "South Africa coverage",
             },
             {
-              copy: "0–1 business day handling after payment confirmation, with a 2:00 PM SAST cut-off; 1–3 business days shipping after dispatch.",
+              copy: "Handling normally takes 0–1 business day after payment confirmation. Transit time depends on the destination and delivery service.",
               icon: Clock3Icon,
-              title: "1–4 business days total",
+              title: "Service-based timing",
             },
             {
               copy: "Exchange pricing is shown only when the required empty-cylinder handover is supported.",
@@ -125,9 +134,9 @@ export async function LocalDeliveryPage() {
               title: "Clear exchanges",
             },
             {
-              copy: "Checkout confirms the available fulfilment option and delivery fee before payment.",
+              copy: deliveryFeeDescription,
               icon: ShieldCheckIcon,
-              title: "Upfront checkout",
+              title: "One order fee",
             },
           ].map((item) => {
             const Icon = item.icon;
@@ -153,7 +162,7 @@ export async function LocalDeliveryPage() {
 
         <section className="mt-14 sm:mt-20">
           <ContentSectionHeading
-            description="These products are currently prepared for Jurgens Energy fulfilment. Stock, delivery and any exchange requirements are confirmed during checkout."
+            description="These products are currently prepared for Jurgens Energy fulfilment. Stock, postcode eligibility and any exchange requirements are confirmed during checkout."
             eyebrow="Shop online"
             title="LPG products for delivery."
           />

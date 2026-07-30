@@ -24,8 +24,8 @@ INSERT INTO "subscription_plans" (
   "created_at",
   "updated_at"
 ) VALUES (
-  'piessang-premium-monthly',
-  'Piessang Premium',
+  'jurgens-energy-premium-monthly',
+  'Jurgens Energy Premium',
   'Unlock more storage, faster uploads, and advanced media tools.',
   'user',
   'active',

@@ -52,10 +52,10 @@ VALUES (
   'Admin staff invited',
   'admin_staff',
   'Sent when a staff member is invited to access the admin dashboard.',
-  'You have been invited to Piessang Admin',
-  'Set your password to access the Piessang admin dashboard.',
-  '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#070b16"><h1 style="font-size:22px;margin:0 0 12px">Admin dashboard invitation</h1><p>Hi {{name}},</p><p>You have been invited to Piessang Admin with the <strong>{{roleLabel}}</strong> role.</p><p><a href="{{acceptUrl}}" style="display:inline-block;background:#070b16;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:700">Accept invitation</a></p><p style="color:#596176;font-size:14px">This invitation expires at {{expiresAtLabel}}.</p></div>',
-  'Hi {{name}},\n\nYou have been invited to Piessang Admin with the {{roleLabel}} role.\n\nAccept invitation: {{acceptUrl}}\n\nThis invitation expires at {{expiresAtLabel}}.',
+  'You have been invited to Jurgens Energy Admin',
+  'Set your password to access the Jurgens Energy admin dashboard.',
+  '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#070b16"><h1 style="font-size:22px;margin:0 0 12px">Admin dashboard invitation</h1><p>Hi {{name}},</p><p>You have been invited to Jurgens Energy Admin with the <strong>{{roleLabel}}</strong> role.</p><p><a href="{{acceptUrl}}" style="display:inline-block;background:#070b16;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:700">Accept invitation</a></p><p style="color:#596176;font-size:14px">This invitation expires at {{expiresAtLabel}}.</p></div>',
+  'Hi {{name}},\n\nYou have been invited to Jurgens Energy Admin with the {{roleLabel}} role.\n\nAccept invitation: {{acceptUrl}}\n\nThis invitation expires at {{expiresAtLabel}}.',
   '["name","roleLabel","acceptUrl","expiresAtLabel"]'
 )
 ON CONFLICT ("key") DO NOTHING;

@@ -628,8 +628,6 @@ function ProductBuyBox({
   const [added, setAdded] = useState(false);
   const [isOptionsDialogOpen, setIsOptionsDialogOpen] = useState(false);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const exchangeAcceptedReturnBrands =
-    selectedVariant?.exchangeAcceptedReturnBrands ?? [];
   const exchangeEmptySize = getExchangeEmptySize(product, selectedVariant);
   const exchangeRequirementText = selectedVariant
     ? getExchangeRequirementText({
@@ -673,7 +671,6 @@ function ProductBuyBox({
 
     addLocalCartItem({
       brandName: product.brandName,
-      exchangeAcceptedReturnBrands,
       exchangeConfirmationText: exchangeRequirementText,
       exchangeEmptyConfirmed: false,
       exchangeRequiredEmptyCylinderSize: exchangeEmptySize,
@@ -803,7 +800,6 @@ function ProductBuyBox({
 
       {hasExchangeRequirement ? (
         <ExchangeRequirementNotice
-          acceptedReturnBrands={exchangeAcceptedReturnBrands}
           emptySize={exchangeEmptySize}
           quantity={quantity}
           requirementText={exchangeRequirementText}
@@ -868,7 +864,6 @@ function ProductBuyBox({
         currencyContext={currencyContext}
         deliveryDetail={deliveryDetail}
         deliveryFeeNotice={deliveryFeeNotice}
-        exchangeAcceptedReturnBrands={exchangeAcceptedReturnBrands}
         exchangeEmptySize={exchangeEmptySize}
         exchangeRequirementText={exchangeRequirementText}
         hasExchangeRequirement={hasExchangeRequirement}
@@ -1227,7 +1222,6 @@ function ProductOptionsDialog({
   currencyContext,
   deliveryDetail,
   deliveryFeeNotice,
-  exchangeAcceptedReturnBrands,
   exchangeEmptySize,
   exchangeRequirementText,
   hasExchangeRequirement,
@@ -1249,7 +1243,6 @@ function ProductOptionsDialog({
   currencyContext: CurrencyContext;
   deliveryDetail: string;
   deliveryFeeNotice: string;
-  exchangeAcceptedReturnBrands: string[];
   exchangeEmptySize: string | null;
   exchangeRequirementText: string;
   hasExchangeRequirement: boolean;
@@ -1345,7 +1338,6 @@ function ProductOptionsDialog({
 
           {hasExchangeRequirement ? (
             <ExchangeRequirementNotice
-              acceptedReturnBrands={exchangeAcceptedReturnBrands}
               className="mt-3"
               emptySize={exchangeEmptySize}
               quantity={quantity}
@@ -1669,13 +1661,11 @@ function CompactTrustRow({
 }
 
 function ExchangeRequirementNotice({
-  acceptedReturnBrands,
   className,
   emptySize,
   quantity,
   requirementText,
 }: {
-  acceptedReturnBrands: string[];
   className?: string;
   emptySize: string | null;
   quantity: number;
@@ -1705,14 +1695,6 @@ function ExchangeRequirementNotice({
         <p className="col-start-2 text-[11px] leading-4 text-slate-600 dark:text-zinc-300">
           {requirementText}
         </p>
-        {acceptedReturnBrands.length > 0 ? (
-          <p className="col-start-2 mt-0.5 text-[10px] leading-4 text-slate-500 dark:text-zinc-400">
-            <span className="font-black text-slate-700 dark:text-zinc-200">
-              Accepted return brands:
-            </span>{" "}
-            {acceptedReturnBrands.join(", ")}
-          </p>
-        ) : null}
       </div>
     </section>
   );
@@ -2116,18 +2098,18 @@ function getVariantPreviewList(
 function getDeliveryPromise(
   fulfillmentMode: MarketplaceProductDetailView["fulfillmentMode"],
 ) {
-  if (fulfillmentMode !== "piessang_fulfilled") {
+  if (fulfillmentMode !== "jurgens_fulfilled") {
     return {
-      detail: "Estimated delivery in 1–4 business days",
-      feeNotice: "Shipping calculated at checkout",
-      label: "Delivery in South Africa",
+      detail: "Timing depends on the destination and delivery service",
+      feeNotice: "One order-level delivery fee applies",
+      label: "Delivery to eligible addresses",
     };
   }
 
   return {
-    detail: "Estimated delivery in 1–4 business days",
-    feeNotice: "Shipping calculated at checkout",
-    label: "Delivery in South Africa",
+    detail: "Timing depends on the destination and delivery service",
+    feeNotice: "One order-level delivery fee applies",
+    label: "Delivery to eligible addresses",
   };
 }
 

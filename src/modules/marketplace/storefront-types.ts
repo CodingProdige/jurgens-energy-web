@@ -257,7 +257,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
         },
       ],
       copy:
-        "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
+        "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
       heading:
         "Buy full LPG cylinders, exchange empty cylinders, and shop gas accessories.",
       headingSize: 52,
@@ -419,8 +419,8 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       features: [
         {
           icon: "delivery",
-          text: "Estimated delivery in 1–4 business days.",
-          title: "Delivery in South Africa",
+          text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+          title: "Delivery availability",
         },
         {
           icon: "certified",

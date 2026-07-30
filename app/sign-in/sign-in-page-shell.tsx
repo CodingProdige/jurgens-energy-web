@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import type { SignInState } from "@/app/sign-in/actions";
 import { SignInForm } from "@/app/sign-in/sign-in-form";
-import { PiessangLogo } from "@/components/brand/piessang-logo";
+import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
   Card,
@@ -36,11 +36,7 @@ export function SignInPageShell({
       <section className="w-full max-w-md">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <PiessangLogo
-              priority
-              className="h-[38px] w-[206px]"
-              imageClassName="dark:brightness-110"
-            />
+            <JurgensEnergyLogo className="origin-left scale-[0.92]" />
             <p className="mt-1 text-xs text-muted-foreground">{badge}</p>
           </div>
           <ThemeToggle />

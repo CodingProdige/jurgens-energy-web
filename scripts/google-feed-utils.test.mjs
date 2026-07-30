@@ -4,12 +4,30 @@ import test from "node:test";
 import {
   getGoogleMerchantCustomLabel0,
   getGoogleMerchantDestinationControls,
+  getGoogleMerchantShippingLabel,
+  shouldPublishGoogleMerchantOffer,
 } from "../src/modules/marketplace/google-feed-utils.ts";
 
-test("keeps postcode-limited LPG offers in online destinations", () => {
+const usableLiveDelivery = {
+  courierGuyDropoffPickupPointId: "K0000",
+  courierGuyEnabled: true,
+  courierGuyLiveAccountCode: "JUR082",
+  courierGuyMode: "live",
+  courierGuySandboxAccountCode: null,
+  hasCourierGuyLiveApiKey: true,
+  hasCourierGuySandboxApiKey: false,
+  shippingEnabled: true,
+};
+
+test("excludes postcode-limited Jurgens offers from every Google destination", () => {
   assert.deepEqual(getGoogleMerchantDestinationControls("local_lpg"), {
-    excluded: ["Local_inventory_ads", "Free_local_listings"],
-    included: ["Shopping_ads", "Free_listings"],
+    excluded: [
+      "Shopping_ads",
+      "Free_listings",
+      "Local_inventory_ads",
+      "Free_local_listings",
+    ],
+    included: [],
   });
 });
 
@@ -26,4 +44,72 @@ test("labels every offer by its delivery channel for Google Ads", () => {
     getGoogleMerchantCustomLabel0("national_courier"),
     "national_courier",
   );
+});
+
+test("never labels a Jurgens-delivered offer as nationwide courier delivery", () => {
+  assert.equal(
+    getGoogleMerchantShippingLabel("national_courier", "jurgens_fulfilled"),
+    "local_lpg",
+  );
+  assert.equal(
+    getGoogleMerchantShippingLabel(null, "jurgens_fulfilled"),
+    "local_lpg",
+  );
+});
+
+test("defaults seller-fulfilled offers to nationwide courier delivery", () => {
+  assert.equal(
+    getGoogleMerchantShippingLabel(null, "seller_fulfilled"),
+    "national_courier",
+  );
+});
+
+test("preserves an explicit Merchant Center exclusion", () => {
+  assert.equal(
+    getGoogleMerchantShippingLabel("excluded", "seller_fulfilled"),
+    null,
+  );
+});
+
+test("publishes nationwide offers only with enabled shipping and a usable active Courier Guy environment", () => {
+  assert.equal(
+    shouldPublishGoogleMerchantOffer("national_courier", usableLiveDelivery),
+    true,
+  );
+
+  for (const unavailableConfiguration of [
+    { ...usableLiveDelivery, shippingEnabled: false },
+    { ...usableLiveDelivery, courierGuyEnabled: false },
+    { ...usableLiveDelivery, courierGuyLiveAccountCode: null },
+    { ...usableLiveDelivery, hasCourierGuyLiveApiKey: false },
+    { ...usableLiveDelivery, courierGuyDropoffPickupPointId: null },
+    {
+      ...usableLiveDelivery,
+      courierGuyMode: "sandbox",
+      courierGuySandboxAccountCode: "JUR001",
+      hasCourierGuySandboxApiKey: true,
+    },
+  ]) {
+    assert.equal(
+      shouldPublishGoogleMerchantOffer(
+        "national_courier",
+        unavailableConfiguration,
+      ),
+      false,
+    );
+  }
+});
+
+test("keeps postcode-limited offers in the feed with their destination exclusions", () => {
+  assert.equal(
+    shouldPublishGoogleMerchantOffer("local_lpg", {
+      ...usableLiveDelivery,
+      courierGuyEnabled: false,
+      courierGuyDropoffPickupPointId: null,
+      hasCourierGuyLiveApiKey: false,
+      shippingEnabled: false,
+    }),
+    true,
+  );
+  assert.deepEqual(getGoogleMerchantDestinationControls("local_lpg").included, []);
 });

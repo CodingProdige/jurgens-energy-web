@@ -13,9 +13,12 @@ import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import {
   getGoogleMerchantCustomLabel0,
   getGoogleMerchantDestinationControls,
+  getGoogleMerchantShippingLabel,
+  shouldPublishGoogleMerchantOffer,
   type GoogleMerchantDestination,
   type GoogleMerchantShippingLabel,
 } from "@/src/modules/marketplace/google-feed-utils";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 
 const publicProductStatuses = ["live", "active"] as const;
@@ -59,51 +62,54 @@ export type GoogleMerchantFeedItem = {
 };
 
 export async function getGoogleMerchantFeedItems() {
-  const variantRows = await db
-    .select({
-      brandName: brands.name,
-      categoryPath: categories.path,
-      compareAtPrice: productVariants.compareAtPrice,
-      continueSellingOutOfStock:
-        productVariants.continueSellingOutOfStock,
-      googleFulfillmentChannel: productVariants.googleFulfillmentChannel,
-      googleReturnPolicyLabel: productVariants.googleReturnPolicyLabel,
-      manufacturerMpn: productVariants.manufacturerMpn,
-      optionSchema: products.optionSchema,
-      optionValues: productVariants.optionValues,
-      price: productVariants.price,
-      productBarcode: products.barcode,
-      productDescription: products.description,
-      productFullDescription: products.fullDescription,
-      productFulfillmentMode: products.fulfillmentMode,
-      productId: products.id,
-      productShortDescription: products.shortDescription,
-      productSlug: products.slug,
-      productTitle: products.title,
-      requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
-      stockOnHand: productVariants.stockOnHand,
-      variantBarcode: productVariants.barcode,
-      variantId: productVariants.id,
-      variantMediaId: productVariants.mediaId,
-      variantSku: productVariants.sku,
-      variantTitle: productVariants.title,
-    })
-    .from(productVariants)
-    .innerJoin(products, eq(products.id, productVariants.productId))
-    .leftJoin(brands, eq(brands.id, products.brandId))
-    .leftJoin(categories, eq(categories.id, products.categoryId))
-    .where(
-      and(
-        inArray(products.status, publicProductStatuses),
-        eq(productVariants.status, "active"),
-        eq(productVariants.isActive, true),
+  const [settings, variantRows] = await Promise.all([
+    getMarketplaceSettings(),
+    db
+      .select({
+        brandName: brands.name,
+        categoryPath: categories.path,
+        compareAtPrice: productVariants.compareAtPrice,
+        continueSellingOutOfStock:
+          productVariants.continueSellingOutOfStock,
+        googleFulfillmentChannel: productVariants.googleFulfillmentChannel,
+        googleReturnPolicyLabel: productVariants.googleReturnPolicyLabel,
+        manufacturerMpn: productVariants.manufacturerMpn,
+        optionSchema: products.optionSchema,
+        optionValues: productVariants.optionValues,
+        price: productVariants.price,
+        productBarcode: products.barcode,
+        productDescription: products.description,
+        productFullDescription: products.fullDescription,
+        productFulfillmentMode: products.fulfillmentMode,
+        productId: products.id,
+        productShortDescription: products.shortDescription,
+        productSlug: products.slug,
+        productTitle: products.title,
+        requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
+        stockOnHand: productVariants.stockOnHand,
+        variantBarcode: productVariants.barcode,
+        variantId: productVariants.id,
+        variantMediaId: productVariants.mediaId,
+        variantSku: productVariants.sku,
+        variantTitle: productVariants.title,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .leftJoin(brands, eq(brands.id, products.brandId))
+      .leftJoin(categories, eq(categories.id, products.categoryId))
+      .where(
+        and(
+          inArray(products.status, publicProductStatuses),
+          eq(productVariants.status, "active"),
+          eq(productVariants.isActive, true),
+        ),
+      )
+      .orderBy(
+        asc(products.title),
+        asc(productVariants.price),
+        asc(productVariants.title),
       ),
-    )
-    .orderBy(
-      asc(products.title),
-      asc(productVariants.price),
-      asc(productVariants.title),
-    );
+  ]);
 
   const eligibleRows = variantRows.filter((row) => {
     const price = Number(row.price);
@@ -229,10 +235,19 @@ export async function getGoogleMerchantFeedItems() {
     const returnPolicyLabel =
       firstCleanProductText([row.googleReturnPolicyLabel])?.slice(0, 100) ??
       null;
-    const shippingLabel = getGoogleShippingLabel(
+    const shippingLabel = getGoogleMerchantShippingLabel(
       row.googleFulfillmentChannel,
       row.productFulfillmentMode,
     );
+
+    if (!shippingLabel) {
+      return [];
+    }
+
+    if (!shouldPublishGoogleMerchantOffer(shippingLabel, settings)) {
+      return [];
+    }
+
     const customLabel0 = getGoogleMerchantCustomLabel0(shippingLabel);
     const destinations = getGoogleMerchantDestinationControls(shippingLabel);
 
@@ -374,19 +389,6 @@ function getIsExchangeOffer(row: {
   variantTitle: string;
 }) {
   return row.requiresExchangeEmpty || /\bexchange\b/i.test(row.variantTitle);
-}
-
-function getGoogleShippingLabel(
-  channel: "local_lpg" | "national_courier" | "excluded" | null,
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled",
-) {
-  if (channel === "local_lpg" || channel === "national_courier") {
-    return channel;
-  }
-
-  return fulfillmentMode === "piessang_fulfilled"
-    ? ("local_lpg" as const)
-    : ("national_courier" as const);
 }
 
 function formatGooglePrice(value: number) {

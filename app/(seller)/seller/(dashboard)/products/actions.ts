@@ -361,12 +361,12 @@ export async function updateSellerProductShipping(
   }
 
   if (
-    parsed.data.fulfillmentMode === "piessang_fulfilled" &&
-    !seller.isPiessangFulfillmentEnabled
+    parsed.data.fulfillmentMode === "jurgens_fulfilled" &&
+    !seller.isJurgensFulfillmentEnabled
   ) {
     return {
       error:
-        "Fulfilled by Piessang is invitation-only and is not enabled for this seller account yet.",
+        "Jurgens Energy fulfillment is invitation-only and is not enabled for this seller account yet.",
     };
   }
 
@@ -555,7 +555,7 @@ export async function submitSavedSellerProductForReview(input: unknown) {
       return productActionResult(false, "Complete parcel data before submitting.");
     }
 
-    if (product.fulfillmentMode === "piessang_fulfilled" && !variant.barcode) {
+    if (product.fulfillmentMode === "jurgens_fulfilled" && !variant.barcode) {
       return productActionResult(
         false,
         "Every FBP variant needs a barcode before submitting.",
@@ -673,7 +673,7 @@ export async function updateSellerProductOperationalFields(input: unknown) {
         .set({
           compareAtPrice: parseOptionalMoneyInput(variant.compareAtPrice),
           continueSellingOutOfStock:
-            product.fulfillmentMode === "piessang_fulfilled"
+            product.fulfillmentMode === "jurgens_fulfilled"
               ? false
               : variant.continueSellingOutOfStock,
           heightMm: parseOptionalMetricInput(variant.heightMm),
@@ -681,14 +681,14 @@ export async function updateSellerProductOperationalFields(input: unknown) {
           isFragile: variant.isFragile,
           lengthMm: parseOptionalMetricInput(variant.lengthMm),
           lowStockAlert:
-            product.fulfillmentMode === "piessang_fulfilled"
+            product.fulfillmentMode === "jurgens_fulfilled"
               ? 0
               : parseStockInput(variant.lowStockAlert || "5"),
           price: parseRequiredMoneyInput(variant.price) ?? "0.00",
           shipsAlone: variant.shipsAlone,
           status: variant.status,
           stockOnHand:
-            product.fulfillmentMode === "piessang_fulfilled"
+            product.fulfillmentMode === "jurgens_fulfilled"
               ? 0
               : parseStockInput(variant.stock),
           weightGrams: parseOptionalMetricInput(variant.weightGrams),
@@ -940,7 +940,7 @@ export async function checkSellerProductCsvImport(input: unknown) {
       issues.push("Product appears more than once in this CSV.");
     }
     if (existingSku) {
-      issues.push("SKU already exists in Piessang.");
+      issues.push("SKU already exists in Jurgens Energy.");
     }
     if (existingProduct) {
       issues.push(

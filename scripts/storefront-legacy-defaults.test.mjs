@@ -73,7 +73,7 @@ test("historical default storefront claims are replaced exactly", () => {
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
+    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
   );
   assert.equal(
     result[1].settings.steps[0].description,
@@ -83,8 +83,8 @@ test("historical default storefront claims are replaced exactly", () => {
     result[2].settings.features.map(({ text, title }) => ({ text, title })),
     [
       {
-        text: "Estimated delivery in 1–4 business days.",
-        title: "Delivery in South Africa",
+        text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+        title: "Delivery availability",
       },
       {
         text: "Cylinder eligibility and handover checks apply where required.",
@@ -178,15 +178,65 @@ test("the previous neutral defaults are upgraded to the South Africa store copy"
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
+    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
   );
   assert.deepEqual(result[1].settings.features[0], {
     icon: "delivery",
-    text: "Estimated delivery in 1–4 business days.",
-    title: "Delivery in South Africa",
+    text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+    title: "Delivery availability",
   });
   assert.equal(
     result[1].settings.eyebrow,
     "South African online LPG store",
   );
+});
+
+test("the previous South Africa defaults are upgraded to checkout-qualified delivery copy", () => {
+  const sections = [
+    {
+      enabled: true,
+      id: "hero",
+      settings: {
+        actions: [],
+        accentText: "",
+        copy: "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
+        heading: "LPG",
+        headingSize: 52,
+        headingTag: "h1",
+        imageAlt: "Cylinder",
+        imageUrl: "/cylinder.webp",
+      },
+      type: "hero",
+    },
+    {
+      enabled: true,
+      id: "features",
+      settings: {
+        eyebrow: "South African online LPG store",
+        features: [
+          {
+            icon: "delivery",
+            text: "Estimated delivery in 1–4 business days.",
+            title: "Delivery in South Africa",
+          },
+        ],
+        title: "LPG ordering with clear product, payment and delivery updates.",
+        titleSize: 30,
+        titleTag: "h2",
+      },
+      type: "feature_grid",
+    },
+  ];
+
+  const result = replaceLegacyDefaultStorefrontClaims(sections);
+
+  assert.equal(
+    result[0].settings.copy,
+    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
+  );
+  assert.deepEqual(result[1].settings.features[0], {
+    icon: "delivery",
+    text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+    title: "Delivery availability",
+  });
 });

@@ -2676,7 +2676,7 @@ function MediaDetails({
     const link = document.createElement("a");
 
     link.href = objectUrl;
-    link.download = asset.originalFileName ?? "piessang-media";
+    link.download = asset.originalFileName ?? "jurgens-energy-media";
     document.body.append(link);
     link.click();
     link.remove();

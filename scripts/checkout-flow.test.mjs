@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CHECKOUT_STEPS,
   getCheapestCheckoutShippingOption,
+  getSingleOrderShippingTotal,
   isCheckoutAddressStepReady,
   isCheckoutShippingStepReady,
 } from "../src/modules/checkout/flow.ts";
@@ -33,6 +34,37 @@ test("keeps the first checkout shipping option when amounts are equal", () => {
   ];
 
   assert.strictEqual(getCheapestCheckoutShippingOption(options), options[0]);
+});
+
+test("charges exactly one order-level delivery fee", () => {
+  const groups = [
+    {
+      groupKey: "delivery",
+      options: [{ amountZar: 125, quoteId: "policy-quote" }],
+    },
+  ];
+
+  assert.equal(
+    getSingleOrderShippingTotal(groups, { delivery: "policy-quote" }),
+    125,
+  );
+  assert.throws(
+    () =>
+      getSingleOrderShippingTotal(
+        [
+          ...groups,
+          {
+            groupKey: "legacy-second-group",
+            options: [{ amountZar: 80, quoteId: "legacy-quote" }],
+          },
+        ],
+        {
+          delivery: "policy-quote",
+          "legacy-second-group": "legacy-quote",
+        },
+      ),
+    /exactly one order-level delivery group/,
+  );
 });
 
 test("allows the address step to continue when every requirement is complete", () => {

@@ -4,7 +4,6 @@ export type LocalCartPurchaseType = "standard" | "exchange";
 
 export type LocalCartItem = {
   brandName: string | null;
-  exchangeAcceptedReturnBrands: string[];
   exchangeConfirmationText: string | null;
   exchangeEmptyConfirmed: boolean;
   exchangeRequiredEmptyCylinderSize: string | null;
@@ -21,7 +20,6 @@ export type LocalCartItem = {
 
 export type LocalCartInput = Omit<
   LocalCartItem,
-  | "exchangeAcceptedReturnBrands"
   | "exchangeConfirmationText"
   | "exchangeEmptyConfirmed"
   | "exchangeRequiredEmptyCylinderSize"
@@ -29,7 +27,6 @@ export type LocalCartInput = Omit<
   | "quantity"
   | "updatedAt"
 > & {
-  exchangeAcceptedReturnBrands?: string[];
   exchangeConfirmationText?: string | null;
   exchangeEmptyConfirmed?: boolean;
   exchangeRequiredEmptyCylinderSize?: string | null;
@@ -108,9 +105,6 @@ function normalizeCartItem(value: unknown): LocalCartItem | null {
 
   return {
     brandName: typeof item.brandName === "string" ? item.brandName : null,
-    exchangeAcceptedReturnBrands: normalizeStringList(
-      item.exchangeAcceptedReturnBrands,
-    ),
     exchangeConfirmationText: normalizeNullableString(
       item.exchangeConfirmationText,
     ),
@@ -283,10 +277,6 @@ export function addLocalCartItem(input: LocalCartInput): LocalCartState {
       ? normalizeNullableString(input.exchangeRequiredEmptyCylinderSize)
       : null;
   const exchangeSnapshot = {
-    exchangeAcceptedReturnBrands:
-      purchaseType === "exchange"
-        ? normalizeStringList(input.exchangeAcceptedReturnBrands)
-        : [],
     exchangeConfirmationText,
     exchangeEmptyConfirmed:
       purchaseType === "exchange" ? Boolean(input.exchangeEmptyConfirmed) : false,

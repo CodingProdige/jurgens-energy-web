@@ -184,6 +184,21 @@ export function isInvoiceBusinessInformationReady(
   );
 }
 
+export async function getBusinessDispatchContact() {
+  const information = await getBusinessInformation();
+  const contact = {
+    contactName:
+      information.collectionContactName.trim() ||
+      information.tradingName.trim() ||
+      information.legalName.trim(),
+    contactPhone:
+      information.collectionContactPhone.trim() ||
+      information.invoicePhone.trim(),
+  };
+
+  return contact.contactName && contact.contactPhone ? contact : null;
+}
+
 export async function getBusinessCollectionAddress() {
   const information = await getBusinessInformation();
   const same = information.collectionAddressSameAsRegistered;

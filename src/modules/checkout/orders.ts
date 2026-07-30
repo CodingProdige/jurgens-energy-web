@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { and, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, like } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { db } from "@/src/db";
@@ -9,6 +9,7 @@ import {
   orderItems,
   orders,
   payments,
+  productVariants,
   shippingRateQuotes,
 } from "@/src/db/schema";
 import { validateCartLines } from "@/src/modules/cart/server";
@@ -21,6 +22,7 @@ import {
 } from "@/src/modules/checkout/contracts";
 import {
   createCheckoutFingerprint,
+  getCheckoutFulfillmentProvider,
   getCheckoutDeliveryGroupKey,
 } from "@/src/modules/checkout/delivery";
 import type { CurrencyContext } from "@/src/modules/currency";
@@ -35,6 +37,8 @@ import {
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
 import type { CampaignAttributionSnapshot } from "@/src/modules/marketing/campaign-attribution";
 import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
+import { evaluateCustomerDelivery } from "@/src/modules/shipping/customer-delivery-evaluation";
+import { customerShippingSnapshotMatchesCart } from "@/src/modules/shipping/customer-shipping-snapshot";
 import {
   linkWhatsappNumberToUser,
   WhatsappNumberLinkedToAnotherUserError,
@@ -64,9 +68,10 @@ function createOrderNumber() {
 }
 
 function quoteGroupKey(quote: {
-  provider: "manual" | "bobgo" | "piessang_local";
+  provider: "manual" | "bobgo" | "courier_guy" | "jurgens_local";
 }) {
-  return quote.provider === "piessang_local" ? "jurgens" : "courier";
+  void quote;
+  return "delivery";
 }
 
 function getJurgensZoneId(providerPayload: unknown) {
@@ -77,6 +82,40 @@ function getJurgensZoneId(providerPayload: unknown) {
   const value = (providerPayload as { zoneId?: unknown }).zoneId;
 
   return typeof value === "string" ? value : null;
+}
+
+function customerPolicyPayloadMatches({
+  flatRate,
+  freeOverAmount,
+  providerPayload,
+  rule,
+}: {
+  flatRate: number;
+  freeOverAmount: number | null;
+  providerPayload: unknown;
+  rule: "flat_rate" | "free_shipping_over";
+}) {
+  if (!providerPayload || typeof providerPayload !== "object") {
+    return false;
+  }
+
+  const payload = providerPayload as {
+    customerPriceRule?: unknown;
+    flatRate?: unknown;
+    freeOverAmount?: unknown;
+    merchantCountry?: unknown;
+    providerRatesVisibleToCustomer?: unknown;
+  };
+  const payloadFreeOverAmount =
+    payload.freeOverAmount === null ? null : Number(payload.freeOverAmount);
+
+  return (
+    payload.merchantCountry === "ZA" &&
+    payload.providerRatesVisibleToCustomer === false &&
+    payload.customerPriceRule === rule &&
+    Number(payload.flatRate) === flatRate &&
+    payloadFreeOverAmount === freeOverAmount
+  );
 }
 
 function toCheckoutDeliveryAddress(address: {
@@ -287,8 +326,55 @@ export async function createHostedCheckoutOrder(
     throw new Error("A selected delivery option does not match the current cart.");
   }
 
-  const jurgensQuote = quoteByGroup.get("jurgens");
-  const hasJurgensDelivery = expectedGroupKeys.includes("jurgens");
+  const deliveryQuote = quoteByGroup.get("delivery");
+
+  if (
+    !deliveryQuote ||
+    deliveryQuote.provider !== "manual" ||
+    !deliveryQuote.providerRateId?.startsWith("customer-shipping-policy-")
+  ) {
+    throw new Error(
+      "The delivery policy changed. Request a fresh delivery quote and try again.",
+    );
+  }
+
+  const subtotal = roundMoney(
+    cart.items.reduce((total, item) => total + item.lineTotalZar, 0),
+  );
+  const deliveryEvaluation = await evaluateCustomerDelivery({
+    deliveryAddress: checkoutDetails.deliveryAddress,
+    items: cart.items,
+    orderSubtotal: subtotal,
+  });
+
+  if (!deliveryEvaluation.eligible) {
+    throw new Error(deliveryEvaluation.unavailableReason);
+  }
+
+  if (
+    !customerShippingSnapshotMatchesCart(
+      deliveryQuote.parcelSnapshot,
+      cart.items,
+    ) ||
+    roundMoney(Number(deliveryQuote.customerAmount)) !==
+      deliveryEvaluation.price.amount ||
+    getJurgensZoneId(deliveryQuote.providerPayload) !==
+      deliveryEvaluation.jurgensZoneId ||
+    !customerPolicyPayloadMatches({
+      flatRate: deliveryEvaluation.price.flatRate,
+      freeOverAmount: deliveryEvaluation.price.freeOverAmount,
+      providerPayload: deliveryQuote.providerPayload,
+      rule: deliveryEvaluation.price.rule,
+    })
+  ) {
+    throw new Error(
+      "The delivery policy or selected products changed. Request a fresh delivery quote and try again.",
+    );
+  }
+
+  const hasJurgensDelivery = cart.items.some(
+    (item) => item.fulfillmentMode === "jurgens_fulfilled",
+  );
   const scheduleSelection = parsed.jurgensDeliverySchedule
     ? await validateJurgensDeliveryScheduleSelection(
         parsed.jurgensDeliverySchedule,
@@ -305,13 +391,6 @@ export async function createHostedCheckoutOrder(
     );
   }
 
-  if (scheduleSelection && jurgensQuote?.provider !== "piessang_local") {
-    throw new Error("Choose a valid Jurgens delivery option before scheduling.");
-  }
-
-  const subtotal = roundMoney(
-    cart.items.reduce((total, item) => total + item.lineTotalZar, 0),
-  );
   const shippingTotal = roundMoney(
     quoteRows.reduce((total, quote) => total + Number(quote.customerAmount), 0),
   );
@@ -351,6 +430,31 @@ export async function createHostedCheckoutOrder(
   };
 
   const created = await db.transaction(async (tx) => {
+    const claimedQuotes = await tx
+      .update(shippingRateQuotes)
+      .set({ status: "selected" })
+      .where(
+        and(
+          inArray(shippingRateQuotes.id, quoteIds),
+          eq(shippingRateQuotes.status, "quoted"),
+          isNull(shippingRateQuotes.orderId),
+          eq(shippingRateQuotes.checkoutFingerprint, fingerprint),
+          eq(shippingRateQuotes.provider, "manual"),
+          like(
+            shippingRateQuotes.providerRateId,
+            "customer-shipping-policy-%",
+          ),
+          gt(shippingRateQuotes.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: shippingRateQuotes.id });
+
+    if (claimedQuotes.length !== quoteIds.length) {
+      throw new Error(
+        "This delivery quote was already used or expired. Request a fresh quote and try again.",
+      );
+    }
+
     if (userId) {
       const addressInput = {
         ...checkoutDetails.deliveryAddress,
@@ -419,18 +523,40 @@ export async function createHostedCheckoutOrder(
       })
       .returning({ id: orders.id, orderNumber: orders.orderNumber });
 
+    const exchangeBrandRows = await tx
+      .select({
+        exchangeAcceptedReturnBrands:
+          productVariants.exchangeAcceptedReturnBrands,
+        variantId: productVariants.id,
+      })
+      .from(productVariants)
+      .where(
+        inArray(
+          productVariants.id,
+          cart.items.map((item) => item.variantId),
+        ),
+      );
+    const exchangeAcceptedReturnBrandsByVariantId = new Map(
+      exchangeBrandRows.map((row) => [
+        row.variantId,
+        row.exchangeAcceptedReturnBrands,
+      ]),
+    );
+
     await tx.insert(orderItems).values(
       cart.items.map((item) => {
-        const groupKey = getCheckoutDeliveryGroupKey(item);
-        const quote = quoteByGroup.get(groupKey)!;
+        const fulfillmentProvider = getCheckoutFulfillmentProvider(item);
 
         return {
           brandId: item.brandId,
           categoryId: item.categoryId,
-          deliveryLabelSnapshot: quote.serviceName,
-          deliveryMethodSnapshot: quote.provider,
+          deliveryLabelSnapshot:
+            fulfillmentProvider === "jurgens_local"
+              ? "Jurgens Energy delivery"
+              : "The Courier Guy",
+          deliveryMethodSnapshot: fulfillmentProvider,
           exchangeAcceptedReturnBrandsSnapshot:
-            item.exchangeAcceptedReturnBrands,
+            exchangeAcceptedReturnBrandsByVariantId.get(item.variantId) ?? [],
           exchangeConfirmationTextSnapshot: item.exchangeConfirmationText,
           exchangeEmptyConfirmed: item.exchangeEmptyConfirmed,
           exchangeRequiredEmptyCylinderSize:
@@ -448,13 +574,13 @@ export async function createHostedCheckoutOrder(
       }),
     );
 
-    if (scheduleSelection?.ok && jurgensQuote) {
+    if (scheduleSelection?.ok && deliveryQuote) {
       await tx.insert(jurgensDeliverySchedules).values({
         deliveryInstructions: scheduleSelection.selection.deliveryInstructions,
         orderId: order.id,
-        quoteId: jurgensQuote.id,
+        quoteId: deliveryQuote.id,
         scheduledDate: scheduleSelection.selection.date,
-        zoneId: getJurgensZoneId(jurgensQuote.providerPayload),
+        zoneId: getJurgensZoneId(deliveryQuote.providerPayload),
       });
     }
 
@@ -467,10 +593,23 @@ export async function createHostedCheckoutOrder(
       })
       .returning({ id: payments.id });
 
-    await tx
+    const linkedQuotes = await tx
       .update(shippingRateQuotes)
-      .set({ orderId: order.id, status: "selected" })
-      .where(inArray(shippingRateQuotes.id, quoteIds));
+      .set({ orderId: order.id })
+      .where(
+        and(
+          inArray(shippingRateQuotes.id, quoteIds),
+          eq(shippingRateQuotes.status, "selected"),
+          isNull(shippingRateQuotes.orderId),
+        ),
+      )
+      .returning({ id: shippingRateQuotes.id });
+
+    if (linkedQuotes.length !== quoteIds.length) {
+      throw new Error(
+        "The delivery quote could not be linked to this order. Request a fresh quote and try again.",
+      );
+    }
 
     if (userId) {
       try {

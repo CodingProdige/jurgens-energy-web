@@ -1,14 +1,14 @@
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'product_fulfillment_mode') THEN
-    CREATE TYPE "product_fulfillment_mode" AS ENUM ('seller_fulfilled', 'piessang_fulfilled');
+    CREATE TYPE "product_fulfillment_mode" AS ENUM ('seller_fulfilled', 'jurgens_fulfilled');
   END IF;
 END $$;
 --> statement-breakpoint
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'shipping_provider') THEN
-    CREATE TYPE "shipping_provider" AS ENUM ('manual', 'bobgo', 'piessang_local');
+    CREATE TYPE "shipping_provider" AS ENUM ('manual', 'bobgo', 'jurgens_local');
   END IF;
 END $$;
 --> statement-breakpoint

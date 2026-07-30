@@ -96,8 +96,9 @@ function ComingSoonVisual() {
           </h1>
           <p className="mt-5 max-w-[360px] text-[14px] font-medium leading-6 text-white/86">
             JurgensEnergy.com is an online store for LPG cylinders, cylinder
-            exchanges and gas accessories, with estimated delivery in 1–4
-            business days within South Africa.
+            exchanges and gas accessories. Delivery eligibility is confirmed
+            at checkout, and timing depends on the destination and delivery
+            service.
           </p>
         </div>
       </div>
@@ -138,8 +139,8 @@ function ComingSoonPanel({
         </h2>
         <p className="mx-auto mt-4 max-w-[360px] text-[14px] leading-6 text-[#596176] dark:text-zinc-300 lg:mx-0">
           JurgensEnergy.com is an online store for LPG cylinders, cylinder
-          exchanges and gas accessories, with estimated delivery in 1–4 business
-          days within South Africa.
+          exchanges and gas accessories. Delivery eligibility is confirmed at
+          checkout, and timing depends on the destination and delivery service.
         </p>
       </div>
 

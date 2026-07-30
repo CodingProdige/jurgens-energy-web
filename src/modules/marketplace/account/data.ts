@@ -20,9 +20,11 @@ import {
 const orderIdSchema = z.string().uuid();
 const activeShipmentStatuses = [
   "pending_booking",
+  "booking",
   "booked",
   "waybill_ready",
   "ready_for_collection",
+  "cancelling",
   "collected",
   "in_transit",
   "out_for_delivery",
@@ -193,7 +195,12 @@ function summarizeShipmentStatus(statuses: string[]) {
     return "partially_delivered";
   }
 
-  for (const status of ["failed_delivery", "returned", "cancelled"]) {
+  for (const status of [
+    "failed_delivery",
+    "returned",
+    "undeliverable",
+    "cancelled",
+  ]) {
     if (statuses.includes(status)) {
       return status;
     }

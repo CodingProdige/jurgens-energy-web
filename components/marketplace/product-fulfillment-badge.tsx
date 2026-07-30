@@ -11,7 +11,7 @@ export function MarketplaceProductFulfillmentBadge({
   fulfillmentMode: ProductFulfillmentMode;
   label?: string;
 }) {
-  const isJurgensFulfilled = fulfillmentMode === "piessang_fulfilled";
+  const isJurgensFulfilled = fulfillmentMode === "jurgens_fulfilled";
 
   return (
     <Badge

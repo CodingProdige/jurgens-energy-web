@@ -372,7 +372,7 @@ export function SellerApplicationManager({
 
       <DashboardCompactMetrics
         metrics={metrics}
-        storageKey="piessang:admin:seller-application-metrics"
+        storageKey="jurgens-energy:admin:seller-application-metrics"
       />
 
       <section className="mt-4 grid gap-3 md:mt-5 md:flex md:items-center md:justify-between">

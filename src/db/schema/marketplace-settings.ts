@@ -1,6 +1,10 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   integer,
+  jsonb,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -89,6 +93,18 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
     "payfast_sandbox_passphrase_encrypted",
   ),
   shippingEnabled: boolean("shipping_enabled").notNull().default(false),
+  shippingFlatRate: numeric("shipping_flat_rate", {
+    mode: "number",
+    precision: 12,
+    scale: 2,
+  })
+    .notNull()
+    .default(0),
+  shippingFreeOverAmount: numeric("shipping_free_over_amount", {
+    mode: "number",
+    precision: 12,
+    scale: 2,
+  }),
   shippingMarginBps: integer("shipping_margin_bps").notNull().default(0),
   shippingBufferBps: integer("shipping_buffer_bps").notNull().default(0),
   jurgensDeliveryCutoffTime: varchar("jurgens_delivery_cutoff_time", {
@@ -137,6 +153,50 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   )
     .notNull()
     .default(true),
+  courierGuyEnabled: boolean("courier_guy_enabled")
+    .notNull()
+    .default(false),
+  courierGuyMode: varchar("courier_guy_mode", { length: 16 })
+    .notNull()
+    .default("sandbox"),
+  courierGuyLiveAccountCode: varchar("courier_guy_live_account_code", {
+    length: 64,
+  }),
+  courierGuyLiveApiKeyEncrypted: text(
+    "courier_guy_live_api_key_encrypted",
+  ),
+  courierGuySandboxAccountCode: varchar("courier_guy_sandbox_account_code", {
+    length: 64,
+  }),
+  courierGuySandboxApiKeyEncrypted: text(
+    "courier_guy_sandbox_api_key_encrypted",
+  ),
+  courierGuyWebhookTokenEncrypted: text(
+    "courier_guy_webhook_token_encrypted",
+  ),
+  courierGuyDefaultServiceCode: varchar(
+    "courier_guy_default_service_code",
+    { length: 64 },
+  ),
+  courierGuyDropoffType: varchar("courier_guy_dropoff_type", {
+    length: 32,
+  })
+    .notNull()
+    .default("generic_kiosk"),
+  courierGuyDropoffPickupPointId: varchar(
+    "courier_guy_dropoff_pickup_point_id",
+    { length: 120 },
+  ),
+  courierGuyDropoffPickupPointLabel: varchar(
+    "courier_guy_dropoff_pickup_point_label",
+    { length: 500 },
+  ),
+  courierGuyDropoffProvider: varchar(
+    "courier_guy_dropoff_provider",
+    { length: 80 },
+  )
+    .notNull()
+    .default("tcg-locker"),
   whatsappOrderingEnabled: boolean("whatsapp_ordering_enabled")
     .notNull()
     .default(false),
@@ -152,6 +212,27 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   whatsappWebhookSigningSecretEncrypted: text(
     "whatsapp_webhook_signing_secret_encrypted",
   ),
+  whatsappEmailNotificationsEnabled: boolean(
+    "whatsapp_email_notifications_enabled",
+  )
+    .notNull()
+    .default(false),
+  whatsappEmailNotifyNewConversation: boolean(
+    "whatsapp_email_notify_new_conversation",
+  )
+    .notNull()
+    .default(true),
+  whatsappEmailNotifyInboundMessage: boolean(
+    "whatsapp_email_notify_inbound_message",
+  )
+    .notNull()
+    .default(true),
+  whatsappEmailNotificationRecipients: jsonb(
+    "whatsapp_email_notification_recipients",
+  )
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   whatsappFollowUpsEnabled: boolean("whatsapp_follow_ups_enabled")
     .notNull()
     .default(true),
@@ -177,4 +258,25 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   whatsappFollowUpSupportMessage: text("whatsapp_follow_up_support_message"),
   whatsappFollowUpDefaultMessage: text("whatsapp_follow_up_default_message"),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+}, (settings) => ({
+  courierGuyLiveAccountCodeValid: check(
+    "marketplace_settings_courier_guy_live_account_code_valid",
+    sql`${settings.courierGuyLiveAccountCode} IS NULL OR btrim(${settings.courierGuyLiveAccountCode}) <> ''`,
+  ),
+  courierGuySandboxAccountCodeValid: check(
+    "marketplace_settings_courier_guy_sandbox_account_code_valid",
+    sql`${settings.courierGuySandboxAccountCode} IS NULL OR btrim(${settings.courierGuySandboxAccountCode}) <> ''`,
+  ),
+  courierGuyDropoffPickupPointLabelValid: check(
+    "marketplace_settings_cg_dropoff_point_label_valid",
+    sql`${settings.courierGuyDropoffPickupPointLabel} IS NULL OR btrim(${settings.courierGuyDropoffPickupPointLabel}) <> ''`,
+  ),
+  shippingFlatRateNonnegative: check(
+    "marketplace_settings_shipping_flat_rate_nonnegative",
+    sql`${settings.shippingFlatRate} >= 0`,
+  ),
+  shippingFreeOverNonnegative: check(
+    "marketplace_settings_shipping_free_over_nonnegative",
+    sql`${settings.shippingFreeOverAmount} IS NULL OR ${settings.shippingFreeOverAmount} > 0`,
+  ),
+}));

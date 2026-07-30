@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const clientIp = await getClientIp();
   const rateLimit = await checkRateLimit({
     key: `checkout-quotes:${clientIp}`,
-    limit: 30,
+    limit: 15,
     windowSeconds: 300,
   });
 

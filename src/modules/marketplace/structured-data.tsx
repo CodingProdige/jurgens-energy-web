@@ -2,6 +2,7 @@ import type { MarketplaceProductDetail } from "@/src/modules/marketplace/catalog
 import type { CustomerSupportContactDetails } from "@/src/modules/customer-support/contact-details";
 import { createMarketplaceBusinessAddress } from "@/src/modules/marketplace/business-structured-address";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
+import { shouldPublishGoogleMerchantOffer } from "@/src/modules/marketplace/google-feed-utils";
 import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
 import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 
@@ -50,6 +51,8 @@ export function createMarketplaceBusinessStructuredData({
     settings.instagramUrl,
     settings.twitterUrl,
   ].filter((value): value is string => Boolean(value));
+  const shippingService =
+    createNationwideShippingServiceStructuredData(settings);
 
   return {
     "@context": "https://schema.org",
@@ -88,6 +91,9 @@ export function createMarketplaceBusinessStructuredData({
         telephone: contactPhone,
         url: homeUrl,
         vatID: vatRegistrationNumber,
+        ...(shippingService
+          ? { hasShippingService: shippingService }
+          : {}),
       },
     ],
   };
@@ -96,6 +102,7 @@ export function createMarketplaceBusinessStructuredData({
 export function createProductStructuredData(
   product: MarketplaceProductDetail,
   selectedVariantId?: string,
+  settings?: MarketplaceSettings,
 ): StructuredDataValue {
   const productUrl = createMarketplaceCanonicalUrl(`/products/${product.slug}`);
   const availableVariants = product.variants.filter((variant) =>
@@ -119,28 +126,48 @@ export function createProductStructuredData(
   const exactVariantUrl = exactVariant
     ? `${productUrl}?variant=${encodeURIComponent(exactVariant.id)}`
     : undefined;
-  const offer = exactVariant
-      ? {
-          "@type": "Offer",
-          availability: exactVariant.inStock
-            ? "https://schema.org/InStock"
-            : "https://schema.org/OutOfStock",
-          itemCondition: "https://schema.org/NewCondition",
-          price: exactVariant.price,
-          priceCurrency: "ZAR",
-          seller: { "@id": `${createMarketplaceCanonicalUrl("/")}#organization` },
-          url: exactVariantUrl,
-        }
-      : prices.length > 0
+  const nationwideShippingServiceId =
+    settings &&
+    shouldPublishGoogleMerchantOffer("national_courier", settings)
+      ? `${createMarketplaceCanonicalUrl("/")}#standard-shipping-service`
+      : null;
+  const offer =
+    product.fulfillmentMode === "jurgens_fulfilled"
+      ? undefined
+      : exactVariant
         ? {
-            "@type": "AggregateOffer",
-            highPrice: highPrice.toFixed(2),
-            lowPrice: lowPrice.toFixed(2),
-            offerCount: availableVariants.length,
+            "@type": "Offer",
+            availability: exactVariant.inStock
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+            itemCondition: "https://schema.org/NewCondition",
+            price: exactVariant.price,
             priceCurrency: "ZAR",
-            url: productUrl,
+            seller: {
+              "@id": `${createMarketplaceCanonicalUrl("/")}#organization`,
+            },
+            ...(nationwideShippingServiceId
+              ? {
+                  shippingDetails: {
+                    "@type": "OfferShippingDetails",
+                    hasShippingService: {
+                      "@id": nationwideShippingServiceId,
+                    },
+                  },
+                }
+              : {}),
+            url: exactVariantUrl,
           }
-        : undefined;
+        : prices.length > 0
+          ? {
+              "@type": "AggregateOffer",
+              highPrice: highPrice.toFixed(2),
+              lowPrice: lowPrice.toFixed(2),
+              offerCount: availableVariants.length,
+              priceCurrency: "ZAR",
+              url: productUrl,
+            }
+          : undefined;
 
   return {
     "@context": "https://schema.org",
@@ -250,24 +277,106 @@ export function createArticleStructuredData({
   };
 }
 
-export function createDeliveryServiceStructuredData(): StructuredDataValue {
-  const url = createMarketplaceCanonicalUrl("/lpg-delivery");
+export function createDeliveryServiceStructuredData(
+  settings: MarketplaceSettings,
+): StructuredDataValue | null {
+  const shippingService =
+    createNationwideShippingServiceStructuredData(settings);
+
+  return shippingService
+    ? {
+        "@context": "https://schema.org",
+        "@id": `${createMarketplaceCanonicalUrl("/")}#online-store`,
+        "@type": "OnlineStore",
+        hasShippingService: shippingService,
+      }
+    : null;
+}
+
+function createNationwideShippingServiceStructuredData(
+  settings: MarketplaceSettings,
+): StructuredDataValue | null {
+  if (!shouldPublishGoogleMerchantOffer("national_courier", settings)) {
+    return null;
+  }
+
+  const flatRate = normalizeCurrencyAmount(settings.shippingFlatRate);
+  const freeOverAmount =
+    settings.shippingFreeOverAmount === null
+      ? null
+      : normalizeCurrencyAmount(settings.shippingFreeOverAmount);
+  const hasFreeShippingThreshold =
+    flatRate > 0 && freeOverAmount !== null && freeOverAmount > 0;
+  const shippingDestination = {
+    "@type": "DefinedRegion",
+    addressCountry: "ZA",
+  };
+  const shippingConditions = hasFreeShippingThreshold
+    ? [
+        {
+          "@type": "ShippingConditions",
+          orderValue: {
+            "@type": "MonetaryAmount",
+            currency: "ZAR",
+            maxValue: normalizeCurrencyAmount(freeOverAmount - 0.01),
+            minValue: 0,
+          },
+          shippingDestination,
+          shippingRate: {
+            "@type": "MonetaryAmount",
+            currency: "ZAR",
+            value: flatRate,
+          },
+        },
+        {
+          "@type": "ShippingConditions",
+          orderValue: {
+            "@type": "MonetaryAmount",
+            currency: "ZAR",
+            minValue: freeOverAmount,
+          },
+          shippingDestination,
+          shippingRate: {
+            "@type": "MonetaryAmount",
+            currency: "ZAR",
+            value: 0,
+          },
+        },
+      ]
+    : [
+        {
+          "@type": "ShippingConditions",
+          shippingDestination,
+          shippingRate: {
+            "@type": "MonetaryAmount",
+            currency: "ZAR",
+            value: flatRate,
+          },
+        },
+      ];
+  const feeDescription = hasFreeShippingThreshold
+    ? `A VAT-inclusive delivery fee of ZAR ${flatRate.toFixed(2)} applies below a product subtotal of ZAR ${freeOverAmount.toFixed(2)}; qualifying orders at or above that subtotal ship free.`
+    : flatRate === 0
+      ? "Eligible orders ship free."
+      : `A VAT-inclusive delivery fee of ZAR ${flatRate.toFixed(2)} applies per eligible order.`;
 
   return {
-    "@context": "https://schema.org",
-    "@id": `${url}#service`,
-    "@type": "Service",
-    areaServed: {
-      "@type": "Country",
-      name: "South Africa",
-    },
-    description:
-      "Online delivery of eligible LPG cylinders, cylinder exchanges and gas accessories within South Africa, with 0–1 business day handling, a 2:00 PM SAST order cut-off, 1–3 business day shipping after dispatch and an estimated total of 1–4 business days.",
-    name: "Jurgens Energy South Africa LPG delivery",
-    provider: { "@id": `${createMarketplaceCanonicalUrl("/")}#online-store` },
-    serviceType: "LPG cylinder delivery and exchange",
-    url,
+    "@id": `${createMarketplaceCanonicalUrl("/")}#standard-shipping-service`,
+    "@type": "ShippingService",
+    description: `Nationwide delivery within South Africa. ${feeDescription}`,
+    fulfillmentType: "https://schema.org/FulfillmentTypeDelivery",
+    name: "Standard nationwide South Africa delivery",
+    shippingConditions,
+    url: createMarketplaceCanonicalUrl("/lpg-delivery"),
   };
+}
+
+function normalizeCurrencyAmount(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.round(Math.max(0, value) * 100) / 100;
 }
 
 function toAbsoluteUrl(value: string | null | undefined) {

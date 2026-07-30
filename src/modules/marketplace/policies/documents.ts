@@ -203,7 +203,7 @@ export const termsAndConditions: PolicyDocument = {
       id: "pricing",
       title: "3. Prices, VAT, and promotions",
       paragraphs: [
-        "Product prices displayed by the store are VAT-inclusive unless a product clearly states otherwise. Delivery, handling, deposit, exchange, or other applicable charges are shown separately before you confirm the order where they apply.",
+        "Product prices displayed by the store are VAT-inclusive unless a product clearly states otherwise. The order-level delivery fee is also VAT-inclusive. Delivery, handling, deposit, exchange, or other applicable charges are shown separately before you confirm the order where they apply.",
         "A non-ZAR currency selection is a display convenience based on an exchange rate available to the store. The checkout total and payment-provider confirmation govern the amount charged. Promotions apply only for their stated period and conditions and may not be combined unless expressly allowed.",
         "If a price, description, discount, or calculation contains an obvious error, we may correct it before accepting the order. We will ask whether you want to proceed at the corrected amount or cancel, and will refund any amount already paid for an order we cannot accept.",
       ],
@@ -228,9 +228,11 @@ export const termsAndConditions: PolicyDocument = {
       id: "delivery",
       title: "6. Shipping and delivery",
       paragraphs: [
-        "We deliver eligible online-store orders to addresses within South Africa. Checkout confirms whether the selected products can be delivered to the entered address and shows the delivery fee before payment.",
+        "Courier-eligible products can be delivered nationwide to eligible addresses within South Africa. Products marked for Jurgens delivery are available only when the delivery postcode falls within an active Jurgens service area. Checkout cross-references the selected products and complete address before payment.",
+        "An eligible order has one configured VAT-inclusive flat delivery fee, even when more than one fulfilment method is used. An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches the configured threshold. The final fee is shown before payment.",
+        "A courier quotation or the amount charged to us by a delivery provider is an internal fulfilment cost. It does not replace or increase the delivery fee disclosed to you for the confirmed order; Jurgens Energy absorbs any difference.",
         "Our handling time is 0–1 business day after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched that day. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.",
-        "After dispatch, the estimated shipping or transit time is 1–3 business days. Handling and transit together give an estimated total delivery time of 1–4 business days. These periods are estimates rather than guaranteed appointments unless we expressly confirm otherwise.",
+        "Transit time after dispatch depends on the destination, parcel, delivery service and operating conditions. Any available delivery estimate is communicated in the order updates or tracking details and is not a guaranteed appointment unless we expressly confirm otherwise.",
         "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
         "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
         "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the eligible empty cylinder at the delivery handover.",
@@ -241,7 +243,7 @@ export const termsAndConditions: PolicyDocument = {
       title: "7. LPG safety and cylinder exchanges",
       paragraphs: [
         "LPG is hazardous if stored, transported, installed, or used incorrectly. Follow the product instructions and applicable safety rules, keep cylinders upright in a well-ventilated place away from ignition sources, and use a suitably qualified registered gas installer where installation is required.",
-        "For an exchange order, you must make the correct empty cylinder available at handover. The cylinder must be of an eligible size and type and must be safe to handle. Exchange eligibility may depend on the applicable brand, ownership, condition, and supplier rules shown with the product or confirmed before fulfilment.",
+        "For an exchange order, you must make the correct empty cylinder available at handover. The cylinder must meet the size, type and condition requirements shown with the product or confirmed before fulfilment, and it must be safe to handle.",
         "We or a fulfilment partner may refuse to collect or exchange a cylinder that appears unsafe, damaged, modified, illegally filled, leaking, or otherwise ineligible. Never refill, tamper with, vent, or repair a cylinder yourself. If you smell gas or suspect a leak, move away from ignition sources, follow emergency safety guidance, and contact the appropriate emergency or qualified gas service rather than using ordinary customer-support messaging as an emergency service.",
       ],
     },
@@ -372,7 +374,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       id: "cylinder-exchanges",
       title: "7. Cylinder-exchange orders",
       paragraphs: [
-        "An exchange price assumes that an eligible empty cylinder is available for collection at the same handover. Size, type, brand or ownership rules, and cylinder condition may affect eligibility. A driver or fulfilment partner may refuse a leaking, modified, severely damaged, illegally filled, or otherwise unsafe cylinder.",
+        "An exchange price assumes that an eligible empty cylinder is available for collection at the same handover. Cylinder size, type and condition may affect eligibility. A driver or fulfilment partner may refuse a leaking, modified, severely damaged, illegally filled, or otherwise unsafe cylinder.",
         "If the requested exchange cannot be completed, we will explain the available options, which may include correcting the order, paying the disclosed difference for another eligible option, rescheduling, or cancelling the affected item. If the delivered cylinder appears unsafe or incorrect, do not use it and contact us promptly for an inspection and appropriate remedy.",
       ],
     },
@@ -413,7 +415,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
 
 export const deliveryInformation: PolicyDocument = {
   description:
-    "Eligible South Africa orders have 0–1 business day handling and 1–3 business day shipping, for an estimated total of 1–4 business days.",
+    "Eligible South Africa orders normally have 0–1 business day handling. Transit time depends on the destination, parcel and delivery service.",
   eyebrow: "Getting your order",
   kind: "delivery",
   shortTitle: "Shipping & Delivery Policy",
@@ -423,18 +425,20 @@ export const deliveryInformation: PolicyDocument = {
       id: "coverage",
       title: "1. Where we deliver",
       paragraphs: [
-        "Jurgens Energy delivers eligible online-store orders to valid addresses within South Africa. We do not offer international shipping.",
-        "Enter a complete South African delivery address and working telephone number at checkout, or provide them during an assisted order. Delivery availability also depends on the selected products, stock, order preparation, access, and whether an approved service can safely transport the order.",
+        "Courier-eligible products can be delivered nationwide to eligible addresses in South Africa. We do not offer international shipping.",
+        "Products marked for Jurgens delivery use active postcode service areas to determine whether Jurgens can deliver the product to the address. Those postcode areas determine delivery eligibility only; they do not set the customer delivery fee.",
+        "Enter a complete South African delivery address, postcode and working telephone number at checkout, or provide them during an assisted order. Delivery availability also depends on the selected products, stock, order preparation, access, and whether an approved service can safely transport the order.",
         "Checkout is the final confirmation of delivery availability and cost before payment. If a legal, safety, stock, or transport constraint means we cannot complete the delivery, we will contact you about a practical alternative or cancellation and refund of the affected order.",
         "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. Cylinder exchanges take place at the delivery handover when the eligible empty cylinder is collected.",
       ],
     },
     {
       id: "fees",
-      title: "2. Delivery fees and quotes",
+      title: "2. Delivery fee and free-shipping rules",
       paragraphs: [
-        "The delivery charge is calculated or confirmed from the products, quantity, order value, parcel dimensions, LPG handling requirements, and available fulfilment method. The applicable option and charge are shown at checkout before payment, or communicated for approval during an assisted order.",
-        "A quote may change if the address, products, quantities, access requirements, or fulfilment method changes. We will ask you to approve a material change before proceeding.",
+        "Checkout applies one configured VAT-inclusive flat delivery fee to an eligible order. We do not add separate customer delivery fees for Jurgens delivery and courier delivery when an order requires both fulfilment methods.",
+        "If a free-shipping rule is active and the qualifying product subtotal reaches its configured threshold, checkout reduces the delivery fee to zero. Changing the products or quantities before payment may change whether the order qualifies. The final delivery fee is always shown before payment, or communicated for approval during an assisted order.",
+        "Courier rates, parcel measurements and delivery-provider charges are used internally to fulfil the order and do not determine the customer delivery fee. If the provider charges more than the fee collected from you, Jurgens Energy absorbs the difference.",
       ],
     },
     {
@@ -443,7 +447,7 @@ export const deliveryInformation: PolicyDocument = {
       paragraphs: [
         "Handling time is 0–1 business day after payment confirmation. This means an eligible order may be prepared and dispatched on the same business day or the next business day.",
         "Our order cutoff is 2:00 PM South African Standard Time (SAST) on business days. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed. Orders placed on weekends or South African public holidays also begin processing on the next business day.",
-        "Shipping or transit time after dispatch is estimated at 1–3 business days. Combined with handling, the estimated total delivery time is 1–4 business days. Delivery dates and time windows are estimates unless we expressly confirm a fixed appointment.",
+        "Transit time after dispatch depends on the destination, parcel, delivery service and operating conditions. Any available delivery estimate is communicated in the order updates or tracking details. Delivery dates and time windows are estimates unless we expressly confirm a fixed appointment.",
         "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements.",
         "We will communicate a material delay and provide the available next step. If an accepted order cannot be fulfilled within an agreed or legally required period, you may have a right to cancel and receive the applicable refund.",
       ],
@@ -467,7 +471,7 @@ export const deliveryInformation: PolicyDocument = {
       title: "5. LPG and cylinder handover",
       paragraphs: [
         "LPG orders require safe handling. Cylinders must remain upright, secured, and away from ignition sources. A delivery representative may pause or refuse a handover where access, storage, the receiving environment, or an exchange cylinder creates a material safety risk.",
-        "A cylinder exchange is completed only when the correct eligible empty cylinder is handed over. Exchange rules may consider size, type, brand or ownership, and condition. If the empty cylinder is not eligible, we will explain the available correction, price difference, reschedule, or cancellation options.",
+        "A cylinder exchange is completed only when the correct eligible empty cylinder is handed over. Exchange rules may consider size, type and condition. If the empty cylinder is not eligible, we will explain the available correction, price difference, reschedule, or cancellation options.",
         "Delivery does not include appliance installation or connection unless that service is expressly listed and confirmed. Work that legally requires a registered gas installer must be performed by a suitably qualified registered person.",
       ],
     },
@@ -512,3 +516,23 @@ export const deliveryInformation: PolicyDocument = {
     },
   ],
 };
+
+export function createDeliveryInformationDocument(
+  deliveryFeeDescription: string,
+): PolicyDocument {
+  return {
+    ...deliveryInformation,
+    sections: deliveryInformation.sections.map((section) =>
+      section.id === "fees"
+        ? {
+            ...section,
+            paragraphs: [
+              deliveryFeeDescription,
+              "One order-level customer delivery fee applies even when an order requires both Jurgens delivery and courier delivery. The final delivery fee is always shown before payment, or communicated for approval during an assisted order.",
+              "Courier rates, parcel measurements and delivery-provider charges are used internally to fulfil the order and do not determine the customer delivery fee. If the provider charges more than the fee collected from you, Jurgens Energy absorbs the difference.",
+            ],
+          }
+        : section,
+    ),
+  };
+}

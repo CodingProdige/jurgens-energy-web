@@ -183,6 +183,7 @@ export function AdminDashboardShell({
       notificationSurface="admin"
       searchAriaLabel="Search admin dashboard"
       searchPlaceholder="Search anything... (Orders, Products, Customers, etc.)"
+      showQuickActions={false}
       user={user}
       userFallbackLabel="Admin user"
     >

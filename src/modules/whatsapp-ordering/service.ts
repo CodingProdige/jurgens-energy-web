@@ -19,12 +19,14 @@ import {
   whatsappOrderDrafts,
 } from "@/src/db/schema";
 import { env } from "@/src/config/env";
-import { getBusinessCollectionAddress } from "@/src/modules/business-information";
 import { validateCartLines } from "@/src/modules/cart/server";
 import { formatFromZar } from "@/src/modules/currency";
 import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
-import { getOpenAiIntegrationConfig } from "@/src/modules/marketplace/settings";
+import {
+  getMarketplaceSettings,
+  getOpenAiIntegrationConfig,
+} from "@/src/modules/marketplace/settings";
 import {
   deliveryInformation,
   privacyPolicy,
@@ -32,8 +34,8 @@ import {
   termsAndConditions,
   type PolicyDocument,
 } from "@/src/modules/marketplace/policies/documents";
-import { probeBobGoCheckoutRates } from "@/src/modules/shipping/bobgo-client";
 import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
+import { calculateCustomerShippingPrice } from "@/src/modules/shipping/customer-shipping-policy";
 import {
   send360DialogTextMessage,
   type WhatsappMediaMessageAttachment,
@@ -99,16 +101,24 @@ const publicProductStatuses = new Set(["active", "live"]);
 const southAfricaDeliveryTimingFacts = [
   "Handling takes 0–1 business day after payment confirmation.",
   "The order cutoff is 2:00 PM SAST; orders placed after the cutoff start processing on the next business day.",
-  "Shipping takes 1–3 business days after dispatch, for a combined estimated delivery time of 1–4 business days.",
+  "Transit time after dispatch depends on the destination, parcel and delivery service. Any available estimate is communicated in the order updates or tracking details.",
 ] as const;
 const southAfricaDeliveryFacts = [
   "Jurgens Energy is an online store.",
-  "Jurgens Energy delivers eligible online-store orders within South Africa.",
-  ...southAfricaDeliveryTimingFacts,
-  "Delivery fees are shown at checkout.",
+  "Courier-eligible products can be delivered nationwide within South Africa.",
+  "Products marked for Jurgens delivery require an eligible delivery postcode.",
+  "One configured VAT-inclusive flat delivery fee applies per eligible order.",
+  "An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches its threshold.",
   "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
 ] as const;
 const checkoutLinkExpiryLabel = "1 hour";
+
+function formatZarAmount(value: number) {
+  return new Intl.NumberFormat("en-ZA", {
+    currency: "ZAR",
+    style: "currency",
+  }).format(value);
+}
 
 type WhatsappProvider = "360dialog" | "generic" | "meta" | "take_app" | "twilio";
 export type WhatsappPurchaseType = "exchange" | "standard";
@@ -130,6 +140,21 @@ export type WhatsappInboundMessage = {
   providerConversationId?: string | null;
   providerMessageId?: string | null;
   rawPayload?: Record<string, unknown>;
+};
+
+export type WhatsappAcceptedInboundMessage = {
+  body: string;
+  conversationId: string;
+  inboundMessageId: string;
+  isNewConversation: boolean;
+  phone: string;
+  profileName: string | null;
+  provider: WhatsappProvider;
+  receivedAt: Date;
+};
+
+export type ProcessWhatsappInboundMessageOptions = {
+  onInboundAccepted?: (message: WhatsappAcceptedInboundMessage) => void;
 };
 
 export type WhatsappAssistantResult = {
@@ -879,7 +904,11 @@ async function getOrCreateConversation({
     .limit(1);
 
   if (existing) {
-    return { id: existing.id, state: getConversationState(existing.state) };
+    return {
+      created: false,
+      id: existing.id,
+      state: getConversationState(existing.state),
+    };
   }
 
   const now = new Date();
@@ -899,7 +928,11 @@ async function getOrCreateConversation({
       state: whatsappConversations.state,
     });
 
-  return { id: created.id, state: getConversationState(created.state) };
+  return {
+    created: true,
+    id: created.id,
+    state: getConversationState(created.state),
+  };
 }
 
 function getConversationState(value: unknown): WhatsappConversationState {
@@ -1123,7 +1156,6 @@ async function updateConversationModerationState(
 async function updateDeliveryInquiryState(
   conversationId: string,
   inquiry: WhatsappDeliveryInquiry,
-  expectedProbeAt?: string,
 ) {
   const rows = await db
     .update(whatsappConversations)
@@ -1131,16 +1163,7 @@ async function updateDeliveryInquiryState(
       state: drizzleSql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{deliveryInquiry}', ${JSON.stringify(inquiry)}::jsonb, true)`,
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(whatsappConversations.id, conversationId),
-        ...(expectedProbeAt
-          ? [
-              drizzleSql`${whatsappConversations.state} #>> '{deliveryInquiry,lastProbeAt}' = ${expectedProbeAt}`,
-            ]
-          : []),
-      ),
-    )
+    .where(eq(whatsappConversations.id, conversationId))
     .returning({ id: whatsappConversations.id });
 
   return rows.length > 0;
@@ -1213,9 +1236,12 @@ async function recordWhatsappMessage({
         providerMessageId ?? `${direction}:${crypto.randomUUID()}`,
     })
     .onConflictDoNothing()
-    .returning({ id: whatsappMessages.id });
+    .returning({
+      createdAt: whatsappMessages.createdAt,
+      id: whatsappMessages.id,
+    });
 
-  return rows.length > 0;
+  return rows[0] ?? null;
 }
 
 async function updateConversationAfterMessage({
@@ -1367,7 +1393,7 @@ async function findCatalogCandidate({
         score += 30;
       }
 
-      if (row.fulfillmentMode === "piessang_fulfilled") {
+      if (row.fulfillmentMode === "jurgens_fulfilled") {
         score += 15;
       }
 
@@ -1719,11 +1745,8 @@ async function buildGreetingReply(state: WhatsappConversationState) {
     }
 
     if (deliveryInquiry.step === "awaiting_address") {
-      if (
-        getCompleteDeliveryAddress(deliveryInquiry.address) &&
-        deliveryInquiry.lastProbeAt
-      ) {
-        return "Hi, welcome back. I already have the courier address, but the last live check did not complete. Reply RETRY after a minute and I will try again, or ask for a human.";
+      if (getCompleteDeliveryAddress(deliveryInquiry.address)) {
+        return "Hi, welcome back. I already have the courier address. Reply RETRY and I will confirm the current delivery policy, or ask for a human.";
       }
 
       return buildDeliveryAddressPrompt(
@@ -1737,7 +1760,7 @@ async function buildGreetingReply(state: WhatsappConversationState) {
         : null;
 
       if (expiresAt !== null && expiresAt <= Date.now()) {
-        return "Hi, welcome back. That live courier estimate has expired. Reply RETRY and I will request current delivery options again.";
+        return "Hi, welcome back. That saved delivery result has expired. Reply RETRY and I will confirm the current delivery policy again.";
       }
 
       return deliveryInquiry.lastResult.reply;
@@ -2062,7 +2085,7 @@ async function answerOrderStatus({
 
 async function answerDeliveryAreas() {
   return [
-    "Jurgens Energy delivers eligible online-store orders within South Africa.",
+    "Delivery is available to eligible addresses within South Africa.",
     ...southAfricaDeliveryTimingFacts,
     "Exact product eligibility and delivery fees are confirmed at checkout from the complete delivery address.",
   ].join("\n");
@@ -2071,7 +2094,7 @@ async function answerDeliveryAreas() {
 async function answerShippingRates() {
   return [
     "Delivery fees are shown at checkout after you enter the complete South African delivery address.",
-    "Jurgens Energy delivers eligible online-store orders within South Africa.",
+    "Delivery is available to eligible addresses within South Africa.",
     ...southAfricaDeliveryTimingFacts,
   ].join("\n");
 }
@@ -2100,7 +2123,7 @@ async function answerLocation() {
   const support = await getCustomerSupportContactDetails();
 
   return [
-    `${support.businessName} is a South African online store delivering eligible orders within South Africa.`,
+    `${support.businessName} is a South African online store. Delivery is available to eligible addresses within South Africa and confirmed at checkout.`,
     support.businessAddress
       ? `Registered business address: ${support.businessAddress}`
       : null,
@@ -2691,23 +2714,20 @@ function isDeliveryDestinationChangeRequest(message: string) {
 
 async function respondToDeliveryInquiry({
   context,
-  expectedProbeAt,
   inquiry,
   reply,
 }: {
   context: DeliveryInquiryContext;
-  expectedProbeAt?: string;
   inquiry: WhatsappDeliveryInquiry;
   reply: string;
 }) {
   const stateUpdated = await updateDeliveryInquiryState(
     context.conversationId,
     inquiry,
-    expectedProbeAt,
   );
   const currentReply = stateUpdated
     ? reply.slice(0, 4000)
-    : "Your delivery details changed while I was checking, so I discarded the older courier result and kept your newer request.";
+    : "I could not save the delivery result right now. Please retry or ask for a human.";
 
   return respond({
     conversationId: context.conversationId,
@@ -2740,11 +2760,9 @@ function appendDeliveryCustomerPrompt(current: string, message: string) {
 }
 
 function createResolvedDeliveryInquiry({
-  expiresAt = null,
   inquiry,
   reply,
 }: {
-  expiresAt?: string | null;
   inquiry: WhatsappDeliveryInquiry;
   reply: string;
 }): WhatsappDeliveryInquiry {
@@ -2754,9 +2772,10 @@ function createResolvedDeliveryInquiry({
   return {
     ...inquiry,
     choices: [],
+    lastProbeAt: null,
     lastResult: {
       checkedAt,
-      expiresAt,
+      expiresAt: null,
       reply: safeReply,
     },
     step: "resolved",
@@ -2884,7 +2903,7 @@ async function checkJurgensDeliveryInquiry({
   if (!postalCode) {
     const reply = [
       `Delivery for ${itemLabel} is confirmed at checkout from the complete South African delivery address.`,
-      "Jurgens Energy delivers eligible online-store orders within South Africa.",
+      "Delivery is available to eligible addresses within South Africa.",
       ...southAfricaDeliveryTimingFacts,
       "The delivery fee will be shown before payment.",
       nextStep,
@@ -2905,7 +2924,6 @@ async function checkJurgensDeliveryInquiry({
 
   try {
     availability = await checkJurgensDeliveryAvailability({
-      declaredValue: item.lineTotalZar,
       postalCode,
     });
   } catch {
@@ -2923,7 +2941,7 @@ async function checkJurgensDeliveryInquiry({
   if (availability.eligible) {
     const reply = [
       `Yes — delivery is available for ${itemLabel} to the address you supplied.`,
-      "Jurgens Energy delivers eligible online-store orders within South Africa.",
+      "Delivery is available to eligible addresses within South Africa.",
       ...southAfricaDeliveryTimingFacts,
       "The delivery fee will be shown at checkout.",
       nextStep,
@@ -2941,22 +2959,8 @@ async function checkJurgensDeliveryInquiry({
   if (availability.unavailableCode === "postal_code_unavailable") {
     const reply = [
       `I could not confirm delivery for ${itemLabel} to the address you supplied.`,
-      "Jurgens Energy delivers eligible online-store orders within South Africa; exact product eligibility is confirmed from the complete address at checkout.",
+      "Delivery is available to eligible addresses within South Africa; exact product eligibility is confirmed from the complete address at checkout.",
       getUnavailableDeliveryNextStep(),
-    ].join("\n");
-
-    return respondToDeliveryInquiry({
-      context,
-      inquiry: createResolvedDeliveryInquiry({ inquiry, reply }),
-      reply,
-    });
-  }
-
-  if (availability.unavailableCode === "minimum_order_not_met") {
-    const reply = [
-      `I could not confirm delivery for ${itemLabel} to the address you supplied at this quantity.`,
-      "Delivery availability and the fee are confirmed at checkout from the complete address.",
-      "Send a larger quantity or a different product and I will check again, or ask for a human.",
     ].join("\n");
 
     return respondToDeliveryInquiry({
@@ -2982,40 +2986,7 @@ function isPositiveNumber(value: number | null): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
-async function claimBobGoDeliveryProbe(
-  conversationId: string,
-  inquiry: WhatsappDeliveryInquiry,
-) {
-  const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
-  const [claimed] = await db
-    .update(whatsappConversations)
-    .set({
-      state: drizzleSql`jsonb_set(COALESCE(${whatsappConversations.state}, '{}'::jsonb), '{deliveryInquiry}', ${JSON.stringify(inquiry)}::jsonb, true)`,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(whatsappConversations.id, conversationId),
-        drizzleSql`COALESCE(${whatsappConversations.state} #>> '{deliveryInquiry,lastProbeAt}', '') < ${cutoff}`,
-      ),
-    )
-    .returning({ id: whatsappConversations.id });
-
-  return Boolean(claimed);
-}
-
-function bobGoProbeInputsChanged(
-  current: WhatsappDeliveryInquiry | undefined,
-  next: WhatsappDeliveryInquiry,
-) {
-  return (
-    current?.selectedVariantId !== next.selectedVariantId ||
-    current?.quantity !== next.quantity ||
-    !deliveryAddressDraftsEqual(current?.address, next.address)
-  );
-}
-
-async function checkBobGoDeliveryInquiry({
+async function checkNationwideCourierDeliveryInquiry({
   context,
   inquiry,
 }: {
@@ -3078,206 +3049,62 @@ async function checkBobGoDeliveryInquiry({
     });
   }
 
-  const collection = await getBusinessCollectionAddress();
+  const settings = await getMarketplaceSettings();
+  const itemLabel = `${item.quantity} x ${item.productTitle}${
+    item.variantTitle !== item.productTitle ? ` - ${item.variantTitle}` : ""
+  }`;
 
-  if (!collection) {
+  if (!settings.shippingEnabled) {
     return respondToDeliveryInquiry({
       context,
-      inquiry: {
-        ...inquiry,
-        step: "awaiting_address",
-        updatedAt: new Date().toISOString(),
-      },
-      reply:
-        "I cannot confirm courier delivery because the configured business dispatch details are incomplete. Ask for a human and the team can check it manually.",
-    });
-  }
-
-  const previousProbeAt = inquiry.lastProbeAt
-    ? new Date(inquiry.lastProbeAt).getTime()
-    : 0;
-  const changedProbeInputs = bobGoProbeInputsChanged(
-    context.conversationState.deliveryInquiry,
-    inquiry,
-  );
-
-  if (
-    Number.isFinite(previousProbeAt) &&
-    Date.now() - previousProbeAt < 60 * 1000
-  ) {
-    if (changedProbeInputs) {
-      const deferredAt = new Date().toISOString();
-
-      await updateDeliveryInquiryState(context.conversationId, {
-        ...inquiry,
-        lastProbeAt: deferredAt,
-        lastResult: null,
-        step: "awaiting_address",
-        updatedAt: deferredAt,
-      });
-    }
-
-    return respond({
-      conversationId: context.conversationId,
-      provider: context.provider,
-      reply: changedProbeInputs
-        ? "I saved the changed item, quantity or address. Please wait a minute, then reply RETRY so I can request a fresh courier result for those new details."
-        : "I have already asked the courier for this address. Please wait a minute before retrying so we do not send duplicate delivery checks.",
-      status: "support_answer",
-    });
-  }
-
-  const probeStartedAt = new Date().toISOString();
-  const probingInquiry: WhatsappDeliveryInquiry = {
-    ...inquiry,
-    lastProbeAt: probeStartedAt,
-    lastResult: null,
-    step: "awaiting_address",
-    updatedAt: probeStartedAt,
-  };
-
-  const probeClaimed = await claimBobGoDeliveryProbe(
-    context.conversationId,
-    probingInquiry,
-  );
-
-  if (!probeClaimed) {
-    const changedInputs = bobGoProbeInputsChanged(
-      context.conversationState.deliveryInquiry,
-      inquiry,
-    );
-
-    if (changedInputs) {
-      await updateDeliveryInquiryState(context.conversationId, {
-        ...inquiry,
-        lastProbeAt: probeStartedAt,
-        lastResult: null,
-        step: "awaiting_address",
-        updatedAt: probeStartedAt,
-      });
-    }
-
-    return respond({
-      conversationId: context.conversationId,
-      provider: context.provider,
-      reply: changedInputs
-        ? "I saved the changed item, quantity or address, but a courier check already ran within the last minute. Please wait a minute, then reply RETRY for the new details."
-        : "A courier check has already run for this conversation within the last minute. Please wait a minute, then reply RETRY.",
-      status: "support_answer",
-    });
-  }
-
-  try {
-    const result = await probeBobGoCheckoutRates({
-      collectionAddress: {
-        city: collection.city,
-        code: collection.postalCode,
-        company: collection.company,
-        country: collection.countryCode,
-        local_area: collection.suburb || collection.city,
-        street_address: [collection.addressLine1, collection.addressLine2]
-          .filter(Boolean)
-          .join(", "),
-        zone: collection.province,
-      },
-      declaredValue: item.lineTotalZar,
-      deliveryAddress: {
-        city: address.city,
-        code: address.postalCode,
-        country: address.countryCode,
-        local_area: address.suburb,
-        street_address: [address.addressLine1, address.addressLine2]
-          .filter(Boolean)
-          .join(", "),
-        zone: address.province,
-      },
-      handlingTime: 2,
-      items: [
-        {
-          description: `${item.productTitle} - ${item.variantTitle}`,
-          heightMm,
-          lengthMm,
-          price: item.unitPriceZar,
-          quantity: item.quantity,
-          weightGrams,
-          widthMm,
-        },
-      ],
-      sellerId: item.sellerId,
-    });
-    const itemLabel = `${item.quantity} x ${item.productTitle}${
-      item.variantTitle !== item.productTitle ? ` - ${item.variantTitle}` : ""
-    }`;
-    const nextStep = getDeliveryResultNextStep(
-      context.conversationState,
-      item,
-    );
-
-    if (result.mode !== "live") {
-      const reply = [
-        `The courier connection is in test mode for ${itemLabel} and the delivery address you supplied.`,
-        "A test result cannot confirm real delivery availability, so I will not present it as a delivery promise.",
-        "Ask for a human to confirm delivery, or try again once live courier checking is available.",
-      ].join("\n");
-
-      return respondToDeliveryInquiry({
-        context,
-        expectedProbeAt: probeStartedAt,
-        inquiry: createResolvedDeliveryInquiry({
-          expiresAt: result.expiresAt.toISOString(),
-          inquiry: probingInquiry,
-          reply,
-        }),
-        reply,
-      });
-    }
-
-    if (result.rates.length === 0) {
-      const reply = [
-        `The courier returned no current delivery options for ${itemLabel} and the delivery address you supplied.`,
-        "That result applies to this exact item, quantity and address.",
-        getUnavailableDeliveryNextStep(),
-      ].join("\n");
-
-      return respondToDeliveryInquiry({
-        context,
-        expectedProbeAt: probeStartedAt,
-        inquiry: createResolvedDeliveryInquiry({
-          expiresAt: result.expiresAt.toISOString(),
-          inquiry: probingInquiry,
-          reply,
-        }),
-        reply,
-      });
-    }
-
-    const reply = [
-      `Yes — courier delivery is available for ${itemLabel} to the address you supplied.`,
-      "Jurgens Energy delivers eligible online-store orders within South Africa.",
-      ...southAfricaDeliveryTimingFacts,
-      "The delivery fee and final delivery option will be shown at checkout.",
-      nextStep,
-    ].join("\n");
-
-    return respondToDeliveryInquiry({
-      context,
-      expectedProbeAt: probeStartedAt,
       inquiry: createResolvedDeliveryInquiry({
-        expiresAt: result.expiresAt.toISOString(),
-        inquiry: probingInquiry,
-        reply,
+        inquiry,
+        reply: "Online delivery is temporarily unavailable.",
       }),
-      reply,
-    });
-  } catch {
-    return respondToDeliveryInquiry({
-      context,
-      expectedProbeAt: probeStartedAt,
-      inquiry: probingInquiry,
       reply:
-        "I could not confirm courier availability right now. That does not mean delivery is unavailable. Please reply RETRY after a minute, use the secure checkout, or ask for a human.",
+        "Online delivery is temporarily unavailable. Ask for a human if you need help with this order.",
     });
   }
+
+  if (address.countryCode.trim().toUpperCase() !== "ZA") {
+    return respondToDeliveryInquiry({
+      context,
+      inquiry: createResolvedDeliveryInquiry({
+        inquiry,
+        reply: "Delivery is currently available within South Africa only.",
+      }),
+      reply: "Delivery is currently available within South Africa only.",
+    });
+  }
+
+  const price = calculateCustomerShippingPrice({
+    flatRate: settings.shippingFlatRate,
+    freeOverAmount: settings.shippingFreeOverAmount,
+    orderSubtotal: item.lineTotalZar,
+  });
+  const priceMessage =
+    price.rule === "free_shipping_over"
+      ? `This item and quantity meet the current free-shipping threshold, so the order delivery fee would be ${formatZarAmount(0)} if the checkout subtotal remains eligible.`
+      : `The current VAT-inclusive order delivery fee is ${formatZarAmount(price.amount)}.`;
+  const thresholdMessage =
+    price.freeOverAmount === null
+      ? null
+      : `Free shipping currently applies from a qualifying product subtotal of ${formatZarAmount(price.freeOverAmount)}.`;
+  const reply = [
+    `Yes — ${itemLabel} is courier-eligible for nationwide delivery to the South African address you supplied.`,
+    "One configured VAT-inclusive flat delivery fee applies per eligible order; the private carrier cost never changes the checkout total.",
+    priceMessage,
+    thresholdMessage,
+    getDeliveryResultNextStep(context.conversationState, item),
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+
+  return respondToDeliveryInquiry({
+    context,
+    inquiry: createResolvedDeliveryInquiry({ inquiry, reply }),
+    reply,
+  });
 }
 
 async function continueDeliveryInquiryForSelectedProduct({
@@ -3318,9 +3145,9 @@ async function continueDeliveryInquiryForSelectedProduct({
     });
   }
 
-  return item.fulfillmentMode === "piessang_fulfilled"
+  return item.fulfillmentMode === "jurgens_fulfilled"
     ? checkJurgensDeliveryInquiry({ context, inquiry })
-    : checkBobGoDeliveryInquiry({ context, inquiry });
+    : checkNationwideCourierDeliveryInquiry({ context, inquiry });
 }
 
 async function handleDeliveryInquiryMessage(
@@ -3912,7 +3739,7 @@ async function answerSupportQuestion({
           ? { grounded: true, media: [], reply: answer }
           : textReply([
               "Jurgens Energy is a South African online store for LPG cylinders, eligible cylinder exchanges and gas-related products.",
-              "Eligible online-store orders are delivered within South Africa.",
+              "Delivery is available to eligible addresses within South Africa.",
               ...southAfricaDeliveryTimingFacts,
               "Delivery fees are shown at checkout.",
             ].join(" "));
@@ -4673,6 +4500,7 @@ async function tryProcessWhatsappMessageWithAgent({
 
 export async function processWhatsappInboundMessage(
   input: WhatsappInboundMessage,
+  options: ProcessWhatsappInboundMessageOptions = {},
 ): Promise<WhatsappAssistantResult> {
   const phone = normalizeWhatsappPhone(input.from);
 
@@ -4715,6 +4543,27 @@ export async function processWhatsappInboundMessage(
   }
 
   const providerProfileName = sanitizeWhatsappDisplayName(input.profileName);
+
+  if (insertedInbound) {
+    try {
+      options.onInboundAccepted?.({
+        body: input.body,
+        conversationId: conversation.id,
+        inboundMessageId: insertedInbound.id,
+        isNewConversation: conversation.created,
+        phone,
+        profileName: providerProfileName,
+        provider: input.provider,
+        receivedAt: insertedInbound.createdAt,
+      });
+    } catch (error) {
+      console.error(
+        "Failed to capture the accepted inbound WhatsApp message",
+        error,
+      );
+    }
+  }
+
   let baseConversationState = conversation.state;
 
   if (
@@ -5410,7 +5259,6 @@ export async function getWhatsappOrderDraftByToken(
   return {
     cartItem: {
       brandName: snapshot.brandName,
-      exchangeAcceptedReturnBrands: snapshot.exchangeAcceptedReturnBrands,
       exchangeConfirmationText: snapshot.exchangeConfirmationText,
       exchangeEmptyConfirmed: draft.exchangeEmptyConfirmed,
       exchangeRequiredEmptyCylinderSize:

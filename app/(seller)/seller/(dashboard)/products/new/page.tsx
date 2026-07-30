@@ -6,7 +6,7 @@ import { ProductCreateWizard } from "@/app/(seller)/seller/(dashboard)/products/
 
 export const metadata: Metadata = {
   title: "New Product",
-  description: "Create a new seller product on Piessang.",
+  description: "Create a new seller product on Jurgens Energy.",
   robots: {
     index: false,
     follow: false,

@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   integer,
   index,
   jsonb,
@@ -9,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -19,7 +22,8 @@ import { sellers } from "@/src/db/schema/sellers";
 export const shippingProvider = pgEnum("shipping_provider", [
   "manual",
   "bobgo",
-  "piessang_local",
+  "courier_guy",
+  "jurgens_local",
 ]);
 
 export const shippingQuoteStatus = pgEnum("shipping_quote_status", [
@@ -32,15 +36,18 @@ export const shippingQuoteStatus = pgEnum("shipping_quote_status", [
 
 export const shipmentStatus = pgEnum("shipment_status", [
   "pending_booking",
+  "booking",
   "booked",
   "waybill_ready",
   "ready_for_collection",
+  "cancelling",
   "collected",
   "in_transit",
   "out_for_delivery",
   "delivered",
   "failed_delivery",
   "returned",
+  "undeliverable",
   "cancelled",
 ]);
 
@@ -229,30 +236,99 @@ export const shippingRateQuotes = pgTable("shipping_rate_quotes", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
-export const shipments = pgTable("shipments", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  orderId: uuid("order_id")
-    .notNull()
-    .references(() => orders.id, { onDelete: "cascade" }),
-  sellerId: uuid("seller_id").references(() => sellers.id, {
-    onDelete: "set null",
+export const shipments = pgTable(
+  "shipments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    sellerId: uuid("seller_id").references(() => sellers.id, {
+      onDelete: "set null",
+    }),
+    quoteId: uuid("quote_id").references(() => shippingRateQuotes.id, {
+      onDelete: "set null",
+    }),
+    provider: shippingProvider("provider").notNull(),
+    status: shipmentStatus("status").notNull().default("pending_booking"),
+    providerEnvironment: varchar("provider_environment", { length: 16 }).$type<
+      "live" | "sandbox"
+    >(),
+    providerAccountCode: varchar("provider_account_code", { length: 64 }),
+    providerShipmentId: text("provider_shipment_id"),
+    waybillNumber: varchar("waybill_number", { length: 160 }),
+    trackingNumber: varchar("tracking_number", { length: 160 }),
+    trackingUrl: text("tracking_url"),
+    waybillUrl: text("waybill_url"),
+    providerCostAmount: numeric("provider_cost_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    providerCostCurrency: varchar("provider_cost_currency", { length: 3 }),
+    serviceCode: varchar("service_code", { length: 120 }),
+    serviceName: varchar("service_name", { length: 160 }),
+    bookedAt: timestamp("booked_at", { mode: "date" }),
+    collectedAt: timestamp("collected_at", { mode: "date" }),
+    deliveredAt: timestamp("delivered_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (shipment) => ({
+    courierGuyProviderShipmentUnique: uniqueIndex(
+      "shipments_courier_guy_provider_shipment_unique",
+    )
+      .on(
+        shipment.provider,
+        shipment.providerEnvironment,
+        shipment.providerShipmentId,
+      )
+      .where(
+        sql`${shipment.provider} = 'courier_guy' AND ${shipment.providerShipmentId} IS NOT NULL`,
+      ),
+    courierGuyTrackingUnique: uniqueIndex(
+      "shipments_courier_guy_tracking_unique",
+    )
+      .on(
+        shipment.provider,
+        shipment.providerEnvironment,
+        shipment.trackingNumber,
+      )
+      .where(
+        sql`${shipment.provider} = 'courier_guy' AND ${shipment.trackingNumber} IS NOT NULL`,
+      ),
+    courierGuyEnvironmentValid: check(
+      "shipments_courier_guy_environment_valid",
+      sql`${shipment.providerEnvironment} IS NULL OR ${shipment.providerEnvironment} IN ('live', 'sandbox')`,
+    ),
+    courierGuyAccountCodeValid: check(
+      "shipments_courier_guy_account_code_valid",
+      sql`${shipment.providerAccountCode} IS NULL OR btrim(${shipment.providerAccountCode}) <> ''`,
+    ),
+    courierGuyIdentityScoped: check(
+      "shipments_courier_guy_identity_scoped",
+      sql`${shipment.provider} <> 'courier_guy'
+        OR (
+          (${shipment.providerShipmentId} IS NULL AND ${shipment.trackingNumber} IS NULL)
+          OR (
+            ${shipment.providerEnvironment} IS NOT NULL
+            AND ${shipment.providerAccountCode} IS NOT NULL
+          )
+        )`,
+    ),
+    providerCostNonnegative: check(
+      "shipments_provider_cost_nonnegative",
+      sql`${shipment.providerCostAmount} IS NULL OR ${shipment.providerCostAmount} >= 0`,
+    ),
+    providerCostCurrencyPresent: check(
+      "shipments_provider_cost_currency_present",
+      sql`${shipment.providerCostAmount} IS NULL
+        OR (
+          ${shipment.providerCostCurrency} IS NOT NULL
+          AND char_length(${shipment.providerCostCurrency}) = 3
+        )`,
+    ),
   }),
-  quoteId: uuid("quote_id").references(() => shippingRateQuotes.id, {
-    onDelete: "set null",
-  }),
-  provider: shippingProvider("provider").notNull(),
-  status: shipmentStatus("status").notNull().default("pending_booking"),
-  providerShipmentId: text("provider_shipment_id"),
-  waybillNumber: varchar("waybill_number", { length: 160 }),
-  trackingNumber: varchar("tracking_number", { length: 160 }),
-  trackingUrl: text("tracking_url"),
-  waybillUrl: text("waybill_url"),
-  bookedAt: timestamp("booked_at", { mode: "date" }),
-  collectedAt: timestamp("collected_at", { mode: "date" }),
-  deliveredAt: timestamp("delivered_at", { mode: "date" }),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+);
 
 export const shipmentParcels = pgTable("shipment_parcels", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -283,20 +359,32 @@ export const shipmentParcels = pgTable("shipment_parcels", {
   reference: varchar("reference", { length: 160 }),
 });
 
-export const shipmentEvents = pgTable("shipment_events", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  shipmentId: uuid("shipment_id")
-    .notNull()
-    .references(() => shipments.id, { onDelete: "cascade" }),
-  provider: shippingProvider("provider").notNull(),
-  providerEventId: text("provider_event_id"),
-  status: varchar("status", { length: 120 }).notNull(),
-  message: text("message"),
-  location: varchar("location", { length: 180 }),
-  occurredAt: timestamp("occurred_at", { mode: "date" }).notNull(),
-  payload: jsonb("payload"),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-});
+export const shipmentEvents = pgTable(
+  "shipment_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    shipmentId: uuid("shipment_id")
+      .notNull()
+      .references(() => shipments.id, { onDelete: "cascade" }),
+    provider: shippingProvider("provider").notNull(),
+    providerEventId: text("provider_event_id"),
+    status: varchar("status", { length: 120 }).notNull(),
+    message: text("message"),
+    location: varchar("location", { length: 180 }),
+    occurredAt: timestamp("occurred_at", { mode: "date" }).notNull(),
+    payload: jsonb("payload"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (event) => ({
+    courierGuyProviderEventUnique: uniqueIndex(
+      "shipment_events_courier_guy_provider_event_unique",
+    )
+      .on(event.shipmentId, event.provider, event.providerEventId)
+      .where(
+        sql`${event.provider} = 'courier_guy' AND ${event.providerEventId} IS NOT NULL`,
+      ),
+  }),
+);
 
 export const jurgensDeliverySchedules = pgTable(
   "jurgens_delivery_schedules",
@@ -362,5 +450,39 @@ export const bobgoWebhookEvents = pgTable(
       event.providerShipmentId,
     ),
     topicIdx: index("bobgo_webhook_events_topic_idx").on(event.topic),
+  }),
+);
+
+export const courierGuyWebhookEvents = pgTable(
+  "courier_guy_webhook_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    topic: varchar("topic", { length: 160 }).notNull(),
+    providerEnvironment: varchar("provider_environment", { length: 16 })
+      .$type<"live" | "sandbox">()
+      .notNull(),
+    providerEventId: text("provider_event_id").notNull(),
+    providerShipmentId: text("provider_shipment_id"),
+    trackingReference: text("tracking_reference"),
+    status: varchar("status", { length: 32 }).notNull().default("received"),
+    payload: jsonb("payload").notNull(),
+    receivedAt: timestamp("received_at", { mode: "date" }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { mode: "date" }),
+  },
+  (event) => ({
+    environmentValid: check(
+      "courier_guy_webhook_events_environment_valid",
+      sql`${event.providerEnvironment} IN ('live', 'sandbox')`,
+    ),
+    providerEventUnique: unique(
+      "courier_guy_webhook_events_provider_event_unique",
+    ).on(event.providerEnvironment, event.providerEventId),
+    shipmentIdx: index(
+      "courier_guy_webhook_events_provider_shipment_id_idx",
+    ).on(event.providerEnvironment, event.providerShipmentId),
+    trackingIdx: index(
+      "courier_guy_webhook_events_tracking_reference_idx",
+    ).on(event.providerEnvironment, event.trackingReference),
+    topicIdx: index("courier_guy_webhook_events_topic_idx").on(event.topic),
   }),
 );

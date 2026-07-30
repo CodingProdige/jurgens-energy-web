@@ -82,7 +82,7 @@ VALUES
     'seller',
     'seller_application',
     'Application received',
-    'Thanks for applying to sell on Piessang. We received your application for {{storeName}} and our team will review it shortly.',
+    'Thanks for applying to sell with Jurgens Energy. We received your application for {{storeName}} and our team will review it shortly.',
     'View application',
     '{{sellerDashboardUrl}}/register',
     '["storeName","sellerDashboardUrl"]'

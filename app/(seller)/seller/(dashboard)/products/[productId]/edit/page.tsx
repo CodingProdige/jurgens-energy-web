@@ -10,7 +10,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Edit Product",
-  description: "Edit a seller product on Piessang.",
+  description: "Edit a seller product on Jurgens Energy.",
   robots: {
     index: false,
     follow: false,

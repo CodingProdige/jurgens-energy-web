@@ -101,7 +101,7 @@ import type {
 
 type ProductStatusFilter = SellerProductRow["status"] | "all";
 type ReadinessFilter = "all" | "ready" | "missing";
-type FulfillmentFilter = "all" | "seller_fulfilled" | "piessang_fulfilled";
+type FulfillmentFilter = "all" | "seller_fulfilled" | "jurgens_fulfilled";
 type ProductLifecycleAction =
   | "activate"
   | "cancel_review"
@@ -128,7 +128,7 @@ type CsvImportRow = {
   duplicateProductInCsv?: boolean;
   duplicateSkuInCsv?: boolean;
   existingSkuProductId?: string | null;
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
   fullDescription?: string;
   heightMm?: string;
   id: string;
@@ -286,7 +286,7 @@ function downloadCsvTemplate() {
     "85",
     "85",
     "300",
-    "seller_fulfilled",
+    "jurgens_fulfilled",
     "https://example.com/image-1.jpg|https://example.com/image-2.jpg",
     "Size",
     "1L",
@@ -303,7 +303,7 @@ function downloadCsvTemplate() {
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = "piessang-product-import-template.csv";
+  link.download = "jurgens-energy-product-import-template.csv";
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -406,10 +406,10 @@ function normalizeDeliveryMethod(value: string) {
       "jurgens_delivery",
       "jurgens_energy",
       "jurgens_energy_delivery",
-      "piessang_fulfilled",
+      "jurgens_fulfilled",
     ].includes(normalized)
   ) {
-    return "piessang_fulfilled" as const;
+    return "jurgens_fulfilled" as const;
   }
 
   return "seller_fulfilled" as const;
@@ -572,7 +572,7 @@ function FulfillmentBadge({
 }: {
   mode: SellerProductRow["fulfillmentMode"];
 }) {
-  const isJurgensDelivery = mode === "piessang_fulfilled";
+  const isJurgensDelivery = mode === "jurgens_fulfilled";
 
   return (
     <Badge
@@ -583,7 +583,7 @@ function FulfillmentBadge({
           : "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-zinc-300",
       )}
     >
-      {isJurgensDelivery ? "Jurgens delivery" : "Bob Go courier"}
+      {isJurgensDelivery ? "Jurgens delivery" : "The Courier Guy"}
     </Badge>
   );
 }
@@ -706,8 +706,8 @@ function ProductFilterPanel({
             </SelectTrigger>
             <SelectContent className={selectContentClass}>
               <SelectItem value="all" className={selectItemClass}>All delivery methods</SelectItem>
-              <SelectItem value="seller_fulfilled" className={selectItemClass}>Bob Go courier</SelectItem>
-              <SelectItem value="piessang_fulfilled" className={selectItemClass}>Jurgens delivery</SelectItem>
+              <SelectItem value="seller_fulfilled" className={selectItemClass}>The Courier Guy</SelectItem>
+              <SelectItem value="jurgens_fulfilled" className={selectItemClass}>Jurgens delivery</SelectItem>
             </SelectContent>
           </Select>
         </label>
@@ -1421,9 +1421,9 @@ export function SellerProductManager({
     },
     {
       color: "#10b981",
-      description: "Products where every variant has required parcel data.",
+      description: "Products where every variant has parcel data for carrier booking.",
       id: "ready_for_rates",
-      label: "Ready for rates",
+      label: "Ready for dispatch",
       value: data.metrics.readyForRates,
     },
     {
@@ -1435,17 +1435,17 @@ export function SellerProductManager({
     },
     {
       color: "#64748b",
-      description: "Products that the seller fulfills directly.",
+      description: "Products eligible for nationwide South African delivery through The Courier Guy.",
       id: "seller_fulfilled",
-      label: "Bob Go courier",
+      label: "The Courier Guy",
       value: data.metrics.sellerFulfilled,
     },
     {
       color: "#8b5cf6",
-      description: "Products marked for Jurgens Energy local delivery.",
-      id: "piessang_fulfilled",
+      description: "Products limited to postcode-eligible Jurgens Energy delivery.",
+      id: "jurgens_fulfilled",
       label: "Jurgens delivery",
-      value: data.metrics.piessangFulfilled,
+      value: data.metrics.jurgensFulfilled,
     },
   ];
 

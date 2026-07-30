@@ -84,7 +84,7 @@ export type MarketplaceProductCard = {
   coverImageUrl: string | null;
   compareAtPriceLabel: string | null;
   discountLabel: string | null;
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
   hasExchangeOption: boolean;
   id: string;
   inStock: boolean;
@@ -105,7 +105,6 @@ export type MarketplaceProductOptionSchema = {
 export type MarketplaceVariant = {
   barcode: string | null;
   compareAtPrice: string | null;
-  exchangeAcceptedReturnBrands: string[];
   exchangeConfirmationText: string | null;
   exchangeEmptyCylinderSize: string | null;
   id: string;
@@ -1373,8 +1372,6 @@ export async function getMarketplaceProductBySlug(
         barcode: productVariants.barcode,
         compareAtPrice: productVariants.compareAtPrice,
         continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
-        exchangeAcceptedReturnBrands:
-          productVariants.exchangeAcceptedReturnBrands,
         exchangeConfirmationText: productVariants.exchangeConfirmationText,
         exchangeEmptyCylinderSize: productVariants.exchangeEmptyCylinderSize,
         id: productVariants.id,
@@ -1459,7 +1456,6 @@ export async function getMarketplaceProductBySlug(
   const variants = activeVariantRows.map((variant): MarketplaceVariant => ({
     barcode: variant.barcode,
     compareAtPrice: variant.compareAtPrice,
-    exchangeAcceptedReturnBrands: variant.exchangeAcceptedReturnBrands ?? [],
     exchangeConfirmationText: variant.exchangeConfirmationText,
     exchangeEmptyCylinderSize: variant.exchangeEmptyCylinderSize,
     id: variant.id,

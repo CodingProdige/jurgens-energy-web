@@ -1,23 +1,31 @@
-import { desc, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
-  bobgoWebhookEvents,
+  courierGuyWebhookEvents,
+  orders,
   shipmentEvents,
   shipmentParcels,
   shipments,
   shippingRateQuotes,
 } from "@/src/db/schema";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import { createCourierGuyBookingReference } from "@/src/modules/shipping/courier-guy-operations";
 
 export type AdminShipmentRow = {
+  bookingReference: string;
   bookedAt: Date | null;
   createdAt: Date;
   deliveredAt: Date | null;
   id: string;
   orderId: string;
+  orderNumber: string;
   parcelCount: number;
   provider: string;
+  providerAccountCode: string | null;
+  providerCostAmount: string | null;
+  providerCostCurrency: string | null;
+  providerEnvironment: "live" | "sandbox" | null;
   providerShipmentId: string | null;
   status: string;
   trackingNumber: string | null;
@@ -39,7 +47,8 @@ export type AdminShippingQuoteRow = {
   status: string;
 };
 
-export type AdminBobGoWebhookRow = {
+export type AdminCourierGuyWebhookRow = {
+  providerEnvironment: "live" | "sandbox";
   providerEventId: string;
   providerShipmentId: string | null;
   receivedAt: Date;
@@ -48,16 +57,19 @@ export type AdminBobGoWebhookRow = {
 };
 
 export type AdminShippingData = {
-  bobgo: {
-    bookingMode: "disabled" | "quote_only" | "quote_and_book";
+  courierGuy: {
+    defaultServiceCode: string | null;
+    dropoffPickupPointId: string | null;
+    dropoffType: string;
     enabled: boolean;
+    hasActiveAccountCode: boolean;
     hasActiveApiKey: boolean;
-    hasActiveWebhookSecret: boolean;
+    hasWebhookToken: boolean;
     mode: "live" | "sandbox";
     shippingEnabled: boolean;
   };
   metrics: {
-    bobgoQuotes: number;
+    courierGuyShipments: number;
     booked: number;
     delivered: number;
     inTransit: number;
@@ -68,7 +80,7 @@ export type AdminShippingData = {
   };
   quotes: AdminShippingQuoteRow[];
   shipments: AdminShipmentRow[];
-  webhookEvents: AdminBobGoWebhookRow[];
+  webhookEvents: AdminCourierGuyWebhookRow[];
 };
 
 export async function getAdminShippingData(): Promise<AdminShippingData> {
@@ -81,7 +93,12 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
         deliveredAt: shipments.deliveredAt,
         id: shipments.id,
         orderId: shipments.orderId,
+        orderNumber: orders.orderNumber,
         provider: shipments.provider,
+        providerAccountCode: shipments.providerAccountCode,
+        providerCostAmount: shipments.providerCostAmount,
+        providerCostCurrency: shipments.providerCostCurrency,
+        providerEnvironment: shipments.providerEnvironment,
         providerShipmentId: shipments.providerShipmentId,
         status: shipments.status,
         trackingNumber: shipments.trackingNumber,
@@ -91,6 +108,7 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
         waybillUrl: shipments.waybillUrl,
       })
       .from(shipments)
+      .innerJoin(orders, eq(orders.id, shipments.orderId))
       .orderBy(desc(shipments.updatedAt)),
     db
       .select({
@@ -108,14 +126,15 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
       .orderBy(desc(shippingRateQuotes.createdAt)),
     db
       .select({
-        providerEventId: bobgoWebhookEvents.providerEventId,
-        providerShipmentId: bobgoWebhookEvents.providerShipmentId,
-        receivedAt: bobgoWebhookEvents.receivedAt,
-        status: bobgoWebhookEvents.status,
-        topic: bobgoWebhookEvents.topic,
+        providerEnvironment: courierGuyWebhookEvents.providerEnvironment,
+        providerEventId: courierGuyWebhookEvents.providerEventId,
+        providerShipmentId: courierGuyWebhookEvents.providerShipmentId,
+        receivedAt: courierGuyWebhookEvents.receivedAt,
+        status: courierGuyWebhookEvents.status,
+        topic: courierGuyWebhookEvents.topic,
       })
-      .from(bobgoWebhookEvents)
-      .orderBy(desc(bobgoWebhookEvents.receivedAt))
+      .from(courierGuyWebhookEvents)
+      .orderBy(desc(courierGuyWebhookEvents.receivedAt))
       .limit(12),
   ]);
 
@@ -157,26 +176,36 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
 
   const shipmentData = shipmentRows.map((shipment) => ({
     ...shipment,
+    bookingReference: createCourierGuyBookingReference(
+      shipment.orderNumber,
+      shipment.id,
+    ),
     parcelCount: parcelCountByShipmentId.get(shipment.id) ?? 0,
   }));
 
   return {
-    bobgo: {
-      bookingMode: settings.bobgoBookingMode,
-      enabled: settings.bobgoEnabled,
+    courierGuy: {
+      defaultServiceCode: settings.courierGuyDefaultServiceCode,
+      dropoffPickupPointId: settings.courierGuyDropoffPickupPointId,
+      dropoffType: settings.courierGuyDropoffType,
+      enabled: settings.courierGuyEnabled,
+      hasActiveAccountCode: Boolean(
+        settings.courierGuyMode === "live"
+          ? settings.courierGuyLiveAccountCode
+          : settings.courierGuySandboxAccountCode,
+      ),
       hasActiveApiKey:
-        settings.bobgoMode === "live"
-          ? settings.hasBobgoLiveApiKey
-          : settings.hasBobgoSandboxApiKey,
-      hasActiveWebhookSecret:
-        settings.bobgoMode === "live"
-          ? settings.hasBobgoLiveWebhookSecret
-          : settings.hasBobgoSandboxWebhookSecret,
-      mode: settings.bobgoMode,
+        settings.courierGuyMode === "live"
+          ? settings.hasCourierGuyLiveApiKey
+          : settings.hasCourierGuySandboxApiKey,
+      hasWebhookToken: settings.hasCourierGuyWebhookToken,
+      mode: settings.courierGuyMode,
       shippingEnabled: settings.shippingEnabled,
     },
     metrics: {
-      bobgoQuotes: quoteRows.filter((quote) => quote.provider === "bobgo").length,
+      courierGuyShipments: shipmentData.filter(
+        (shipment) => shipment.provider === "courier_guy",
+      ).length,
       booked: shipmentData.filter((shipment) => shipment.status === "booked")
         .length,
       delivered: shipmentData.filter((shipment) => shipment.status === "delivered")

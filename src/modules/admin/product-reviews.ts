@@ -50,7 +50,7 @@ export type AdminProductReviewRow = {
   categoryPath: string | null;
   coverMediaUrl: string | null;
   createdAt: Date;
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
   id: string;
   mediaCount: number;
   missingParcelVariantCount: number;
@@ -330,7 +330,7 @@ export async function getAdminProductReviews(): Promise<AdminProductReviewsData>
       ),
       warehouseFulfilled: getMetricCount(
         productRows,
-        (product) => product.fulfillmentMode === "piessang_fulfilled",
+        (product) => product.fulfillmentMode === "jurgens_fulfilled",
       ),
       totalSubmitted: productRows.filter((product) => product.status !== "draft")
         .length,
@@ -395,7 +395,7 @@ export async function getAdminProducts(): Promise<AdminProductsData> {
         .length,
       products: products.length,
       warehouseFulfilled: products.filter(
-        (product) => product.fulfillmentMode === "piessang_fulfilled",
+        (product) => product.fulfillmentMode === "jurgens_fulfilled",
       ).length,
       variants: products.reduce(
         (total, product) => total + product.variants.length,

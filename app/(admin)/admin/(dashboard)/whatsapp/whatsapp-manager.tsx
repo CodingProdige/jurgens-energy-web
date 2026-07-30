@@ -406,10 +406,19 @@ export function AdminWhatsappManager({
 
   return (
     <>
-      <DashboardPageHeader
-        breadcrumbs={["Orders", "WhatsApp"]}
-        title="WhatsApp Conversations"
-      />
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <DashboardPageHeader
+          breadcrumbs={["Orders", "WhatsApp"]}
+          className="mb-0"
+          title="WhatsApp Conversations"
+        />
+        <Link
+          href="/settings/platform?section=whatsapp-ordering#whatsapp-email-alerts"
+          className="inline-flex h-9 shrink-0 items-center justify-center self-start rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-zinc-900 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] focus-visible:ring-offset-2 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
+        >
+          Configure email alerts
+        </Link>
+      </div>
 
       <div className="grid gap-4">
         <DashboardCompactMetrics

@@ -6,7 +6,8 @@ import { getNotificationCenter } from "@/src/modules/notifications/in-app";
 
 export const metadata: Metadata = {
   title: "Seller Notifications",
-  description: "Review Piessang seller dashboard notifications and event links.",
+  description:
+    "Review Jurgens Energy seller dashboard notifications and event links.",
   robots: { follow: false, index: false },
 };
 

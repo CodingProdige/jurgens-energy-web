@@ -58,6 +58,7 @@ import type {
 import {
   CHECKOUT_STEPS,
   getCheapestCheckoutShippingOption,
+  getSingleOrderShippingTotal,
   isCheckoutAddressStepReady,
   isCheckoutShippingStepReady,
   type CheckoutStep,
@@ -125,15 +126,8 @@ function formatZar(value: number) {
 }
 
 function getShippingChargeLabel(groupKey: string) {
-  if (groupKey === "jurgens") {
-    return "Jurgens Energy shipping";
-  }
-
-  if (groupKey === "courier") {
-    return "Bob Go courier shipping";
-  }
-
-  return "Shipping";
+  void groupKey;
+  return "Order delivery";
 }
 
 function submitHostedPayFastForm({
@@ -508,13 +502,9 @@ export function CheckoutExperience({
       tier: selections.map((selection) => selection.label).join(" + "),
     };
   }, [checkoutAnalytics, selectedShippingOptions]);
-  const shippingTotal =
-    quotes?.groups.reduce((total, group) => {
-      const selectedQuoteId = selectedQuoteByGroup[group.groupKey];
-      const option = group.options.find((item) => item.quoteId === selectedQuoteId);
-
-      return total + (option?.amountZar ?? 0);
-    }, 0) ?? 0;
+  const shippingTotal = quotes
+    ? getSingleOrderShippingTotal(quotes.groups, selectedQuoteByGroup)
+    : 0;
   const subtotal = cart?.subtotalZar ?? 0;
   const grandTotal = subtotal + shippingTotal;
   const selectedProductCount =
@@ -527,13 +517,13 @@ export function CheckoutExperience({
   );
   const jurgensFulfilledProductCount =
     cart?.items.filter(
-      (item) => item.fulfillmentMode === "piessang_fulfilled",
+      (item) => item.fulfillmentMode === "jurgens_fulfilled",
     ).length ?? 0;
   const hasJurgensFulfilledProducts = jurgensFulfilledProductCount > 0;
   const jurgensSchedulingGroup =
     quotes?.groups.find(
       (group) =>
-        group.groupKey === "jurgens" &&
+        group.groupKey === "delivery" &&
         group.scheduling &&
         Boolean(selectedQuoteByGroup[group.groupKey]),
     ) ?? null;
@@ -812,7 +802,7 @@ export function CheckoutExperience({
         preserveSelections &&
         previousSchedule &&
         payload.groups
-          .find((group) => group.groupKey === "jurgens")
+          .find((group) => group.groupKey === "delivery")
           ?.scheduling?.options.some(
             (option) => option.date === previousSchedule.date,
           )
@@ -1212,18 +1202,15 @@ export function CheckoutExperience({
                         ? `: ${item.exchangeRequiredEmptyCylinderSize}`
                         : ""}
                       .
-                      {item.exchangeAcceptedReturnBrands.length > 0
-                        ? ` Accepted return brands: ${item.exchangeAcceptedReturnBrands.join(", ")}.`
-                        : ""}
                     </p>
                   ) : null}
                   <div className="mt-2 flex min-w-0 items-center">
                     <MarketplaceProductFulfillmentBadge
                       fulfillmentMode={item.fulfillmentMode}
                       label={
-                        item.fulfillmentMode === "piessang_fulfilled"
+                        item.fulfillmentMode === "jurgens_fulfilled"
                           ? "Jurgens delivery"
-                          : "Bob Go courier"
+                          : "Nationwide courier"
                       }
                     />
                   </div>
@@ -1953,12 +1940,12 @@ export function CheckoutExperience({
           <section className="border-y border-[#e8e8e2] bg-white px-3 py-4 dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border sm:px-5 sm:py-5">
             <div className="flex items-center gap-2">
               <TruckIcon className="size-4 text-[#ff5a1f]" />
-              <h2 className="text-sm font-black uppercase">Shipping breakdown</h2>
+              <h2 className="text-sm font-black uppercase">Delivery</h2>
             </div>
             <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
-              Shipping is selected automatically. We apply Jurgens Energy
-              delivery where applicable and the cheapest available Bob Go
-              courier rate.
+              One VAT-inclusive delivery fee applies to the eligible order.
+              Carrier costs are handled privately and never change the total
+              shown here.
             </p>
             {isLoadingQuotes ? (
               <div
@@ -1966,7 +1953,7 @@ export function CheckoutExperience({
                 className="mt-4 flex min-h-24 items-center justify-center gap-2 rounded-md border border-[#e3e3dc] bg-[#f7f7f2] px-4 text-sm font-semibold text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]"
               >
                 <LoaderCircleIcon className="size-5 animate-spin text-[#ff5a1f]" />
-                Calculating shipping charges…
+                Checking delivery eligibility…
               </div>
             ) : quoteError ? (
               <div
@@ -2020,10 +2007,7 @@ export function CheckoutExperience({
                             {getShippingChargeLabel(group.groupKey)}
                           </strong>
                           <span className="mt-0.5 block text-[10px] font-semibold leading-4 text-[#666660] dark:text-[#aaa9a1]">
-                            {option.label}
-                            {group.groupKey === "courier"
-                              ? " · Cheapest available Bob Go rate"
-                              : " · Applied automatically"}
+                            {option.label} · Applied once per order
                           </span>
                           {option.deliveryInformation ? (
                             <span className="mt-0.5 block text-[10px] leading-4 text-[#777770] dark:text-[#aaa9a1]">
@@ -2059,7 +2043,7 @@ export function CheckoutExperience({
             </div>
             ) : (
               <div className="mt-4 rounded-md border border-[#e3e3dc] bg-[#f7f7f2] px-4 py-4 text-sm text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]">
-                Shipping charges have not been calculated yet.
+                Delivery eligibility has not been checked yet.
               </div>
             )}
           </section>
@@ -2086,7 +2070,7 @@ export function CheckoutExperience({
                   </span>
                   <span className="mt-2 flex flex-wrap items-center gap-2">
                     <MarketplaceProductFulfillmentBadge
-                      fulfillmentMode="piessang_fulfilled"
+                      fulfillmentMode="jurgens_fulfilled"
                       label="Jurgens delivery"
                     />
                     <span className="text-[10px] font-bold leading-4 text-emerald-700 dark:text-emerald-300">
@@ -2111,8 +2095,8 @@ export function CheckoutExperience({
                   <TruckIcon className="mt-0.5 size-4 shrink-0" />
                   <p>
                     <strong>Jurgens-fulfilled products only.</strong> This date
-                    preference does not affect products delivered separately by
-                    a Bob Go courier.
+                    preference does not affect products sent through nationwide
+                    courier delivery.
                   </p>
                 </div>
                 <div className="grid gap-1.5 sm:max-w-sm">
@@ -2389,10 +2373,10 @@ export function CheckoutExperience({
                   <TruckIcon className="mt-0.5 size-3.5 shrink-0 text-[#ff5a1f]" />
                 )}
                 {checkoutStep === "address"
-                  ? "Enter your delivery address to calculate shipping."
+                  ? "Enter your delivery address to check serviceability and apply the order delivery fee."
                   : shippingStepReady
-                    ? "Review the automatically calculated shipping charges, then continue to payment."
-                    : "Shipping must be calculated before you can continue to payment."}
+                    ? "Review the single order delivery fee, then continue to payment."
+                    : "Delivery eligibility must be checked before you can continue to payment."}
               </p>
               {checkoutStep === "address" ? (
                 <Button

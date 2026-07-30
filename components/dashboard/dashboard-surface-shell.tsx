@@ -563,6 +563,7 @@ function SurfaceHeader({
   onOpenMenu,
   searchAriaLabel,
   searchPlaceholder,
+  showQuickActions,
 }: {
   accent: DashboardSurfaceAccent;
   brandAriaLabel: string;
@@ -573,6 +574,7 @@ function SurfaceHeader({
   onOpenMenu: () => void;
   searchAriaLabel: string;
   searchPlaceholder: string;
+  showQuickActions: boolean;
 }) {
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex h-[72px] items-center gap-3 border-b border-slate-200 bg-white px-4 shadow-sm dark:border-white/10 dark:bg-[#0f1114] sm:px-6 lg:px-7">
@@ -613,14 +615,16 @@ function SurfaceHeader({
           >
             <SearchIcon className="size-4" />
           </Button>
-          <Button
-            variant="outline"
-            className={cn("hidden h-9 gap-2 rounded-lg px-4 sm:inline-flex", surfaceControlClass)}
-          >
-            <ZapIcon className={cn("size-4", accentStyles[accent].icon)} />
-            Quick Actions
-            <ChevronDownIcon className="size-4" />
-          </Button>
+          {showQuickActions ? (
+            <Button
+              variant="outline"
+              className={cn("hidden h-9 gap-2 rounded-lg px-4 sm:inline-flex", surfaceControlClass)}
+            >
+              <ZapIcon className={cn("size-4", accentStyles[accent].icon)} />
+              Quick Actions
+              <ChevronDownIcon className="size-4" />
+            </Button>
+          ) : null}
           <NotificationBell
             accent={accent}
             centerHref={notificationCenterHref}
@@ -653,6 +657,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
   notificationSurface,
   searchAriaLabel,
   searchPlaceholder,
+  showQuickActions = true,
   user,
   userFallbackLabel,
 }: {
@@ -668,6 +673,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
   notificationSurface: InAppNotificationSurface;
   searchAriaLabel: string;
   searchPlaceholder: string;
+  showQuickActions?: boolean;
   user: DashboardSurfaceUser;
   userFallbackLabel: string;
 }) {
@@ -687,6 +693,7 @@ export function DashboardSurfaceShell<TCapability extends string = string>({
         onOpenMenu={() => setIsMobileNavOpen(true)}
         searchAriaLabel={searchAriaLabel}
         searchPlaceholder={searchPlaceholder}
+        showQuickActions={showQuickActions}
       />
       <Sidebar
         accent={accent}

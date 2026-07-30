@@ -27,6 +27,7 @@ import {
 } from "@/src/modules/checkout/payfast-itn-audit";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
 import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
+import { planOrderShipments } from "@/src/modules/shipping/shipment-planning";
 
 const PAYFAST_VALIDATION_TIMEOUT_MS = 12_000;
 
@@ -181,10 +182,14 @@ async function validateWithPayFast(
 }
 
 type ParcelSnapshotItem = {
+  description?: string;
+  fulfillmentMode?: string;
   heightMm?: number;
   lengthMm?: number;
   price?: number;
   quantity?: number;
+  sellerId?: string | null;
+  variantId?: string;
   weightGrams?: number;
   widthMm?: number;
 };
@@ -398,7 +403,11 @@ async function processPayFastItnFields({
 
     const itemRows = await tx
       .select({
+        deliveryMethod: orderItems.deliveryMethodSnapshot,
         quantity: orderItems.quantity,
+        sellerId: orderItems.sellerId,
+        title: orderItems.title,
+        unitPrice: orderItems.unitPrice,
         variantId: orderItems.variantId,
       })
       .from(orderItems)
@@ -427,50 +436,124 @@ async function processPayFastItnFields({
           eq(shippingRateQuotes.status, "selected"),
         ),
       );
+    const sellerIdByVariantId = new Map(
+      itemRows.map((item) => [item.variantId, item.sellerId]),
+    );
 
-    for (const quote of quoteRows) {
-      const [shipment] = await tx
-        .insert(shipments)
-        .values({
-          orderId: paymentRow.orderId,
-          provider: quote.provider,
-          quoteId: quote.id,
-          sellerId: quote.sellerId,
-        })
-        .returning({ id: shipments.id });
+    const customerPolicyQuote = quoteRows.find(
+      (quote) =>
+        quote.provider === "manual" &&
+        quote.providerRateId?.startsWith("customer-shipping-policy-"),
+    );
 
-      if (quote.provider === "piessang_local") {
-        await tx
-          .update(jurgensDeliverySchedules)
-          .set({ shipmentId: shipment.id, updatedAt: now })
-          .where(
-            and(
-              eq(jurgensDeliverySchedules.orderId, paymentRow.orderId),
-              eq(jurgensDeliverySchedules.quoteId, quote.id),
-            ),
-          );
-      }
-
-      const parcelItems = getParcelSnapshotItems(quote.parcelSnapshot).filter(
-        (item) =>
-          Number(item.heightMm) > 0 &&
-          Number(item.lengthMm) > 0 &&
-          Number(item.weightGrams) > 0 &&
-          Number(item.widthMm) > 0,
+    if (customerPolicyQuote) {
+      const policyItems = getParcelSnapshotItems(
+        customerPolicyQuote.parcelSnapshot,
+      );
+      const shipmentPlans = planOrderShipments(
+        policyItems.map((item) => ({
+          deliveryMethod: item.fulfillmentMode ?? null,
+          heightMm:
+            item.heightMm === undefined ? null : Number(item.heightMm),
+          lengthMm:
+            item.lengthMm === undefined ? null : Number(item.lengthMm),
+          quantity: Number(item.quantity ?? 1),
+          sellerId:
+            item.fulfillmentMode === "courier_guy" && item.variantId
+              ? (sellerIdByVariantId.get(item.variantId) ?? null)
+              : null,
+          title: item.description ?? "Order item",
+          unitPrice: Number(item.price ?? 0),
+          variantId: item.variantId ?? "",
+          weightGrams:
+            item.weightGrams === undefined
+              ? null
+              : Number(item.weightGrams),
+          widthMm:
+            item.widthMm === undefined ? null : Number(item.widthMm),
+        })),
       );
 
-      if (parcelItems.length > 0) {
-        await tx.insert(shipmentParcels).values(
-          parcelItems.map((item, index) => ({
-            declaredValue: Number(item.price ?? 0).toFixed(2),
-            heightMm: Number(item.heightMm),
-            lengthMm: Number(item.lengthMm),
-            reference: `${paymentRow.orderNumber}-${index + 1}`,
-            shipmentId: shipment.id,
-            weightGrams: Number(item.weightGrams) * Number(item.quantity ?? 1),
-            widthMm: Number(item.widthMm),
-          })),
+      for (const plan of shipmentPlans) {
+        const [shipment] = await tx
+          .insert(shipments)
+          .values({
+            orderId: paymentRow.orderId,
+            provider: plan.provider,
+            quoteId: customerPolicyQuote.id,
+            sellerId: plan.sellerId,
+          })
+          .returning({ id: shipments.id });
+
+        if (plan.provider === "jurgens_local") {
+          await tx
+            .update(jurgensDeliverySchedules)
+            .set({ shipmentId: shipment.id, updatedAt: now })
+            .where(eq(jurgensDeliverySchedules.orderId, paymentRow.orderId));
+        }
+
+        if (plan.parcels.length > 0) {
+          await tx.insert(shipmentParcels).values(
+            plan.parcels.map((parcel) => ({
+              declaredValue: parcel.declaredValue.toFixed(2),
+              heightMm: parcel.heightMm,
+              lengthMm: parcel.lengthMm,
+              reference: `${paymentRow.orderNumber}-${parcel.referenceSuffix}`,
+              shipmentId: shipment.id,
+              weightGrams: parcel.weightGrams,
+              widthMm: parcel.widthMm,
+            })),
+          );
+        }
+      }
+    } else {
+      for (const quote of quoteRows) {
+        const [shipment] = await tx
+          .insert(shipments)
+          .values({
+            orderId: paymentRow.orderId,
+            provider: quote.provider,
+            quoteId: quote.id,
+            sellerId: quote.sellerId,
+          })
+          .returning({ id: shipments.id });
+
+        if (quote.provider === "jurgens_local") {
+          await tx
+            .update(jurgensDeliverySchedules)
+            .set({ shipmentId: shipment.id, updatedAt: now })
+            .where(
+              and(
+                eq(jurgensDeliverySchedules.orderId, paymentRow.orderId),
+                eq(jurgensDeliverySchedules.quoteId, quote.id),
+              ),
+            );
+        }
+
+        const parcelItems = getParcelSnapshotItems(
+          quote.parcelSnapshot,
+        ).filter(
+          (item) =>
+            Number(item.heightMm) > 0 &&
+            Number(item.lengthMm) > 0 &&
+            Number(item.weightGrams) > 0 &&
+            Number(item.widthMm) > 0,
         );
+
+        if (parcelItems.length > 0) {
+          await tx.insert(shipmentParcels).values(
+            parcelItems.map((item, index) => ({
+              declaredValue: Number(item.price ?? 0).toFixed(2),
+              heightMm: Number(item.heightMm),
+              lengthMm: Number(item.lengthMm),
+              reference: `${paymentRow.orderNumber}-${index + 1}`,
+              shipmentId: shipment.id,
+              weightGrams:
+                Number(item.weightGrams) * Number(item.quantity ?? 1),
+              widthMm: Number(item.widthMm),
+            })),
+          );
+        }
       }
     }
 

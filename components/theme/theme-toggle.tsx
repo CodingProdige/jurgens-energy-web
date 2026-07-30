@@ -3,7 +3,7 @@
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
-import { usePiessangTheme } from "@/components/theme/theme-provider";
+import { useJurgensEnergyTheme } from "@/components/theme/theme-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +19,7 @@ type ThemeToggleProps = {
 };
 
 export function ThemeToggle({ compact = false, className }: ThemeToggleProps) {
-  const { theme, setTheme } = usePiessangTheme();
+  const { theme, setTheme } = useJurgensEnergyTheme();
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,

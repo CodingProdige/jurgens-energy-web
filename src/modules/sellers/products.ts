@@ -25,7 +25,7 @@ export type SellerProductVariant = {
 export type SellerProductRow = {
   activeVariantCount: number;
   createdAt: Date;
-  fulfillmentMode: "seller_fulfilled" | "piessang_fulfilled";
+  fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
   id: string;
   primaryImage: {
     altText: string | null;
@@ -56,7 +56,7 @@ export type SellerProductsPageData = {
     archivedProducts: number;
     draftProducts: number;
     missingParcelData: number;
-    piessangFulfilled: number;
+    jurgensFulfilled: number;
     products: number;
     readyForRates: number;
     sellerFulfilled: number;
@@ -66,7 +66,7 @@ export type SellerProductsPageData = {
   seller: {
     displayName: string;
     id: string;
-    isPiessangFulfillmentEnabled: boolean;
+    isJurgensFulfillmentEnabled: boolean;
   } | null;
 };
 
@@ -77,7 +77,7 @@ function buildEmptyData(): SellerProductsPageData {
       archivedProducts: 0,
       draftProducts: 0,
       missingParcelData: 0,
-      piessangFulfilled: 0,
+      jurgensFulfilled: 0,
       products: 0,
       readyForRates: 0,
       sellerFulfilled: 0,
@@ -238,8 +238,8 @@ export async function getSellerProductsPageData(
       draftProducts: sellerProducts.filter((product) => product.status === "draft")
         .length,
       missingParcelData: Math.max(0, variantCount - readyVariantCount),
-      piessangFulfilled: sellerProducts.filter(
-        (product) => product.fulfillmentMode === "piessang_fulfilled",
+      jurgensFulfilled: sellerProducts.filter(
+        (product) => product.fulfillmentMode === "jurgens_fulfilled",
       ).length,
       products: sellerProducts.length,
       readyForRates: sellerProducts.filter((product) => product.shippingReady)
@@ -253,7 +253,7 @@ export async function getSellerProductsPageData(
     seller: {
       displayName: seller.displayName,
       id: seller.id,
-      isPiessangFulfillmentEnabled: seller.isPiessangFulfillmentEnabled,
+      isJurgensFulfillmentEnabled: seller.isJurgensFulfillmentEnabled,
     },
   };
 }

@@ -29,7 +29,7 @@ export type SellerShipmentRow = {
   deliveredAt: Date | null;
   id: string;
   orderId: string;
-  provider: "manual" | "bobgo" | "piessang_local";
+  provider: "manual" | "bobgo" | "courier_guy" | "jurgens_local";
   serviceName: string | null;
   status: string;
   trackingNumber: string | null;
@@ -100,7 +100,7 @@ export async function getSellerShipments(userId: string) {
       id: shipments.id,
       orderId: shipments.orderId,
       provider: shipments.provider,
-      serviceName: shipments.providerShipmentId,
+      serviceName: shipments.serviceName,
       status: shipments.status,
       trackingNumber: shipments.trackingNumber,
       trackingUrl: shipments.trackingUrl,
@@ -163,7 +163,7 @@ export async function getSellerShippingOverview(userId: string) {
     await Promise.all([
       db.select({ value: count() }).from(sellerParcelPresets).where(eq(sellerParcelPresets.sellerId, seller.id)),
       db.select({ value: count() }).from(sellerParcelPresets).where(and(eq(sellerParcelPresets.sellerId, seller.id), eq(sellerParcelPresets.isActive, true))),
-      db.select({ value: count() }).from(shipments).where(and(eq(shipments.sellerId, seller.id), ne(shipments.status, "delivered"), ne(shipments.status, "cancelled"), ne(shipments.status, "returned"))),
+      db.select({ value: count() }).from(shipments).where(and(eq(shipments.sellerId, seller.id), ne(shipments.status, "delivered"), ne(shipments.status, "cancelled"), ne(shipments.status, "returned"), ne(shipments.status, "undeliverable"))),
       db.select({ value: count() }).from(shipments).where(and(eq(shipments.sellerId, seller.id), inArray(shipments.status, ["waybill_ready", "ready_for_collection"]))),
       db.select({ value: count() }).from(shipments).where(and(eq(shipments.sellerId, seller.id), inArray(shipments.status, ["booked", "waybill_ready", "ready_for_collection"]))),
       db.select({ value: count() }).from(shipments).where(and(eq(shipments.sellerId, seller.id), inArray(shipments.status, ["collected", "delivered"]))),
