@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronRightIcon, TriangleAlertIcon } from "lucide-react";
 
 import { auth } from "@/auth";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckoutExperience } from "@/components/marketplace/checkout-experience";
 import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
@@ -12,7 +13,9 @@ import type {
   CheckoutSavedAddress,
 } from "@/src/modules/checkout/contracts";
 import { getLatestOwnedCheckoutAddress } from "@/src/modules/checkout/orders";
+import { hasCourierGuySandboxCheckoutAccess } from "@/src/modules/checkout/sandbox-access";
 import { getCheckoutAddressBook } from "@/src/modules/marketplace/account/addresses";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import {
   getPrimaryWhatsappCustomerLinkForUser,
 } from "@/src/modules/whatsapp-ordering/customer-links";
@@ -24,8 +27,16 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
-  const session = await auth();
+  const [session, marketplaceSettings] = await Promise.all([
+    auth(),
+    getMarketplaceSettings(),
+  ]);
   const userId = session?.user?.id ?? null;
+  const isCourierGuySandboxPreview =
+    marketplaceSettings.courierGuyEnabled &&
+    marketplaceSettings.hasCourierGuySandboxApiKey &&
+    marketplaceSettings.courierGuyMode === "sandbox" &&
+    hasCourierGuySandboxCheckoutAccess(session?.user);
   let initialAddresses: CheckoutSavedAddress[] = [];
   let initialFallbackAddress: CheckoutAddressPrefill | null = null;
   let initialPhone = "";
@@ -80,6 +91,20 @@ export default async function CheckoutPage() {
                 Checkout
               </h1>
             </header>
+            {isCourierGuySandboxPreview ? (
+              <div className="px-3 pb-4 sm:px-0 sm:pb-6">
+                <Alert className="border-amber-400/50 bg-amber-50 text-amber-950 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+                  <TriangleAlertIcon />
+                  <AlertTitle>Courier Guy sandbox checkout preview</AlertTitle>
+                  <AlertDescription>
+                    This signed-in administrator can test delivery while public
+                    courier checkout remains blocked. Quotes and later courier
+                    bookings use sandbox data. Confirm the PayFast environment
+                    before submitting a test payment.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : null}
             <CheckoutExperience
               initialAddresses={initialAddresses}
               initialCustomer={{

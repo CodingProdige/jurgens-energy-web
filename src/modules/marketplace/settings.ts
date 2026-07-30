@@ -948,6 +948,194 @@ export async function updateMarketplacePayFastSettings({
   return { ok: true, message: "PayFast payment settings saved." };
 }
 
+async function getCourierGuyCredentialChangeBlock(
+  environments: Array<"live" | "sandbox">,
+) {
+  if (environments.length === 0) {
+    return null;
+  }
+
+  const [blockingShipment] = await db
+    .select({
+      environment: shipments.providerEnvironment,
+    })
+    .from(shipments)
+    .where(
+      and(
+        eq(shipments.provider, "courier_guy"),
+        or(
+          inArray(shipments.providerEnvironment, environments),
+          and(
+            eq(shipments.status, "booking"),
+            isNull(shipments.providerEnvironment),
+          ),
+        ),
+        notInArray(shipments.status, [
+          "cancelled",
+          "delivered",
+          "returned",
+          "undeliverable",
+        ]),
+      ),
+    )
+    .limit(1);
+
+  if (!blockingShipment) {
+    return null;
+  }
+
+  return blockingShipment.environment
+    ? `The ${blockingShipment.environment} Courier Guy account code or bearer token cannot be changed while active ${blockingShipment.environment} shipments still need tracking, waybills, or cancellation. Complete or cancel those shipments first.`
+    : "Courier Guy credentials cannot be changed while a booking is in progress. Wait for it to finish, then try again.";
+}
+
+export async function updateMarketplaceCourierGuyCredentials({
+  actorUserId,
+  courierGuyLiveAccountCode,
+  courierGuyLiveApiKey,
+  courierGuyMode,
+  courierGuySandboxAccountCode,
+  courierGuySandboxApiKey,
+  courierGuyWebhookToken,
+}: {
+  actorUserId: string;
+  courierGuyLiveAccountCode: string | null;
+  courierGuyLiveApiKey?: string;
+  courierGuyMode: "live" | "sandbox";
+  courierGuySandboxAccountCode: string | null;
+  courierGuySandboxApiKey?: string;
+  courierGuyWebhookToken?: string;
+}) {
+  const normalizedLiveAccountCode =
+    courierGuyLiveAccountCode?.trim() || null;
+  const normalizedSandboxAccountCode =
+    courierGuySandboxAccountCode?.trim() || null;
+
+  if (
+    [normalizedLiveAccountCode, normalizedSandboxAccountCode].some(
+      (accountCode) => accountCode !== null && accountCode.length > 64,
+    )
+  ) {
+    return {
+      ok: false as const,
+      message: "Courier Guy account codes must be 64 characters or less.",
+    };
+  }
+
+  if (
+    [courierGuyLiveApiKey, courierGuySandboxApiKey].some(
+      (apiKey) => apiKey !== undefined && apiKey.length > 1_000,
+    )
+  ) {
+    return {
+      ok: false as const,
+      message: "Courier Guy bearer tokens must be 1,000 characters or less.",
+    };
+  }
+
+  if (
+    courierGuyWebhookToken &&
+    (courierGuyWebhookToken.trim().length < 24 ||
+      courierGuyWebhookToken.trim().length > 1_000)
+  ) {
+    return {
+      ok: false as const,
+      message:
+        "Courier Guy webhook tokens must be between 24 and 1,000 characters.",
+    };
+  }
+
+  const existing = await getRawMarketplaceSettings();
+  const existingLiveApiKey = decryptOptionalSecret(
+    existing?.courierGuyLiveApiKeyEncrypted,
+  );
+  const existingSandboxApiKey = decryptOptionalSecret(
+    existing?.courierGuySandboxApiKeyEncrypted,
+  );
+  const liveCredentialsChanged =
+    normalizedLiveAccountCode !==
+      (existing?.courierGuyLiveAccountCode?.trim() || null) ||
+    (courierGuyLiveApiKey !== undefined &&
+      courierGuyLiveApiKey !== existingLiveApiKey);
+  const sandboxCredentialsChanged =
+    normalizedSandboxAccountCode !==
+      (existing?.courierGuySandboxAccountCode?.trim() || null) ||
+    (courierGuySandboxApiKey !== undefined &&
+      courierGuySandboxApiKey !== existingSandboxApiKey);
+  const changedEnvironments: Array<"live" | "sandbox"> = [];
+
+  if (liveCredentialsChanged) {
+    changedEnvironments.push("live");
+  }
+
+  if (sandboxCredentialsChanged) {
+    changedEnvironments.push("sandbox");
+  }
+
+  const credentialChangeBlock =
+    await getCourierGuyCredentialChangeBlock(changedEnvironments);
+
+  if (credentialChangeBlock) {
+    return {
+      ok: false as const,
+      message: credentialChangeBlock,
+    };
+  }
+
+  const nextLiveApiKeyEncrypted = courierGuyLiveApiKey
+    ? encryptSecret(courierGuyLiveApiKey)
+    : existing?.courierGuyLiveApiKeyEncrypted;
+  const nextSandboxApiKeyEncrypted = courierGuySandboxApiKey
+    ? encryptSecret(courierGuySandboxApiKey)
+    : existing?.courierGuySandboxApiKeyEncrypted;
+  const nextWebhookTokenEncrypted = courierGuyWebhookToken
+    ? encryptSecret(courierGuyWebhookToken)
+    : existing?.courierGuyWebhookTokenEncrypted;
+  const now = new Date();
+  const values = {
+    courierGuyLiveAccountCode: normalizedLiveAccountCode,
+    courierGuyLiveApiKeyEncrypted: nextLiveApiKeyEncrypted ?? null,
+    courierGuySandboxAccountCode: normalizedSandboxAccountCode,
+    courierGuySandboxApiKeyEncrypted: nextSandboxApiKeyEncrypted ?? null,
+    courierGuyWebhookTokenEncrypted: nextWebhookTokenEncrypted ?? null,
+    updatedAt: now,
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({ id: 1, ...values })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: values,
+      });
+
+    await tx.insert(auditLogs).values({
+      action: "marketplace.courier_guy_credentials.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({
+        courierGuyLiveAccountCode: normalizedLiveAccountCode,
+        credentialEditorMode: courierGuyMode,
+        courierGuySandboxAccountCode: normalizedSandboxAccountCode,
+        liveCredentialsChanged,
+        sandboxCredentialsChanged,
+        webhookTokenChanged: Boolean(courierGuyWebhookToken),
+      }),
+    });
+  });
+
+  return {
+    courierGuyCredentials: {
+      hasLiveApiKey: Boolean(nextLiveApiKeyEncrypted),
+      hasSandboxApiKey: Boolean(nextSandboxApiKeyEncrypted),
+      hasWebhookToken: Boolean(nextWebhookTokenEncrypted),
+    },
+    ok: true as const,
+    message: `Courier Guy credentials saved. ${courierGuyMode === "live" ? "Live" : "Sandbox"} pickup-point search is ready.`,
+  };
+}
+
 export async function updateMarketplaceShippingSettings({
   actorUserId,
   courierGuyDefaultServiceCode,
@@ -1103,43 +1291,15 @@ export async function updateMarketplaceShippingSettings({
     protectedCredentialEnvironments.push("sandbox");
   }
 
-  if (protectedCredentialEnvironments.length > 0) {
-    const [blockingShipment] = await db
-      .select({
-        environment: shipments.providerEnvironment,
-      })
-      .from(shipments)
-      .where(
-        and(
-          eq(shipments.provider, "courier_guy"),
-          or(
-            inArray(
-              shipments.providerEnvironment,
-              protectedCredentialEnvironments,
-            ),
-            and(
-              eq(shipments.status, "booking"),
-              isNull(shipments.providerEnvironment),
-            ),
-          ),
-          notInArray(shipments.status, [
-            "cancelled",
-            "delivered",
-            "returned",
-            "undeliverable",
-          ]),
-        ),
-      )
-      .limit(1);
+  const credentialChangeBlock = await getCourierGuyCredentialChangeBlock(
+    protectedCredentialEnvironments,
+  );
 
-    if (blockingShipment) {
-      return {
-        ok: false,
-        message: blockingShipment.environment
-          ? `The ${blockingShipment.environment} Courier Guy account code or bearer token cannot be changed while active ${blockingShipment.environment} shipments still need tracking, waybills, or cancellation. Complete or cancel those shipments first.`
-          : "Courier Guy credentials cannot be changed while a booking is in progress. Wait for it to finish, then try again.",
-      };
-    }
+  if (credentialChangeBlock) {
+    return {
+      ok: false,
+      message: credentialChangeBlock,
+    };
   }
 
   const nextLiveApiKeyPlain = courierGuyLiveApiKey ?? existingLiveApiKey;
@@ -1261,14 +1421,6 @@ export async function updateMarketplaceShippingSettings({
     };
   }
 
-  if (shippingEnabled && courierGuyEnabled && courierGuyMode !== "live") {
-    return {
-      ok: false,
-      message:
-        "Switch The Courier Guy to live mode before enabling nationwide customer checkout. Sandbox mode is for configuration and testing only.",
-    };
-  }
-
   if (courierGuyEnabled && !resolvedPickupPointId) {
     return {
       ok: false,
@@ -1327,7 +1479,15 @@ export async function updateMarketplaceShippingSettings({
     });
   });
 
-  return { ok: true, message: "Shipping settings saved." };
+  return {
+    courierGuyCredentials: {
+      hasLiveApiKey: Boolean(nextLiveApiKeyEncrypted),
+      hasSandboxApiKey: Boolean(nextSandboxApiKeyEncrypted),
+      hasWebhookToken: Boolean(nextWebhookToken),
+    },
+    ok: true,
+    message: "Shipping settings saved.",
+  };
 }
 
 export async function updateMarketplaceWhatsappSettings({

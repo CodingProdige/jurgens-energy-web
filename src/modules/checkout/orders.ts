@@ -25,6 +25,7 @@ import {
   getCheckoutFulfillmentProvider,
   getCheckoutDeliveryGroupKey,
 } from "@/src/modules/checkout/delivery";
+import { hasCourierGuySandboxCheckoutAccess } from "@/src/modules/checkout/sandbox-access";
 import type { CurrencyContext } from "@/src/modules/currency";
 import { validateJurgensDeliveryScheduleSelection } from "@/src/modules/delivery-scheduling/jurgens";
 import {
@@ -342,6 +343,8 @@ export async function createHostedCheckoutOrder(
     cart.items.reduce((total, item) => total + item.lineTotalZar, 0),
   );
   const deliveryEvaluation = await evaluateCustomerDelivery({
+    allowCourierGuySandboxCheckout:
+      hasCourierGuySandboxCheckoutAccess(session?.user),
     deliveryAddress: checkoutDetails.deliveryAddress,
     items: cart.items,
     orderSubtotal: subtotal,

@@ -1,7 +1,9 @@
+import { auth } from "@/auth";
 import {
   checkoutQuoteRequestSchema,
 } from "@/src/modules/checkout/contracts";
 import { getCheckoutDeliveryQuotes } from "@/src/modules/checkout/delivery";
+import { hasCourierGuySandboxCheckoutAccess } from "@/src/modules/checkout/sandbox-access";
 import {
   checkRateLimit,
   getClientIp,
@@ -45,7 +47,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await getCheckoutDeliveryQuotes(parsed.data);
+    const session = await auth();
+    const result = await getCheckoutDeliveryQuotes(parsed.data, {
+      allowCourierGuySandboxCheckout:
+        hasCourierGuySandboxCheckoutAccess(session?.user),
+    });
 
     return Response.json(result, {
       headers: { "Cache-Control": "private, no-store" },

@@ -58,10 +58,12 @@ function courierServiceabilityItems(
 }
 
 export async function evaluateCustomerDelivery({
+  allowCourierGuySandboxCheckout = false,
   deliveryAddress,
   items,
   orderSubtotal,
 }: {
+  allowCourierGuySandboxCheckout?: boolean;
   deliveryAddress: CheckoutDeliveryAddress;
   items: ValidatedCartItem[];
   orderSubtotal: number;
@@ -75,8 +77,11 @@ export async function evaluateCustomerDelivery({
   }
 
   const settings = await getMarketplaceSettings();
+  const isAuthorizedSandboxCheckout =
+    settings.courierGuyMode === "sandbox" &&
+    allowCourierGuySandboxCheckout;
 
-  if (!settings.shippingEnabled) {
+  if (!settings.shippingEnabled && !isAuthorizedSandboxCheckout) {
     return {
       eligible: false,
       unavailableReason: "Online delivery is temporarily unavailable.",
@@ -89,6 +94,19 @@ export async function evaluateCustomerDelivery({
   const hasJurgensItems = items.some(
     (item) => item.fulfillmentMode === "jurgens_fulfilled",
   );
+
+  if (
+    hasCourierItems &&
+    settings.courierGuyMode === "sandbox" &&
+    !isAuthorizedSandboxCheckout
+  ) {
+    return {
+      eligible: false,
+      unavailableReason:
+        "Nationwide courier delivery is temporarily unavailable.",
+    };
+  }
+
   const courierUnitCount = countCourierGuyUnits(items);
 
   if (courierUnitCount > MAX_COURIER_GUY_UNITS_PER_ORDER) {

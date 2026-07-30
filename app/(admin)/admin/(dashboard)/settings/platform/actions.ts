@@ -13,6 +13,7 @@ import {
   updateMarketplaceMediaSettings,
   updateMarketplaceOpenAiSettings,
   updateMarketplacePayFastSettings,
+  updateMarketplaceCourierGuyCredentials,
   updateMarketplaceShippingSettings,
   updateMarketplaceWhatsappSettings,
 } from "@/src/modules/marketplace/settings";
@@ -34,6 +35,11 @@ import {
 } from "@/src/modules/notifications/templates";
 
 export type AdminSettingsState = {
+  courierGuyCredentials?: {
+    hasLiveApiKey: boolean;
+    hasSandboxApiKey: boolean;
+    hasWebhookToken: boolean;
+  };
   message?: string;
   ok?: boolean;
 };
@@ -547,6 +553,15 @@ const shippingSettingsSchema = z.object({
   ),
 });
 
+const courierGuyCredentialSettingsSchema = shippingSettingsSchema.pick({
+  courierGuyLiveAccountCode: true,
+  courierGuyLiveApiKey: true,
+  courierGuyMode: true,
+  courierGuySandboxAccountCode: true,
+  courierGuySandboxApiKey: true,
+  courierGuyWebhookToken: true,
+});
+
 const whatsappOptionalTimeSchema = z
   .string()
   .trim()
@@ -820,6 +835,10 @@ export async function updateShippingIntegrationSettings(
     actorUserId: session.user.id,
   });
 
+  if (!result.ok) {
+    return result;
+  }
+
   revalidatePath("/");
   revalidatePath("/delivery-information");
   revalidatePath("/faq");
@@ -828,6 +847,43 @@ export async function updateShippingIntegrationSettings(
   revalidatePath("/settings/platform");
 
   return result;
+}
+
+export async function updateCourierGuyCredentialSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireSettingsManageAccess();
+  const parsed = courierGuyCredentialSettingsSchema.safeParse({
+    courierGuyLiveAccountCode: formData.get("courierGuyLiveAccountCode"),
+    courierGuyLiveApiKey: String(
+      formData.get("courierGuyLiveApiKey") ?? "",
+    ),
+    courierGuyMode: String(formData.get("courierGuyMode") ?? "sandbox"),
+    courierGuySandboxAccountCode: formData.get(
+      "courierGuySandboxAccountCode",
+    ),
+    courierGuySandboxApiKey: String(
+      formData.get("courierGuySandboxApiKey") ?? "",
+    ),
+    courierGuyWebhookToken: String(
+      formData.get("courierGuyWebhookToken") ?? "",
+    ),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ??
+        "Check the Courier Guy credentials.",
+    };
+  }
+
+  return updateMarketplaceCourierGuyCredentials({
+    ...parsed.data,
+    actorUserId: session.user.id,
+  });
 }
 
 const jurgensDeliveryZoneSchema = z.object({

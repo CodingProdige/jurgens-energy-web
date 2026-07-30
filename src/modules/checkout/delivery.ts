@@ -86,6 +86,9 @@ export function getCheckoutFulfillmentProvider(item: {
 
 export async function getCheckoutDeliveryQuotes(
   input: CheckoutQuoteRequest,
+  context: {
+    allowCourierGuySandboxCheckout?: boolean;
+  } = {},
 ): Promise<CheckoutQuoteResponse> {
   const parsed = checkoutQuoteRequestSchema.parse(input);
   const cart = await validateCartLines({ items: parsed.items }, zarCurrencyContext);
@@ -132,6 +135,8 @@ export async function getCheckoutDeliveryQuotes(
   });
 
   const evaluation = await evaluateCustomerDelivery({
+    allowCourierGuySandboxCheckout:
+      context.allowCourierGuySandboxCheckout,
     deliveryAddress: {
       ...parsed.deliveryAddress,
       countryCode: normalizedAddress.countryCode,

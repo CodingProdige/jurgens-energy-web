@@ -284,6 +284,7 @@ export const courierGuyPickupPointsInputSchema = z
   .object({
     limit: z.number().int().min(1).max(50).default(20),
     offset: z.number().int().min(0).default(0),
+    orderClosest: z.boolean().optional(),
     pickupPointId: z.string().trim().min(1).max(120).optional(),
     pickupPointProvider: z.string().trim().min(1).max(80).optional(),
     search: z.string().trim().min(1).max(120).optional(),
@@ -293,14 +294,6 @@ export const courierGuyPickupPointsInputSchema = z
   .superRefine((input, context) => {
     const hasPickupPointId = input.pickupPointId !== undefined;
     const hasPickupPointProvider = input.pickupPointProvider !== undefined;
-
-    if (!input.search && !hasPickupPointId) {
-      context.addIssue({
-        code: "custom",
-        message: "Provide a search term or pickup-point ID.",
-        path: ["search"],
-      });
-    }
 
     if (hasPickupPointId !== hasPickupPointProvider) {
       context.addIssue({
@@ -712,6 +705,10 @@ async function getPickupPoints(
 
   if (parsed.type) {
     query.set("type", parsed.type);
+  }
+
+  if (parsed.orderClosest) {
+    query.set("order_closest", "true");
   }
 
   if (parsed.pickupPointId) {

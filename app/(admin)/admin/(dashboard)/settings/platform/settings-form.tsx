@@ -78,6 +78,7 @@ import {
   deleteJurgensDeliveryZoneSettings,
   saveJurgensDeliveryZoneSettings,
   updatePayFastPaymentSettings,
+  updateCourierGuyCredentialSettings,
   updateShippingIntegrationSettings,
   updateWhatsappOrderingSettings,
   type AdminSettingsState,
@@ -167,9 +168,9 @@ function SecretTextInput({
   }, [defaultValue, value]);
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       {icon === "key" ? (
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+        <span className="pointer-events-none absolute top-1/2 left-2.5 z-10 -translate-y-1/2">
           <KeyRoundIcon className="size-4 text-zinc-400" />
         </span>
       ) : null}
@@ -189,20 +190,18 @@ function SecretTextInput({
         }}
         minLength={minLength}
         placeholder={placeholder}
-        className={cn(icon === "key" ? "pl-10 pr-12" : "pr-12", className)}
+        className={cn("h-8 pr-9", icon === "key" && "pl-8", className)}
       />
-      <span className="absolute inset-y-0 right-2 flex items-center">
-        <Button
-          aria-label={isVisible ? "Hide value" : "Show value"}
-          className="size-7 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
-          onClick={() => setIsVisible((current) => !current)}
-          size="icon-sm"
-          type="button"
-          variant="ghost"
-        >
-          <Icon className="size-4" />
-        </Button>
-      </span>
+      <Button
+        aria-label={isVisible ? "Hide value" : "Show value"}
+        className="absolute top-1/2 right-0.5 size-7 -translate-y-1/2 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+        onClick={() => setIsVisible((current) => !current)}
+        size="icon-sm"
+        type="button"
+        variant="ghost"
+      >
+        <Icon className="size-4" />
+      </Button>
     </div>
   );
 }
@@ -2145,11 +2144,13 @@ type CourierGuyPickupPointOption = {
 };
 
 type CourierGuyPickupPointSearchResponse = {
+  directoryNotice?: string | null;
   message?: string;
   ok?: boolean;
   pickupPoints?: Array<
     Omit<CourierGuyPickupPointOption, "label" | "value">
   >;
+  suggestionContext?: string | null;
 };
 
 function toCourierGuyPickupPointOption(
@@ -2238,6 +2239,10 @@ function CourierGuyPickupPointCombobox({
     "live" | "sandbox"
   >(mode);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [directoryNotice, setDirectoryNotice] = useState<string | null>(null);
+  const [suggestionContext, setSuggestionContext] = useState<string | null>(
+    null,
+  );
   const [isSearching, setIsSearching] = useState(false);
   const previousModeRef = useRef(mode);
   const trimmedSearchValue = searchValue.trim();
@@ -2266,9 +2271,11 @@ function CourierGuyPickupPointCombobox({
 
     previousModeRef.current = mode;
     setIsSearching(false);
+    setDirectoryNotice(null);
     setSearchError(null);
     setSearchResults([]);
     setSearchResultsMode(mode);
+    setSuggestionContext(null);
     setSearchValue("");
   }, [mode]);
 
@@ -2276,26 +2283,33 @@ function CourierGuyPickupPointCombobox({
     if (
       !enabled ||
       !hasSavedApiKey ||
-      trimmedSearchValue.length < 2
+      trimmedSearchValue.length === 1
     ) {
       setIsSearching(false);
+      setDirectoryNotice(null);
       setSearchError(null);
       setSearchResults([]);
       setSearchResultsMode(mode);
+      setSuggestionContext(null);
       return;
     }
 
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       setIsSearching(true);
+      setDirectoryNotice(null);
       setSearchError(null);
 
       try {
         const query = new URLSearchParams({
           limit: "20",
           mode,
-          q: trimmedSearchValue,
         });
+
+        if (trimmedSearchValue.length >= 2) {
+          query.set("q", trimmedSearchValue);
+        }
+
         const response = await fetch(
           `/settings/platform/courier-guy-pickup-points?${query.toString()}`,
           {
@@ -2314,6 +2328,8 @@ function CourierGuyPickupPointCombobox({
         if (!response.ok || !result.ok) {
           setSearchResults([]);
           setSearchResultsMode(mode);
+          setDirectoryNotice(null);
+          setSuggestionContext(null);
           setSearchError(
             result.message ??
               "Courier Guy pickup points could not be searched.",
@@ -2327,10 +2343,14 @@ function CourierGuyPickupPointCombobox({
             .map(toCourierGuyPickupPointOption),
         );
         setSearchResultsMode(mode);
+        setDirectoryNotice(result.directoryNotice ?? null);
+        setSuggestionContext(result.suggestionContext ?? null);
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
           setSearchResults([]);
           setSearchResultsMode(mode);
+          setDirectoryNotice(null);
+          setSuggestionContext(null);
           setSearchError(
             "Courier Guy pickup points could not be searched.",
           );
@@ -2340,7 +2360,7 @@ function CourierGuyPickupPointCombobox({
           setIsSearching(false);
         }
       }
-    }, 350);
+    }, trimmedSearchValue.length >= 2 ? 350 : 0);
 
     return () => {
       controller.abort();
@@ -2351,11 +2371,22 @@ function CourierGuyPickupPointCombobox({
   let statusMessage: string | null = null;
 
   if (isSearching) {
-    statusMessage = "Searching Courier Guy pickup points…";
+    statusMessage = trimmedSearchValue
+      ? "Searching Courier Guy pickup points…"
+      : "Loading pickup points near the Jurgens collection address…";
   } else if (searchError) {
     statusMessage = searchError;
-  } else if (trimmedSearchValue.length < 2) {
+  } else if (directoryNotice) {
+    statusMessage = directoryNotice;
+  } else if (trimmedSearchValue.length === 1) {
     statusMessage = "Enter at least two characters to search.";
+  } else if (!trimmedSearchValue && activeSearchResults.length > 0) {
+    statusMessage = suggestionContext
+      ? `Suggested near ${suggestionContext}. Type to search anywhere in South Africa.`
+      : "Suggested pickup points. Type to search anywhere in South Africa.";
+  } else if (!trimmedSearchValue) {
+    statusMessage =
+      "No nearby pickup points were found. Type at least two characters to search elsewhere.";
   } else if (activeSearchResults.length === 0) {
     statusMessage = `No pickup points found for “${trimmedSearchValue}”.`;
   }
@@ -2401,9 +2432,11 @@ function CourierGuyPickupPointCombobox({
         onValueChange={(nextSelectedPoint) => {
           setSelectedPoint(nextSelectedPoint);
           setSelectedMode(nextSelectedPoint ? mode : null);
+          setDirectoryNotice(null);
           setSearchError(null);
           setSearchResults(nextSelectedPoint ? [nextSelectedPoint] : []);
           setSearchResultsMode(mode);
+          setSuggestionContext(null);
           setSearchValue("");
         }}
         value={activeSelection}
@@ -2419,7 +2452,7 @@ function CourierGuyPickupPointCombobox({
             disabled={!enabled || !hasSavedApiKey}
             placeholder={
               hasSavedApiKey
-                ? "Search by name, suburb, city or postcode"
+                ? "Search or choose a suggested pickup point"
                 : `Save the ${mode} bearer token first`
             }
             spellCheck={false}
@@ -2483,7 +2516,12 @@ function CourierGuyPickupPointCombobox({
                       </span>
                     ) : null}
                     <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                      {pickupPoint.type ?? "pickup point"} ·{" "}
+                      {pickupPoint.type === "counter"
+                        ? "staffed kiosk / counter"
+                        : pickupPoint.type === "point"
+                          ? "Parcel Point"
+                          : pickupPoint.type ?? "pickup point"}{" "}
+                      ·{" "}
                       {pickupPoint.pickupPointId}
                     </span>
                     <Combobox.ItemIndicator className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
@@ -2500,12 +2538,18 @@ function CourierGuyPickupPointCombobox({
         {hasSavedApiKey
           ? activeSelection
             ? `Selected for ${mode}: ${activeSelection.label}`
-            : `Search the ${mode} Courier Guy directory and choose where parcels will be handed in.`
-          : `Save the ${mode} account code and bearer token, then return here to search.`}
+            : `Suggested ${mode} pickup points load automatically from the Jurgens collection address. You can also search by name, suburb, city, or postcode.`
+          : `Save the ${mode} account code and bearer token above to unlock pickup-point suggestions.`}
       </p>
     </div>
   );
 }
+
+const courierGuyDropoffLabels = {
+  generic_kiosk: "Any staffed Courier Guy kiosk (recommended)",
+  generic_locker: "Any Courier Guy locker",
+  specific_pickup_point: "One fixed kiosk, locker, or Parcel Point",
+} as const;
 
 type NationwideShippingSettingsFormProps = {
   courierGuyDefaultServiceCode: string | null;
@@ -2555,8 +2599,30 @@ export function NationwideShippingSettingsForm({
   shippingFlatRate,
   shippingFreeOverAmount,
 }: NationwideShippingSettingsFormProps) {
+  const [shippingEnabledValue, setShippingEnabledValue] =
+    useState(shippingEnabled);
+  const [shippingFlatRateValue, setShippingFlatRateValue] = useState(
+    String(shippingFlatRate),
+  );
+  const [shippingFreeOverAmountValue, setShippingFreeOverAmountValue] =
+    useState(shippingFreeOverAmount === null ? "" : String(shippingFreeOverAmount));
+  const [jurgensDeliveryCutoffTimeValue, setJurgensDeliveryCutoffTimeValue] =
+    useState(jurgensDeliveryCutoffTime);
+  const [courierGuyEnabledValue, setCourierGuyEnabledValue] =
+    useState(courierGuyEnabled);
   const [apiMode, setApiMode] = useState<"live" | "sandbox">(
     courierGuyMode,
+  );
+  const [courierGuyDefaultServiceCodeValue, setCourierGuyDefaultServiceCodeValue] =
+    useState(courierGuyDefaultServiceCode ?? "");
+  const [courierGuySandboxAccountCodeValue, setCourierGuySandboxAccountCodeValue] =
+    useState(courierGuySandboxAccountCode ?? "");
+  const [courierGuySandboxApiKeyValue, setCourierGuySandboxApiKeyValue] =
+    useState(courierGuySandboxApiKey ?? "");
+  const [courierGuyLiveAccountCodeValue, setCourierGuyLiveAccountCodeValue] =
+    useState(courierGuyLiveAccountCode ?? "");
+  const [courierGuyLiveApiKeyValue, setCourierGuyLiveApiKeyValue] = useState(
+    courierGuyLiveApiKey ?? "",
   );
   const [dropoffType, setDropoffType] = useState<
     NationwideShippingSettingsFormProps["courierGuyDropoffType"]
@@ -2569,6 +2635,23 @@ export function NationwideShippingSettingsForm({
     updateShippingIntegrationSettings,
     initialState,
   );
+  const [
+    credentialState,
+    credentialFormAction,
+    credentialsArePending,
+  ] = useActionState(updateCourierGuyCredentialSettings, initialState);
+  const hasActiveLiveApiKey =
+    credentialState.courierGuyCredentials?.hasLiveApiKey ??
+    state.courierGuyCredentials?.hasLiveApiKey ??
+    hasCourierGuyLiveApiKey;
+  const hasActiveSandboxApiKey =
+    credentialState.courierGuyCredentials?.hasSandboxApiKey ??
+    state.courierGuyCredentials?.hasSandboxApiKey ??
+    hasCourierGuySandboxApiKey;
+  const hasActiveWebhookToken =
+    credentialState.courierGuyCredentials?.hasWebhookToken ??
+    state.courierGuyCredentials?.hasWebhookToken ??
+    hasCourierGuyWebhookToken;
   const courierGuyWebhookSubscriptionUrl = (() => {
     const url = new URL(courierGuyWebhookUrl);
 
@@ -2580,6 +2663,15 @@ export function NationwideShippingSettingsForm({
 
     return url.toString();
   })();
+
+  useEffect(() => {
+    if (!credentialState.ok && !state.ok) {
+      return;
+    }
+
+    setCourierGuyLiveApiKeyValue("");
+    setCourierGuySandboxApiKeyValue("");
+  }, [credentialState, state]);
 
   return (
     <div className="grid gap-6">
@@ -2602,16 +2694,22 @@ export function NationwideShippingSettingsForm({
           </div>
 
           <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
-            <Checkbox name="shippingEnabled" defaultChecked={shippingEnabled} />
-            <span>
-              <span className="block font-semibold text-zinc-950 dark:text-white">
-                Enable online delivery
+            <Checkbox
+              checked={shippingEnabledValue}
+              name="shippingEnabled"
+              onCheckedChange={setShippingEnabledValue}
+            />
+              <span>
+                <span className="block font-semibold text-zinc-950 dark:text-white">
+                  Enable public online delivery
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  Applies the policy below throughout South Africa. Jurgens-only
+                  products must also match an active postcode eligibility zone.
+                  Signed-in settings administrators can test a saved sandbox
+                  setup even while this public switch is off.
+                </span>
               </span>
-              <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                Applies the policy below throughout South Africa. Jurgens-only
-                products must also match an active postcode eligibility zone.
-              </span>
-            </span>
           </label>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -2626,7 +2724,10 @@ export function NationwideShippingSettingsForm({
                 min={0}
                 max={1_000_000}
                 step="0.01"
-                defaultValue={shippingFlatRate}
+                value={shippingFlatRateValue}
+                onChange={(event) =>
+                  setShippingFlatRateValue(event.target.value)
+                }
                 required
               />
             </div>
@@ -2641,7 +2742,10 @@ export function NationwideShippingSettingsForm({
                 min="0.01"
                 max={1_000_000}
                 step="0.01"
-                defaultValue={shippingFreeOverAmount ?? ""}
+                value={shippingFreeOverAmountValue}
+                onChange={(event) =>
+                  setShippingFreeOverAmountValue(event.target.value)
+                }
                 placeholder="Leave blank to disable"
               />
               <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
@@ -2659,7 +2763,10 @@ export function NationwideShippingSettingsForm({
               id="jurgensDeliveryCutoffTime"
               name="jurgensDeliveryCutoffTime"
               type="time"
-              defaultValue={jurgensDeliveryCutoffTime}
+              value={jurgensDeliveryCutoffTimeValue}
+              onChange={(event) =>
+                setJurgensDeliveryCutoffTimeValue(event.target.value)
+              }
             />
           </div>
 
@@ -2695,8 +2802,9 @@ export function NationwideShippingSettingsForm({
 
           <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
             <Checkbox
+              checked={courierGuyEnabledValue}
               name="courierGuyEnabled"
-              defaultChecked={courierGuyEnabled}
+              onCheckedChange={setCourierGuyEnabledValue}
             />
             <span className="font-semibold text-zinc-950 dark:text-white">
               Enable new Courier Guy bookings
@@ -2715,8 +2823,10 @@ export function NationwideShippingSettingsForm({
                   }
                 }}
               >
-                <SelectTrigger id="courierGuyMode">
-                  <SelectValue />
+                <SelectTrigger className="w-full" id="courierGuyMode">
+                  <SelectValue>
+                    {apiMode === "live" ? "Live" : "Sandbox"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sandbox">Sandbox</SelectItem>
@@ -2724,8 +2834,9 @@ export function NationwideShippingSettingsForm({
                 </SelectContent>
               </Select>
               <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                Nationwide customer checkout requires Live. Sandbox can only be
-                saved while online shipping is disabled.
+                Sandbox supports end-to-end checkout testing for signed-in
+                administrators. Ordinary customers and Google Merchant Center
+                remain blocked from sandbox courier delivery.
               </p>
             </div>
             <div className="grid gap-2">
@@ -2735,11 +2846,27 @@ export function NationwideShippingSettingsForm({
               <Input
                 id="courierGuyDefaultServiceCode"
                 name="courierGuyDefaultServiceCode"
-                defaultValue={courierGuyDefaultServiceCode ?? ""}
+                value={courierGuyDefaultServiceCodeValue}
+                onChange={(event) =>
+                  setCourierGuyDefaultServiceCodeValue(event.target.value)
+                }
                 placeholder="Optional; cheapest available when blank"
               />
             </div>
           </div>
+
+          {apiMode === "sandbox" ? (
+            <Alert className="border-amber-400/50 bg-amber-50 dark:border-amber-400/30 dark:bg-amber-400/10">
+              <TriangleAlertIcon />
+              <AlertTitle>Sandbox test mode</AlertTitle>
+              <AlertDescription>
+                Your signed-in admin account can test the full checkout delivery
+                flow with sandbox quotes after this Courier Guy setup is saved.
+                Ordinary customers and Google Merchant Center will not receive
+                sandbox courier delivery.
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
@@ -2750,22 +2877,32 @@ export function NationwideShippingSettingsForm({
                 id="courierGuySandboxAccountCode"
                 name="courierGuySandboxAccountCode"
                 maxLength={64}
-                defaultValue={courierGuySandboxAccountCode ?? ""}
+                value={courierGuySandboxAccountCodeValue}
+                onChange={(event) =>
+                  setCourierGuySandboxAccountCodeValue(event.target.value)
+                }
                 placeholder="For example, JUR001"
                 type="text"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="courierGuySandboxApiKey">
-                Sandbox bearer token
+              <Label
+                className="flex items-center justify-between gap-2"
+                htmlFor="courierGuySandboxApiKey"
+              >
+                <span>Sandbox bearer token</span>
+                {hasActiveSandboxApiKey ? (
+                  <Badge variant="outline">Saved securely</Badge>
+                ) : null}
               </Label>
               <SecretTextInput
                 id="courierGuySandboxApiKey"
                 name="courierGuySandboxApiKey"
                 icon="key"
-                defaultValue={courierGuySandboxApiKey}
+                value={courierGuySandboxApiKeyValue}
+                onValueChange={setCourierGuySandboxApiKeyValue}
                 placeholder={
-                  hasCourierGuySandboxApiKey
+                  hasActiveSandboxApiKey
                     ? "Saved — leave blank to keep it"
                     : "Paste sandbox API token"
                 }
@@ -2779,22 +2916,32 @@ export function NationwideShippingSettingsForm({
                 id="courierGuyLiveAccountCode"
                 name="courierGuyLiveAccountCode"
                 maxLength={64}
-                defaultValue={courierGuyLiveAccountCode ?? ""}
+                value={courierGuyLiveAccountCodeValue}
+                onChange={(event) =>
+                  setCourierGuyLiveAccountCodeValue(event.target.value)
+                }
                 placeholder="For example, JUR082"
                 type="text"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="courierGuyLiveApiKey">
-                Live bearer token
+              <Label
+                className="flex items-center justify-between gap-2"
+                htmlFor="courierGuyLiveApiKey"
+              >
+                <span>Live bearer token</span>
+                {hasActiveLiveApiKey ? (
+                  <Badge variant="outline">Saved securely</Badge>
+                ) : null}
               </Label>
               <SecretTextInput
                 id="courierGuyLiveApiKey"
                 name="courierGuyLiveApiKey"
                 icon="key"
-                defaultValue={courierGuyLiveApiKey}
+                value={courierGuyLiveApiKeyValue}
+                onValueChange={setCourierGuyLiveApiKeyValue}
                 placeholder={
-                  hasCourierGuyLiveApiKey
+                  hasActiveLiveApiKey
                     ? "Saved — leave blank to keep it"
                     : "Paste live API token"
                 }
@@ -2806,12 +2953,49 @@ export function NationwideShippingSettingsForm({
             bearer token scopes API requests to that account; the code is kept
             for configuration checks and shipment audit history. Account codes
             and tokens cannot be rotated while that environment has active
-            shipments.
+            shipments. Secret inputs intentionally reopen blank after a browser
+            refresh; a “Saved securely” badge confirms the encrypted value is
+            still stored, and leaving the input blank keeps it.
           </p>
+
+          <div className="grid gap-2">
+            <Button
+              className="w-fit gap-2"
+              disabled={credentialsArePending}
+              formAction={credentialFormAction}
+              type="submit"
+              variant="outline"
+            >
+              <SaveIcon className="size-4" />
+              {credentialsArePending
+                ? "Saving credentials..."
+                : "Save Courier Guy credentials"}
+            </Button>
+            {credentialState.message ? (
+              <p
+                aria-live="polite"
+                className={cn(
+                  "text-xs leading-5",
+                  credentialState.ok
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : "text-red-700 dark:text-red-300",
+                )}
+              >
+                {credentialState.message}
+              </p>
+            ) : (
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Save credentials independently to unlock pickup-point search.
+                This does not enable customer delivery or create a booking.
+              </p>
+            )}
+          </div>
 
           <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="courierGuyDropoffType">Drop-off method</Label>
+              <Label htmlFor="courierGuyDropoffType">
+                Where will Jurgens hand parcels in?
+              </Label>
               <Select
                 name="courierGuyDropoffType"
                 value={dropoffType}
@@ -2825,28 +3009,40 @@ export function NationwideShippingSettingsForm({
                   }
                 }}
               >
-                <SelectTrigger id="courierGuyDropoffType">
-                  <SelectValue />
+                <SelectTrigger
+                  className="w-full"
+                  id="courierGuyDropoffType"
+                >
+                  <SelectValue>
+                    {courierGuyDropoffLabels[dropoffType]}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="generic_kiosk">
-                    Any Courier Guy kiosk
+                    {courierGuyDropoffLabels.generic_kiosk}
                   </SelectItem>
                   <SelectItem value="generic_locker">
-                    Any Courier Guy locker
+                    {courierGuyDropoffLabels.generic_locker}
                   </SelectItem>
                   <SelectItem value="specific_pickup_point">
-                    Specific pickup point
+                    {courierGuyDropoffLabels.specific_pickup_point}
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                {dropoffType === "generic_kiosk"
+                  ? "Use this for your normal staffed counter hand-in. No branch ID is needed—you can use the Paarl kiosk or any other Courier Guy kiosk."
+                  : dropoffType === "generic_locker"
+                    ? "Use this only when every parcel will be placed in a self-service Courier Guy locker. Locker size, weight, and access limits apply."
+                    : "Use this only when operations require every parcel to be handed to one exact kiosk, locker, or partner Parcel Point."}
+              </p>
             </div>
             <CourierGuyPickupPointCombobox
               enabled={dropoffType === "specific_pickup_point"}
               hasSavedApiKey={
                 apiMode === "live"
-                  ? hasCourierGuyLiveApiKey
-                  : hasCourierGuySandboxApiKey
+                  ? hasActiveLiveApiKey
+                  : hasActiveSandboxApiKey
               }
               initialMode={courierGuyMode}
               initialPickupPointId={
@@ -2866,8 +3062,14 @@ export function NationwideShippingSettingsForm({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="courierGuyWebhookToken">
-                Webhook shared token
+              <Label
+                className="flex items-center justify-between gap-2"
+                htmlFor="courierGuyWebhookToken"
+              >
+                <span>Webhook shared token</span>
+                {hasActiveWebhookToken ? (
+                  <Badge variant="outline">Saved securely</Badge>
+                ) : null}
               </Label>
               <SecretTextInput
                 id="courierGuyWebhookToken"
@@ -2880,9 +3082,9 @@ export function NationwideShippingSettingsForm({
                   setCourierGuyWebhookUrlCopied(false);
                 }}
                 placeholder={
-                  hasCourierGuyWebhookToken
+                  hasActiveWebhookToken
                     ? "Saved — leave blank to keep it"
-                  : "Create a strong shared token"
+                    : "Create a strong shared token"
                 }
               />
               <Button
@@ -2893,12 +3095,11 @@ export function NationwideShippingSettingsForm({
                   );
                   setCourierGuyWebhookUrlCopied(false);
                 }}
-                size="sm"
                 type="button"
                 variant="outline"
               >
-                <RotateCcwIcon className="size-3.5" />
-                {hasCourierGuyWebhookToken
+                <RotateCcwIcon className="size-4" />
+                {hasActiveWebhookToken
                   ? "Generate replacement"
                   : "Generate token"}
               </Button>
@@ -2915,7 +3116,7 @@ export function NationwideShippingSettingsForm({
                   value={courierGuyWebhookSubscriptionUrl}
                 />
                 <Button
-                  className="h-10 shrink-0 gap-2"
+                  className="h-8 shrink-0 gap-2"
                   disabled={!courierGuyWebhookTokenValue.trim()}
                   onClick={async () => {
                     await navigator.clipboard.writeText(

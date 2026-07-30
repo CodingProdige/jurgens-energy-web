@@ -492,6 +492,35 @@ test("accepts null pickup-point results and omitted optional fields", async () =
   );
 });
 
+test("requests city pickup-point suggestions ordered by proximity", async () => {
+  let capturedUrl;
+  const client = createCourierGuyClient(config, {
+    fetchImpl: async (url) => {
+      capturedUrl = String(url);
+      return jsonResponse({
+        count: 0,
+        pickup_points: null,
+      });
+    },
+  });
+
+  assert.deepEqual(
+    await client.getPickupPoints({
+      limit: 10,
+      orderClosest: true,
+      search: "Paarl",
+    }),
+    {
+      count: 0,
+      pickupPoints: [],
+    },
+  );
+  assert.equal(
+    capturedUrl,
+    `${COURIER_GUY_LIVE_API_BASE_URL}/pickup-points?search=Paarl&order_closest=true&limit=10&offset=0`,
+  );
+});
+
 test("rejects malformed pickup-point response envelopes", async () => {
   const client = createCourierGuyClient(config, {
     fetchImpl: async () => jsonResponse({ pickup_points: "not-an-array" }),

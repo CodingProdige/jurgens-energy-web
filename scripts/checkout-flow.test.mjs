@@ -8,9 +8,42 @@ import {
   isCheckoutAddressStepReady,
   isCheckoutShippingStepReady,
 } from "../src/modules/checkout/flow.ts";
+import { hasCourierGuySandboxCheckoutAccess } from "../src/modules/checkout/sandbox-access.ts";
 
 test("defines the checkout steps in customer-facing order", () => {
   assert.deepEqual(CHECKOUT_STEPS, ["address", "shipping", "payment"]);
+});
+
+test("restricts Courier Guy sandbox checkout to settings-managing admins", () => {
+  assert.equal(hasCourierGuySandboxCheckoutAccess(null), false);
+  assert.equal(
+    hasCourierGuySandboxCheckoutAccess({
+      adminCapabilities: ["admin.settings.manage"],
+      roles: ["customer"],
+    }),
+    false,
+  );
+  assert.equal(
+    hasCourierGuySandboxCheckoutAccess({
+      adminCapabilities: ["admin.settings.view"],
+      roles: ["admin"],
+    }),
+    false,
+  );
+  assert.equal(
+    hasCourierGuySandboxCheckoutAccess({
+      adminCapabilities: ["admin.settings.manage"],
+      roles: ["admin"],
+    }),
+    true,
+  );
+  assert.equal(
+    hasCourierGuySandboxCheckoutAccess({
+      adminCapabilities: ["admin.settings.manage"],
+      roles: ["superadmin"],
+    }),
+    true,
+  );
 });
 
 test("returns null when no checkout shipping options are available", () => {
