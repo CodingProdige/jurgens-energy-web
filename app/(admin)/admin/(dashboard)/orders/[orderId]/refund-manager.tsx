@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 
 import {
+  type CancellationReviewMutationState,
   reconcileRefundAction,
+  resolveRefundShipmentCancellationReviewAction,
+  retryRefundShipmentCancellationAction,
   submitRefundAction,
   type RefundMutationState,
 } from "@/app/(admin)/admin/(dashboard)/orders/[orderId]/actions";
@@ -54,9 +57,25 @@ export type AdminRefundableInvoiceLine = {
 
 export type AdminOrderRefund = {
   amountCents: number;
+  cancelOpenShipments: boolean;
   createdAt: string;
   creditNoteNumber: string | null;
   id: string;
+  fulfillmentActions: Array<{
+    attempts: number;
+    id: string;
+    lastError: string | null;
+    provider: string;
+    shipmentId: string;
+    shipmentStatus: string;
+    status:
+      | "completed"
+      | "failed"
+      | "manual_review"
+      | "pending"
+      | "processing";
+    trackingReference: string | null;
+  }>;
   kind: "full" | "partial";
   manualActionReason: string | null;
   method:
@@ -65,6 +84,7 @@ export type AdminOrderRefund = {
     | "not_available"
     | "unknown";
   reason: string;
+  requestedRestockQuantity: number;
   status: AdminRefundStatus;
 };
 
@@ -85,6 +105,7 @@ type DraftAllocation = {
 };
 
 const initialMutationState: RefundMutationState = {};
+const initialCancellationReviewState: CancellationReviewMutationState = {};
 
 const statusLabels: Record<AdminRefundStatus, string> = {
   completed: "Completed",
@@ -203,6 +224,152 @@ function ReconcileRefundButton({
   );
 }
 
+function ManualCancellationReview({
+  action,
+  orderId,
+}: {
+  action: AdminOrderRefund["fulfillmentActions"][number];
+  orderId: string;
+}) {
+  const [resolveState, resolveFormAction, resolving] = useActionState(
+    resolveRefundShipmentCancellationReviewAction,
+    initialCancellationReviewState,
+  );
+  const [retryState, retryFormAction, retrying] = useActionState(
+    retryRefundShipmentCancellationAction,
+    initialCancellationReviewState,
+  );
+  const [acknowledgedRetry, setAcknowledgedRetry] = useState(false);
+  const retryEligible =
+    action.provider === "courier_guy" &&
+    ["booked", "waybill_ready", "cancelling"].includes(
+      action.shipmentStatus,
+    );
+  const pending = resolving || retrying;
+  const noteId = `cancellation-review-note-${action.id}`;
+
+  return (
+    <details className="mt-3 overflow-hidden rounded-lg border border-amber-300 bg-white/70 dark:border-amber-500/30 dark:bg-black/15">
+      <summary className="cursor-pointer px-3 py-2 font-semibold marker:text-amber-600">
+        Resolve this manual review
+      </summary>
+      <form
+        action={resolveFormAction}
+        className="grid min-w-0 gap-3 border-t border-amber-200 p-3 dark:border-amber-500/20"
+      >
+        <input name="jobId" type="hidden" value={action.id} />
+        <input name="orderId" type="hidden" value={orderId} />
+        <input
+          name="acknowledgeProviderOutcome"
+          type="hidden"
+          value={acknowledgedRetry ? "confirmed" : ""}
+        />
+
+        <div className="grid gap-1 text-xs leading-5">
+          <p className="font-semibold">
+            Verify the real-world outcome before choosing an action.
+          </p>
+          <p className="opacity-80">
+            {action.provider === "courier_guy"
+              ? `Check The Courier Guy portal or support${
+                  action.trackingReference
+                    ? ` using ${action.trackingReference}`
+                    : ""
+                }.`
+              : "Confirm the parcel and driver status with the Jurgens delivery team."}{" "}
+            Do not infer the outcome from this page alone.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor={noteId}>Verification note *</Label>
+          <Textarea
+            className="min-h-20 resize-y bg-white text-sm dark:bg-black/20"
+            disabled={pending}
+            id={noteId}
+            maxLength={1_000}
+            minLength={10}
+            name="verificationNote"
+            placeholder="Who or what you checked, when, and the confirmed outcome"
+            required
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button
+            className="h-8 rounded-lg"
+            disabled={pending}
+            name="resolution"
+            type="submit"
+            value="confirmed_cancelled"
+            variant="outline"
+          >
+            {resolving ? (
+              <LoaderCircleIcon className="size-3.5 animate-spin" />
+            ) : (
+              <CheckCircle2Icon className="size-3.5" />
+            )}
+            Provider confirms cancelled
+          </Button>
+          <Button
+            className="h-8 rounded-lg"
+            disabled={pending}
+            name="resolution"
+            type="submit"
+            value="shipment_not_cancelled"
+            variant="outline"
+          >
+            Not cancelled — keep shipment state
+          </Button>
+        </div>
+
+        {retryEligible ? (
+          <div className="grid gap-2 rounded-lg border border-red-200 bg-red-50/80 p-3 text-red-900 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-100">
+            <label className="flex items-start gap-3">
+              <Checkbox
+                checked={acknowledgedRetry}
+                className="mt-0.5"
+                disabled={pending}
+                onCheckedChange={(checked) =>
+                  setAcknowledgedRetry(checked === true)
+                }
+              />
+              <span className="text-xs leading-5">
+                I verified that the earlier cancellation was not accepted, the
+                parcel has not been handed over, and sending one new request
+                will not duplicate a successful cancellation.
+              </span>
+            </label>
+            <Button
+              className="h-8 w-fit rounded-lg"
+              disabled={pending || !acknowledgedRetry}
+              formAction={retryFormAction}
+              type="submit"
+              variant="destructive"
+            >
+              {retrying ? (
+                <LoaderCircleIcon className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCwIcon className="size-3.5" />
+              )}
+              {retrying ? "Queueing..." : "Queue one guarded retry"}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs leading-5 opacity-80">
+            A provider retry is unavailable for the current shipment state.
+            Record the verified outcome using one of the resolution actions
+            above.
+          </p>
+        )}
+
+        <MutationMessage state={resolveState} />
+        <MutationMessage state={retryState} />
+      </form>
+    </details>
+  );
+}
+
 function RefundForm({
   currency = "ZAR",
   idempotencyKey,
@@ -219,6 +386,8 @@ function RefundForm({
   );
   const [kind, setKind] = useState<"full" | "partial">("full");
   const [reason, setReason] = useState("");
+  const [restockReturnedItems, setRestockReturnedItems] = useState(false);
+  const [cancelOpenShipments, setCancelOpenShipments] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [quantityValues, setQuantityValues] = useState<Record<string, string>>(
     () =>
@@ -294,6 +463,35 @@ function RefundForm({
 
   const refundTotalCents =
     kind === "full" ? refundableBalanceCents : partialTotalCents;
+  const refundedProductQuantities = useMemo(() => {
+    if (kind === "full") {
+      return lines
+        .filter(
+          (line) =>
+            line.kind === "product" && line.refundableQuantity > 0,
+        )
+        .map((line) => ({
+          invoiceLineId: line.id,
+          quantity: line.refundableQuantity,
+        }));
+    }
+
+    const productLineIds = new Set(
+      lines
+        .filter((line) => line.kind === "product")
+        .map((line) => line.id),
+    );
+
+    return allocations
+      .filter((allocation) => productLineIds.has(allocation.invoiceLineId))
+      .map((allocation) => ({
+        invoiceLineId: allocation.invoiceLineId,
+        quantity: allocation.quantity,
+      }));
+  }, [allocations, kind, lines]);
+  const restockItems = restockReturnedItems
+    ? refundedProductQuantities
+    : [];
   const formBlocked =
     pending ||
     reason.trim().length < 3 ||
@@ -302,6 +500,7 @@ function RefundForm({
     (kind === "partial" && Boolean(allocationError));
 
   function toggleLine(line: AdminRefundableInvoiceLine, selected: boolean) {
+    setRestockReturnedItems(false);
     setSelectedIds((current) => {
       const next = new Set(current);
 
@@ -318,9 +517,19 @@ function RefundForm({
   return (
     <form action={formAction} className="contents">
       <input name="allocations" type="hidden" value={JSON.stringify(allocations)} />
+      <input
+        name="cancelOpenShipments"
+        type="hidden"
+        value={cancelOpenShipments ? "true" : "false"}
+      />
       <input name="idempotencyKey" type="hidden" value={idempotencyKey} />
       <input name="kind" type="hidden" value={kind} />
       <input name="orderId" type="hidden" value={orderId} />
+      <input
+        name="restockItems"
+        type="hidden"
+        value={JSON.stringify(restockItems)}
+      />
 
       <DialogBody className="grid gap-5">
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1 dark:bg-white/[0.05]">
@@ -334,7 +543,10 @@ function RefundForm({
               )}
               key={option}
               disabled={pending}
-              onClick={() => setKind(option)}
+              onClick={() => {
+                setKind(option);
+                setRestockReturnedItems(false);
+              }}
               type="button"
             >
               {option === "full" ? "Full remaining refund" : "Partial refund"}
@@ -476,13 +688,59 @@ function RefundForm({
           </div>
         </div>
 
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-          <p className="leading-5">
-            Refunding a payment does not restock products, cancel courier
-            bookings, or stop fulfilment. Handle those operational steps
-            separately when they apply.
-          </p>
+        <div className="grid gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+          <div className="flex items-start gap-3">
+            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+            <div>
+              <p className="font-semibold">Choose operational actions explicitly</p>
+              <p className="mt-1 text-xs leading-5 opacity-80">
+                A refund by itself does not change stock or delivery. Leave
+                these unchecked unless the conditions below are true.
+              </p>
+            </div>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-lg border border-amber-300/70 bg-white/60 p-3 dark:border-amber-400/20 dark:bg-black/10">
+            <Checkbox
+              checked={restockReturnedItems}
+              className="mt-0.5"
+              disabled={pending || refundedProductQuantities.length === 0}
+              onCheckedChange={(checked) =>
+                setRestockReturnedItems(checked === true)
+              }
+            />
+            <span>
+              <span className="block font-semibold">
+                Restock the refunded product quantities
+              </span>
+              <span className="mt-1 block text-xs leading-5 opacity-80">
+                Confirm only after the units have physically been returned and
+                inspected as saleable. Stock changes only after PayFast
+                confirms the refund.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-lg border border-amber-300/70 bg-white/60 p-3 dark:border-amber-400/20 dark:bg-black/10">
+            <Checkbox
+              checked={cancelOpenShipments}
+              className="mt-0.5"
+              disabled={pending}
+              onCheckedChange={(checked) =>
+                setCancelOpenShipments(checked === true)
+              }
+            />
+            <span>
+              <span className="block font-semibold">
+                Cancel every open delivery for this order
+              </span>
+              <span className="mt-1 block text-xs leading-5 opacity-80">
+                Use this only when fulfilment must stop. Unbooked deliveries
+                are cancelled automatically; handed-over or uncertain courier
+                shipments are flagged for manual review.
+              </span>
+            </span>
+          </label>
         </div>
 
         <MutationMessage state={state} />
@@ -619,6 +877,75 @@ export function AdminRefundManager({
                     <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
                       {refund.manualActionReason}
                     </p>
+                  ) : null}
+                  {refund.requestedRestockQuantity > 0 ? (
+                    <p className="mt-2 text-xs text-slate-600 dark:text-zinc-300">
+                      Stock action: {refund.requestedRestockQuantity} refunded
+                      unit
+                      {refund.requestedRestockQuantity === 1 ? "" : "s"}{" "}
+                      selected for restocking after provider confirmation.
+                    </p>
+                  ) : null}
+                  {refund.cancelOpenShipments ? (
+                    <div className="mt-3 grid gap-2">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-zinc-200">
+                        Delivery cancellation actions
+                      </p>
+                      {refund.fulfillmentActions.length === 0 ? (
+                        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-300">
+                          Waiting for PayFast confirmation, or no open
+                          deliveries remained when the refund completed.
+                        </p>
+                      ) : (
+                        refund.fulfillmentActions.map((action) => (
+                          <div
+                            className={cn(
+                              "rounded-lg border px-3 py-2 text-xs leading-5",
+                              action.status === "manual_review"
+                                ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100"
+                                : action.status === "completed"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+                                  : "border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-200",
+                            )}
+                            key={action.id}
+                          >
+                            <p className="font-semibold capitalize">
+                              {action.provider.replaceAll("_", " ")} ·{" "}
+                              {action.status === "completed" &&
+                              action.shipmentStatus !== "cancelled"
+                                ? "review resolved"
+                                : action.status.replaceAll("_", " ")}
+                            </p>
+                            <p className="opacity-80">
+                              Shipment is{" "}
+                              {action.shipmentStatus.replaceAll("_", " ")}.
+                            </p>
+                            {action.trackingReference ? (
+                              <p className="mt-1 break-all opacity-80">
+                                Tracking: {action.trackingReference}
+                              </p>
+                            ) : null}
+                            {action.attempts > 0 ? (
+                              <p className="mt-1 opacity-80">
+                                Cancellation attempt
+                                {action.attempts === 1 ? "" : "s"}:{" "}
+                                {action.attempts}
+                              </p>
+                            ) : null}
+                            {action.lastError ? (
+                              <p className="mt-1">{action.lastError}</p>
+                            ) : null}
+                            {canManage &&
+                            action.status === "manual_review" ? (
+                              <ManualCancellationReview
+                                action={action}
+                                orderId={orderId}
+                              />
+                            ) : null}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   ) : null}
                 </div>
 

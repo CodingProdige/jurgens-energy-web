@@ -20,6 +20,7 @@ import {
   saveCustomerAddress,
   type CustomerAddressActionState,
 } from "@/app/(marketplace)/account/addresses/actions";
+import { GooglePlacesAddressAutocomplete } from "@/components/address/google-places-address-autocomplete";
 import { CountryPhoneInput } from "@/components/phone/country-phone-input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,15 +64,20 @@ function RequiredMark() {
 
 function FieldError({
   errors,
+  id,
   name,
 }: {
   errors: CustomerAddressActionState["fieldErrors"];
+  id: string;
   name: string;
 }) {
   const message = errors?.[name]?.[0];
 
   return message ? (
-    <span className="text-xs font-semibold text-red-600 dark:text-red-300">
+    <span
+      className="text-xs font-semibold text-red-600 dark:text-red-300"
+      id={id}
+    >
       {message}
     </span>
   ) : null;
@@ -92,6 +98,14 @@ function AddressForm({
     saveCustomerAddress,
     initialActionState,
   );
+  const [postalAddress, setPostalAddress] = useState(() => ({
+    addressLine1: address?.addressLine1 ?? "",
+    addressLine2: address?.addressLine2 ?? "",
+    city: address?.city ?? "",
+    postalCode: address?.postalCode ?? "",
+    province: address?.province ?? "",
+    suburb: address?.suburb ?? "",
+  }));
 
   useEffect(() => {
     if (state.status === "success") {
@@ -141,6 +155,7 @@ function AddressForm({
             Address label <RequiredMark />
           </Label>
           <Input
+            aria-describedby={errors?.label ? "saved-address-label-error" : undefined}
             aria-invalid={Boolean(errors?.label)}
             className={fieldClass}
             defaultValue={address?.label ?? "Home"}
@@ -150,7 +165,11 @@ function AddressForm({
             placeholder="Home or work"
             required
           />
-          <FieldError errors={errors} name="label" />
+          <FieldError
+            errors={errors}
+            id="saved-address-label-error"
+            name="label"
+          />
         </div>
 
         <div className="grid gap-1.5">
@@ -158,6 +177,11 @@ function AddressForm({
             Recipient name <RequiredMark />
           </Label>
           <Input
+            aria-describedby={
+              errors?.recipientName
+                ? "saved-address-recipient-error"
+                : undefined
+            }
             aria-invalid={Boolean(errors?.recipientName)}
             autoComplete="name"
             className={fieldClass}
@@ -167,7 +191,11 @@ function AddressForm({
             name="recipientName"
             required
           />
-          <FieldError errors={errors} name="recipientName" />
+          <FieldError
+            errors={errors}
+            id="saved-address-recipient-error"
+            name="recipientName"
+          />
         </div>
 
         <div className="grid gap-1.5 sm:col-span-2">
@@ -175,6 +203,12 @@ function AddressForm({
             Recipient phone <RequiredMark />
           </Label>
           <CountryPhoneInput
+            ariaDescribedBy={
+              errors?.recipientPhone
+                ? "saved-address-phone-error"
+                : undefined
+            }
+            ariaInvalid={Boolean(errors?.recipientPhone)}
             defaultValue={address?.recipientPhone}
             id="saved-address-phone"
             inputClassName={cn(fieldClass, "min-w-0")}
@@ -183,25 +217,55 @@ function AddressForm({
             required
             selectClassName={fieldClass}
           />
-          <FieldError errors={errors} name="recipientPhone" />
+          <FieldError
+            errors={errors}
+            id="saved-address-phone-error"
+            name="recipientPhone"
+          />
         </div>
 
         <div className="grid gap-1.5 sm:col-span-2">
           <Label htmlFor="saved-address-line-1">
             Street address <RequiredMark />
           </Label>
-          <Input
-            aria-invalid={Boolean(errors?.addressLine1)}
+          <GooglePlacesAddressAutocomplete
+            ariaDescribedBy={
+              errors?.addressLine1
+                ? "saved-address-line-1-error"
+                : undefined
+            }
+            ariaInvalid={Boolean(errors?.addressLine1)}
             autoComplete="address-line1"
-            className={fieldClass}
-            defaultValue={address?.addressLine1}
+            countryCode="ZA"
             id="saved-address-line-1"
+            inputClassName={fieldClass}
             maxLength={240}
             name="addressLine1"
+            onAddressSelect={(selectedAddress) => {
+              setPostalAddress({
+                addressLine1: selectedAddress.addressLine1,
+                addressLine2: selectedAddress.addressLine2,
+                city: selectedAddress.city,
+                postalCode: selectedAddress.postalCode,
+                province: selectedAddress.province,
+                suburb: selectedAddress.suburb,
+              });
+            }}
+            onValueChange={(addressLine1) =>
+              setPostalAddress((current) => ({
+                ...current,
+                addressLine1,
+              }))
+            }
             placeholder="Street number and name"
             required
+            value={postalAddress.addressLine1}
           />
-          <FieldError errors={errors} name="addressLine1" />
+          <FieldError
+            errors={errors}
+            id="saved-address-line-1-error"
+            name="addressLine1"
+          />
         </div>
 
         <div className="grid gap-1.5 sm:col-span-2">
@@ -209,29 +273,57 @@ function AddressForm({
             Complex, unit or building
           </Label>
           <Input
+            aria-describedby={
+              errors?.addressLine2
+                ? "saved-address-line-2-error"
+                : undefined
+            }
             aria-invalid={Boolean(errors?.addressLine2)}
             autoComplete="address-line2"
             className={fieldClass}
-            defaultValue={address?.addressLine2 ?? ""}
             id="saved-address-line-2"
             maxLength={240}
             name="addressLine2"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                addressLine2: event.target.value,
+              }))
+            }
+            value={postalAddress.addressLine2}
           />
-          <FieldError errors={errors} name="addressLine2" />
+          <FieldError
+            errors={errors}
+            id="saved-address-line-2-error"
+            name="addressLine2"
+          />
         </div>
 
         <div className="grid gap-1.5">
           <Label htmlFor="saved-address-suburb">Suburb (optional)</Label>
           <Input
+            aria-describedby={
+              errors?.suburb ? "saved-address-suburb-error" : undefined
+            }
             aria-invalid={Boolean(errors?.suburb)}
             autoComplete="address-level3"
             className={fieldClass}
-            defaultValue={address?.suburb}
             id="saved-address-suburb"
             maxLength={120}
             name="suburb"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                suburb: event.target.value,
+              }))
+            }
+            value={postalAddress.suburb}
           />
-          <FieldError errors={errors} name="suburb" />
+          <FieldError
+            errors={errors}
+            id="saved-address-suburb-error"
+            name="suburb"
+          />
         </div>
 
         <div className="grid gap-1.5">
@@ -239,16 +331,29 @@ function AddressForm({
             City <RequiredMark />
           </Label>
           <Input
+            aria-describedby={
+              errors?.city ? "saved-address-city-error" : undefined
+            }
             aria-invalid={Boolean(errors?.city)}
             autoComplete="address-level2"
             className={fieldClass}
-            defaultValue={address?.city}
             id="saved-address-city"
             maxLength={120}
             name="city"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                city: event.target.value,
+              }))
+            }
             required
+            value={postalAddress.city}
           />
-          <FieldError errors={errors} name="city" />
+          <FieldError
+            errors={errors}
+            id="saved-address-city-error"
+            name="city"
+          />
         </div>
 
         <div className="grid gap-1.5">
@@ -256,13 +361,22 @@ function AddressForm({
             Province <RequiredMark />
           </Label>
           <select
+            aria-describedby={
+              errors?.province ? "saved-address-province-error" : undefined
+            }
             aria-invalid={Boolean(errors?.province)}
             autoComplete="address-level1"
             className={cn(fieldClass, "border text-sm outline-none")}
-            defaultValue={address?.province ?? ""}
             id="saved-address-province"
             name="province"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                province: event.target.value,
+              }))
+            }
             required
+            value={postalAddress.province}
           >
             <option value="">Select province</option>
             {SOUTH_AFRICAN_PROVINCES.map((province) => (
@@ -271,7 +385,11 @@ function AddressForm({
               </option>
             ))}
           </select>
-          <FieldError errors={errors} name="province" />
+          <FieldError
+            errors={errors}
+            id="saved-address-province-error"
+            name="province"
+          />
         </div>
 
         <div className="grid gap-1.5">
@@ -279,17 +397,32 @@ function AddressForm({
             Postal code <RequiredMark />
           </Label>
           <Input
+            aria-describedby={
+              errors?.postalCode
+                ? "saved-address-postal-code-error"
+                : undefined
+            }
             aria-invalid={Boolean(errors?.postalCode)}
             autoComplete="postal-code"
             className={fieldClass}
-            defaultValue={address?.postalCode}
             id="saved-address-postal-code"
             inputMode="numeric"
             maxLength={40}
             name="postalCode"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                postalCode: event.target.value,
+              }))
+            }
             required
+            value={postalAddress.postalCode}
           />
-          <FieldError errors={errors} name="postalCode" />
+          <FieldError
+            errors={errors}
+            id="saved-address-postal-code-error"
+            name="postalCode"
+          />
         </div>
 
         <div className="sm:col-span-2">

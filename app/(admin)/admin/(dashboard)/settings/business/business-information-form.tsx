@@ -7,6 +7,10 @@ import {
   saveBusinessInformation,
   type BusinessInformationState,
 } from "@/app/(admin)/admin/(dashboard)/settings/business/actions";
+import {
+  GooglePlacesAddressAutocomplete,
+  type GooglePlacesResolvedAddress,
+} from "@/components/address/google-places-address-autocomplete";
 import { CountryPhoneInput } from "@/components/phone/country-phone-input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,29 +25,65 @@ function Field({
   defaultValue,
   id,
   label,
+  onValueChange,
   placeholder,
   required = false,
+  value,
 }: {
   autoComplete?: string;
   defaultValue?: string | null;
   id: string;
   label: string;
+  onValueChange?: (value: string) => void;
   placeholder?: string;
   required?: boolean;
+  value?: string;
 }) {
+  const isControlled = onValueChange !== undefined;
+
   return (
     <div className="grid min-w-0 gap-2">
       <Label htmlFor={id}>{required ? `${label} *` : label}</Label>
       <Input
         autoComplete={autoComplete}
-        defaultValue={defaultValue ?? ""}
+        defaultValue={isControlled ? undefined : (defaultValue ?? "")}
         id={id}
         name={id}
+        onChange={
+          onValueChange
+            ? (event) => onValueChange(event.target.value)
+            : undefined
+        }
         placeholder={placeholder}
         required={required}
+        value={isControlled ? (value ?? "") : undefined}
       />
     </div>
   );
+}
+
+type AddressDraft = {
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  countryCode: string;
+  postalCode: string;
+  province: string;
+  suburb: string;
+};
+
+function addressDraftFromGoogle(
+  suggestion: GooglePlacesResolvedAddress,
+): AddressDraft {
+  return {
+    addressLine1: suggestion.addressLine1,
+    addressLine2: suggestion.addressLine2,
+    city: suggestion.city,
+    countryCode: suggestion.countryCode,
+    postalCode: suggestion.postalCode,
+    province: suggestion.province,
+    suburb: suggestion.suburb,
+  };
 }
 
 export function BusinessInformationForm({
@@ -54,6 +94,24 @@ export function BusinessInformationForm({
   const [sameAddress, setSameAddress] = useState(
     information.collectionAddressSameAsRegistered,
   );
+  const [registeredAddress, setRegisteredAddress] = useState<AddressDraft>({
+    addressLine1: information.addressLine1,
+    addressLine2: information.addressLine2 ?? "",
+    city: information.city,
+    countryCode: information.countryCode || "ZA",
+    postalCode: information.postalCode,
+    province: information.province,
+    suburb: information.suburb ?? "",
+  });
+  const [collectionAddress, setCollectionAddress] = useState<AddressDraft>({
+    addressLine1: information.collectionAddressLine1 ?? "",
+    addressLine2: information.collectionAddressLine2 ?? "",
+    city: information.collectionCity ?? "",
+    countryCode: information.collectionCountryCode ?? "ZA",
+    postalCode: information.collectionPostalCode ?? "",
+    province: information.collectionProvince ?? "",
+    suburb: information.collectionSuburb ?? "",
+  });
   const [state, formAction, pending] = useActionState(
     saveBusinessInformation,
     initialState,
@@ -140,43 +198,88 @@ export function BusinessInformationForm({
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <Field
-              autoComplete="street-address"
-              defaultValue={information.addressLine1}
-              id="addressLine1"
-              label="Street address"
-              required
-            />
+            <div className="grid min-w-0 gap-2">
+              <Label htmlFor="addressLine1">Street address *</Label>
+              <GooglePlacesAddressAutocomplete
+                autoComplete="address-line1"
+                countryCode="ZA"
+                id="addressLine1"
+                name="addressLine1"
+                onAddressSelect={(suggestion) =>
+                  setRegisteredAddress(addressDraftFromGoogle(suggestion))
+                }
+                onValueChange={(addressLine1) =>
+                  setRegisteredAddress((current) => ({
+                    ...current,
+                    addressLine1,
+                  }))
+                }
+                placeholder="Start typing a South African street address"
+                required
+                value={registeredAddress.addressLine1}
+              />
+            </div>
           </div>
           <div className="md:col-span-2">
             <Field
-              defaultValue={information.addressLine2}
+              value={registeredAddress.addressLine2}
+              onValueChange={(addressLine2) =>
+                setRegisteredAddress((current) => ({
+                  ...current,
+                  addressLine2,
+                }))
+              }
               id="addressLine2"
               label="Complex, unit or building"
             />
           </div>
-          <Field defaultValue={information.suburb} id="suburb" label="Suburb" />
           <Field
-            defaultValue={information.city}
+            value={registeredAddress.suburb}
+            onValueChange={(suburb) =>
+              setRegisteredAddress((current) => ({ ...current, suburb }))
+            }
+            id="suburb"
+            label="Suburb"
+          />
+          <Field
+            value={registeredAddress.city}
+            onValueChange={(city) =>
+              setRegisteredAddress((current) => ({ ...current, city }))
+            }
             id="city"
             label="City"
             required
           />
           <Field
-            defaultValue={information.province}
+            value={registeredAddress.province}
+            onValueChange={(province) =>
+              setRegisteredAddress((current) => ({ ...current, province }))
+            }
             id="province"
             label="Province"
             required
           />
           <Field
             autoComplete="postal-code"
-            defaultValue={information.postalCode}
+            value={registeredAddress.postalCode}
+            onValueChange={(postalCode) =>
+              setRegisteredAddress((current) => ({
+                ...current,
+                postalCode,
+              }))
+            }
             id="postalCode"
             label="Postal code"
             required
           />
           <Field
-            defaultValue={information.countryCode}
+            value={registeredAddress.countryCode}
+            onValueChange={(countryCode) =>
+              setRegisteredAddress((current) => ({
+                ...current,
+                countryCode,
+              }))
+            }
             id="countryCode"
             label="Country code"
             required
@@ -240,45 +343,93 @@ export function BusinessInformationForm({
         {!sameAddress ? (
           <div className="grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2 dark:border-white/10">
             <div className="md:col-span-2">
-              <Field
-                defaultValue={information.collectionAddressLine1}
-                id="collectionAddressLine1"
-                label="Collection street address"
-                required
-              />
+              <div className="grid min-w-0 gap-2">
+                <Label htmlFor="collectionAddressLine1">
+                  Collection street address *
+                </Label>
+                <GooglePlacesAddressAutocomplete
+                  autoComplete="address-line1"
+                  countryCode="ZA"
+                  id="collectionAddressLine1"
+                  name="collectionAddressLine1"
+                  onAddressSelect={(suggestion) =>
+                    setCollectionAddress(addressDraftFromGoogle(suggestion))
+                  }
+                  onValueChange={(addressLine1) =>
+                    setCollectionAddress((current) => ({
+                      ...current,
+                      addressLine1,
+                    }))
+                  }
+                  placeholder="Start typing a South African collection address"
+                  required
+                  value={collectionAddress.addressLine1}
+                />
+              </div>
             </div>
             <div className="md:col-span-2">
               <Field
-                defaultValue={information.collectionAddressLine2}
+                value={collectionAddress.addressLine2}
+                onValueChange={(addressLine2) =>
+                  setCollectionAddress((current) => ({
+                    ...current,
+                    addressLine2,
+                  }))
+                }
                 id="collectionAddressLine2"
                 label="Collection complex, unit or building"
               />
             </div>
             <Field
-              defaultValue={information.collectionSuburb}
+              value={collectionAddress.suburb}
+              onValueChange={(suburb) =>
+                setCollectionAddress((current) => ({ ...current, suburb }))
+              }
               id="collectionSuburb"
               label="Collection suburb"
             />
             <Field
-              defaultValue={information.collectionCity}
+              value={collectionAddress.city}
+              onValueChange={(city) =>
+                setCollectionAddress((current) => ({ ...current, city }))
+              }
               id="collectionCity"
               label="Collection city"
               required
             />
             <Field
-              defaultValue={information.collectionProvince}
+              value={collectionAddress.province}
+              onValueChange={(province) =>
+                setCollectionAddress((current) => ({
+                  ...current,
+                  province,
+                }))
+              }
               id="collectionProvince"
               label="Collection province"
               required
             />
             <Field
-              defaultValue={information.collectionPostalCode}
+              autoComplete="postal-code"
+              value={collectionAddress.postalCode}
+              onValueChange={(postalCode) =>
+                setCollectionAddress((current) => ({
+                  ...current,
+                  postalCode,
+                }))
+              }
               id="collectionPostalCode"
               label="Collection postal code"
               required
             />
             <Field
-              defaultValue={information.collectionCountryCode ?? "ZA"}
+              value={collectionAddress.countryCode}
+              onValueChange={(countryCode) =>
+                setCollectionAddress((current) => ({
+                  ...current,
+                  countryCode,
+                }))
+              }
               id="collectionCountryCode"
               label="Collection country code"
               required

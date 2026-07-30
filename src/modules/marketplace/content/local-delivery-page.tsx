@@ -43,7 +43,7 @@ function createDeliveryFaqItems(deliveryFeeDescription: string) {
   },
   {
     question: "How much does delivery cost?",
-    answer: `${deliveryFeeDescription} Courier-provider costs do not change the customer fee.`,
+    answer: deliveryFeeDescription,
   },
   {
     question: "Can I exchange an empty LPG cylinder during delivery?",

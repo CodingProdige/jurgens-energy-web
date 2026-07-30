@@ -5,10 +5,12 @@ import { useActionState } from "react";
 import {
   bookCourierGuyShipmentAction,
   cancelCourierGuyShipmentAction,
+  reconcileCourierGuyBookingAction,
   refreshCourierGuyShipmentAction,
   type ShippingActionState,
 } from "@/app/(admin)/admin/(dashboard)/shipping/actions";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const initialState: ShippingActionState = { message: "", ok: false };
 
@@ -62,6 +64,68 @@ function ShipmentActionForm({
   );
 }
 
+function BookingReconciliationForm({
+  bookingReference,
+  shipmentId,
+}: {
+  bookingReference: string;
+  shipmentId: string;
+}) {
+  const [state, formAction, isPending] = useActionState(
+    reconcileCourierGuyBookingAction,
+    initialState,
+  );
+
+  return (
+    <form action={formAction} className="grid max-w-80 gap-2">
+      <input type="hidden" name="shipmentId" value={shipmentId} />
+      <p className="text-xs leading-4 text-amber-700 dark:text-amber-300">
+        Search The Courier Guy portal for customer reference{" "}
+        <span className="font-semibold break-all">{bookingReference}</span>,
+        then enter the matching tracking reference.
+      </p>
+      <label
+        className="text-xs font-medium text-foreground"
+        htmlFor={`tracking-reference-${shipmentId}`}
+      >
+        Courier Guy tracking reference
+      </label>
+      <div className="flex flex-wrap items-stretch gap-2">
+        <Input
+          className="h-9 min-w-44 flex-1"
+          disabled={isPending}
+          id={`tracking-reference-${shipmentId}`}
+          maxLength={160}
+          name="trackingReference"
+          placeholder="e.g. TCG123456"
+          required
+        />
+        <Button
+          className="h-9"
+          disabled={isPending}
+          size="sm"
+          type="submit"
+          variant="outline"
+        >
+          {isPending ? "Verifying…" : "Verify & adopt"}
+        </Button>
+      </div>
+      {state.message ? (
+        <span
+          aria-live="polite"
+          className={
+            state.ok
+              ? "text-[11px] leading-4 text-emerald-700 dark:text-emerald-300"
+              : "text-[11px] leading-4 text-red-700 dark:text-red-300"
+          }
+        >
+          {state.message}
+        </span>
+      ) : null}
+    </form>
+  );
+}
+
 export function CourierGuyShipmentActions({
   bookingReference,
   shipmentId,
@@ -85,10 +149,10 @@ export function CourierGuyShipmentActions({
 
   if (status === "booking") {
     return (
-      <span className="max-w-56 text-xs leading-4 text-amber-700 dark:text-amber-300">
-        Booking outcome needs reconciliation. Search the portal for{" "}
-        {bookingReference}.
-      </span>
+      <BookingReconciliationForm
+        bookingReference={bookingReference}
+        shipmentId={shipmentId}
+      />
     );
   }
 

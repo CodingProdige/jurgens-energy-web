@@ -91,21 +91,38 @@ function OrderPayments({ order }: { order: AdminOrderRow }) {
 }
 
 function OrderShipments({ order }: { order: AdminOrderRow }) {
-  const shipment = order.shipments[0];
-
-  if (!shipment) {
+  if (order.shipments.length === 0) {
     return <span className={dashboardTableSecondaryTextClass}>Not shipped</span>;
   }
 
   return (
-    <div className="min-w-0 space-y-1">
-      <Badge className={cn("rounded-md border-0 capitalize", statusClass(shipment.status))}>
-        {shipment.status.replaceAll("_", " ")}
-      </Badge>
-      <p className={dashboardTableSecondaryTextClass}>
-        {[shipment.waybillNumber, shipment.trackingNumber].filter(Boolean).join(" · ") ||
-          shipment.provider}
-      </p>
+    <div className="grid max-h-36 min-w-0 gap-2 overflow-y-auto pr-1">
+      {order.shipments.map((shipment, index) => (
+        <div
+          className="min-w-0 border-b border-slate-200 pb-2 last:border-0 last:pb-0 dark:border-white/10"
+          key={shipment.id}
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <Badge
+              className={cn(
+                "rounded-md border-0 capitalize",
+                statusClass(shipment.status),
+              )}
+            >
+              {shipment.status.replaceAll("_", " ")}
+            </Badge>
+            <span className={dashboardTableSecondaryTextClass}>
+              {order.shipments.length > 1 ? `${index + 1}/${order.shipments.length} · ` : ""}
+              {shipment.provider.replaceAll("_", " ")}
+            </span>
+          </div>
+          <p className={cn("mt-1 break-all", dashboardTableSecondaryTextClass)}>
+            {[shipment.waybillNumber, shipment.trackingNumber]
+              .filter(Boolean)
+              .join(" · ") || "Tracking pending"}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -156,14 +173,14 @@ export default async function AdminOrdersPage() {
     },
     {
       color: "slate",
-      description: "Shipping collected from customers across orders.",
+      description: "Shipping collected from paid and fulfilled orders.",
       id: "shipping",
       label: "Shipping",
       value: Math.round(data.metrics.shippingCollected),
     },
     {
       color: "#ff5a1f",
-      description: "Gross order value across all orders.",
+      description: "Gross order value from paid and fulfilled orders.",
       id: "revenue",
       label: "Revenue",
       value: Math.round(data.metrics.revenue),
@@ -233,10 +250,10 @@ export default async function AdminOrdersPage() {
                     <TableCell className={dashboardTableCellClass}>
                       <div className="min-w-0">
                         <p className={dashboardTablePrimaryTextClass}>
-                          {order.customerName ?? "Guest customer"}
+                          {order.customerName}
                         </p>
                         <p className={dashboardTableSecondaryTextClass}>
-                          {order.customerEmail ?? "No email"}
+                          {order.customerEmail}
                         </p>
                       </div>
                     </TableCell>

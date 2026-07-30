@@ -25,8 +25,10 @@ import {
   parseInvoiceDocumentData,
   type InvoiceDocumentData,
 } from "@/src/modules/invoices/document-data";
-
-const STANDARD_VAT_RATE_BPS = 1_500;
+import {
+  calculateVatInclusiveAmounts,
+  SOUTH_AFRICAN_STANDARD_VAT_RATE_BPS,
+} from "@/src/modules/tax/vat-inclusive";
 
 type InvoiceLineDraft = {
   description: string;
@@ -59,26 +61,6 @@ function centsToMoney(value: number) {
 function nullableText(value: string | null | undefined) {
   const normalized = value?.trim();
   return normalized ? normalized : null;
-}
-
-function calculateVatInclusiveAmounts(grossCents: number, taxRateBps: number) {
-  if (
-    !Number.isInteger(grossCents) ||
-    grossCents < 0 ||
-    !Number.isInteger(taxRateBps) ||
-    taxRateBps < 0
-  ) {
-    throw new Error("Invoice tax calculation received invalid input.");
-  }
-
-  const netCents = Math.round(
-    (grossCents * 10_000) / (10_000 + taxRateBps),
-  );
-
-  return {
-    netCents,
-    taxCents: grossCents - netCents,
-  };
 }
 
 function toAddressSnapshot(address: {
@@ -168,7 +150,7 @@ function createInvoiceLines({
   if (shippingTotalCents > 0) {
     const amounts = calculateVatInclusiveAmounts(
       shippingTotalCents,
-      STANDARD_VAT_RATE_BPS,
+      SOUTH_AFRICAN_STANDARD_VAT_RATE_BPS,
     );
 
     lines.push({
@@ -181,7 +163,7 @@ function createInvoiceLines({
       quantity: 1,
       sku: null,
       taxCents: amounts.taxCents,
-      taxRateBps: STANDARD_VAT_RATE_BPS,
+      taxRateBps: SOUTH_AFRICAN_STANDARD_VAT_RATE_BPS,
       unitGrossCents: shippingTotalCents,
     });
   }

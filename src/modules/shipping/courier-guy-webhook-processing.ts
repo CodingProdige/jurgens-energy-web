@@ -8,7 +8,9 @@ import {
   shipmentEvents,
   shipments,
 } from "@/src/db/schema";
+import { reconcileOrderFulfillment } from "@/src/modules/orders/fulfillment";
 import { createCourierGuyCustomerTrackingUrl } from "@/src/modules/shipping/courier-guy-operations";
+import { sendCourierGuyShipmentStatusNotification } from "@/src/modules/shipping/courier-guy-notifications";
 import {
   createCourierGuyTrackingEventId,
   createCourierGuyWebhookEventId,
@@ -54,7 +56,7 @@ export async function processCourierGuyWebhookPayload(
       ],
     });
 
-  return db.transaction(async (tx) => {
+  const processing = await db.transaction(async (tx) => {
     const [webhookEvent] = await tx
       .select({
         id: courierGuyWebhookEvents.id,
@@ -70,11 +72,11 @@ export async function processCourierGuyWebhookPayload(
       .limit(1)
       .for("update");
 
-    if (
-      !webhookEvent ||
-      !["received", "unmatched"].includes(webhookEvent.status)
-    ) {
-      return "duplicate";
+    if (!webhookEvent) {
+      return {
+        result: "duplicate" as const,
+        shipment: null,
+      };
     }
 
     const [shipment] =
@@ -84,6 +86,7 @@ export async function processCourierGuyWebhookPayload(
               collectedAt: shipments.collectedAt,
               deliveredAt: shipments.deliveredAt,
               id: shipments.id,
+              orderId: shipments.orderId,
               status: shipments.status,
             })
             .from(shipments)
@@ -113,13 +116,25 @@ export async function processCourierGuyWebhookPayload(
             .for("update")
         : [];
 
+    if (!["received", "unmatched"].includes(webhookEvent.status)) {
+      return {
+        result: "duplicate" as const,
+        shipment: shipment
+          ? { id: shipment.id, orderId: shipment.orderId }
+          : null,
+      };
+    }
+
     if (!shipment) {
       await tx
         .update(courierGuyWebhookEvents)
         .set({ processedAt: new Date(), status: "unmatched" })
         .where(eq(courierGuyWebhookEvents.id, webhookEvent.id));
 
-      return "unmatched";
+      return {
+        result: "unmatched" as const,
+        shipment: null,
+      };
     }
 
     const now = new Date();
@@ -241,8 +256,31 @@ export async function processCourierGuyWebhookPayload(
       .set({ processedAt: now, status: "processed" })
       .where(eq(courierGuyWebhookEvents.id, webhookEvent.id));
 
-    return "processed";
+    return {
+      result: "processed" as const,
+      shipment: { id: shipment.id, orderId: shipment.orderId },
+    };
   });
+
+  if (processing.shipment) {
+    const sideEffects = await Promise.allSettled([
+      reconcileOrderFulfillment(processing.shipment.orderId),
+      sendCourierGuyShipmentStatusNotification(processing.shipment.id),
+    ]);
+
+    sideEffects.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(
+          index === 0
+            ? "[courier-guy] order fulfilment reconciliation failed"
+            : "[courier-guy] customer shipment notification failed",
+          result.reason,
+        );
+      }
+    });
+  }
+
+  return processing.result;
 }
 
 export async function replayUnmatchedCourierGuyWebhookEvents({

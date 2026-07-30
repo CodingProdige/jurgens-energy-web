@@ -11,7 +11,7 @@ import {
   RefreshCwIcon,
   ShoppingBagIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +19,15 @@ import {
   trackGoogleEvent,
 } from "@/src/modules/analytics/google";
 import { removeLocalCartItems } from "@/src/modules/cart";
+import {
+  getConfirmedPurchasedVariantIds,
+  isCheckoutPaymentConfirmed,
+} from "@/src/modules/checkout/payment-confirmation";
 
 const PURCHASE_ANALYTICS_STORAGE_PREFIX =
   "jurgens:analytics:google-purchase:v1";
+const PAID_ORDER_CART_CLEANUP_STORAGE_PREFIX =
+  "jurgens:checkout:paid-cart-cleanup:v1";
 
 export type CheckoutOrderSummary = {
   createdAt: string;
@@ -63,7 +69,11 @@ export function OrderReturnExperience({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const cleanedOrderIdRef = useRef<string | null>(null);
   const trackedPurchaseOrderIdRef = useRef<string | null>(null);
-  const isPaid = order.status === "paid" || order.status === "fulfilled";
+  const confirmedPurchasedVariantIds = useMemo(
+    () => getConfirmedPurchasedVariantIds(order),
+    [order],
+  );
+  const isPaid = isCheckoutPaymentConfirmed(order);
   const isFailed = order.status === "cancelled" || order.paymentStatus === "failed";
   const invoiceReady = order.invoice?.renderStatus === "ready";
 
@@ -122,14 +132,33 @@ export function OrderReturnExperience({
 
   useEffect(() => {
     if (
-      isPaid &&
-      order.purchasedVariantIds.length > 0 &&
-      cleanedOrderIdRef.current !== order.orderId
+      !isPaid ||
+      confirmedPurchasedVariantIds.length === 0 ||
+      cleanedOrderIdRef.current === order.orderId
     ) {
-      removeLocalCartItems(order.purchasedVariantIds);
-      cleanedOrderIdRef.current = order.orderId;
+      return;
     }
-  }, [isPaid, order.orderId, order.purchasedVariantIds]);
+
+    const storageKey = `${PAID_ORDER_CART_CLEANUP_STORAGE_PREFIX}:${order.orderId}`;
+
+    try {
+      if (window.localStorage.getItem(storageKey) !== null) {
+        cleanedOrderIdRef.current = order.orderId;
+        return;
+      }
+    } catch {
+      // Continue with in-memory idempotency when browser storage is unavailable.
+    }
+
+    removeLocalCartItems(confirmedPurchasedVariantIds);
+    cleanedOrderIdRef.current = order.orderId;
+
+    try {
+      window.localStorage.setItem(storageKey, new Date().toISOString());
+    } catch {
+      // The ref still prevents duplicate cleanup during this mounted visit.
+    }
+  }, [confirmedPurchasedVariantIds, isPaid, order.orderId]);
 
   useEffect(() => {
     if (!isPaid || trackedPurchaseOrderIdRef.current === order.orderId) {

@@ -66,6 +66,7 @@ import {
   updateMarketplaceGateSettings,
   updateChatGptIntegrationSettings,
   updateGoogleMarketingSettings,
+  updateGooglePlacesSettings,
   updateMediaStorageSettings,
   deleteNotificationGlobalVariableSettings,
   saveNotificationGlobalVariableSettings,
@@ -138,6 +139,7 @@ type SettingsFormProps = {
 function SecretTextInput({
   className,
   defaultValue,
+  disabled,
   icon,
   id,
   minLength,
@@ -148,6 +150,7 @@ function SecretTextInput({
 }: {
   className?: string;
   defaultValue?: string | null;
+  disabled?: boolean;
   icon?: "key";
   id: string;
   minLength?: number;
@@ -179,6 +182,7 @@ function SecretTextInput({
         name={name}
         type={isVisible ? "text" : "password"}
         autoComplete="off"
+        disabled={disabled}
         value={inputValue}
         onChange={(event) => {
           if (onValueChange) {
@@ -196,6 +200,7 @@ function SecretTextInput({
         aria-label={isVisible ? "Hide value" : "Show value"}
         className="absolute top-1/2 right-0.5 size-7 -translate-y-1/2 rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
         onClick={() => setIsVisible((current) => !current)}
+        disabled={disabled}
         size="icon-sm"
         type="button"
         variant="ghost"
@@ -918,6 +923,165 @@ export function GoogleMarketingSettingsForm({
       <Button type="submit" disabled={isPending} className="w-fit gap-2">
         <SaveIcon className="size-4" />
         {isPending ? "Saving..." : "Save Google settings"}
+      </Button>
+    </form>
+  );
+}
+
+type GooglePlacesSettingsFormProps = {
+  googlePlacesApiKey: string | null;
+  googlePlacesEnabled: boolean;
+  hasGooglePlacesApiKey: boolean;
+};
+
+export function GooglePlacesSettingsForm({
+  googlePlacesApiKey,
+  googlePlacesEnabled,
+  hasGooglePlacesApiKey,
+}: GooglePlacesSettingsFormProps) {
+  const [isEnabled, setIsEnabled] = useState(googlePlacesEnabled);
+  const [removeApiKey, setRemoveApiKey] = useState(false);
+  const [state, formAction, isPending] = useActionState(
+    updateGooglePlacesSettings,
+    initialState,
+  );
+
+  return (
+    <form action={formAction} className="grid gap-5">
+      <div className="grid gap-4 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+            <MapPinIcon className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                Google Places address autocomplete
+              </h3>
+              <Badge variant={hasGooglePlacesApiKey ? "default" : "secondary"}>
+                {hasGooglePlacesApiKey
+                  ? "API key configured"
+                  : "API key required"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Suggests South African addresses and fills the structured address
+              fields after a suggestion is selected. Customers can always enter
+              every field manually if Google is unavailable or autocomplete is
+              switched off.
+            </p>
+          </div>
+        </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+          <Checkbox
+            checked={isEnabled}
+            id="googlePlacesEnabled"
+            name="enabled"
+            onCheckedChange={(checked) => setIsEnabled(checked === true)}
+          />
+          <span className="grid gap-1">
+            <span className="font-semibold text-zinc-950 dark:text-white">
+              Enable address autocomplete
+            </span>
+            <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Applies to supported checkout, customer, business, seller, and
+              collection address forms. Searches are restricted to South
+              Africa.
+            </span>
+          </span>
+        </label>
+
+        <div className="grid gap-2">
+          <Label htmlFor="googlePlacesApiKey">
+            Google Places server API key
+          </Label>
+          <SecretTextInput
+            defaultValue={googlePlacesApiKey}
+            disabled={removeApiKey}
+            icon="key"
+            id="googlePlacesApiKey"
+            name="apiKey"
+            placeholder={
+              hasGooglePlacesApiKey
+                ? "Saved - leave unchanged to keep the current API key"
+                : "Paste the server API key"
+            }
+          />
+          <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            The key is encrypted in Postgres and is only used by the server-side
+            Places proxy. It is never loaded into the customer&apos;s browser.
+          </p>
+        </div>
+
+        {hasGooglePlacesApiKey ? (
+          <label className="flex items-start gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm dark:bg-red-500/10">
+            <Checkbox
+              checked={removeApiKey}
+              id="removeGooglePlacesApiKey"
+              name="removeApiKey"
+              onCheckedChange={(checked) => {
+                const shouldRemove = checked === true;
+                setRemoveApiKey(shouldRemove);
+
+                if (shouldRemove) {
+                  setIsEnabled(false);
+                }
+              }}
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-red-700 dark:text-red-200">
+                Remove the stored API key
+              </span>
+              <span className="text-xs leading-5 text-red-700/80 dark:text-red-200/80">
+                Saving this option also leaves autocomplete disabled. Manual
+                address entry remains available.
+              </span>
+            </span>
+          </label>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-white/10 dark:bg-black/20">
+        <div className="flex items-start gap-3">
+          <KeyRoundIcon className="mt-0.5 size-4 shrink-0 text-admin-primary" />
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Google Cloud setup
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-zinc-300">
+              Enable billing and <strong>Places API (New)</strong> in the Google
+              Cloud project. Create a dedicated server key, restrict the key to
+              Places API (New), and apply an IP-address restriction for the
+              production server&apos;s outbound public IP. Set a daily Places
+              quota and billing-budget alerts as a final cost guard. Do not use
+              a browser, Android, iOS, OAuth, or service-account credential here.
+            </p>
+          </div>
+        </div>
+        <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+          Address suggestions are limited to South Africa. The selected result
+          assists data entry; the normal checkout and delivery eligibility
+          validation remains the source of truth.
+        </p>
+      </div>
+
+      {state.message ? (
+        <p
+          className={
+            state.ok
+              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+          }
+          role="status"
+        >
+          {state.message}
+        </p>
+      ) : null}
+
+      <Button className="w-fit gap-2" disabled={isPending} type="submit">
+        <SaveIcon className="size-4" />
+        {isPending ? "Saving..." : "Save Google Places settings"}
       </Button>
     </form>
   );
@@ -2566,6 +2730,7 @@ type NationwideShippingSettingsFormProps = {
   courierGuyMode: "live" | "sandbox";
   courierGuySandboxAccountCode: string | null;
   courierGuySandboxApiKey: string | null;
+  courierGuyWebhookToken: string | null;
   courierGuyWebhookUrl: string;
   hasCourierGuyLiveApiKey: boolean;
   hasCourierGuySandboxApiKey: boolean;
@@ -2589,6 +2754,7 @@ export function NationwideShippingSettingsForm({
   courierGuyMode,
   courierGuySandboxAccountCode,
   courierGuySandboxApiKey,
+  courierGuyWebhookToken,
   courierGuyWebhookUrl,
   hasCourierGuyLiveApiKey,
   hasCourierGuySandboxApiKey,
@@ -2628,7 +2794,7 @@ export function NationwideShippingSettingsForm({
     NationwideShippingSettingsFormProps["courierGuyDropoffType"]
   >(courierGuyDropoffType);
   const [courierGuyWebhookTokenValue, setCourierGuyWebhookTokenValue] =
-    useState("");
+    useState(courierGuyWebhookToken ?? "");
   const [courierGuyWebhookUrlCopied, setCourierGuyWebhookUrlCopied] =
     useState(false);
   const [state, formAction, isPending] = useActionState(
@@ -2663,15 +2829,6 @@ export function NationwideShippingSettingsForm({
 
     return url.toString();
   })();
-
-  useEffect(() => {
-    if (!credentialState.ok && !state.ok) {
-      return;
-    }
-
-    setCourierGuyLiveApiKeyValue("");
-    setCourierGuySandboxApiKeyValue("");
-  }, [credentialState, state]);
 
   return (
     <div className="grid gap-6">
@@ -2953,9 +3110,9 @@ export function NationwideShippingSettingsForm({
             bearer token scopes API requests to that account; the code is kept
             for configuration checks and shipment audit history. Account codes
             and tokens cannot be rotated while that environment has active
-            shipments. Secret inputs intentionally reopen blank after a browser
-            refresh; a “Saved securely” badge confirms the encrypted value is
-            still stored, and leaving the input blank keeps it.
+            shipments. Tokens remain encrypted in storage, reload into this
+            authorized admin form masked, and can be revealed with the eye
+            button.
           </p>
 
           <div className="grid gap-2">
@@ -3132,13 +3289,11 @@ export function NationwideShippingSettingsForm({
                 </Button>
               </div>
               <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                Enter a new token to generate the full subscription URL, then
-                select an API environment above, and copy the resulting URL
-                into that environment&apos;s ShipLogic portal under Settings →
-                Webhook subscriptions using the Tracking event topic. Repeat
-                for the other environment after switching the selector. Saved
-                tokens are never sent back to the browser; rotate the token if
-                either URL must be configured again.
+                Select an API environment above, then copy the full URL into
+                that environment&apos;s ShipLogic portal under Settings →
+                Webhook subscriptions using the Shipment tracking event topic.
+                Repeat for the other environment after switching the selector.
+                The saved shared token remains masked until you reveal it.
               </p>
             </div>
           </div>

@@ -66,9 +66,8 @@ const faqGroups: FaqGroup[] = [
             Checkout applies one configured VAT-inclusive flat delivery fee per
             eligible order, not separate Jurgens and courier fees. When an active
             free-shipping rule applies and the qualifying product subtotal reaches
-            its threshold, the delivery fee is reduced to zero. The courier&apos;s
-            charge to Jurgens Energy is private and does not change the fee shown
-            to you before payment.
+            its threshold, the delivery fee is reduced to zero. The final delivery
+            fee is shown before payment.
           </>
         ),
         question: "How is the delivery fee calculated?",
@@ -286,7 +285,7 @@ export const faqStructuredDataItems = [
   {
     question: "How is the delivery fee calculated?",
     answer:
-      "Checkout applies one configured VAT-inclusive flat delivery fee per eligible order, not separate Jurgens and courier fees. If an active free-shipping rule applies and the qualifying product subtotal reaches its threshold, the delivery fee is reduced to zero. A courier provider's charge to Jurgens Energy does not change the customer fee shown before payment.",
+      "Checkout applies one configured VAT-inclusive flat delivery fee per eligible order, not separate Jurgens and courier fees. If an active free-shipping rule applies and the qualifying product subtotal reaches its threshold, the delivery fee is reduced to zero. The final delivery fee is shown before payment.",
   },
   {
     question: "How quickly will my order arrive?",
@@ -317,7 +316,7 @@ export function createFaqStructuredDataItems(
     item.question === "How is the delivery fee calculated?"
       ? {
           ...item,
-          answer: `${deliveryFeeDescription} A courier provider's charge to Jurgens Energy does not change the customer fee shown before payment.`,
+          answer: deliveryFeeDescription,
         }
       : item,
   );
@@ -334,13 +333,7 @@ export function FaqPage({
       item.question === "How is the delivery fee calculated?"
         ? {
             ...item,
-            answer: (
-              <>
-                {deliveryFeeDescription} The courier&apos;s charge to Jurgens
-                Energy is private and does not change the fee shown before
-                payment.
-              </>
-            ),
+            answer: deliveryFeeDescription,
           }
         : item,
     ),

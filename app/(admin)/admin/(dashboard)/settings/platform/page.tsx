@@ -10,6 +10,7 @@ import {
   GlobeLockIcon,
   LayersIcon,
   MailIcon,
+  MapPinIcon,
   MessageCircleIcon,
   Share2Icon,
   TruckIcon,
@@ -28,6 +29,7 @@ import {
   ChatGptIntegrationSettingsForm,
   SettingsForm,
   GoogleMarketingSettingsForm,
+  GooglePlacesSettingsForm,
   MediaStorageSettingsForm,
   NotificationSettingsForm,
   NationwideShippingSettingsForm,
@@ -84,6 +86,13 @@ const settingSections = [
     description:
       "Manage Google measurement, Merchant Center IDs, and the online product feed.",
     icon: BarChart3Icon,
+  },
+  {
+    key: "google-places",
+    title: "Google Places",
+    description:
+      "Manage encrypted server credentials for South African address autocomplete.",
+    icon: MapPinIcon,
   },
   {
     key: "marketplace-gate",
@@ -171,7 +180,9 @@ export default async function AdminSettingsPage({
   const secrets =
     canManageSettings &&
     (selectedSection === "payfast-payments" ||
+      selectedSection === "shipping" ||
       selectedSection === "whatsapp-ordering" ||
+      selectedSection === "google-places" ||
       selectedSection === "chatgpt-integration")
       ? await getMarketplaceAdminSecrets()
       : null;
@@ -331,12 +342,17 @@ function SettingsSection({
           courierGuyDropoffType={settings.courierGuyDropoffType}
           courierGuyEnabled={settings.courierGuyEnabled}
           courierGuyLiveAccountCode={settings.courierGuyLiveAccountCode}
-          courierGuyLiveApiKey={null}
+          courierGuyLiveApiKey={secrets?.courierGuyLiveApiKey ?? null}
           courierGuyMode={settings.courierGuyMode}
           courierGuySandboxAccountCode={
             settings.courierGuySandboxAccountCode
           }
-          courierGuySandboxApiKey={null}
+          courierGuySandboxApiKey={
+            secrets?.courierGuySandboxApiKey ?? null
+          }
+          courierGuyWebhookToken={
+            secrets?.courierGuyWebhookToken ?? null
+          }
           courierGuyWebhookUrl={settings.courierGuyWebhookUrl}
           hasCourierGuyLiveApiKey={settings.hasCourierGuyLiveApiKey}
           hasCourierGuySandboxApiKey={settings.hasCourierGuySandboxApiKey}
@@ -420,6 +436,21 @@ function SettingsSection({
           googleMerchantCenterId={settings.googleMerchantCenterId}
           googleSiteVerificationToken={settings.googleSiteVerificationToken}
           googleTagManagerId={settings.googleTagManagerId}
+        />
+      </DashboardPanel>
+    );
+  }
+
+  if (section === "google-places") {
+    return (
+      <DashboardPanel
+        title="Google Places"
+        description="Manage the encrypted server API key used to suggest South African addresses while preserving manual entry as a fallback."
+      >
+        <GooglePlacesSettingsForm
+          googlePlacesApiKey={secrets?.googlePlacesApiKey ?? null}
+          googlePlacesEnabled={settings.googlePlacesEnabled}
+          hasGooglePlacesApiKey={settings.hasGooglePlacesApiKey}
         />
       </DashboardPanel>
     );

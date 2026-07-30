@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne, or } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
@@ -10,6 +10,7 @@ import {
   shipments,
 } from "@/src/db/schema";
 import { getBusinessDispatchContact } from "@/src/modules/business-information";
+import { reconcileOrderFulfillment } from "@/src/modules/orders/fulfillment";
 import {
   cancelCourierGuyShipment,
   createCourierGuyClient,
@@ -20,7 +21,9 @@ import {
   courierGuyCancellableShipmentStatuses,
   createCourierGuyBookingReference,
   createCourierGuyCustomerTrackingUrl,
+  matchesCourierGuyBookingReference,
 } from "@/src/modules/shipping/courier-guy-operations";
+import { sendCourierGuyShipmentStatusNotification } from "@/src/modules/shipping/courier-guy-notifications";
 import {
   createCourierGuyTrackingEventId,
   resolveCourierGuyMilestones,
@@ -56,6 +59,11 @@ export async function bookCourierGuyShipment(shipmentId: string) {
       existing.providerShipmentId &&
       existing.trackingNumber
     ) {
+      await synchronizeCourierGuyShipmentOutcome({
+        orderId: existing.orderId,
+        shipmentId,
+      });
+
       return {
         alreadyBooked: true as const,
         providerShipmentId: existing.providerShipmentId,
@@ -294,6 +302,10 @@ export async function bookCourierGuyShipment(shipmentId: string) {
         })
         .onConflictDoNothing();
     });
+    await synchronizeCourierGuyShipmentOutcome({
+      orderId: record.orderId,
+      shipmentId,
+    });
 
     return {
       alreadyBooked: false as const,
@@ -372,6 +384,265 @@ export async function bookCourierGuyShipment(shipmentId: string) {
 
     throw error;
   }
+}
+
+export async function reconcileCourierGuyBooking({
+  shipmentId,
+  trackingReference: enteredTrackingReference,
+}: {
+  shipmentId: string;
+  trackingReference: string;
+}) {
+  const record = await getCourierGuyShipmentRecord(shipmentId);
+
+  if (
+    !record ||
+    record.provider !== "courier_guy" ||
+    record.status !== "booking"
+  ) {
+    throw new Error(
+      "Only Courier Guy shipments awaiting booking reconciliation can be adopted.",
+    );
+  }
+
+  if (!record.providerAccountCode || !record.providerEnvironment) {
+    throw new Error(
+      "This uncertain booking does not have a saved Courier Guy account environment.",
+    );
+  }
+
+  const config = await getCourierGuyOperationalConfig({
+    accountCode: record.providerAccountCode,
+    mode: record.providerEnvironment,
+  });
+
+  if (!config.hasCredentials || !config.accountCode || !config.apiKey) {
+    throw new Error(
+      `Courier Guy ${config.mode} credentials for this shipment are not configured.`,
+    );
+  }
+
+  const trackingReference = enteredTrackingReference.trim();
+  const client = createCourierGuyClient({
+    apiBaseUrl: config.apiBaseUrl,
+    apiKey: config.apiKey,
+  });
+  const tracking = await client.trackShipment({ trackingReference });
+  const expectedBookingReference = createCourierGuyBookingReference(
+    record.orderNumber,
+    shipmentId,
+  );
+
+  if (
+    !matchesCourierGuyBookingReference(
+      expectedBookingReference,
+      tracking.customerReference,
+    )
+  ) {
+    throw new Error(
+      `The tracking reference is not linked to booking reference ${expectedBookingReference}. Nothing was changed.`,
+    );
+  }
+
+  if (!tracking.providerShipmentId) {
+    throw new Error(
+      "Courier Guy verified the tracking reference but did not return a shipment ID.",
+    );
+  }
+
+  const verifiedTrackingReference =
+    tracking.trackingReference.trim() || trackingReference;
+
+  if (verifiedTrackingReference.length > 160) {
+    throw new Error(
+      "Courier Guy returned a tracking reference that is too long to store safely.",
+    );
+  }
+
+  const [conflictingShipment] = await db
+    .select({ id: shipments.id })
+    .from(shipments)
+    .where(
+      and(
+        eq(shipments.provider, "courier_guy"),
+        eq(shipments.providerEnvironment, config.mode),
+        ne(shipments.id, shipmentId),
+        or(
+          eq(shipments.providerShipmentId, tracking.providerShipmentId),
+          eq(shipments.trackingNumber, verifiedTrackingReference),
+        ),
+      ),
+    )
+    .limit(1);
+
+  if (conflictingShipment) {
+    throw new Error(
+      "That Courier Guy booking is already attached to another local shipment.",
+    );
+  }
+
+  const label = await client
+    .getLabel({
+      kind: "waybill",
+      shipmentId: tracking.providerShipmentId,
+    })
+    .catch(() => null);
+  let waybillUrl: string | null = null;
+
+  if (label) {
+    const url = new URL(label.url);
+
+    if (url.protocol !== "https:") {
+      throw new Error("Courier Guy returned an unsafe waybill URL.");
+    }
+
+    waybillUrl = url.toString();
+  }
+
+  const now = new Date();
+  const providerCollectedAt = parseProviderDate(tracking.collectedAt);
+  const providerDeliveredAt = parseProviderDate(tracking.deliveredAt);
+  let nextStatus = resolveCourierGuyShipmentStatus(
+    record.status,
+    tracking.status,
+  );
+
+  if (providerDeliveredAt) {
+    nextStatus = resolveCourierGuyShipmentStatus(nextStatus, "delivered");
+  }
+
+  if (nextStatus === "booking") {
+    nextStatus = waybillUrl ? "waybill_ready" : "booked";
+  } else if (nextStatus === "booked" && waybillUrl) {
+    nextStatus = "waybill_ready";
+  }
+
+  const milestones = resolveCourierGuyMilestones({
+    currentCollectedAt: record.collectedAt,
+    currentDeliveredAt: record.deliveredAt,
+    nextStatus,
+    occurredAt: now,
+    providerCollectedAt,
+    providerDeliveredAt,
+  });
+  const eventRows = tracking.events.map((event) => ({
+    location: event.location,
+    message: event.message,
+    occurredAt: parseProviderDate(event.occurredAt) ?? now,
+    payload: event.data,
+    provider: "courier_guy" as const,
+    providerEventId: createCourierGuyTrackingEventId({
+      data: event.data,
+      location: event.location,
+      message: event.message,
+      occurredAt: event.occurredAt,
+      parcelId: event.parcelId,
+      providerEventId: event.providerEventId,
+      shipmentIdentity: verifiedTrackingReference,
+      source: event.source,
+      status: event.status,
+    }),
+    shipmentId,
+    status: event.status,
+  }));
+
+  await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({
+        providerAccountCode: shipments.providerAccountCode,
+        providerEnvironment: shipments.providerEnvironment,
+        status: shipments.status,
+      })
+      .from(shipments)
+      .where(eq(shipments.id, shipmentId))
+      .limit(1)
+      .for("update");
+
+    if (
+      !current ||
+      current.status !== "booking" ||
+      current.providerEnvironment !== config.mode ||
+      current.providerAccountCode?.trim() !== config.accountCode
+    ) {
+      throw new Error(
+        "The shipment changed while the Courier Guy booking was being verified. Refresh before continuing.",
+      );
+    }
+
+    if (eventRows.length > 0) {
+      await tx
+        .insert(shipmentEvents)
+        .values(eventRows)
+        .onConflictDoNothing();
+    }
+
+    await tx
+      .insert(shipmentEvents)
+      .values({
+        message:
+          "Uncertain Courier Guy booking verified and attached by an administrator.",
+        occurredAt: now,
+        payload: {
+          bookingReference: expectedBookingReference,
+          providerShipmentId: tracking.providerShipmentId,
+          trackingReference: verifiedTrackingReference,
+          waybillReady: Boolean(waybillUrl),
+        },
+        provider: "courier_guy",
+        providerEventId: `booking-reconciled:${tracking.providerShipmentId}`,
+        shipmentId,
+        status: "booking_reconciled",
+      })
+      .onConflictDoNothing();
+
+    const [adopted] = await tx
+      .update(shipments)
+      .set({
+        bookedAt: now,
+        collectedAt: milestones.collectedAt,
+        deliveredAt: milestones.deliveredAt,
+        providerShipmentId: tracking.providerShipmentId,
+        status: nextStatus,
+        trackingNumber: verifiedTrackingReference,
+        trackingUrl: createCourierGuyCustomerTrackingUrl(
+          verifiedTrackingReference,
+        ),
+        updatedAt: now,
+        waybillNumber: verifiedTrackingReference,
+        waybillUrl,
+      })
+      .where(
+        and(
+          eq(shipments.id, shipmentId),
+          eq(shipments.status, "booking"),
+        ),
+      )
+      .returning({ id: shipments.id });
+
+    if (!adopted) {
+      throw new Error(
+        "The verified Courier Guy booking could not be attached to the shipment.",
+      );
+    }
+  });
+
+  await replayUnmatchedCourierGuyWebhookEvents({
+    environment: config.mode,
+    providerShipmentId: tracking.providerShipmentId,
+    trackingReference: verifiedTrackingReference,
+  }).catch(() => undefined);
+  await synchronizeCourierGuyShipmentOutcome({
+    orderId: record.orderId,
+    shipmentId,
+  });
+
+  return {
+    bookingReference: expectedBookingReference,
+    providerShipmentId: tracking.providerShipmentId,
+    status: nextStatus,
+    trackingReference: verifiedTrackingReference,
+    waybillUrl,
+  };
 }
 
 export async function refreshCourierGuyShipment(shipmentId: string) {
@@ -524,6 +795,10 @@ export async function refreshCourierGuyShipment(shipmentId: string) {
       tracking.providerShipmentId ?? record.providerShipmentId,
     trackingReference,
   }).catch(() => undefined);
+  await synchronizeCourierGuyShipmentOutcome({
+    orderId: record.orderId,
+    shipmentId,
+  });
 
   return {
     eventCount,
@@ -733,6 +1008,10 @@ export async function cancelBookedCourierGuyShipment(shipmentId: string) {
       );
     }
   }
+  await synchronizeCourierGuyShipmentOutcome({
+    orderId: record.orderId,
+    shipmentId,
+  });
 
   return { cancelled: true as const };
 }
@@ -767,6 +1046,7 @@ async function getCourierGuyShipmentRecord(shipmentId: string) {
       customerPhone: orders.customerPhone,
       deliveredAt: shipments.deliveredAt,
       deliveryAddress: orders.deliveryAddressSnapshot,
+      orderId: orders.id,
       orderNumber: orders.orderNumber,
       provider: shipments.provider,
       providerAccountCode: shipments.providerAccountCode,
@@ -782,6 +1062,30 @@ async function getCourierGuyShipmentRecord(shipmentId: string) {
     .limit(1);
 
   return record ?? null;
+}
+
+async function synchronizeCourierGuyShipmentOutcome({
+  orderId,
+  shipmentId,
+}: {
+  orderId: string;
+  shipmentId: string;
+}) {
+  const results = await Promise.allSettled([
+    reconcileOrderFulfillment(orderId),
+    sendCourierGuyShipmentStatusNotification(shipmentId),
+  ]);
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error(
+        index === 0
+          ? "[courier-guy] order fulfilment reconciliation failed"
+          : "[courier-guy] customer shipment notification failed",
+        result.reason,
+      );
+    }
+  });
 }
 
 function parseProviderDate(value: string | null) {

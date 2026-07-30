@@ -42,7 +42,7 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
         capability: "admin.orders.view",
       },
       {
-        label: "Scheduled",
+        label: "Local deliveries",
         href: "/orders/scheduled",
         capability: "admin.orders.view",
       },

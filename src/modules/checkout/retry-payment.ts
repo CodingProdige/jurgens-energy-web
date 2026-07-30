@@ -7,6 +7,11 @@ import { z } from "zod";
 
 import { db } from "@/src/db";
 import { orders, payments } from "@/src/db/schema";
+import { isPendingCheckoutOpen } from "@/src/modules/inventory/lifecycle";
+import {
+  InventoryReservationError,
+  reacquireOrderInventory,
+} from "@/src/modules/inventory/reservations";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
 
 const retryPaymentInputSchema = z.object({
@@ -16,6 +21,8 @@ const retryPaymentInputSchema = z.object({
 
 export type RetryPayFastPaymentErrorCode =
   | "amount_changed"
+  | "expired"
+  | "inventory_unavailable"
   | "not_configured"
   | "not_eligible"
   | "not_found";
@@ -85,6 +92,7 @@ export async function retryHostedPayFastPayment(input: {
         grandTotal: orders.grandTotal,
         id: orders.id,
         orderNumber: orders.orderNumber,
+        paymentExpiresAt: orders.paymentExpiresAt,
         status: orders.status,
       })
       .from(orders)
@@ -101,6 +109,13 @@ export async function retryHostedPayFastPayment(input: {
       throw new RetryPayFastPaymentError(
         "not_found",
         "This order could not be found in your account.",
+      );
+    }
+
+    if (!isPendingCheckoutOpen(order.paymentExpiresAt)) {
+      throw new RetryPayFastPaymentError(
+        "expired",
+        "This payment window has expired. Return to your cart and place a new order so stock and delivery can be confirmed again.",
       );
     }
 
@@ -143,6 +158,24 @@ export async function retryHostedPayFastPayment(input: {
         "not_eligible",
         "This order is no longer awaiting payment.",
       );
+    }
+
+    try {
+      await reacquireOrderInventory({
+        orderId: order.id,
+        transaction: tx,
+      });
+    } catch (error) {
+      if (error instanceof InventoryReservationError) {
+        throw new RetryPayFastPaymentError(
+          "inventory_unavailable",
+          error.code === "insufficient_stock"
+            ? "One or more products are no longer available in the ordered quantity. Return to your cart and review the order."
+            : "This order's stock hold cannot be reopened. Return to your cart and place a new order.",
+        );
+      }
+
+      throw error;
     }
 
     const currentAmount = Number(order.grandTotal);

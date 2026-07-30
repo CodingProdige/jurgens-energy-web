@@ -363,6 +363,7 @@ const providerTrackingEventSchema = z
 const providerTrackingShipmentSchema = z
   .object({
     custom_tracking_reference: z.string().nullable().optional(),
+    customer_reference: z.string().nullable().optional(),
     shipment_id: identifierSchema.nullable().optional(),
     shipment_collected_date: z.string().nullable().optional(),
     shipment_delivered_date: z.string().nullable().optional(),
@@ -501,6 +502,7 @@ export type CourierGuyTrackingEvent = {
 export type CourierGuyTracking = {
   collectedAt: string | null;
   customTrackingReference: string | null;
+  customerReference: string | null;
   deliveredAt: string | null;
   events: CourierGuyTrackingEvent[];
   providerShipmentId: string | null;
@@ -1065,6 +1067,7 @@ async function trackShipment(
   return {
     collectedAt: response.shipment_collected_date ?? null,
     customTrackingReference: response.custom_tracking_reference ?? null,
+    customerReference: response.customer_reference ?? null,
     deliveredAt: response.shipment_delivered_date ?? null,
     events: response.tracking_events.map<CourierGuyTrackingEvent>(
       (event) => ({

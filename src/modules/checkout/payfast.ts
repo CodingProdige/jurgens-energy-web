@@ -4,6 +4,7 @@ import { db } from "@/src/db";
 import { orderItems, payments } from "@/src/db/schema";
 import { env } from "@/src/config/env";
 import { getCheckoutOrderWithToken } from "@/src/modules/checkout/orders";
+import { isPendingCheckoutOpen } from "@/src/modules/inventory/lifecycle";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
 import {
   createPayFastSignature,
@@ -39,7 +40,10 @@ export async function getHostedPayFastForm(orderId: string, token: string) {
     return null;
   }
 
-  if (order.status !== "pending") {
+  if (
+    order.status !== "pending" ||
+    !isPendingCheckoutOpen(order.paymentExpiresAt)
+  ) {
     return null;
   }
 

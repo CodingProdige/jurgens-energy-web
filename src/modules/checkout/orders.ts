@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { and, desc, eq, gt, inArray, isNull, like } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, like, sql } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { db } from "@/src/db";
@@ -20,6 +20,7 @@ import {
   type CheckoutCustomer,
   type CreateCheckoutOrderRequest,
 } from "@/src/modules/checkout/contracts";
+import { isCheckoutPaymentConfirmed } from "@/src/modules/checkout/payment-confirmation";
 import {
   createCheckoutFingerprint,
   getCheckoutFulfillmentProvider,
@@ -38,6 +39,11 @@ import {
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
 import type { CampaignAttributionSnapshot } from "@/src/modules/marketing/campaign-attribution";
 import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
+import {
+  createPendingCheckoutExpiry,
+  isPendingCheckoutOpen,
+} from "@/src/modules/inventory/lifecycle";
+import { reserveOrderInventory } from "@/src/modules/inventory/reservations";
 import { evaluateCustomerDelivery } from "@/src/modules/shipping/customer-delivery-evaluation";
 import { customerShippingSnapshotMatchesCart } from "@/src/modules/shipping/customer-shipping-snapshot";
 import {
@@ -59,6 +65,110 @@ function roundMoney(value: number) {
 
 function hashCheckoutToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function createStableCheckoutToken(checkoutRequestId: string) {
+  const secret = process.env.AUTH_SECRET;
+
+  if (!secret) {
+    throw new Error("AUTH_SECRET is required.");
+  }
+
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`hosted-checkout:${checkoutRequestId}`)
+    .digest("base64url");
+}
+
+function createCheckoutRequestFingerprint(
+  input: CreateCheckoutOrderRequest,
+  userId: string | null,
+) {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ input, userId }))
+    .digest("hex");
+}
+
+async function getIdempotentCheckoutReplay({
+  checkoutRequestFingerprint,
+  checkoutRequestId,
+  userId,
+}: {
+  checkoutRequestFingerprint: string;
+  checkoutRequestId: string;
+  userId: string | null;
+}) {
+  const [order] = await db
+    .select({
+      checkoutRequestFingerprint: orders.checkoutRequestFingerprint,
+      checkoutTokenHash: orders.checkoutTokenHash,
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      paymentExpiresAt: orders.paymentExpiresAt,
+      status: orders.status,
+      userId: orders.userId,
+    })
+    .from(orders)
+    .where(eq(orders.checkoutRequestId, checkoutRequestId))
+    .limit(1);
+
+  if (!order) {
+    return null;
+  }
+
+  if (
+    order.checkoutRequestFingerprint !== checkoutRequestFingerprint ||
+    order.userId !== userId
+  ) {
+    throw new Error(
+      "This checkout attempt was already used for different order details. Refresh checkout and try again.",
+    );
+  }
+
+  if (
+    order.status !== "pending" ||
+    !isPendingCheckoutOpen(order.paymentExpiresAt)
+  ) {
+    throw new Error(
+      "This checkout attempt is no longer awaiting payment. Return to your cart and start a new checkout.",
+    );
+  }
+
+  const checkoutToken = createStableCheckoutToken(checkoutRequestId);
+
+  if (order.checkoutTokenHash !== hashCheckoutToken(checkoutToken)) {
+    throw new Error(
+      "This checkout attempt cannot be reopened safely. Return to your cart and start a new checkout.",
+    );
+  }
+
+  const [payment] = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .where(
+      and(
+        eq(payments.orderId, order.id),
+        eq(payments.provider, "payfast"),
+        eq(payments.status, "pending"),
+      ),
+    )
+    .orderBy(desc(payments.createdAt))
+    .limit(1);
+
+  if (!payment) {
+    throw new Error(
+      "This checkout attempt no longer has a pending payment. Return to your cart and start a new checkout.",
+    );
+  }
+
+  return {
+    checkoutToken,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    paymentId: payment.id,
+    redirectUrl: `/checkout/payfast/${order.id}?token=${encodeURIComponent(checkoutToken)}`,
+  };
 }
 
 function createOrderNumber() {
@@ -232,10 +342,9 @@ export async function createHostedCheckoutOrder(
   } = {},
 ) {
   const parsed = createCheckoutOrderRequestSchema.parse(input);
-  const [session, payFastConfig, cart] = await Promise.all([
+  const [session, payFastConfig] = await Promise.all([
     auth(),
     getPayFastIntegrationConfig(),
-    validateCartLines({ items: parsed.items }, zarCurrencyContext),
   ]);
 
   if (!payFastConfig.isConfigured) {
@@ -243,6 +352,26 @@ export async function createHostedCheckoutOrder(
       "PayFast hosted checkout is not configured. Add the active merchant credentials in Platform Settings.",
     );
   }
+
+  const userId = session?.user?.id ?? null;
+  const checkoutRequestFingerprint = createCheckoutRequestFingerprint(
+    parsed,
+    userId,
+  );
+  const replay = await getIdempotentCheckoutReplay({
+    checkoutRequestFingerprint,
+    checkoutRequestId: parsed.checkoutRequestId,
+    userId,
+  });
+
+  if (replay) {
+    return replay;
+  }
+
+  const cart = await validateCartLines(
+    { items: parsed.items },
+    zarCurrencyContext,
+  );
 
   if (
     cart.invalidVariantIds.length > 0 ||
@@ -268,7 +397,6 @@ export async function createHostedCheckoutOrder(
     );
   }
 
-  const userId = session?.user?.id ?? null;
   const checkoutDetails = await resolveCheckoutAddressBookSelection({
     input: parsed,
     userId,
@@ -398,9 +526,10 @@ export async function createHostedCheckoutOrder(
     quoteRows.reduce((total, quote) => total + Number(quote.customerAmount), 0),
   );
   const grandTotal = roundMoney(subtotal + shippingTotal);
-  const checkoutToken = crypto.randomBytes(32).toString("base64url");
+  const checkoutToken = createStableCheckoutToken(parsed.checkoutRequestId);
   const checkoutTokenHash = hashCheckoutToken(checkoutToken);
   const orderNumber = createOrderNumber();
+  const paymentExpiresAt = createPendingCheckoutExpiry();
   const deliveryAddressSnapshot = {
     addressLine1: checkoutDetails.deliveryAddress.addressLine1,
     addressLine2: checkoutDetails.deliveryAddress.addressLine2 || null,
@@ -433,6 +562,62 @@ export async function createHostedCheckoutOrder(
   };
 
   const created = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${parsed.checkoutRequestId}))`,
+    );
+
+    const [existingOrder] = await tx
+      .select({
+        checkoutRequestFingerprint: orders.checkoutRequestFingerprint,
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        paymentExpiresAt: orders.paymentExpiresAt,
+        status: orders.status,
+        userId: orders.userId,
+      })
+      .from(orders)
+      .where(eq(orders.checkoutRequestId, parsed.checkoutRequestId))
+      .limit(1);
+
+    if (existingOrder) {
+      if (
+        existingOrder.checkoutRequestFingerprint !==
+          checkoutRequestFingerprint ||
+        existingOrder.userId !== userId ||
+        existingOrder.status !== "pending" ||
+        !isPendingCheckoutOpen(existingOrder.paymentExpiresAt)
+      ) {
+        throw new Error(
+          "This checkout attempt cannot be replayed safely. Refresh checkout and try again.",
+        );
+      }
+
+      const [existingPayment] = await tx
+        .select({ id: payments.id })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.orderId, existingOrder.id),
+            eq(payments.provider, "payfast"),
+            eq(payments.status, "pending"),
+          ),
+        )
+        .orderBy(desc(payments.createdAt))
+        .limit(1);
+
+      if (!existingPayment) {
+        throw new Error(
+          "This checkout attempt no longer has a pending payment.",
+        );
+      }
+
+      return {
+        id: existingOrder.id,
+        orderNumber: existingOrder.orderNumber,
+        paymentId: existingPayment.id,
+      };
+    }
+
     const claimedQuotes = await tx
       .update(shippingRateQuotes)
       .set({ status: "selected" })
@@ -504,6 +689,8 @@ export async function createHostedCheckoutOrder(
       .values({
         billingDetailsSnapshot,
         campaignAttributionSnapshot: context.campaignAttribution ?? null,
+        checkoutRequestFingerprint,
+        checkoutRequestId: parsed.checkoutRequestId,
         checkoutTokenHash,
         currency: "ZAR",
         customerEmail: checkoutDetails.customer.email.toLowerCase(),
@@ -512,6 +699,7 @@ export async function createHostedCheckoutOrder(
         deliveryAddressSnapshot,
         grandTotal: grandTotal.toFixed(2),
         orderNumber,
+        paymentExpiresAt,
         policyAcceptanceSnapshot: {
           acceptedAt: new Date().toISOString(),
           deliveryInformationPath: "/delivery-information",
@@ -576,6 +764,16 @@ export async function createHostedCheckoutOrder(
         };
       }),
     );
+
+    await reserveOrderInventory({
+      expiresAt: paymentExpiresAt,
+      lines: cart.items.map((item) => ({
+        quantity: item.quantity,
+        variantId: item.variantId,
+      })),
+      orderId: order.id,
+      transaction: tx,
+    });
 
     if (scheduleSelection?.ok && deliveryQuote) {
       await tx.insert(jurgensDeliverySchedules).values({
@@ -710,6 +908,13 @@ export async function getCheckoutOrderSummary(orderId: string, token: string) {
       .limit(1),
   ]);
 
+  const payment = paymentRows[0];
+  const paymentConfirmation = {
+    paymentStatus: payment?.status ?? "pending",
+    providerStatus: payment?.providerStatus ?? null,
+    status: order.status,
+  };
+
   return {
     createdAt: order.createdAt.toISOString(),
     customerEmail: order.customerEmail,
@@ -718,12 +923,15 @@ export async function getCheckoutOrderSummary(orderId: string, token: string) {
     items: itemRows,
     orderId: order.id,
     orderNumber: order.orderNumber,
-    paymentStatus: paymentRows[0]?.status ?? "pending",
-    providerStatus: paymentRows[0]?.providerStatus ?? null,
-    purchasedVariantIds:
-      order.status === "paid" || order.status === "fulfilled"
-        ? itemRows.map((item) => item.variantId)
-        : [],
+    paymentExpiresAt: order.paymentExpiresAt?.toISOString() ?? null,
+    paymentWindowOpen:
+      order.status === "pending" &&
+      isPendingCheckoutOpen(order.paymentExpiresAt),
+    paymentStatus: paymentConfirmation.paymentStatus,
+    providerStatus: paymentConfirmation.providerStatus,
+    purchasedVariantIds: isCheckoutPaymentConfirmed(paymentConfirmation)
+      ? itemRows.map((item) => item.variantId)
+      : [],
     shippingTotal: Number(order.shippingTotal),
     status: order.status,
     subtotal: Number(order.subtotal),

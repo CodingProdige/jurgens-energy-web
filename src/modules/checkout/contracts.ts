@@ -107,6 +107,7 @@ export const checkoutAddressBookIntentSchema = z.discriminatedUnion("kind", [
 export const createCheckoutOrderRequestSchema = checkoutQuoteRequestSchema.extend({
   addressBookIntent: checkoutAddressBookIntentSchema.default({ kind: "none" }),
   billingDetails: checkoutBillingDetailsSchema.optional(),
+  checkoutRequestId: z.string().uuid(),
   customer: checkoutCustomerSchema,
   deliverySelections: z.array(checkoutDeliverySelectionSchema).min(1).max(20),
   jurgensDeliverySchedule: checkoutDeliveryScheduleSchema.optional(),

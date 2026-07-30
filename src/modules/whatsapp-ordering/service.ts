@@ -1988,6 +1988,7 @@ async function findLastOrderSummary({
       .where(eq(orderItems.orderId, order.id)),
     db
       .select({
+        provider: shipments.provider,
         status: shipments.status,
         trackingNumber: shipments.trackingNumber,
         trackingUrl: shipments.trackingUrl,
@@ -1995,8 +1996,7 @@ async function findLastOrderSummary({
       })
       .from(shipments)
       .where(eq(shipments.orderId, order.id))
-      .orderBy(desc(shipments.createdAt))
-      .limit(1),
+      .orderBy(desc(shipments.createdAt)),
     db
       .select({
         providerStatus: payments.providerStatus,
@@ -2012,7 +2012,7 @@ async function findLastOrderSummary({
     ...order,
     items,
     payment: paymentRows[0] ?? null,
-    shipment: shipmentRows[0] ?? null,
+    shipments: shipmentRows,
   };
 }
 
@@ -2064,19 +2064,28 @@ async function answerOrderStatus({
     return "I could not find an order linked to this WhatsApp number yet. If you ordered with another number or email, ask for a human and we can help find it.";
   }
 
-  const shipment = order.shipment;
-  const trackingLine = shipment?.trackingUrl
-    ? `Tracking: ${shipment.trackingUrl}`
-    : shipment?.trackingNumber
-      ? `Tracking number: ${shipment.trackingNumber}`
-      : null;
+  const deliveryLines = order.shipments.flatMap((shipment, index) => {
+    const prefix =
+      order.shipments.length > 1
+        ? `Delivery ${index + 1}/${order.shipments.length}`
+        : "Delivery";
+    const trackingLine = shipment.trackingUrl
+      ? `${prefix} tracking: ${shipment.trackingUrl}`
+      : shipment.trackingNumber
+        ? `${prefix} tracking number: ${shipment.trackingNumber}`
+        : null;
+
+    return [
+      `${prefix} (${shipment.provider.replaceAll("_", " ")}): ${shipment.status.replaceAll("_", " ")}`,
+      trackingLine,
+    ].filter((line): line is string => Boolean(line));
+  });
 
   return [
     `Latest order: ${order.orderNumber}`,
     `Order status: ${order.status}`,
     order.payment ? `Payment status: ${order.payment.status}` : null,
-    shipment ? `Delivery status: ${shipment.status.replaceAll("_", " ")}` : null,
-    trackingLine,
+    ...deliveryLines,
     `Total: ${formatMoney(order.grandTotal)}`,
   ]
     .filter(Boolean)
@@ -3092,7 +3101,7 @@ async function checkNationwideCourierDeliveryInquiry({
       : `Free shipping currently applies from a qualifying product subtotal of ${formatZarAmount(price.freeOverAmount)}.`;
   const reply = [
     `Yes — ${itemLabel} is courier-eligible for nationwide delivery to the South African address you supplied.`,
-    "One configured VAT-inclusive flat delivery fee applies per eligible order; the private carrier cost never changes the checkout total.",
+    "One configured VAT-inclusive flat delivery fee applies per eligible order.",
     priceMessage,
     thresholdMessage,
     getDeliveryResultNextStep(context.conversationState, item),

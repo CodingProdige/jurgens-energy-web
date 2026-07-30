@@ -2,6 +2,9 @@ import "server-only";
 
 import { processCreditNotePipeline } from "@/src/modules/invoices/credit-note-jobs";
 import { processInvoicePipeline } from "@/src/modules/invoices/jobs";
+import { expirePendingCheckoutOrders } from "@/src/modules/inventory/pending-orders";
+import { processNotificationDispatchRetries } from "@/src/modules/notifications/worker";
+import { processRefundShipmentCancellationJobs } from "@/src/modules/payments/refund-fulfillment-worker";
 import { reconcilePendingPayFastRefunds } from "@/src/modules/payments/refunds";
 
 const workerState = globalThis as typeof globalThis & {
@@ -27,6 +30,9 @@ export function startInvoiceWorker() {
       void Promise.all([
         processInvoicePipeline(),
         processCreditNotePipeline(),
+        expirePendingCheckoutOrders(),
+        processNotificationDispatchRetries(),
+        processRefundShipmentCancellationJobs(),
         reconcilePendingPayFastRefunds(),
       ])
         .catch((error) => {
@@ -47,6 +53,9 @@ export function startInvoiceWorker() {
       void Promise.all([
         processInvoicePipeline(),
         processCreditNotePipeline(),
+        expirePendingCheckoutOrders(),
+        processNotificationDispatchRetries(),
+        processRefundShipmentCancellationJobs(),
         reconcilePendingPayFastRefunds(),
       ])
         .catch((error) => {

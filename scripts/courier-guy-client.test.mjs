@@ -12,6 +12,7 @@ import {
   createCourierGuyBookingReference,
   createCourierGuyCustomerTrackingUrl,
   hasCourierGuyCredentialsForIdentity,
+  matchesCourierGuyBookingReference,
 } from "../src/modules/shipping/courier-guy-operations.ts";
 
 const config = {
@@ -69,6 +70,20 @@ test("creates a unique reconciliation reference and safe customer tracking URL",
   assert.equal(
     createCourierGuyCustomerTrackingUrl("ABC 123"),
     "https://portal.thecourierguy.co.za/track?ref=ABC+123",
+  );
+  assert.equal(
+    matchesCourierGuyBookingReference(
+      "JE-ORDER-shipment-id",
+      " je-order-SHIPMENT-id ",
+    ),
+    true,
+  );
+  assert.equal(
+    matchesCourierGuyBookingReference(
+      "JE-ORDER-shipment-id",
+      "JE-ORDER-another-id",
+    ),
+    false,
   );
 });
 
@@ -540,6 +555,7 @@ test("normalizes Courier Guy tracking events", async () => {
   const client = createCourierGuyClient(config, {
     fetchImpl: async () =>
       jsonResponse({
+        customer_reference: "JE-ORDER-shipment-id",
         shipment_id: 98765,
         shipment_collected_date: "2026-07-28T08:00:00Z",
         shipment_delivered_date: null,
@@ -564,6 +580,7 @@ test("normalizes Courier Guy tracking events", async () => {
   });
 
   assert.equal(result.providerShipmentId, "98765");
+  assert.equal(result.customerReference, "JE-ORDER-shipment-id");
   assert.equal(result.collectedAt, "2026-07-28T08:00:00Z");
   assert.equal(result.deliveredAt, null);
   assert.equal(result.status, "in-transit");

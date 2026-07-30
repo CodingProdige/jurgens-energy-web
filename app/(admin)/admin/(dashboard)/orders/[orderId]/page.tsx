@@ -10,6 +10,7 @@ import {
   MegaphoneIcon,
   PackageIcon,
   RefreshCwIcon,
+  TriangleAlertIcon,
   UserRoundIcon,
 } from "lucide-react";
 
@@ -129,6 +130,10 @@ export default async function AdminOrderDetailPage({
       creditNote.creditNoteNumber,
     ]) ?? [],
   );
+  const openReconciliationExceptions =
+    order.reconciliationExceptions.filter(
+      (exception) => exception.status === "open",
+    );
   const refundableLines: AdminRefundableInvoiceLine[] =
     order.invoice?.lines.flatMap((line) => {
       if (
@@ -158,15 +163,18 @@ export default async function AdminOrderDetailPage({
   );
   const refundRows: AdminOrderRefund[] = order.refunds.map((refund) => ({
     amountCents: Math.round(refund.amount * 100),
+    cancelOpenShipments: refund.cancelOpenShipments,
     createdAt: refund.createdAt.toISOString(),
     creditNoteNumber: refund.creditNoteId
       ? (creditNoteNumberById.get(refund.creditNoteId) ?? null)
       : null,
     id: refund.id,
+    fulfillmentActions: refund.fulfillmentActions,
     kind: refund.refundKind,
     manualActionReason: refund.manualActionReason,
     method: refund.refundMethod,
     reason: refund.reason,
+    requestedRestockQuantity: refund.requestedRestockQuantity,
     status: refund.status,
   }));
 
@@ -188,6 +196,73 @@ export default async function AdminOrderDetailPage({
           {humanize(order.status)}
         </Badge>
       </div>
+
+      {openReconciliationExceptions.length > 0 ? (
+        <section className="mb-5 overflow-hidden rounded-lg border border-red-500/35 bg-red-500/[0.06] shadow-sm">
+          <div className="flex items-start gap-3 border-b border-red-500/20 px-5 py-4">
+            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-red-500/12 text-red-700 dark:text-red-300">
+              <TriangleAlertIcon className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-red-800 dark:text-red-200">
+                Payment reconciliation required
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-red-800/85 dark:text-red-200/85">
+                PayFast reported a completed payment, but inventory could not be
+                assigned safely. This order was not captured or released for
+                fulfilment. Do not fulfil it until the payment and stock have
+                been reviewed; refund the PayFast payment if the order cannot
+                be honoured.
+              </p>
+            </div>
+          </div>
+          <div className="divide-y divide-red-500/20">
+            {openReconciliationExceptions.map((exception) => (
+              <div
+                className="grid gap-3 px-5 py-4 text-sm md:grid-cols-[minmax(0,1fr)_auto]"
+                key={exception.id}
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge
+                      className={cn(
+                        "rounded-md border capitalize",
+                        exception.status === "open"
+                          ? "border-red-500/25 bg-red-500/12 text-red-700 dark:text-red-300"
+                          : "border-emerald-500/25 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+                      )}
+                    >
+                      {humanize(exception.status)}
+                    </Badge>
+                    <span className="font-semibold capitalize text-zinc-950 dark:text-white">
+                      {humanize(exception.reason)}
+                    </span>
+                  </div>
+                  <p className="mt-2 leading-6 text-slate-700 dark:text-zinc-300">
+                    {exception.detail}
+                  </p>
+                  <p className="mt-1 break-all text-xs text-slate-500 dark:text-zinc-400">
+                    PayFast reference{" "}
+                    {exception.providerPaymentId ?? "not supplied"} · Last
+                    confirmed {dateFormatter.format(exception.lastSeenAt)}
+                    {exception.occurrences > 1
+                      ? ` · ${exception.occurrences} notifications received`
+                      : ""}
+                  </p>
+                  {exception.resolutionNote ? (
+                    <p className="mt-2 text-xs text-slate-600 dark:text-zinc-300">
+                      Resolution: {exception.resolutionNote}
+                    </p>
+                  ) : null}
+                </div>
+                <strong className="tabular-nums text-red-800 dark:text-red-200">
+                  {money(exception.receivedAmount)}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.75fr)]">
         <div className="grid min-w-0 content-start gap-5">

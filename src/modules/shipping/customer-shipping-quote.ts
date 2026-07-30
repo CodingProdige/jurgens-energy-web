@@ -102,7 +102,7 @@ export async function createCustomerShippingQuote(input: {
     option: {
       amountZar: parsed.price.amount,
       deliveryInformation:
-        "Delivery is available to eligible addresses throughout South Africa. Courier charges are reconciled internally and never change the amount shown at checkout.",
+        "Delivery is available to eligible addresses throughout South Africa.",
       label: serviceName,
       provider: "manual" as const,
       quoteId: quote.id,

@@ -11,9 +11,11 @@ import {
   invoices,
   orderItems,
   orders,
+  paymentReconciliationExceptions,
   paymentRefundAllocations,
   paymentRefunds,
   payments,
+  refundShipmentCancellationJobs,
   shipments,
 } from "@/src/db/schema";
 import type { CampaignAttributionSnapshot } from "@/src/modules/marketing/campaign-attribution";
@@ -107,12 +109,43 @@ export type AdminOrderDetail = {
     providerStatus: string | null;
     status: string;
   }>;
+  reconciliationExceptions: Array<{
+    detail: string;
+    firstSeenAt: Date;
+    id: string;
+    lastSeenAt: Date;
+    occurrences: number;
+    providerPaymentId: string | null;
+    reason:
+      | "inventory_reservation_invalid"
+      | "inventory_unavailable_after_expiry";
+    receivedAmount: number;
+    resolutionNote: string | null;
+    resolvedAt: Date | null;
+    status: "open" | "resolved";
+  }>;
   refunds: Array<{
     amount: number;
     completedAt: Date | null;
     createdAt: Date;
     creditNoteId: string | null;
+    cancelOpenShipments: boolean;
     errorMessage: string | null;
+    fulfillmentActions: Array<{
+      attempts: number;
+      id: string;
+      lastError: string | null;
+      provider: string;
+      shipmentId: string;
+      shipmentStatus: string;
+      status:
+        | "completed"
+        | "failed"
+        | "manual_review"
+        | "pending"
+        | "processing";
+      trackingReference: string | null;
+    }>;
     id: string;
     manualActionReason: string | null;
     providerStatus: string | null;
@@ -123,6 +156,7 @@ export type AdminOrderDetail = {
       | "not_available"
       | "payment_source"
       | "unknown";
+    requestedRestockQuantity: number;
     status:
       | "completed"
       | "failed"
@@ -178,11 +212,20 @@ export async function getAdminOrderDetail(
     return null;
   }
 
-  const [refundRows, itemRows, paymentRows, shipmentRows, invoiceRows] =
+  const [
+    refundRows,
+    refundFulfillmentRows,
+    itemRows,
+    paymentRows,
+    reconciliationExceptionRows,
+    shipmentRows,
+    invoiceRows,
+  ] =
     await Promise.all([
     db
       .select({
         amount: paymentRefunds.amount,
+        cancelOpenShipments: paymentRefunds.cancelOpenShipments,
         completedAt: paymentRefunds.completedAt,
         createdAt: paymentRefunds.createdAt,
         creditNoteId: paymentRefunds.creditNoteId,
@@ -193,12 +236,37 @@ export async function getAdminOrderDetail(
         reason: paymentRefunds.reason,
         refundKind: paymentRefunds.refundKind,
         refundMethod: paymentRefunds.refundMethod,
+        requestedRestockItems: paymentRefunds.requestedRestockItems,
         status: paymentRefunds.status,
         submittedAt: paymentRefunds.submittedAt,
       })
       .from(paymentRefunds)
       .where(eq(paymentRefunds.orderId, order.id))
       .orderBy(desc(paymentRefunds.createdAt)),
+    db
+      .select({
+        attempts: refundShipmentCancellationJobs.attempts,
+        id: refundShipmentCancellationJobs.id,
+        lastError: refundShipmentCancellationJobs.lastError,
+        provider: shipments.provider,
+        refundId: refundShipmentCancellationJobs.refundId,
+        shipmentId: shipments.id,
+        shipmentStatus: shipments.status,
+        status: refundShipmentCancellationJobs.status,
+        trackingNumber: shipments.trackingNumber,
+        waybillNumber: shipments.waybillNumber,
+      })
+      .from(refundShipmentCancellationJobs)
+      .innerJoin(
+        paymentRefunds,
+        eq(paymentRefunds.id, refundShipmentCancellationJobs.refundId),
+      )
+      .innerJoin(
+        shipments,
+        eq(shipments.id, refundShipmentCancellationJobs.shipmentId),
+      )
+      .where(eq(paymentRefunds.orderId, order.id))
+      .orderBy(desc(refundShipmentCancellationJobs.createdAt)),
     db
       .select({
         id: orderItems.id,
@@ -224,6 +292,26 @@ export async function getAdminOrderDetail(
       .orderBy(desc(payments.createdAt)),
     db
       .select({
+        detail: paymentReconciliationExceptions.detail,
+        firstSeenAt: paymentReconciliationExceptions.firstSeenAt,
+        id: paymentReconciliationExceptions.id,
+        lastSeenAt: paymentReconciliationExceptions.lastSeenAt,
+        occurrences: paymentReconciliationExceptions.occurrences,
+        providerPaymentId:
+          paymentReconciliationExceptions.providerPaymentId,
+        reason: paymentReconciliationExceptions.reason,
+        receivedAmount:
+          paymentReconciliationExceptions.receivedAmount,
+        resolutionNote:
+          paymentReconciliationExceptions.resolutionNote,
+        resolvedAt: paymentReconciliationExceptions.resolvedAt,
+        status: paymentReconciliationExceptions.status,
+      })
+      .from(paymentReconciliationExceptions)
+      .where(eq(paymentReconciliationExceptions.orderId, order.id))
+      .orderBy(desc(paymentReconciliationExceptions.lastSeenAt)),
+    db
+      .select({
         id: shipments.id,
         provider: shipments.provider,
         status: shipments.status,
@@ -245,6 +333,17 @@ export async function getAdminOrderDetail(
       .where(eq(invoices.orderId, order.id))
       .limit(1),
     ]);
+  const refundFulfillmentByRefundId = new Map<
+    string,
+    typeof refundFulfillmentRows
+  >();
+
+  for (const action of refundFulfillmentRows) {
+    const current = refundFulfillmentByRefundId.get(action.refundId) ?? [];
+
+    current.push(action);
+    refundFulfillmentByRefundId.set(action.refundId, current);
+  }
   const invoice = invoiceRows[0] ?? null;
   const [
     invoiceLineRows,
@@ -397,9 +496,32 @@ export async function getAdminOrderDetail(
       ...payment,
       amount: toMoney(payment.amount),
     })),
+    reconciliationExceptions: reconciliationExceptionRows.map(
+      (exception) => ({
+        ...exception,
+        receivedAmount: toMoney(exception.receivedAmount),
+      }),
+    ),
     refunds: refundRows.map((refund) => ({
       ...refund,
       amount: toMoney(refund.amount),
+      fulfillmentActions: (
+        refundFulfillmentByRefundId.get(refund.id) ?? []
+      ).map((action) => ({
+        attempts: action.attempts,
+        id: action.id,
+        lastError: action.lastError,
+        provider: action.provider,
+        shipmentId: action.shipmentId,
+        shipmentStatus: action.shipmentStatus,
+        status: action.status,
+        trackingReference:
+          action.trackingNumber ?? action.waybillNumber ?? null,
+      })),
+      requestedRestockQuantity: refund.requestedRestockItems.reduce(
+        (total, item) => total + item.quantity,
+        0,
+      ),
     })),
     shipments: shipmentRows,
     shippingTotal: toMoney(order.shippingTotal),

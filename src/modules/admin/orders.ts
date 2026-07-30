@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
@@ -6,7 +6,6 @@ import {
   orders,
   payments,
   shipments,
-  users,
 } from "@/src/db/schema";
 
 export type AdminOrderStatus =
@@ -24,6 +23,7 @@ export type AdminOrderPayment = {
 };
 
 export type AdminOrderShipmentSummary = {
+  id: string;
   provider: string;
   status: string;
   trackingNumber: string | null;
@@ -33,8 +33,8 @@ export type AdminOrderShipmentSummary = {
 
 export type AdminOrderRow = {
   createdAt: Date;
-  customerEmail: string | null;
-  customerName: string | null;
+  customerEmail: string;
+  customerName: string;
   grandTotal: string;
   id: string;
   itemCount: number;
@@ -72,8 +72,8 @@ export async function getAdminOrders(): Promise<AdminOrdersData> {
   const orderRows = await db
     .select({
       createdAt: orders.createdAt,
-      customerEmail: users.email,
-      customerName: users.name,
+      customerEmail: orders.customerEmail,
+      customerName: orders.customerName,
       grandTotal: orders.grandTotal,
       id: orders.id,
       orderNumber: orders.orderNumber,
@@ -82,7 +82,6 @@ export async function getAdminOrders(): Promise<AdminOrdersData> {
       subtotal: orders.subtotal,
     })
     .from(orders)
-    .leftJoin(users, eq(users.id, orders.userId))
     .orderBy(desc(orders.createdAt));
 
   const orderIds = orderRows.map((order) => order.id);
@@ -125,6 +124,7 @@ export async function getAdminOrders(): Promise<AdminOrdersData> {
       .orderBy(desc(payments.createdAt)),
     db
       .select({
+        id: shipments.id,
         orderId: shipments.orderId,
         provider: shipments.provider,
         status: shipments.status,
@@ -179,6 +179,7 @@ export async function getAdminOrders(): Promise<AdminOrdersData> {
     const current = shipmentsByOrderId.get(shipment.orderId) ?? [];
 
     current.push({
+      id: shipment.id,
       provider: shipment.provider,
       status: shipment.status,
       trackingNumber: shipment.trackingNumber,
@@ -204,6 +205,9 @@ export async function getAdminOrders(): Promise<AdminOrdersData> {
       totalQuantity: itemSummary.totalQuantity,
     };
   });
+  const paidOrders = adminOrders.filter((order) =>
+    ["paid", "fulfilled"].includes(order.status),
+  );
 
   return {
     metrics: {
@@ -212,11 +216,11 @@ export async function getAdminOrders(): Promise<AdminOrdersData> {
       paid: adminOrders.filter((order) => order.status === "paid").length,
       pending: adminOrders.filter((order) => order.status === "pending").length,
       refunded: adminOrders.filter((order) => order.status === "refunded").length,
-      revenue: adminOrders.reduce(
+      revenue: paidOrders.reduce(
         (total, order) => total + toMoneyNumber(order.grandTotal),
         0,
       ),
-      shippingCollected: adminOrders.reduce(
+      shippingCollected: paidOrders.reduce(
         (total, order) => total + toMoneyNumber(order.shippingTotal),
         0,
       ),

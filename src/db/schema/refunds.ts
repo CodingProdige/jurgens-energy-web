@@ -47,6 +47,11 @@ export type PaymentRefundRequestedAllocation = Readonly<{
   quantity: number;
 }>;
 
+export type PaymentRefundRequestedRestockItem = Readonly<{
+  invoiceLineId: string;
+  quantity: number;
+}>;
+
 export const paymentRefunds = pgTable(
   "payment_refunds",
   {
@@ -91,6 +96,13 @@ export const paymentRefunds = pgTable(
     requestedAllocations: jsonb("requested_allocations")
       .$type<PaymentRefundRequestedAllocation[]>()
       .notNull(),
+    requestedRestockItems: jsonb("requested_restock_items")
+      .$type<PaymentRefundRequestedRestockItem[]>()
+      .notNull()
+      .default([]),
+    cancelOpenShipments: boolean("cancel_open_shipments")
+      .notNull()
+      .default(false),
     providerAvailableBeforeCents: integer("provider_available_before_cents"),
     providerAvailableAfterCents: integer("provider_available_after_cents"),
     providerStatus: varchar("provider_status", { length: 120 }),

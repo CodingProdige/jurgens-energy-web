@@ -20,6 +20,11 @@ import {
   reconcilePayFastRefund,
   submitPayFastRefund,
 } from "@/src/modules/payments/refunds";
+import {
+  RefundShipmentCancellationReviewError,
+  resolveRefundShipmentCancellationReview,
+  retryRefundShipmentCancellationAfterVerification,
+} from "@/src/modules/payments/refund-shipment-cancellation-review";
 
 export type RefundMutationState = {
   creditNoteNumber?: string | null;
@@ -35,15 +40,31 @@ export type RefundMutationState = {
     | "failed";
 };
 
+export type CancellationReviewMutationState = {
+  message?: string;
+  ok?: boolean;
+};
+
 const allocationSchema = z.object({
   grossAmountCents: z.number().int().positive(),
   invoiceLineId: z.string().uuid(),
   quantity: z.number().int().positive().safe(),
 });
 
+const restockItemSchema = z.object({
+  invoiceLineId: z.string().uuid(),
+  quantity: z.number().int().positive().safe(),
+});
+
+const refundOperationalFields = {
+  cancelOpenShipments: z.boolean(),
+  restockItems: z.array(restockItemSchema).max(200),
+};
+
 const submitRefundFormSchema = z.discriminatedUnion("kind", [
   z.object({
     allocations: z.array(allocationSchema).max(200),
+    ...refundOperationalFields,
     idempotencyKey: z
       .string()
       .trim()
@@ -56,6 +77,7 @@ const submitRefundFormSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     allocations: z.array(allocationSchema).min(1).max(200),
+    ...refundOperationalFields,
     idempotencyKey: z
       .string()
       .trim()
@@ -73,11 +95,35 @@ const reconcileRefundFormSchema = z.object({
   refundId: z.string().uuid(),
 });
 
+const cancellationReviewFormSchema = z.object({
+  jobId: z.string().uuid(),
+  orderId: z.string().uuid(),
+  resolution: z.enum(["confirmed_cancelled", "shipment_not_cancelled"]),
+  verificationNote: z.string().trim().min(10).max(1_000),
+});
+
+const cancellationRetryFormSchema = z.object({
+  acknowledgedProviderOutcome: z.literal(true),
+  jobId: z.string().uuid(),
+  orderId: z.string().uuid(),
+  verificationNote: z.string().trim().min(10).max(1_000),
+});
+
 const creditNoteIdSchema = z.string().uuid();
 
 function readAllocations(formData: FormData) {
   try {
     const parsed = JSON.parse(String(formData.get("allocations") ?? "[]"));
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function readRestockItems(formData: FormData) {
+  try {
+    const parsed = JSON.parse(String(formData.get("restockItems") ?? "[]"));
 
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -139,10 +185,13 @@ export async function submitRefundAction(
 
   const parsed = submitRefundFormSchema.safeParse({
     allocations: readAllocations(formData),
+    cancelOpenShipments:
+      String(formData.get("cancelOpenShipments") ?? "") === "true",
     idempotencyKey: String(formData.get("idempotencyKey") ?? ""),
     kind: String(formData.get("kind") ?? ""),
     orderId: String(formData.get("orderId") ?? ""),
     reason: String(formData.get("reason") ?? ""),
+    restockItems: readRestockItems(formData),
   });
 
   if (!parsed.success) {
@@ -233,6 +282,141 @@ export async function reconcileRefundAction(
     return {
       message:
         "PayFast status could not be checked safely. The refund and invoice records were left unchanged.",
+      ok: false,
+    };
+  }
+}
+
+export async function resolveRefundShipmentCancellationReviewAction(
+  _state: CancellationReviewMutationState,
+  formData: FormData,
+): Promise<CancellationReviewMutationState> {
+  const access = await requireAdminCapability("admin.orders.manage");
+
+  if (!access.ok) {
+    return {
+      message:
+        "You do not have permission to resolve shipment cancellation reviews.",
+      ok: false,
+    };
+  }
+
+  const parsed = cancellationReviewFormSchema.safeParse({
+    jobId: String(formData.get("jobId") ?? ""),
+    orderId: String(formData.get("orderId") ?? ""),
+    resolution: String(formData.get("resolution") ?? ""),
+    verificationNote: String(formData.get("verificationNote") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return {
+      message:
+        parsed.error.issues[0]?.path[0] === "verificationNote"
+          ? "Add a verification note of at least 10 characters describing what you checked."
+          : "Choose a valid cancellation review outcome.",
+      ok: false,
+    };
+  }
+
+  try {
+    const result = await resolveRefundShipmentCancellationReview({
+      actorUserId: access.session.user.id,
+      ...parsed.data,
+    });
+
+    revalidateRefundSurfaces(parsed.data.orderId);
+
+    return {
+      message: result.alreadyResolved
+        ? "This cancellation review was already resolved."
+        : parsed.data.resolution === "confirmed_cancelled"
+          ? "Cancellation confirmed and the shipment was marked cancelled."
+          : "The review was resolved and the shipment's verified state was left in place.",
+      ok: true,
+    };
+  } catch (error) {
+    if (error instanceof RefundShipmentCancellationReviewError) {
+      return { message: error.message, ok: false };
+    }
+
+    console.error(
+      "[admin-refund] Shipment cancellation review resolution failed",
+      error,
+    );
+
+    return {
+      message:
+        "The review could not be resolved safely. Its existing state was left unchanged.",
+      ok: false,
+    };
+  }
+}
+
+export async function retryRefundShipmentCancellationAction(
+  _state: CancellationReviewMutationState,
+  formData: FormData,
+): Promise<CancellationReviewMutationState> {
+  const access = await requireAdminCapability("admin.orders.manage");
+
+  if (!access.ok) {
+    return {
+      message:
+        "You do not have permission to retry shipment cancellations.",
+      ok: false,
+    };
+  }
+
+  const parsed = cancellationRetryFormSchema.safeParse({
+    acknowledgedProviderOutcome:
+      String(formData.get("acknowledgeProviderOutcome") ?? "") ===
+      "confirmed",
+    jobId: String(formData.get("jobId") ?? ""),
+    orderId: String(formData.get("orderId") ?? ""),
+    verificationNote: String(formData.get("verificationNote") ?? ""),
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+
+    return {
+      message:
+        issue?.path[0] === "acknowledgedProviderOutcome"
+          ? "Confirm that the provider rejected or did not receive the earlier request before retrying."
+          : issue?.path[0] === "verificationNote"
+            ? "Add a verification note of at least 10 characters describing what you checked."
+            : "Choose a valid cancellation review to retry.",
+      ok: false,
+    };
+  }
+
+  try {
+    await retryRefundShipmentCancellationAfterVerification({
+      actorUserId: access.session.user.id,
+      jobId: parsed.data.jobId,
+      orderId: parsed.data.orderId,
+      verificationNote: parsed.data.verificationNote,
+    });
+
+    revalidateRefundSurfaces(parsed.data.orderId);
+
+    return {
+      message:
+        "One guarded cancellation retry was queued. If its outcome is uncertain, it will return to manual review instead of retrying blindly.",
+      ok: true,
+    };
+  } catch (error) {
+    if (error instanceof RefundShipmentCancellationReviewError) {
+      return { message: error.message, ok: false };
+    }
+
+    console.error(
+      "[admin-refund] Shipment cancellation retry failed",
+      error,
+    );
+
+    return {
+      message:
+        "The retry could not be queued safely. The review remains unchanged.",
       ok: false,
     };
   }

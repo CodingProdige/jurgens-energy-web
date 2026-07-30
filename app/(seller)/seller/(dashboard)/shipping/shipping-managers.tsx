@@ -15,6 +15,7 @@ import {
   saveParcelPreset,
   type SellerShippingActionState,
 } from "@/app/(seller)/seller/(dashboard)/shipping/actions";
+import { GooglePlacesAddressAutocomplete } from "@/components/address/google-places-address-autocomplete";
 import {
   DashboardButton,
   DashboardInput,
@@ -126,6 +127,14 @@ function StatusBadge({ status }: { status: string }) {
     >
       {status.replaceAll("_", " ")}
     </Badge>
+  );
+}
+
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" className="text-red-600">
+      *
+    </span>
   );
 }
 
@@ -506,6 +515,14 @@ function ShipmentTable({
 export function CollectionProfileForm({ profile }: { profile: SellerCollectionProfile }) {
   const [state, formAction, isPending] = useActionState(saveCollectionProfile, initialState);
   const [contactPhone, setContactPhone] = useState(profile?.contactPhone ?? "");
+  const [postalAddress, setPostalAddress] = useState(() => ({
+    addressLine1: profile?.addressLine1 ?? "",
+    addressLine2: profile?.addressLine2 ?? "",
+    city: profile?.city ?? "",
+    postalCode: profile?.postalCode ?? "",
+    province: profile?.province ?? "",
+    suburb: profile?.suburb ?? "",
+  }));
 
   function normalizeContactPhone() {
     const normalized = normalizePhoneNumber(contactPhone, {
@@ -521,11 +538,20 @@ export function CollectionProfileForm({ profile }: { profile: SellerCollectionPr
     <form action={formAction} className={cn("grid gap-5 p-5", dashboardPanelClass)}>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-1.5">
-          <Label>Contact name</Label>
-          <Input className={fieldClass} defaultValue={profile?.contactName ?? ""} name="contactName" />
+          <Label>
+            Contact name <RequiredMark />
+          </Label>
+          <Input
+            className={fieldClass}
+            defaultValue={profile?.contactName ?? ""}
+            name="contactName"
+            required
+          />
         </label>
         <label className="grid gap-1.5">
-          <Label>Contact phone</Label>
+          <Label>
+            Contact phone <RequiredMark />
+          </Label>
           <Input
             autoComplete="tel"
             className={fieldClass}
@@ -534,46 +560,159 @@ export function CollectionProfileForm({ profile }: { profile: SellerCollectionPr
             onBlur={normalizeContactPhone}
             onChange={(event) => setContactPhone(event.target.value)}
             placeholder="+27821234567"
+            required
             value={contactPhone}
           />
         </label>
         <label className="grid gap-1.5">
-          <Label>Contact email</Label>
-          <Input className={fieldClass} defaultValue={profile?.contactEmail ?? ""} name="contactEmail" type="email" />
+          <Label>
+            Contact email <RequiredMark />
+          </Label>
+          <Input
+            className={fieldClass}
+            defaultValue={profile?.contactEmail ?? ""}
+            name="contactEmail"
+            required
+            type="email"
+          />
         </label>
         <label className="grid gap-1.5">
-          <Label>Address type</Label>
+          <Label>
+            Address type <RequiredMark />
+          </Label>
           <Select defaultValue={profile?.addressType ?? "business"} name="addressType">
-            <SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-required="true" className={fieldClass}><SelectValue /></SelectTrigger>
             <SelectContent className={selectContentClass}>
               <SelectItem className={selectItemClass} value="business">Business</SelectItem>
               <SelectItem className={selectItemClass} value="residential">Residential</SelectItem>
             </SelectContent>
           </Select>
         </label>
+        <div className="grid gap-1.5 md:col-span-2">
+          <Label htmlFor="seller-collection-address-line-1">
+            Address line 1 <RequiredMark />
+          </Label>
+          <GooglePlacesAddressAutocomplete
+            autoComplete="address-line1"
+            countryCode="ZA"
+            id="seller-collection-address-line-1"
+            inputClassName={fieldClass}
+            name="addressLine1"
+            onAddressSelect={(selectedAddress) => {
+              setPostalAddress({
+                addressLine1: selectedAddress.addressLine1,
+                addressLine2: selectedAddress.addressLine2,
+                city: selectedAddress.city,
+                postalCode: selectedAddress.postalCode,
+                province: selectedAddress.province,
+                suburb: selectedAddress.suburb,
+              });
+            }}
+            onValueChange={(addressLine1) =>
+              setPostalAddress((current) => ({
+                ...current,
+                addressLine1,
+              }))
+            }
+            placeholder="Start typing a South African address"
+            required
+            value={postalAddress.addressLine1}
+          />
+        </div>
         <label className="grid gap-1.5 md:col-span-2">
-          <Label>Address line 1</Label>
-          <Input className={fieldClass} defaultValue={profile?.addressLine1 ?? ""} name="addressLine1" />
-        </label>
-        <label className="grid gap-1.5 md:col-span-2">
-          <Label>Address line 2</Label>
-          <Input className={fieldClass} defaultValue={profile?.addressLine2 ?? ""} name="addressLine2" />
-        </label>
-        <label className="grid gap-1.5">
-          <Label>Suburb</Label>
-          <Input className={fieldClass} defaultValue={profile?.suburb ?? ""} name="suburb" />
-        </label>
-        <label className="grid gap-1.5">
-          <Label>City</Label>
-          <Input className={fieldClass} defaultValue={profile?.city ?? ""} name="city" />
-        </label>
-        <label className="grid gap-1.5">
-          <Label>Province</Label>
-          <Input className={fieldClass} defaultValue={profile?.province ?? ""} name="province" />
+          <Label htmlFor="seller-collection-address-line-2">
+            Address line 2
+          </Label>
+          <Input
+            autoComplete="address-line2"
+            className={fieldClass}
+            id="seller-collection-address-line-2"
+            name="addressLine2"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                addressLine2: event.target.value,
+              }))
+            }
+            value={postalAddress.addressLine2}
+          />
         </label>
         <label className="grid gap-1.5">
-          <Label>Postal code</Label>
-          <Input className={fieldClass} defaultValue={profile?.postalCode ?? ""} name="postalCode" />
+          <Label htmlFor="seller-collection-suburb">
+            Suburb <RequiredMark />
+          </Label>
+          <Input
+            autoComplete="address-level3"
+            className={fieldClass}
+            id="seller-collection-suburb"
+            name="suburb"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                suburb: event.target.value,
+              }))
+            }
+            required
+            value={postalAddress.suburb}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <Label htmlFor="seller-collection-city">
+            City <RequiredMark />
+          </Label>
+          <Input
+            autoComplete="address-level2"
+            className={fieldClass}
+            id="seller-collection-city"
+            name="city"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                city: event.target.value,
+              }))
+            }
+            required
+            value={postalAddress.city}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <Label htmlFor="seller-collection-province">
+            Province <RequiredMark />
+          </Label>
+          <Input
+            autoComplete="address-level1"
+            className={fieldClass}
+            id="seller-collection-province"
+            name="province"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                province: event.target.value,
+              }))
+            }
+            required
+            value={postalAddress.province}
+          />
+        </label>
+        <label className="grid gap-1.5">
+          <Label htmlFor="seller-collection-postal-code">
+            Postal code <RequiredMark />
+          </Label>
+          <Input
+            autoComplete="postal-code"
+            className={fieldClass}
+            id="seller-collection-postal-code"
+            inputMode="numeric"
+            name="postalCode"
+            onChange={(event) =>
+              setPostalAddress((current) => ({
+                ...current,
+                postalCode: event.target.value,
+              }))
+            }
+            required
+            value={postalAddress.postalCode}
+          />
         </label>
         <label className="grid gap-1.5 md:col-span-2">
           <Label>Collection instructions</Label>

@@ -45,6 +45,16 @@ export function createCourierGuyBookingReference(
   return `${normalizedOrderNumber}-${suffix}`.slice(0, 255);
 }
 
+export function matchesCourierGuyBookingReference(
+  expectedReference: string,
+  providerCustomerReference: string | null | undefined,
+) {
+  return (
+    providerCustomerReference?.trim().toLowerCase() ===
+    expectedReference.trim().toLowerCase()
+  );
+}
+
 export function createCourierGuyCustomerTrackingUrl(
   trackingReference: string,
 ) {

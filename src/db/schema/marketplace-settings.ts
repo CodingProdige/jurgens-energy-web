@@ -31,6 +31,10 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   googleAdsConversionId: text("google_ads_conversion_id"),
   googleAdsConversionLabel: text("google_ads_conversion_label"),
   googleMerchantCenterId: text("google_merchant_center_id"),
+  googlePlacesEnabled: boolean("google_places_enabled")
+    .notNull()
+    .default(false),
+  googlePlacesApiKeyEncrypted: text("google_places_api_key_encrypted"),
   googleLocalInventoryEnabled: boolean("google_local_inventory_enabled")
     .notNull()
     .default(false),

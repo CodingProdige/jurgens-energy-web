@@ -7,12 +7,13 @@ import {
 } from "@/components/dashboard/dashboard-compact-metrics";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-controls";
 import { getAdminScheduledOrders } from "@/src/modules/admin/scheduled-orders";
+import { hasAdminCapability } from "@/src/modules/admin/staff";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import { ScheduledOrdersManager } from "@/app/(admin)/admin/(dashboard)/orders/scheduled/scheduled-orders-manager";
 
 export const metadata: Metadata = {
-  title: "Scheduled Orders",
-  description: "Review and update scheduled Jurgens Energy delivery orders.",
+  title: "Local Deliveries",
+  description: "Plan and progress paid Jurgens Energy local deliveries.",
   robots: {
     follow: false,
     index: false,
@@ -30,10 +31,18 @@ export default async function AdminScheduledOrdersPage() {
   const metrics: DashboardMetricDefinition[] = [
     {
       color: "blue",
-      description: "All direct Jurgens delivery schedules currently stored.",
+      description: "All paid orders with a Jurgens local-delivery shipment.",
       id: "total",
       label: "Total",
       value: data.metrics.total,
+    },
+    {
+      color: "red",
+      description:
+        "Paid local deliveries that still need an admin-assigned date.",
+      id: "unscheduled",
+      label: "Needs date",
+      value: data.metrics.unscheduled,
     },
     {
       color: "amber",
@@ -75,8 +84,8 @@ export default async function AdminScheduledOrdersPage() {
   return (
     <>
       <DashboardPageHeader
-        breadcrumbs={["Orders", "Scheduled"]}
-        title="Scheduled Orders"
+        breadcrumbs={["Orders", "Local deliveries"]}
+        title="Local Deliveries"
       />
 
       <div className="grid gap-4">
@@ -84,7 +93,13 @@ export default async function AdminScheduledOrdersPage() {
           metrics={metrics}
           storageKey="jurgens:admin:scheduled-order-metrics"
         />
-        <ScheduledOrdersManager rows={data.rows} />
+        <ScheduledOrdersManager
+          canManage={hasAdminCapability(
+            access.session.user.adminCapabilities,
+            "admin.orders.manage",
+          )}
+          rows={data.rows}
+        />
       </div>
     </>
   );

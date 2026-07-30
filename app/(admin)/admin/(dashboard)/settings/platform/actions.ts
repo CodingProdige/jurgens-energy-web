@@ -10,6 +10,7 @@ import {
   updateMarketplaceComingSoonSettings,
   updateMarketplaceFooterSettings,
   updateMarketplaceGoogleMarketingSettings,
+  updateMarketplaceGooglePlacesSettings,
   updateMarketplaceMediaSettings,
   updateMarketplaceOpenAiSettings,
   updateMarketplacePayFastSettings,
@@ -313,6 +314,57 @@ export async function updateGoogleMarketingSettings(
 
   revalidatePath("/");
   revalidatePath("/settings/platform");
+
+  return result;
+}
+
+const googlePlacesSettingsSchema = z.object({
+  apiKey: z
+    .string()
+    .trim()
+    .max(500, "The Google Places API key is too long.")
+    .optional()
+    .transform((value) => value || undefined)
+    .refine(
+      (value) =>
+        !value ||
+        (value.length >= 20 && /^[A-Za-z0-9_-]+$/.test(value)),
+      "Enter a valid Google Places API key without spaces.",
+    ),
+  enabled: z.boolean(),
+  removeApiKey: z.boolean(),
+});
+
+export async function updateGooglePlacesSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireSettingsManageAccess();
+  const parsed = googlePlacesSettingsSchema.safeParse({
+    apiKey: String(formData.get("apiKey") ?? ""),
+    enabled: formData.get("enabled") === "on",
+    removeApiKey: formData.get("removeApiKey") === "on",
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ??
+        "Check the Google Places settings.",
+    };
+  }
+
+  const result = await updateMarketplaceGooglePlacesSettings({
+    actorUserId: session.user.id,
+    ...parsed.data,
+  });
+
+  revalidatePath("/account/addresses");
+  revalidatePath("/checkout");
+  revalidatePath("/settings/business");
+  revalidatePath("/settings/platform");
+  revalidatePath("/shipping/collection-profile");
 
   return result;
 }

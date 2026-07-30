@@ -54,6 +54,7 @@ export const privacyPolicy: PolicyDocument = {
       bullets: [
         "Contact and identity details, such as your name, email address, telephone number, and account identifiers.",
         "Order and fulfilment details, including products, quantities, delivery address, delivery instructions, order history, and cylinder-exchange information.",
+        "Address-search text and the selected address details when you choose to use address autocomplete. You can always enter an address manually instead.",
         "Payment-related records, such as the payment method type, payment status, and transaction reference. Payment providers process card or bank credentials under their own security and privacy terms; we do not need your card PIN or online-banking password.",
         "Messages and support records, including WhatsApp conversations, emails, call notes, requests, complaints, and return or refund information.",
         "Device and usage information, such as IP address, browser and device type, pages viewed, referring links, approximate location derived from an IP address, and security or diagnostic logs.",
@@ -65,6 +66,7 @@ export const privacyPolicy: PolicyDocument = {
       title: "3. How we receive information",
       paragraphs: [
         "Most information comes directly from you when you use the store or contact us. We may also receive limited information automatically from your browser, or from service providers involved in authentication, payments, delivery, analytics, fraud prevention, or communications.",
+        "When address autocomplete is enabled and you type in an address-search field, the search text and selected place request are sent to Google Maps Platform so that matching addresses can be suggested and the address fields can be completed. Google processes that request under the Google Maps Platform Terms of Service at https://cloud.google.com/maps-platform/terms and Google Privacy Policy at https://policies.google.com/privacy. Autocomplete is optional and the entered address remains editable.",
         "If another person places an order for you or gives us your details as a recipient, that person must be authorised to do so and must make you aware that your details will be used for delivery and order support.",
       ],
     },
@@ -91,6 +93,7 @@ export const privacyPolicy: PolicyDocument = {
       ],
       bullets: [
         "Hosting, database, authentication, security, analytics, customer-support, and other technology providers.",
+        "Google Maps Platform when you choose to use address autocomplete.",
         "Payment processors, banks, and fraud-prevention providers involved in a transaction.",
         "Couriers, delivery partners, suppliers, or approved return-collection teams that need order and contact details to fulfil an order or return.",
         "Communications providers, including WhatsApp or Meta where you choose to communicate through WhatsApp, and email or messaging providers where used.",
@@ -230,7 +233,6 @@ export const termsAndConditions: PolicyDocument = {
       paragraphs: [
         "Courier-eligible products can be delivered nationwide to eligible addresses within South Africa. Products marked for Jurgens delivery are available only when the delivery postcode falls within an active Jurgens service area. Checkout cross-references the selected products and complete address before payment.",
         "An eligible order has one configured VAT-inclusive flat delivery fee, even when more than one fulfilment method is used. An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches the configured threshold. The final fee is shown before payment.",
-        "A courier quotation or the amount charged to us by a delivery provider is an internal fulfilment cost. It does not replace or increase the delivery fee disclosed to you for the confirmed order; Jurgens Energy absorbs any difference.",
         "Our handling time is 0–1 business day after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched that day. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.",
         "Transit time after dispatch depends on the destination, parcel, delivery service and operating conditions. Any available delivery estimate is communicated in the order updates or tracking details and is not a guaranteed appointment unless we expressly confirm otherwise.",
         "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
@@ -268,6 +270,7 @@ export const termsAndConditions: PolicyDocument = {
       title: "10. Accounts and acceptable use",
       paragraphs: [
         "You are responsible for keeping account credentials confidential and for activity performed through your account unless you promptly report unauthorised access. Do not misuse the website, attempt to bypass security, interfere with its operation, upload malicious material, scrape it in a way that harms the service, or use it for unlawful or fraudulent activity.",
+        "Where available, address suggestions are provided using Google Maps Platform and are subject to the Google Maps Platform Terms of Service at https://cloud.google.com/maps-platform/terms and Google Privacy Policy at https://policies.google.com/privacy. Suggestions assist with data entry but do not replace your responsibility to check that the delivery, billing, or collection address is complete and correct. You may enter an address manually.",
         "We may suspend access where reasonably necessary to secure the service, investigate misuse, comply with law, or protect customers. We will restore access when the reason for suspension has been resolved where reasonably possible.",
       ],
     },
@@ -438,7 +441,6 @@ export const deliveryInformation: PolicyDocument = {
       paragraphs: [
         "Checkout applies one configured VAT-inclusive flat delivery fee to an eligible order. We do not add separate customer delivery fees for Jurgens delivery and courier delivery when an order requires both fulfilment methods.",
         "If a free-shipping rule is active and the qualifying product subtotal reaches its configured threshold, checkout reduces the delivery fee to zero. Changing the products or quantities before payment may change whether the order qualifies. The final delivery fee is always shown before payment, or communicated for approval during an assisted order.",
-        "Courier rates, parcel measurements and delivery-provider charges are used internally to fulfil the order and do not determine the customer delivery fee. If the provider charges more than the fee collected from you, Jurgens Energy absorbs the difference.",
       ],
     },
     {
@@ -529,7 +531,6 @@ export function createDeliveryInformationDocument(
             paragraphs: [
               deliveryFeeDescription,
               "One order-level customer delivery fee applies even when an order requires both Jurgens delivery and courier delivery. The final delivery fee is always shown before payment, or communicated for approval during an assisted order.",
-              "Courier rates, parcel measurements and delivery-provider charges are used internally to fulfil the order and do not determine the customer delivery fee. If the provider charges more than the fee collected from you, Jurgens Energy absorbs the difference.",
             ],
           }
         : section,

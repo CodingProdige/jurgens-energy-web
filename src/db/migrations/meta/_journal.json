@@ -561,6 +561,69 @@
       "when": 1786269600000,
       "tag": "0079_shorten_courier_guy_label_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1786356000000,
+      "tag": "0080_inventory_reservations_and_refund_fulfillment",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1786442400000,
+      "tag": "0081_fulfillment_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1786528800000,
+      "tag": "0082_refund_shipment_cancellation_idempotency",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1786615200000,
+      "tag": "0083_notification_dispatch_claim_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1786701600000,
+      "tag": "0084_payment_reconciliation_exceptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1786788000000,
+      "tag": "0085_jurgens_delivery_schedule_uniqueness",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1786874400000,
+      "tag": "0086_checkout_request_idempotency",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1786960800000,
+      "tag": "0087_notification_dispatch_pending_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1787047200000,
+      "tag": "0088_google_places",
+      "breakpoints": true
     }
   ]
 }

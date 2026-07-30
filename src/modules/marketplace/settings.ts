@@ -289,9 +289,11 @@ export type MarketplaceSettings = {
   googleLocalInventoryEnabled: boolean;
   googleLocalInventoryStoreCode: string | null;
   googleMerchantCenterId: string | null;
+  googlePlacesEnabled: boolean;
   googleReviewUrl: string | null;
   googleSiteVerificationToken: string | null;
   googleTagManagerId: string | null;
+  hasGooglePlacesApiKey: boolean;
   hasOpenAiApiKey: boolean;
   imageCompressionQuality: number;
   instagramUrl: string | null;
@@ -381,6 +383,10 @@ export type WhatsappFollowUpSettings = Pick<
 >;
 
 export type MarketplaceAdminSecrets = {
+  courierGuyLiveApiKey: string | null;
+  courierGuySandboxApiKey: string | null;
+  courierGuyWebhookToken: string | null;
+  googlePlacesApiKey: string | null;
   openAiApiKey: string | null;
   payfastLiveMerchantKey: string | null;
   payfastLivePassphrase: string | null;
@@ -425,9 +431,11 @@ const defaultSettings: MarketplaceSettings = {
   googleLocalInventoryEnabled: false,
   googleLocalInventoryStoreCode: null,
   googleMerchantCenterId: null,
+  googlePlacesEnabled: false,
   googleReviewUrl: null,
   googleSiteVerificationToken: null,
   googleTagManagerId: null,
+  hasGooglePlacesApiKey: false,
   hasOpenAiApiKey: Boolean(env.OPENAI_API_KEY),
   imageCompressionQuality: 78,
   instagramUrl: null,
@@ -530,6 +538,9 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       googleLocalInventoryStoreCode:
         marketplaceSettings.googleLocalInventoryStoreCode,
       googleMerchantCenterId: marketplaceSettings.googleMerchantCenterId,
+      googlePlacesApiKeyEncrypted:
+        marketplaceSettings.googlePlacesApiKeyEncrypted,
+      googlePlacesEnabled: marketplaceSettings.googlePlacesEnabled,
       googleReviewUrl: marketplaceSettings.googleReviewUrl,
       googleSiteVerificationToken:
         marketplaceSettings.googleSiteVerificationToken,
@@ -671,9 +682,13 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
   const paymentMethodBadges = await resolvePaymentMethodBadges(
     settings.paymentMethodBadges,
   );
+  const {
+    googlePlacesApiKeyEncrypted,
+    ...settingsWithoutGooglePlacesApiKey
+  } = settings;
 
   return {
-    ...settings,
+    ...settingsWithoutGooglePlacesApiKey,
     bobgoBookingMode: normalizeBobgoBookingMode(settings.bobgoBookingMode),
     bobgoMode: settings.bobgoMode === "live" ? "live" : "sandbox",
     contactEmail: settings.contactEmail ?? defaultSettings.contactEmail,
@@ -732,6 +747,9 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
     ),
     hasCourierGuyWebhookToken: Boolean(
       settings.courierGuyWebhookTokenEncrypted,
+    ),
+    hasGooglePlacesApiKey: Boolean(
+      decryptOptionalSecret(googlePlacesApiKeyEncrypted),
     ),
     shippingFlatRate: Math.max(0, Number(settings.shippingFlatRate) || 0),
     shippingFreeOverAmount:
@@ -1052,16 +1070,26 @@ export async function updateMarketplaceCourierGuyCredentials({
   const existingSandboxApiKey = decryptOptionalSecret(
     existing?.courierGuySandboxApiKeyEncrypted,
   );
+  const existingWebhookToken = decryptOptionalSecret(
+    existing?.courierGuyWebhookTokenEncrypted,
+  );
+  const liveApiKeyChanged =
+    courierGuyLiveApiKey !== undefined &&
+    courierGuyLiveApiKey !== existingLiveApiKey;
+  const sandboxApiKeyChanged =
+    courierGuySandboxApiKey !== undefined &&
+    courierGuySandboxApiKey !== existingSandboxApiKey;
+  const webhookTokenChanged =
+    courierGuyWebhookToken !== undefined &&
+    courierGuyWebhookToken !== existingWebhookToken;
   const liveCredentialsChanged =
     normalizedLiveAccountCode !==
       (existing?.courierGuyLiveAccountCode?.trim() || null) ||
-    (courierGuyLiveApiKey !== undefined &&
-      courierGuyLiveApiKey !== existingLiveApiKey);
+    liveApiKeyChanged;
   const sandboxCredentialsChanged =
     normalizedSandboxAccountCode !==
       (existing?.courierGuySandboxAccountCode?.trim() || null) ||
-    (courierGuySandboxApiKey !== undefined &&
-      courierGuySandboxApiKey !== existingSandboxApiKey);
+    sandboxApiKeyChanged;
   const changedEnvironments: Array<"live" | "sandbox"> = [];
 
   if (liveCredentialsChanged) {
@@ -1082,13 +1110,15 @@ export async function updateMarketplaceCourierGuyCredentials({
     };
   }
 
-  const nextLiveApiKeyEncrypted = courierGuyLiveApiKey
+  const nextLiveApiKeyEncrypted = liveApiKeyChanged && courierGuyLiveApiKey
     ? encryptSecret(courierGuyLiveApiKey)
     : existing?.courierGuyLiveApiKeyEncrypted;
-  const nextSandboxApiKeyEncrypted = courierGuySandboxApiKey
+  const nextSandboxApiKeyEncrypted =
+    sandboxApiKeyChanged && courierGuySandboxApiKey
     ? encryptSecret(courierGuySandboxApiKey)
     : existing?.courierGuySandboxApiKeyEncrypted;
-  const nextWebhookTokenEncrypted = courierGuyWebhookToken
+  const nextWebhookTokenEncrypted =
+    webhookTokenChanged && courierGuyWebhookToken
     ? encryptSecret(courierGuyWebhookToken)
     : existing?.courierGuyWebhookTokenEncrypted;
   const now = new Date();
@@ -1120,7 +1150,7 @@ export async function updateMarketplaceCourierGuyCredentials({
         courierGuySandboxAccountCode: normalizedSandboxAccountCode,
         liveCredentialsChanged,
         sandboxCredentialsChanged,
-        webhookTokenChanged: Boolean(courierGuyWebhookToken),
+        webhookTokenChanged,
       }),
     });
   });
@@ -1267,17 +1297,27 @@ export async function updateMarketplaceShippingSettings({
   const existingSandboxApiKey = decryptOptionalSecret(
     existing?.courierGuySandboxApiKeyEncrypted,
   );
+  const existingWebhookToken = decryptOptionalSecret(
+    existing?.courierGuyWebhookTokenEncrypted,
+  );
   const protectedCredentialEnvironments: Array<"live" | "sandbox"> = [];
+  const liveApiKeyChanged =
+    courierGuyLiveApiKey !== undefined &&
+    courierGuyLiveApiKey !== existingLiveApiKey;
+  const sandboxApiKeyChanged =
+    courierGuySandboxApiKey !== undefined &&
+    courierGuySandboxApiKey !== existingSandboxApiKey;
+  const webhookTokenChanged =
+    courierGuyWebhookToken !== undefined &&
+    courierGuyWebhookToken !== existingWebhookToken;
   const liveCredentialsChanged =
     normalizedLiveAccountCode !==
       (existing?.courierGuyLiveAccountCode?.trim() || null) ||
-    (courierGuyLiveApiKey !== undefined &&
-      courierGuyLiveApiKey !== existingLiveApiKey);
+    liveApiKeyChanged;
   const sandboxCredentialsChanged =
     normalizedSandboxAccountCode !==
       (existing?.courierGuySandboxAccountCode?.trim() || null) ||
-    (courierGuySandboxApiKey !== undefined &&
-      courierGuySandboxApiKey !== existingSandboxApiKey);
+    sandboxApiKeyChanged;
   const activeCredentialsChanged =
     courierGuyMode === "live"
       ? liveCredentialsChanged
@@ -1305,13 +1345,14 @@ export async function updateMarketplaceShippingSettings({
   const nextLiveApiKeyPlain = courierGuyLiveApiKey ?? existingLiveApiKey;
   const nextSandboxApiKeyPlain =
     courierGuySandboxApiKey ?? existingSandboxApiKey;
-  const nextLiveApiKeyEncrypted = courierGuyLiveApiKey
+  const nextLiveApiKeyEncrypted = liveApiKeyChanged && courierGuyLiveApiKey
     ? encryptSecret(courierGuyLiveApiKey)
     : existing?.courierGuyLiveApiKeyEncrypted;
-  const nextSandboxApiKeyEncrypted = courierGuySandboxApiKey
+  const nextSandboxApiKeyEncrypted =
+    sandboxApiKeyChanged && courierGuySandboxApiKey
     ? encryptSecret(courierGuySandboxApiKey)
     : existing?.courierGuySandboxApiKeyEncrypted;
-  const nextWebhookToken = courierGuyWebhookToken
+  const nextWebhookToken = webhookTokenChanged && courierGuyWebhookToken
     ? encryptSecret(courierGuyWebhookToken)
     : existing?.courierGuyWebhookTokenEncrypted;
   const activeApiKey =
@@ -1945,10 +1986,48 @@ export async function getWhatsappIntegrationConfig() {
   };
 }
 
+export type GooglePlacesIntegrationConfig = {
+  apiKey: string | null;
+  countryCode: "ZA";
+  enabled: boolean;
+  isConfigured: boolean;
+  languageCode: "en";
+};
+
+export async function getGooglePlacesIntegrationConfig(): Promise<
+  GooglePlacesIntegrationConfig
+> {
+  const rawSettings = await getRawMarketplaceSettings();
+  const apiKey = decryptOptionalSecret(
+    rawSettings?.googlePlacesApiKeyEncrypted,
+  );
+  const enabled = Boolean(rawSettings?.googlePlacesEnabled && apiKey);
+
+  return {
+    apiKey,
+    countryCode: "ZA",
+    enabled,
+    isConfigured: enabled,
+    languageCode: "en",
+  };
+}
+
 export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecrets> {
   const rawSettings = await getRawMarketplaceSettings();
 
   return {
+    courierGuyLiveApiKey: decryptOptionalSecret(
+      rawSettings?.courierGuyLiveApiKeyEncrypted,
+    ),
+    courierGuySandboxApiKey: decryptOptionalSecret(
+      rawSettings?.courierGuySandboxApiKeyEncrypted,
+    ),
+    courierGuyWebhookToken: decryptOptionalSecret(
+      rawSettings?.courierGuyWebhookTokenEncrypted,
+    ),
+    googlePlacesApiKey: decryptOptionalSecret(
+      rawSettings?.googlePlacesApiKeyEncrypted,
+    ),
     openAiApiKey:
       decryptOptionalSecret(rawSettings?.openAiApiKeyEncrypted) ??
       env.OPENAI_API_KEY ??
@@ -2019,6 +2098,9 @@ async function getRawMarketplaceSettings() {
         marketplaceSettings.courierGuySandboxApiKeyEncrypted,
       courierGuyWebhookTokenEncrypted:
         marketplaceSettings.courierGuyWebhookTokenEncrypted,
+      googlePlacesApiKeyEncrypted:
+        marketplaceSettings.googlePlacesApiKeyEncrypted,
+      googlePlacesEnabled: marketplaceSettings.googlePlacesEnabled,
       payfastLiveMerchantKeyEncrypted:
         marketplaceSettings.payfastLiveMerchantKeyEncrypted,
       payfastLivePassphraseEncrypted:
@@ -2297,6 +2379,101 @@ export async function updateMarketplaceGoogleMarketingSettings({
     });
 
   return { ok: true, message: "Google and Merchant Center settings saved." };
+}
+
+export async function updateMarketplaceGooglePlacesSettings({
+  actorUserId,
+  apiKey,
+  enabled,
+  removeApiKey = false,
+}: {
+  actorUserId: string;
+  apiKey?: string;
+  enabled: boolean;
+  removeApiKey?: boolean;
+}) {
+  const existing = await getRawMarketplaceSettings();
+  const existingApiKey = decryptOptionalSecret(
+    existing?.googlePlacesApiKeyEncrypted,
+  );
+  const normalizedApiKey = apiKey?.trim() || undefined;
+
+  if (
+    removeApiKey &&
+    normalizedApiKey &&
+    normalizedApiKey !== existingApiKey
+  ) {
+    return {
+      ok: false as const,
+      message:
+        "Choose either a replacement Google Places API key or remove the saved key.",
+    };
+  }
+
+  if (!env.AUTH_SECRET && (enabled || Boolean(normalizedApiKey))) {
+    return {
+      ok: false as const,
+      message:
+        "Configure the server AUTH_SECRET before storing or enabling Google Places.",
+    };
+  }
+
+  const apiKeyChanged =
+    !removeApiKey &&
+    normalizedApiKey !== undefined &&
+    normalizedApiKey !== existingApiKey;
+  const apiKeyRemoved =
+    removeApiKey && Boolean(existing?.googlePlacesApiKeyEncrypted);
+  const nextApiKey = removeApiKey
+    ? null
+    : (normalizedApiKey ?? existingApiKey);
+  const nextApiKeyEncrypted = removeApiKey
+    ? null
+    : apiKeyChanged && normalizedApiKey
+      ? encryptSecret(normalizedApiKey)
+      : (existing?.googlePlacesApiKeyEncrypted ?? null);
+
+  if (enabled && (!nextApiKey || !nextApiKeyEncrypted)) {
+    return {
+      ok: false as const,
+      message:
+        "Add a Google Places server API key before enabling address autocomplete.",
+    };
+  }
+
+  const values = {
+    googlePlacesApiKeyEncrypted: nextApiKeyEncrypted,
+    googlePlacesEnabled: enabled,
+    updatedAt: new Date(),
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({ id: 1, ...values })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: values,
+      });
+
+    await tx.insert(auditLogs).values({
+      action: "marketplace.google_places_settings.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({
+        apiKeyChanged,
+        apiKeyRemoved,
+        enabled,
+      }),
+    });
+  });
+
+  return {
+    ok: true as const,
+    message: apiKeyRemoved
+      ? "Google Places API key removed and autocomplete disabled."
+      : "Google Places settings saved.",
+  };
 }
 
 export async function updateMarketplaceOpenAiSettings({

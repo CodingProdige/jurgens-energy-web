@@ -421,12 +421,16 @@ export const jurgensDeliverySchedules = pgTable(
       schedule.scheduledDate,
       schedule.status,
     ),
-    orderIdx: index("jurgens_delivery_schedules_order_id_idx").on(
+    orderUnique: uniqueIndex(
+      "jurgens_delivery_schedules_order_id_unique",
+    ).on(
       schedule.orderId,
     ),
-    shipmentIdx: index("jurgens_delivery_schedules_shipment_id_idx").on(
-      schedule.shipmentId,
-    ),
+    shipmentUnique: uniqueIndex(
+      "jurgens_delivery_schedules_shipment_id_unique",
+    )
+      .on(schedule.shipmentId)
+      .where(sql`${schedule.shipmentId} IS NOT NULL`),
   }),
 );
 

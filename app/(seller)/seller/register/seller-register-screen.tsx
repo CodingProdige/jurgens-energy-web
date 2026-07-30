@@ -37,6 +37,10 @@ import {
   type SellerStoreNameAvailabilityState,
 } from "@/app/(seller)/seller/register/actions";
 import { registerSellerWithGoogle } from "@/app/auth/sso/actions";
+import {
+  GooglePlacesAddressAutocomplete,
+  type GooglePlacesResolvedAddress,
+} from "@/components/address/google-places-address-autocomplete";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -716,6 +720,30 @@ function ApplicationForm({
     });
   }
 
+  function applySuggestedAddress(
+    suggestedAddress: GooglePlacesResolvedAddress,
+  ) {
+    setValues((current) => ({
+      ...current,
+      addressLine1: suggestedAddress.addressLine1,
+      addressLine2: suggestedAddress.addressLine2,
+      city: suggestedAddress.city,
+      postalCode: suggestedAddress.postalCode,
+      stateProvince: suggestedAddress.province,
+    }));
+    setFieldErrors((current) => {
+      const next = { ...current };
+
+      delete next.addressLine1;
+      delete next.addressLine2;
+      delete next.city;
+      delete next.postalCode;
+      delete next.stateProvince;
+
+      return next;
+    });
+  }
+
   function requireText(
     errors: FieldErrors,
     field: keyof FormValues,
@@ -1172,16 +1200,59 @@ function ApplicationForm({
       </div>
 
       <div className={cn("grid gap-6", currentStep !== "Address" && "hidden")}>
-        <TextInput
-          error={fieldErrors.addressLine1}
-          icon={MapPin}
-          label="Address line 1"
-          name="addressLine1"
-          onChange={updateValue}
-          placeholder="Enter your address"
-          required
-          value={values.addressLine1}
-        />
+        {values.countryCode === "ZA" ? (
+          <div className="grid gap-2">
+            <label
+              className={authLabelClass}
+              htmlFor="seller-registration-address-line-1"
+            >
+              Address line 1
+              <RequiredMark />
+            </label>
+            <GooglePlacesAddressAutocomplete
+              ariaDescribedBy={
+                fieldErrors.addressLine1
+                  ? "seller-registration-address-line-1-error"
+                  : undefined
+              }
+              ariaInvalid={Boolean(fieldErrors.addressLine1)}
+              autoComplete="address-line1"
+              countryCode="ZA"
+              id="seller-registration-address-line-1"
+              inputClassName={cn(
+                authInputClass,
+                fieldErrors.addressLine1 &&
+                  "border-red-300 focus:border-red-400 focus:ring-red-400/20",
+              )}
+              leadingIcon={<MapPin className="size-4" />}
+              name="addressLine1"
+              onAddressSelect={applySuggestedAddress}
+              onValueChange={(value) => updateValue("addressLine1", value)}
+              placeholder="Start typing a South African address"
+              required
+              value={values.addressLine1}
+            />
+            {fieldErrors.addressLine1 ? (
+              <span
+                className="text-[12px] font-semibold text-red-600"
+                id="seller-registration-address-line-1-error"
+              >
+                {fieldErrors.addressLine1}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <TextInput
+            error={fieldErrors.addressLine1}
+            icon={MapPin}
+            label="Address line 1"
+            name="addressLine1"
+            onChange={updateValue}
+            placeholder="Enter your address"
+            required
+            value={values.addressLine1}
+          />
+        )}
         <TextInput
           error={fieldErrors.addressLine2}
           icon={MapPin}

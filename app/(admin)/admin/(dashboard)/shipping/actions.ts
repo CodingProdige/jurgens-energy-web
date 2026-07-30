@@ -9,6 +9,7 @@ import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
   bookCourierGuyShipment,
   cancelBookedCourierGuyShipment,
+  reconcileCourierGuyBooking,
   refreshCourierGuyShipment,
 } from "@/src/modules/shipping/courier-guy-shipments";
 
@@ -18,6 +19,11 @@ export type ShippingActionState = {
 };
 
 const shipmentIdSchema = z.string().uuid();
+const trackingReferenceSchema = z
+  .string()
+  .trim()
+  .min(1, "Enter the Courier Guy tracking reference.")
+  .max(160, "The tracking reference is too long.");
 
 async function requireShippingManageAccess() {
   const access = await requireAdminCapability("admin.orders.manage");
@@ -95,6 +101,60 @@ export async function refreshCourierGuyShipmentAction(
         error instanceof Error
           ? error.message
           : "Courier Guy tracking refresh failed.",
+      ok: false,
+    };
+  }
+}
+
+export async function reconcileCourierGuyBookingAction(
+  _state: ShippingActionState,
+  formData: FormData,
+): Promise<ShippingActionState> {
+  const session = await requireShippingManageAccess();
+  const shipmentId = parseShipmentId(formData);
+  const parsedTrackingReference = trackingReferenceSchema.safeParse(
+    String(formData.get("trackingReference") ?? ""),
+  );
+
+  if (!parsedTrackingReference.success) {
+    return {
+      message:
+        parsedTrackingReference.error.issues[0]?.message ??
+        "Enter the Courier Guy tracking reference.",
+      ok: false,
+    };
+  }
+
+  try {
+    const result = await reconcileCourierGuyBooking({
+      shipmentId,
+      trackingReference: parsedTrackingReference.data,
+    });
+
+    await db.insert(auditLogs).values({
+      action: "shipping.courier_guy.booking_reconciled",
+      actorUserId: session.user.id,
+      entityId: shipmentId,
+      entityType: "shipment",
+      metadata: JSON.stringify({
+        bookingReference: result.bookingReference,
+        providerShipmentId: result.providerShipmentId,
+        trackingReference: result.trackingReference,
+        waybillReady: Boolean(result.waybillUrl),
+      }),
+    });
+    revalidatePath("/shipping");
+
+    return {
+      message: `Courier Guy booking adopted as ${result.trackingReference}.`,
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      message:
+        error instanceof Error
+          ? error.message
+          : "Courier Guy booking reconciliation failed.",
       ok: false,
     };
   }

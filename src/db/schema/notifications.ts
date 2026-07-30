@@ -2,6 +2,7 @@ import {
   boolean,
   integer,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -31,6 +32,16 @@ export const notificationDeliveryStatuses = [
 
 export type NotificationDeliveryStatus =
   (typeof notificationDeliveryStatuses)[number];
+
+export const notificationDispatchClaimStatuses = [
+  "pending",
+  "processing",
+  "sent",
+  "failed",
+] as const;
+
+export type NotificationDispatchClaimStatus =
+  (typeof notificationDispatchClaimStatuses)[number];
 
 export const inAppNotificationSurfaces = [
   "marketplace",
@@ -141,6 +152,41 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   sentAt: timestamp("sent_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+export const notificationDispatchClaims = pgTable(
+  "notification_dispatch_claims",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    dedupeKey: varchar("dedupe_key", { length: 320 }).notNull().unique(),
+    eventKey: varchar("event_key", { length: 160 }).notNull(),
+    status: varchar("status", { length: 32 })
+      .$type<NotificationDispatchClaimStatus>()
+      .notNull()
+      .default("processing"),
+    attempts: integer("attempts").notNull().default(1),
+    lastError: text("last_error"),
+    payload: jsonb("payload")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+    claimToken: uuid("claim_token").notNull(),
+    claimedAt: timestamp("claimed_at", { mode: "date" }).notNull().defaultNow(),
+    availableAt: timestamp("available_at", { mode: "date" })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (claim) => ({
+    notificationDispatchClaimsEventKeyIdx: index(
+      "notification_dispatch_claims_event_key_idx",
+    ).on(claim.eventKey),
+    notificationDispatchClaimsStatusIdx: index(
+      "notification_dispatch_claims_status_idx",
+    ).on(claim.status, claim.availableAt),
+  }),
+);
 
 export const notificationWebhookEvents = pgTable(
   "notification_webhook_events",

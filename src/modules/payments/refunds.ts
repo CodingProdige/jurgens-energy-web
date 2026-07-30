@@ -24,10 +24,15 @@ import {
   invoiceLines,
   invoiceNumberSequences,
   invoices,
+  orderItems,
   orders,
   paymentRefundAllocations,
   paymentRefunds,
   payments,
+  productVariants,
+  refundInventoryAdjustments,
+  refundShipmentCancellationJobs,
+  shipments,
 } from "@/src/db/schema";
 import type {
   PaymentRefundMethod,
@@ -61,8 +66,14 @@ const allocationInputSchema = z.object({
   quantity: z.number().int().positive().safe(),
 });
 
+const restockItemInputSchema = z.object({
+  invoiceLineId: z.string().uuid(),
+  quantity: z.number().int().positive().safe(),
+});
+
 const refundBaseInputSchema = z.object({
   actorUserId: z.string().uuid(),
+  cancelOpenShipments: z.boolean().default(false),
   idempotencyKey: z
     .string()
     .trim()
@@ -73,6 +84,7 @@ const refundBaseInputSchema = z.object({
   notifyMerchant: z.boolean().default(false),
   orderId: z.string().uuid(),
   reason: z.string().trim().min(3).max(255),
+  restockItems: z.array(restockItemInputSchema).max(200).default([]),
 });
 
 const partialRefundInputSchema = refundBaseInputSchema
@@ -104,10 +116,26 @@ const partialRefundInputSchema = refundBaseInputSchema
     });
   });
 
-export const submitPayFastRefundInputSchema = z.discriminatedUnion("kind", [
-  refundBaseInputSchema.extend({ kind: z.literal("full") }),
-  partialRefundInputSchema,
-]);
+export const submitPayFastRefundInputSchema = z
+  .discriminatedUnion("kind", [
+    refundBaseInputSchema.extend({ kind: z.literal("full") }),
+    partialRefundInputSchema,
+  ])
+  .superRefine((input, context) => {
+    const seen = new Set<string>();
+
+    input.restockItems.forEach((item, index) => {
+      if (seen.has(item.invoiceLineId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Each invoice line may only appear once in the restock list.",
+          path: ["restockItems", index, "invoiceLineId"],
+        });
+      }
+
+      seen.add(item.invoiceLineId);
+    });
+  });
 
 export const reconcilePayFastRefundInputSchema = z.object({
   actorUserId: z.string().uuid().optional(),
@@ -173,7 +201,9 @@ type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type RefundAllocationDraft = Readonly<{
   grossCents: number;
   invoiceLineId: string;
+  kind: "discount" | "product" | "shipping";
   netCents: number;
+  orderItemId: string | null;
   position: number;
   quantity: number;
   taxCents: number;
@@ -230,10 +260,14 @@ function requestFingerprint(
       JSON.stringify({
         allocations,
         kind: input.kind,
+        cancelOpenShipments: input.cancelOpenShipments,
         notifyBuyer: input.notifyBuyer,
         notifyMerchant: input.notifyMerchant,
         orderId: input.orderId,
         reason: input.reason,
+        restockItems: [...input.restockItems].sort((first, second) =>
+          first.invoiceLineId.localeCompare(second.invoiceLineId),
+        ),
       }),
     )
     .digest("hex");
@@ -485,7 +519,9 @@ async function buildRefundAllocations({
     drafts.push({
       grossCents,
       invoiceLineId: line.id,
+      kind: line.kind,
       netCents: tax.netCents,
+      orderItemId: line.orderItemId,
       position: line.position,
       quantity: normalizeQuantity(quantity),
       taxCents: tax.taxCents,
@@ -500,6 +536,44 @@ async function buildRefundAllocations({
   }
 
   return drafts;
+}
+
+function validateRequestedRestockItems({
+  allocations,
+  input,
+}: {
+  allocations: RefundAllocationDraft[];
+  input: z.output<typeof submitPayFastRefundInputSchema>;
+}) {
+  const allocationByLineId = new Map(
+    allocations.map((allocation) => [allocation.invoiceLineId, allocation]),
+  );
+
+  for (const requested of input.restockItems) {
+    const allocation = allocationByLineId.get(requested.invoiceLineId);
+
+    if (
+      !allocation ||
+      allocation.kind !== "product" ||
+      !allocation.orderItemId
+    ) {
+      throw new PayFastRefundServiceError(
+        "allocation_invalid",
+        "Only product quantities included in this refund may be returned to stock.",
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(requested.quantity) ||
+      requested.quantity <= 0 ||
+      requested.quantity > allocation.quantity
+    ) {
+      throw new PayFastRefundServiceError(
+        "allocation_invalid",
+        "A restock quantity cannot exceed the product quantity included in this refund.",
+      );
+    }
+  }
 }
 
 async function reserveRefund(
@@ -662,6 +736,7 @@ async function reserveRefund(
       invoiceId: invoice.id,
       transaction,
     });
+    validateRequestedRestockItems({ allocations, input });
     const amountCents = allocations.reduce(
       (total, allocation) => total + allocation.grossCents,
       0,
@@ -690,6 +765,7 @@ async function reserveRefund(
       .values({
         actorUserId: input.actorUserId,
         amount: centsToMoney(amountCents),
+        cancelOpenShipments: input.cancelOpenShipments,
         idempotencyKey: input.idempotencyKey,
         invoiceId: invoice.id,
         notifyBuyer: input.notifyBuyer,
@@ -705,6 +781,7 @@ async function reserveRefund(
           invoiceLineId: allocation.invoiceLineId,
           quantity: allocation.quantity,
         })),
+        requestedRestockItems: input.restockItems,
       })
       .returning();
 
@@ -732,6 +809,8 @@ async function reserveRefund(
         kind: input.kind,
         orderId: order.id,
         paymentId: payment.id,
+        cancelOpenShipments: input.cancelOpenShipments,
+        requestedRestockItems: input.restockItems,
       }),
     });
 
@@ -804,6 +883,136 @@ async function markProviderFailure({
       }),
     });
   });
+}
+
+async function applyRequestedInventoryRestock({
+  actorUserId,
+  refund,
+  transaction,
+}: {
+  actorUserId?: string;
+  refund: typeof paymentRefunds.$inferSelect;
+  transaction: DatabaseTransaction;
+}) {
+  if (refund.requestedRestockItems.length === 0) {
+    return 0;
+  }
+
+  const requestedLineIds = refund.requestedRestockItems.map(
+    (item) => item.invoiceLineId,
+  );
+  const itemRows = await transaction
+    .select({
+      invoiceLineId: invoiceLines.id,
+      orderItemId: orderItems.id,
+      variantId: orderItems.variantId,
+    })
+    .from(invoiceLines)
+    .innerJoin(orderItems, eq(orderItems.id, invoiceLines.orderItemId))
+    .where(
+      and(
+        eq(invoiceLines.invoiceId, refund.invoiceId),
+        inArray(invoiceLines.id, requestedLineIds),
+      ),
+    );
+  const itemByLineId = new Map(
+    itemRows.map((item) => [item.invoiceLineId, item]),
+  );
+  let applied = 0;
+
+  for (const requested of refund.requestedRestockItems) {
+    const item = itemByLineId.get(requested.invoiceLineId);
+
+    if (!item) {
+      throw new Error(
+        "A requested refund restock item no longer maps to an order product.",
+      );
+    }
+
+    const [adjustment] = await transaction
+      .insert(refundInventoryAdjustments)
+      .values({
+        orderItemId: item.orderItemId,
+        quantity: requested.quantity,
+        refundId: refund.id,
+        variantId: item.variantId,
+      })
+      .onConflictDoNothing({
+        target: [
+          refundInventoryAdjustments.refundId,
+          refundInventoryAdjustments.orderItemId,
+        ],
+      })
+      .returning({ id: refundInventoryAdjustments.id });
+
+    if (!adjustment) {
+      continue;
+    }
+
+    await transaction
+      .update(productVariants)
+      .set({
+        stockOnHand: sql<number>`${productVariants.stockOnHand} + ${requested.quantity}`,
+      })
+      .where(eq(productVariants.id, item.variantId));
+
+    applied += 1;
+  }
+
+  if (applied > 0) {
+    await transaction.insert(auditLogs).values({
+      action: "refund.inventory_restocked",
+      actorUserId: actorUserId ?? refund.actorUserId,
+      entityId: refund.id,
+      entityType: "payment_refund",
+      metadata: JSON.stringify({
+        items: refund.requestedRestockItems,
+        orderId: refund.orderId,
+      }),
+    });
+  }
+
+  return applied;
+}
+
+async function enqueueRequestedShipmentCancellations({
+  refund,
+  transaction,
+}: {
+  refund: typeof paymentRefunds.$inferSelect;
+  transaction: DatabaseTransaction;
+}) {
+  if (!refund.cancelOpenShipments) {
+    return 0;
+  }
+
+  const shipmentRows = await transaction
+    .select({ id: shipments.id, status: shipments.status })
+    .from(shipments)
+    .where(eq(shipments.orderId, refund.orderId));
+  const openShipments = shipmentRows.filter(
+    (shipment) =>
+      !["cancelled", "delivered", "returned"].includes(shipment.status),
+  );
+
+  if (openShipments.length === 0) {
+    return 0;
+  }
+
+  const jobs = await transaction
+    .insert(refundShipmentCancellationJobs)
+    .values(
+      openShipments.map((shipment) => ({
+        refundId: refund.id,
+        shipmentId: shipment.id,
+      })),
+    )
+    .onConflictDoNothing({
+      target: refundShipmentCancellationJobs.shipmentId,
+    })
+    .returning({ id: refundShipmentCancellationJobs.id });
+
+  return jobs.length;
 }
 
 async function finalizeCompletedRefund({
@@ -950,6 +1159,16 @@ async function finalizeCompletedRefund({
     });
 
     const now = new Date();
+    const restockedItemCount = await applyRequestedInventoryRestock({
+      actorUserId,
+      refund,
+      transaction,
+    });
+    const cancellationJobCount =
+      await enqueueRequestedShipmentCancellations({
+        refund,
+        transaction,
+      });
 
     await transaction
       .update(paymentRefunds)
@@ -1033,8 +1252,10 @@ async function finalizeCompletedRefund({
           amount: refund.amount,
           creditNoteId: creditNote.id,
           creditNoteNumber,
+          cancellationJobCount,
           providerAvailableAfterCents,
           providerStatus,
+          restockedItemCount,
         }),
       },
       {

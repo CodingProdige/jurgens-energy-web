@@ -13,6 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 
 type CountryPhoneInputProps = {
+  ariaDescribedBy?: string;
+  ariaInvalid?: boolean;
   autoComplete?: string;
   className?: string;
   countryCode?: PhoneCountryCode;
@@ -32,6 +34,8 @@ type CountryPhoneInputProps = {
 };
 
 export function CountryPhoneInput({
+  ariaDescribedBy,
+  ariaInvalid,
   autoComplete = "tel-national",
   className,
   countryCode,
@@ -96,6 +100,8 @@ export function CountryPhoneInput({
         ))}
       </select>
       <input
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         autoComplete={autoComplete}
         className={cn(
           "h-11 min-w-0 rounded-md border border-[#d8d8d1] bg-white px-3 text-sm font-medium text-[#070b16] outline-none transition placeholder:text-[#7a8297] focus:border-[#ff5a1f] focus:ring-4 focus:ring-[#ff5a1f]/15 disabled:pointer-events-none disabled:bg-[#f7f7f2] disabled:text-[#596176] dark:border-white/12 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-zinc-500 dark:disabled:bg-white/[0.06]",

@@ -53,11 +53,22 @@ export default async function CheckoutCancelPage({
               <h1 className="mt-5 text-2xl font-black">Payment cancelled</h1>
               <p className="mt-2 text-sm leading-6 text-[#666660] dark:text-[#aaa9a1]">
                 Order {order.orderNumber} was not paid. Every product remains in
-                your cart.
+                your cart
+                {order.paymentWindowOpen
+                  ? ", and you can safely reopen this payment."
+                  : "."}
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {order.paymentWindowOpen ? (
+                  <Link
+                    className="inline-flex h-10 items-center rounded-md bg-[#ff5a1f] px-4 text-sm font-bold text-white"
+                    href={`/checkout/payfast/${order.orderId}?token=${encodeURIComponent(token)}`}
+                  >
+                    Try payment again
+                  </Link>
+                ) : null}
                 <Link
-                  className="inline-flex h-10 items-center rounded-md bg-[#ff5a1f] px-4 text-sm font-bold text-white"
+                  className="inline-flex h-10 items-center rounded-md border border-[#d8d8d1] px-4 text-sm font-semibold dark:border-white/15"
                   href="/cart"
                 >
                   Return to cart

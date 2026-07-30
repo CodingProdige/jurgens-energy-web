@@ -1,5 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
+  integer,
   jsonb,
   numeric,
   pgEnum,
@@ -85,5 +88,88 @@ export const payfastItnEvents = pgTable(
     statusReceivedAtIdx: index(
       "payfast_itn_events_status_received_at_idx",
     ).on(event.status, event.receivedAt),
+  }),
+);
+
+export const paymentReconciliationExceptionReasons = [
+  "inventory_unavailable_after_expiry",
+  "inventory_reservation_invalid",
+] as const;
+export type PaymentReconciliationExceptionReason =
+  (typeof paymentReconciliationExceptionReasons)[number];
+
+export const paymentReconciliationExceptionStatuses = [
+  "open",
+  "resolved",
+] as const;
+export type PaymentReconciliationExceptionStatus =
+  (typeof paymentReconciliationExceptionStatuses)[number];
+
+export const paymentReconciliationExceptions = pgTable(
+  "payment_reconciliation_exceptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payments.id, { onDelete: "restrict" }),
+    latestItnEventId: uuid("latest_itn_event_id").references(
+      () => payfastItnEvents.id,
+      { onDelete: "set null" },
+    ),
+    reason: varchar("reason", { length: 80 })
+      .$type<PaymentReconciliationExceptionReason>()
+      .notNull(),
+    status: varchar("status", { length: 24 })
+      .$type<PaymentReconciliationExceptionStatus>()
+      .notNull()
+      .default("open"),
+    providerPaymentId: varchar("provider_payment_id", { length: 160 }),
+    providerStatus: varchar("provider_status", { length: 80 }).notNull(),
+    receivedAmount: numeric("received_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    detail: text("detail").notNull(),
+    occurrences: integer("occurrences").notNull().default(1),
+    firstSeenAt: timestamp("first_seen_at", { mode: "date" })
+      .notNull()
+      .defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { mode: "date" })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolved_at", { mode: "date" }),
+    resolutionNote: text("resolution_note"),
+    createdAt: timestamp("created_at", { mode: "date" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (exception) => ({
+    paymentUnique: unique(
+      "payment_reconciliation_exceptions_payment_id_unique",
+    ).on(exception.paymentId),
+    orderIdx: index(
+      "payment_reconciliation_exceptions_order_id_idx",
+    ).on(exception.orderId),
+    statusLastSeenIdx: index(
+      "payment_reconciliation_exceptions_status_last_seen_idx",
+    ).on(exception.status, exception.lastSeenAt),
+    occurrencesPositive: check(
+      "payment_reconciliation_exceptions_occurrences_positive_check",
+      sql`${exception.occurrences} > 0`,
+    ),
+    reasonValid: check(
+      "payment_reconciliation_exceptions_reason_check",
+      sql`${exception.reason} IN ('inventory_unavailable_after_expiry', 'inventory_reservation_invalid')`,
+    ),
+    statusValid: check(
+      "payment_reconciliation_exceptions_status_check",
+      sql`${exception.status} IN ('open', 'resolved')`,
+    ),
   }),
 );

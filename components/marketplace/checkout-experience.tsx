@@ -20,6 +20,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  GooglePlacesAddressAutocomplete,
+  type GooglePlacesResolvedAddress,
+} from "@/components/address/google-places-address-autocomplete";
 import { CountryPhoneInput } from "@/components/phone/country-phone-input";
 import { MarketplaceProductFulfillmentBadge } from "@/components/marketplace/product-fulfillment-badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +67,7 @@ import {
   isCheckoutShippingStepReady,
   type CheckoutStep,
 } from "@/src/modules/checkout/flow";
+import { calculateCheckoutIncludedVatCents } from "@/src/modules/checkout/totals";
 import { SOUTH_AFRICAN_PROVINCES } from "@/src/modules/marketplace/account/address-options";
 import { POLICY_EFFECTIVE_DATE_ISO } from "@/src/modules/marketplace/policies/constants";
 import {
@@ -96,6 +101,8 @@ const emptyAddress: CheckoutDeliveryAddress = {
 const fieldClass =
   "h-11 rounded-md border-[#d8d8d1] bg-white px-3 text-sm shadow-none focus-visible:border-[#ff5a1f] focus-visible:ring-[#ff5a1f]/15 dark:border-white/12 dark:bg-white/[0.04]";
 const differentAddressValue = "__different_address__";
+const checkoutRequestStorageKey =
+  "jurgens:checkout:hosted-request:v1";
 const checkoutStepLabels: Record<CheckoutStep, string> = {
   address: "Address",
   payment: "Payment",
@@ -229,7 +236,53 @@ function abortCheckoutRequest(controller: AbortController | null) {
     return;
   }
 
-  controller.abort(new DOMException("Checkout refresh cancelled.", "AbortError"));
+  controller.abort();
+}
+
+async function createCheckoutRequestSignature(payload: string) {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(payload),
+  );
+
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function getStableCheckoutRequestId(payload: string) {
+  const signature = await createCheckoutRequestSignature(payload);
+
+  try {
+    const saved = JSON.parse(
+      window.sessionStorage.getItem(checkoutRequestStorageKey) ?? "null",
+    ) as { requestId?: unknown; signature?: unknown } | null;
+
+    if (
+      saved?.signature === signature &&
+      typeof saved.requestId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        saved.requestId,
+      )
+    ) {
+      return saved.requestId;
+    }
+  } catch {
+    // Continue with a fresh key when session storage is unavailable.
+  }
+
+  const requestId = globalThis.crypto.randomUUID();
+
+  try {
+    window.sessionStorage.setItem(
+      checkoutRequestStorageKey,
+      JSON.stringify({ requestId, signature }),
+    );
+  } catch {
+    // The current request remains idempotent for this submission.
+  }
+
+  return requestId;
 }
 
 function toGoogleAnalyticsItem(
@@ -334,6 +387,10 @@ export function CheckoutExperience({
   const [isLoadingCart, setIsLoadingCart] = useState(true);
   const [isLoadingQuotes, setIsLoadingQuotes] = useState(false);
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [isDeliveryAddressResolving, setIsDeliveryAddressResolving] =
+    useState(false);
+  const [isBillingAddressResolving, setIsBillingAddressResolving] =
+    useState(false);
   const [hasAcceptedPolicies, setHasAcceptedPolicies] = useState(true);
   const [checkoutStep, setCheckoutStep] =
     useState<CheckoutStep>("address");
@@ -343,6 +400,7 @@ export function CheckoutExperience({
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const stepPanelRef = useRef<HTMLDivElement | null>(null);
   const cartAbortControllerRef = useRef<AbortController | null>(null);
+  const cartRequestIdRef = useRef(0);
   const quoteAbortControllerRef = useRef<AbortController | null>(null);
   const quoteRequestIdRef = useRef(0);
   const quotesRef = useRef<CheckoutQuoteResponse | null>(null);
@@ -353,57 +411,103 @@ export function CheckoutExperience({
   const trackedPaymentInfoSignaturesRef = useRef(new Set<string>());
 
   useEffect(() => {
-    const allItems = readLocalCartItems();
-    const selectedVariantIds = new Set(
-      getLocalCartSelectedVariantIds(allItems),
-    );
-    const selectedItems = allItems.filter((item) =>
-      selectedVariantIds.has(item.variantId),
-    );
-    setCartItems(selectedItems);
+    let isMounted = true;
 
-    if (selectedItems.length === 0) {
-      setIsLoadingCart(false);
-      return;
-    }
+    const refreshCart = () => {
+      const requestId = cartRequestIdRef.current + 1;
+      cartRequestIdRef.current = requestId;
+      abortCheckoutRequest(cartAbortControllerRef.current);
+      cartAbortControllerRef.current = null;
 
-    const abortController = new AbortController();
-    cartAbortControllerRef.current = abortController;
+      const allItems = readLocalCartItems();
+      const selectedVariantIds = new Set(
+        getLocalCartSelectedVariantIds(allItems),
+      );
+      const selectedItems = allItems.filter((item) =>
+        selectedVariantIds.has(item.variantId),
+      );
 
-    void fetch("/api/cart/validate", {
-      body: JSON.stringify({ items: toValidationItems(selectedItems) }),
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-      signal: abortController.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("Cart validation failed.");
-        }
+      setCartItems(selectedItems);
+      setCart(null);
+      setError(null);
 
-        return (await response.json()) as CartValidationResponse;
+      if (selectedItems.length === 0) {
+        setIsLoadingCart(false);
+        return;
+      }
+
+      const abortController = new AbortController();
+      cartAbortControllerRef.current = abortController;
+      setIsLoadingCart(true);
+      const timeoutId = window.setTimeout(
+        () => abortController.abort(),
+        10_000,
+      );
+
+      void fetch("/api/cart/validate", {
+        body: JSON.stringify({ items: toValidationItems(selectedItems) }),
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        signal: abortController.signal,
       })
-      .then((result) => setCart(result))
-      .catch((caughtError) => {
-        if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
-          return;
-        }
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error("Cart validation failed.");
+          }
 
-        setError("Your cart could not be refreshed. Return to the cart and try again.");
-      })
-      .finally(() => {
-        if (!abortController.signal.aborted) {
-          setIsLoadingCart(false);
-        }
-      });
+          return (await response.json()) as CartValidationResponse;
+        })
+        .then((result) => {
+          if (
+            isMounted &&
+            requestId === cartRequestIdRef.current &&
+            !abortController.signal.aborted
+          ) {
+            setCart(result);
+          }
+        })
+        .catch(() => {
+          if (!isMounted || requestId !== cartRequestIdRef.current) {
+            return;
+          }
 
-    return () => abortCheckoutRequest(abortController);
+          setError(
+            abortController.signal.aborted
+              ? "Refreshing your cart took too long. Reload checkout or return to your cart and try again."
+              : "Your cart could not be refreshed. Return to the cart and try again.",
+          );
+        })
+        .finally(() => {
+          window.clearTimeout(timeoutId);
+
+          if (isMounted && requestId === cartRequestIdRef.current) {
+            cartAbortControllerRef.current = null;
+            setIsLoadingCart(false);
+          }
+        });
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        refreshCart();
+      }
+    };
+
+    refreshCart();
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      isMounted = false;
+      cartRequestIdRef.current += 1;
+      window.removeEventListener("pageshow", handlePageShow);
+      abortCheckoutRequest(cartAbortControllerRef.current);
+      cartAbortControllerRef.current = null;
+    };
   }, []);
 
   useEffect(
     () => () => {
-      abortCheckoutRequest(cartAbortControllerRef.current);
       abortCheckoutRequest(quoteAbortControllerRef.current);
     },
     [],
@@ -507,6 +611,11 @@ export function CheckoutExperience({
     : 0;
   const subtotal = cart?.subtotalZar ?? 0;
   const grandTotal = subtotal + shippingTotal;
+  const includedVat =
+    calculateCheckoutIncludedVatCents({
+      items: cart?.items ?? [],
+      shippingTotalZar: shippingTotal,
+    }) / 100;
   const selectedProductCount =
     cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
   const checkoutStepIndex = CHECKOUT_STEPS.indexOf(checkoutStep);
@@ -592,16 +701,19 @@ export function CheckoutExperience({
   const billingVatNumberValid =
     !normalizedBillingVatNumber || /^\d{10}$/.test(normalizedBillingVatNumber);
   const billingComplete = Boolean(
-    !useBusinessBilling ||
-      (billingBusinessName.trim().length >= 2 &&
-        billingVatNumberValid &&
-        (billingSameAsDelivery || isAddressComplete(billingAddress))),
+    !isBillingAddressResolving &&
+      (!useBusinessBilling ||
+        (billingBusinessName.trim().length >= 2 &&
+          billingVatNumberValid &&
+          (billingSameAsDelivery || isAddressComplete(billingAddress)))),
   );
-  const addressStepReady = isCheckoutAddressStepReady({
-    addressBookChoiceComplete,
-    addressComplete: isAddressComplete(address),
-    customerComplete,
-  });
+  const addressStepReady =
+    !isDeliveryAddressResolving &&
+    isCheckoutAddressStepReady({
+      addressBookChoiceComplete,
+      addressComplete: isAddressComplete(address),
+      customerComplete,
+    });
   const shippingStepReady = isCheckoutShippingStepReady({
     allGroupsAvailable,
     hasQuoteError: Boolean(quoteError),
@@ -706,6 +818,35 @@ export function CheckoutExperience({
     value: string,
   ) {
     setBillingAddress((current) => ({ ...current, [field]: value }));
+  }
+
+  function applySuggestedDeliveryAddress(
+    suggestedAddress: GooglePlacesResolvedAddress,
+  ) {
+    setAddress({
+      addressLine1: suggestedAddress.addressLine1,
+      addressLine2: suggestedAddress.addressLine2,
+      city: suggestedAddress.city,
+      countryCode: "ZA",
+      postalCode: suggestedAddress.postalCode,
+      province: suggestedAddress.province,
+      suburb: suggestedAddress.suburb,
+    });
+    invalidateDeliverySelection();
+  }
+
+  function applySuggestedBillingAddress(
+    suggestedAddress: GooglePlacesResolvedAddress,
+  ) {
+    setBillingAddress({
+      addressLine1: suggestedAddress.addressLine1,
+      addressLine2: suggestedAddress.addressLine2,
+      city: suggestedAddress.city,
+      countryCode: "ZA",
+      postalCode: suggestedAddress.postalCode,
+      province: suggestedAddress.province,
+      suburb: suggestedAddress.suburb,
+    });
   }
 
   function selectSavedAddress(savedAddress: CheckoutSavedAddress) {
@@ -850,6 +991,13 @@ export function CheckoutExperience({
   async function continueToShipping() {
     setError(null);
 
+    if (isDeliveryAddressResolving) {
+      setStepError(
+        "Wait for the selected address to finish loading before continuing.",
+      );
+      return;
+    }
+
     if (!addressStepReady) {
       setStepError(
         "Complete the required contact and delivery address fields before continuing.",
@@ -985,39 +1133,47 @@ export function CheckoutExperience({
         });
       }
 
+      const checkoutRequest = {
+        addressBookIntent,
+        billingDetails: {
+          ...(useBusinessBilling
+            ? {
+                businessName: billingBusinessName,
+                vatRegistrationNumber: billingVatNumber,
+              }
+            : {}),
+          ...(useBusinessBilling && !billingSameAsDelivery
+            ? { address: normalizeDeliveryAddress(billingAddress) }
+            : {}),
+          name: customer.name,
+          sameAsDelivery: !useBusinessBilling || billingSameAsDelivery,
+        },
+        customer: {
+          ...customer,
+          phone: normalizedCustomerPhone,
+        },
+        deliveryAddress: address,
+        deliverySelections: quotes.groups.map((group) => ({
+          groupKey: group.groupKey,
+          quoteId: selectedQuoteByGroup[group.groupKey],
+        })),
+        items: checkoutItems,
+        policyAcceptance: {
+          accepted: true as const,
+          version: POLICY_EFFECTIVE_DATE_ISO,
+        },
+        ...(jurgensDeliverySchedule
+          ? { jurgensDeliverySchedule }
+          : {}),
+      };
+      const serializedCheckoutRequest = JSON.stringify(checkoutRequest);
+      const checkoutRequestId = await getStableCheckoutRequestId(
+        serializedCheckoutRequest,
+      );
       const response = await fetch("/api/checkout/orders", {
         body: JSON.stringify({
-          addressBookIntent,
-          billingDetails: {
-            ...(useBusinessBilling
-              ? {
-                  businessName: billingBusinessName,
-                  vatRegistrationNumber: billingVatNumber,
-                }
-              : {}),
-            ...(useBusinessBilling && !billingSameAsDelivery
-              ? { address: normalizeDeliveryAddress(billingAddress) }
-              : {}),
-            name: customer.name,
-            sameAsDelivery: !useBusinessBilling || billingSameAsDelivery,
-          },
-          customer: {
-            ...customer,
-            phone: normalizedCustomerPhone,
-          },
-          deliveryAddress: address,
-          deliverySelections: quotes.groups.map((group) => ({
-            groupKey: group.groupKey,
-            quoteId: selectedQuoteByGroup[group.groupKey],
-          })),
-          items: checkoutItems,
-          policyAcceptance: {
-            accepted: true,
-            version: POLICY_EFFECTIVE_DATE_ISO,
-          },
-          ...(jurgensDeliverySchedule
-            ? { jurgensDeliverySchedule }
-            : {}),
+          ...checkoutRequest,
+          checkoutRequestId,
         }),
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
@@ -1046,11 +1202,54 @@ export function CheckoutExperience({
   if (isLoadingCart) {
     return (
       <div className="grid min-h-[45dvh] place-items-center">
-        <span className="inline-flex items-center gap-2 text-sm text-[#666660] dark:text-[#aaa9a1]">
-          <LoaderCircleIcon className="size-5 animate-spin text-[#ff5a1f]" />
-          Preparing checkout
-        </span>
+        <div className="text-center">
+          <span className="inline-flex items-center gap-2 text-sm text-[#666660] dark:text-[#aaa9a1]">
+            <LoaderCircleIcon className="size-5 animate-spin text-[#ff5a1f]" />
+            Preparing checkout
+          </span>
+          <p className="mt-3 text-[11px] leading-5 text-[#888881] dark:text-[#92928b]">
+            Taking more than a few seconds?{" "}
+            <a
+              className="font-bold text-[#d9430e] underline underline-offset-2 dark:text-[#ff8a60]"
+              href="/checkout"
+            >
+              Reload checkout
+            </a>
+            .
+          </p>
+        </div>
       </div>
+    );
+  }
+
+  if (!cart && cartItems.length > 0) {
+    return (
+      <section className="grid min-h-[45dvh] place-items-center border-y border-[#e8e8e2] bg-white px-5 py-12 text-center dark:border-white/10 dark:bg-[#101010] sm:rounded-md sm:border">
+        <div className="max-w-md">
+          <AlertCircleIcon className="mx-auto size-8 text-[#ff5a1f]" />
+          <h2 className="mt-4 text-lg font-black">
+            Checkout needs a refresh
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[#666660] dark:text-[#aaa9a1]">
+            {error ??
+              "Your saved cart is still available, but checkout could not verify it."}
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <a
+              className="inline-flex h-10 items-center rounded-md bg-[#ff5a1f] px-4 text-sm font-bold text-white"
+              href="/checkout"
+            >
+              Reload checkout
+            </a>
+            <Link
+              className="inline-flex h-10 items-center rounded-md border border-[#d8d8d1] px-4 text-sm font-semibold dark:border-white/15"
+              href="/cart"
+            >
+              Return to cart
+            </Link>
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -1348,7 +1547,7 @@ export function CheckoutExperience({
           ) : null}
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-1.5 sm:col-span-2">
+            <div className="grid gap-1.5 sm:col-span-2">
               <Label htmlFor="checkout-name">
                 Full name <RequiredMark />
               </Label>
@@ -1362,7 +1561,7 @@ export function CheckoutExperience({
                 required
                 value={customer.name}
               />
-            </label>
+            </div>
             <label className="grid gap-1.5">
               <Label htmlFor="checkout-email">
                 Email <RequiredMark />
@@ -1398,19 +1597,24 @@ export function CheckoutExperience({
                 value={customer.phone}
               />
             </label>
-            <label className="grid gap-1.5 sm:col-span-2">
+            <div className="grid gap-1.5 sm:col-span-2">
               <Label htmlFor="checkout-address-1">
                 Street address <RequiredMark />
               </Label>
-              <Input
+              <GooglePlacesAddressAutocomplete
                 autoComplete="address-line1"
-                className={fieldClass}
+                countryCode="ZA"
                 id="checkout-address-1"
-                onChange={(event) => updateAddress("addressLine1", event.target.value)}
+                inputClassName={fieldClass}
+                name="deliveryAddressLine1"
+                onAddressSelect={applySuggestedDeliveryAddress}
+                onResolvingChange={setIsDeliveryAddressResolving}
+                onValueChange={(value) => updateAddress("addressLine1", value)}
+                placeholder="Start typing a South African street address"
                 required
                 value={address.addressLine1}
               />
-            </label>
+            </div>
             <label className="grid gap-1.5 sm:col-span-2">
               <Label htmlFor="checkout-address-2">Complex, unit or building</Label>
               <Input
@@ -1818,24 +2022,26 @@ export function CheckoutExperience({
 
                   {!billingSameAsDelivery ? (
                     <>
-                      <label className="grid gap-1.5 sm:col-span-2">
+                      <div className="grid gap-1.5 sm:col-span-2">
                         <Label htmlFor="checkout-billing-address-1">
                           Billing street address <RequiredMark />
                         </Label>
-                        <Input
+                        <GooglePlacesAddressAutocomplete
                           autoComplete="billing address-line1"
-                          className={fieldClass}
+                          countryCode="ZA"
                           id="checkout-billing-address-1"
-                          onChange={(event) =>
-                            updateBillingAddress(
-                              "addressLine1",
-                              event.target.value,
-                            )
+                          inputClassName={fieldClass}
+                          name="billingAddressLine1"
+                          onAddressSelect={applySuggestedBillingAddress}
+                          onResolvingChange={setIsBillingAddressResolving}
+                          onValueChange={(value) =>
+                            updateBillingAddress("addressLine1", value)
                           }
+                          placeholder="Start typing a South African street address"
                           required
                           value={billingAddress.addressLine1}
                         />
-                      </label>
+                      </div>
                       <label className="grid gap-1.5 sm:col-span-2">
                         <Label htmlFor="checkout-billing-address-2">
                           Complex, unit or building
@@ -1943,9 +2149,7 @@ export function CheckoutExperience({
               <h2 className="text-sm font-black uppercase">Delivery</h2>
             </div>
             <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
-              One VAT-inclusive delivery fee applies to the eligible order.
-              Carrier costs are handled privately and never change the total
-              shown here.
+              One VAT-inclusive delivery fee applies per eligible order.
             </p>
             {isLoadingQuotes ? (
               <div
@@ -2272,13 +2476,19 @@ export function CheckoutExperience({
               </span>
             </div>
           )}
-          <div className="mt-1 flex items-end justify-between gap-4 border-t border-[#e8e8e2] pt-4 dark:border-white/10">
-            <span className="font-bold">
-              {allGroupsAvailable ? "Total" : "Subtotal"}
-            </span>
-            <span className="text-xl font-black tabular-nums">
-              {formatZar(grandTotal)}
-            </span>
+          <div className="mt-1 border-t border-[#e8e8e2] pt-3 dark:border-white/10">
+            <div className="flex justify-between gap-4 text-[10px] leading-4 text-[#888881] dark:text-[#92928b]">
+              <span>Includes VAT</span>
+              <span className="tabular-nums">{formatZar(includedVat)}</span>
+            </div>
+            <div className="mt-1 flex items-end justify-between gap-4">
+              <span className="font-bold">
+                {allGroupsAvailable ? "Total" : "Subtotal"}
+              </span>
+              <span className="text-xl font-black tabular-nums">
+                {formatZar(grandTotal)}
+              </span>
+            </div>
           </div>
           {checkoutStep === "payment" ? (
             <>
@@ -2335,13 +2545,20 @@ export function CheckoutExperience({
                 </label>
               </div>
               <Button
-                aria-busy={isCreatingOrder}
+                aria-busy={
+                  isCreatingOrder || isBillingAddressResolving || undefined
+                }
                 className="mt-2 h-12 rounded-md bg-[#ff5a1f] text-sm font-bold text-white hover:bg-[#e84c15]"
                 disabled={!canCreateOrder}
                 onClick={() => void startHostedCheckout()}
                 type="button"
               >
-                {isCreatingOrder ? (
+                {isBillingAddressResolving ? (
+                  <>
+                    <LoaderCircleIcon className="size-4 animate-spin" />
+                    Completing billing address…
+                  </>
+                ) : isCreatingOrder ? (
                   <>
                     <LoaderCircleIcon className="size-4 animate-spin" />
                     Opening PayFast…
@@ -2356,7 +2573,7 @@ export function CheckoutExperience({
               <div className="mt-1 grid gap-2 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
                 <p className="flex items-center gap-2">
                   <CheckCircle2Icon className="size-3.5 text-emerald-600" />
-                  VAT included in product prices.
+                  Product and delivery prices include VAT.
                 </p>
                 <p className="flex items-center gap-2">
                   <LockKeyholeIcon className="size-3.5 text-[#ff5a1f]" />
@@ -2380,12 +2597,23 @@ export function CheckoutExperience({
               </p>
               {checkoutStep === "address" ? (
                 <Button
+                  aria-busy={isDeliveryAddressResolving || undefined}
                   className="mt-2 h-12 w-full rounded-md bg-[#ff5a1f] text-sm font-bold text-white hover:bg-[#e84c15]"
+                  disabled={isDeliveryAddressResolving}
                   form="checkout-address-form"
                   type="submit"
                 >
-                  Continue to shipping
-                  <ChevronRightIcon className="size-4" />
+                  {isDeliveryAddressResolving ? (
+                    <>
+                      <LoaderCircleIcon className="size-4 animate-spin" />
+                      Completing address…
+                    </>
+                  ) : (
+                    <>
+                      Continue to shipping
+                      <ChevronRightIcon className="size-4" />
+                    </>
+                  )}
                 </Button>
               ) : (
                 <Button

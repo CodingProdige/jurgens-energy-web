@@ -214,9 +214,12 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
         ["collected", "in_transit", "out_for_delivery"].includes(shipment.status),
       ).length,
       pendingBooking: shipmentData.filter(
-        (shipment) => shipment.status === "pending_booking",
+        (shipment) =>
+          shipment.provider === "courier_guy" &&
+          shipment.status === "pending_booking",
       ).length,
       readyForCollection: shipmentData.filter((shipment) =>
+        shipment.provider === "courier_guy" &&
         ["ready_for_collection", "waybill_ready"].includes(shipment.status),
       ).length,
       shipments: shipmentData.length,

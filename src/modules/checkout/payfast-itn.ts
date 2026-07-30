@@ -1,19 +1,22 @@
 import crypto from "node:crypto";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
   jurgensDeliverySchedules,
   orderItems,
   orders,
+  paymentReconciliationExceptions,
   payments,
-  productVariants,
   shipmentParcels,
   shipments,
   shippingRateQuotes,
 } from "@/src/db/schema";
-import { sendJurgensDeliveryStatusNotification } from "@/src/modules/orders/jurgens-delivery-notifications";
+import {
+  enqueueJurgensDeliveryStatusNotification,
+  sendJurgensDeliveryStatusNotification,
+} from "@/src/modules/orders/jurgens-delivery-notifications";
 import {
   createPayFastItnParameterString,
   createPayFastItnSignature,
@@ -27,6 +30,16 @@ import {
 } from "@/src/modules/checkout/payfast-itn-audit";
 import { getPayFastIntegrationConfig } from "@/src/modules/marketplace/settings";
 import { ensureInvoiceForPaidOrder } from "@/src/modules/invoices/service";
+import {
+  consumeOrderInventory,
+  InventoryReservationError,
+  releaseOrderInventory,
+} from "@/src/modules/inventory/reservations";
+import { notifyAdminsOfPaidOrder } from "@/src/modules/orders/paid-order-notifications";
+import {
+  notifyAdminsOfPaymentReconciliationException,
+  recordPaymentReconciliationException,
+} from "@/src/modules/payments/reconciliation-exceptions";
 import { planOrderShipments } from "@/src/modules/shipping/shipment-planning";
 
 const PAYFAST_VALIDATION_TIMEOUT_MS = 12_000;
@@ -206,11 +219,13 @@ function getParcelSnapshotItems(value: unknown): ParcelSnapshotItem[] {
 }
 
 async function processPayFastItnFields({
+  auditEventId,
   clientIp,
   fields,
   onStage,
   payload,
 }: {
+  auditEventId: string;
   clientIp: string;
   fields: PayFastField[];
   onStage: (stage: PayFastItnStage) => void;
@@ -285,6 +300,7 @@ async function processPayFastItnFields({
       customerEmail: orders.customerEmail,
       customerName: orders.customerName,
       paymentStatus: payments.status,
+      paymentProviderStatus: payments.providerStatus,
     })
     .from(payments)
     .innerJoin(orders, eq(orders.id, payments.orderId))
@@ -335,6 +351,13 @@ async function processPayFastItnFields({
   if (providerStatus !== "COMPLETE") {
     onStage("payment_update");
     await db.transaction(async (tx) => {
+      await tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.id, paymentRow.orderId))
+        .limit(1)
+        .for("update");
+
       const [updatedPayment] = await tx
         .update(payments)
         .set({
@@ -366,6 +389,13 @@ async function processPayFastItnFields({
           .limit(1);
 
         if (!otherPendingAttempt) {
+          await releaseOrderInventory({
+            now,
+            orderId: paymentRow.orderId,
+            reason: "payment_failed",
+            transaction: tx,
+          });
+
           await tx
             .update(orders)
             .set({ status: "cancelled", updatedAt: now })
@@ -382,24 +412,167 @@ async function processPayFastItnFields({
     return { completed: false, orderId: paymentRow.orderId, providerStatus };
   }
 
-  onStage("capture");
-  const completion = await db.transaction(async (tx) => {
-    const [capturedPayment] = await tx
-      .update(payments)
-      .set({
-        completedAt: now,
-        providerPaymentId,
-        providerStatus,
-        rawPayload: redactedPayload,
-        status: "captured",
-        updatedAt: now,
+  if (
+    paymentRow.paymentStatus === "failed" &&
+    paymentRow.paymentProviderStatus === "COMPLETE"
+  ) {
+    const [existingException] = await db
+      .select({
+        id: paymentReconciliationExceptions.id,
+        reason: paymentReconciliationExceptions.reason,
+        status: paymentReconciliationExceptions.status,
       })
-      .where(and(eq(payments.id, paymentRow.id), eq(payments.status, "pending")))
-      .returning({ id: payments.id });
+      .from(paymentReconciliationExceptions)
+      .where(
+        eq(
+          paymentReconciliationExceptions.paymentId,
+          paymentRow.id,
+        ),
+      )
+      .limit(1);
 
-    if (!capturedPayment) {
-      return { newlyCompleted: false };
+    if (existingException) {
+      const exception = await recordPaymentReconciliationException({
+        amount: expectedAmount.toFixed(2),
+        auditEventId,
+        orderId: paymentRow.orderId,
+        paymentId: paymentRow.id,
+        providerPaymentId,
+        rawPayload: redactedPayload,
+        reason: existingException.reason,
+      });
+
+      if (existingException.status === "open") {
+        await notifyAdminsOfPaymentReconciliationException(
+          exception.id,
+        ).catch((error) => {
+          console.error(
+            "[payfast-itn] payment reconciliation notification failed",
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "unknown_error",
+              exceptionId: exception.id,
+              orderId: paymentRow.orderId,
+            },
+          );
+        });
+      }
+
+      onStage("completed");
+      return {
+        completed: false,
+        newlyCompleted: false,
+        orderId: paymentRow.orderId,
+        providerStatus,
+        reconciliationRequired: existingException.status === "open",
+      };
     }
+  }
+
+  onStage("capture");
+  let completion: { newlyCompleted: boolean };
+
+  try {
+    completion = await db.transaction(async (tx) => {
+      await tx
+        .select({ id: orders.id })
+        .from(orders)
+        .where(eq(orders.id, paymentRow.orderId))
+        .limit(1)
+        .for("update");
+
+      const [lockedPayment] = await tx
+        .select({
+          providerStatus: payments.providerStatus,
+          status: payments.status,
+        })
+        .from(payments)
+        .where(eq(payments.id, paymentRow.id))
+        .limit(1)
+        .for("update");
+
+      if (
+        lockedPayment?.status === "captured" &&
+        lockedPayment.providerStatus === "COMPLETE"
+      ) {
+        return { newlyCompleted: false };
+      }
+
+      const canCapture =
+        lockedPayment?.status === "pending" ||
+        (lockedPayment?.status === "failed" &&
+          lockedPayment.providerStatus === "EXPIRED");
+
+      if (!canCapture) {
+        rejectPayFastItn({
+          code: "payment_not_pending",
+          message:
+            "This payment attempt is no longer eligible for completion.",
+          stage: "capture",
+        });
+      }
+
+      try {
+        await consumeOrderInventory({
+          now,
+          orderId: paymentRow.orderId,
+          transaction: tx,
+        });
+      } catch (error) {
+        if (error instanceof InventoryReservationError) {
+          throw new PayFastItnError({
+            cause: error,
+            code:
+              error.code === "insufficient_stock"
+                ? "inventory_unavailable_after_expiry"
+                : "inventory_reservation_invalid",
+            httpStatus: 503,
+            message:
+              error.code === "insufficient_stock"
+                ? "Payment was confirmed after the inventory hold expired, and stock is no longer available. The payment requires reconciliation."
+                : "The payment cannot complete until its inventory reservation is reconciled.",
+            stage: "capture",
+          });
+        }
+
+        throw error;
+      }
+
+      const [capturedPayment] = await tx
+        .update(payments)
+        .set({
+          completedAt: now,
+          providerPaymentId,
+          providerStatus,
+          rawPayload: redactedPayload,
+          status: "captured",
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(payments.id, paymentRow.id),
+            or(
+              eq(payments.status, "pending"),
+              and(
+                eq(payments.status, "failed"),
+                eq(payments.providerStatus, "EXPIRED"),
+              ),
+            ),
+          ),
+        )
+        .returning({ id: payments.id });
+
+      if (!capturedPayment) {
+        throw new PayFastItnError({
+          code: "payment_capture_conflict",
+          httpStatus: 503,
+          message:
+            "The payment state changed while it was being completed.",
+          stage: "capture",
+        });
+      }
 
     const itemRows = await tx
       .select({
@@ -412,15 +585,6 @@ async function processPayFastItnFields({
       })
       .from(orderItems)
       .where(eq(orderItems.orderId, paymentRow.orderId));
-
-    for (const item of itemRows) {
-      await tx
-        .update(productVariants)
-        .set({
-          stockOnHand: sql<number>`greatest(0, ${productVariants.stockOnHand} - ${item.quantity})`,
-        })
-        .where(eq(productVariants.id, item.variantId));
-    }
 
     await tx
       .update(orders)
@@ -486,10 +650,23 @@ async function processPayFastItnFields({
           .returning({ id: shipments.id });
 
         if (plan.provider === "jurgens_local") {
-          await tx
+          const linkedSchedules = await tx
             .update(jurgensDeliverySchedules)
             .set({ shipmentId: shipment.id, updatedAt: now })
-            .where(eq(jurgensDeliverySchedules.orderId, paymentRow.orderId));
+            .where(eq(jurgensDeliverySchedules.orderId, paymentRow.orderId))
+            .returning({
+              orderId: jurgensDeliverySchedules.orderId,
+              scheduleId: jurgensDeliverySchedules.id,
+              status: jurgensDeliverySchedules.status,
+            });
+
+          for (const schedule of linkedSchedules) {
+            await enqueueJurgensDeliveryStatusNotification({
+              ...schedule,
+              revision: now.toISOString(),
+              transaction: tx,
+            });
+          }
         }
 
         if (plan.parcels.length > 0) {
@@ -519,7 +696,7 @@ async function processPayFastItnFields({
           .returning({ id: shipments.id });
 
         if (quote.provider === "jurgens_local") {
-          await tx
+          const linkedSchedules = await tx
             .update(jurgensDeliverySchedules)
             .set({ shipmentId: shipment.id, updatedAt: now })
             .where(
@@ -527,7 +704,20 @@ async function processPayFastItnFields({
                 eq(jurgensDeliverySchedules.orderId, paymentRow.orderId),
                 eq(jurgensDeliverySchedules.quoteId, quote.id),
               ),
-            );
+            )
+            .returning({
+              orderId: jurgensDeliverySchedules.orderId,
+              scheduleId: jurgensDeliverySchedules.id,
+              status: jurgensDeliverySchedules.status,
+            });
+
+          for (const schedule of linkedSchedules) {
+            await enqueueJurgensDeliveryStatusNotification({
+              ...schedule,
+              revision: now.toISOString(),
+              transaction: tx,
+            });
+          }
         }
 
         const parcelItems = getParcelSnapshotItems(
@@ -557,10 +747,61 @@ async function processPayFastItnFields({
       }
     }
 
-    return { newlyCompleted: true };
-  });
+      return { newlyCompleted: true };
+    });
+  } catch (error) {
+    if (
+      error instanceof PayFastItnError &&
+      (error.code === "inventory_unavailable_after_expiry" ||
+        error.code === "inventory_reservation_invalid")
+    ) {
+      const exception = await recordPaymentReconciliationException({
+        amount: expectedAmount.toFixed(2),
+        auditEventId,
+        orderId: paymentRow.orderId,
+        paymentId: paymentRow.id,
+        providerPaymentId,
+        rawPayload: redactedPayload,
+        reason: error.code,
+      });
+
+      await notifyAdminsOfPaymentReconciliationException(
+        exception.id,
+      ).catch((notificationError) => {
+        console.error(
+          "[payfast-itn] payment reconciliation notification failed",
+          {
+            error:
+              notificationError instanceof Error
+                ? notificationError.message
+                : "unknown_error",
+            exceptionId: exception.id,
+            orderId: paymentRow.orderId,
+          },
+        );
+      });
+
+      onStage("completed");
+      return {
+        completed: false,
+        newlyCompleted: false,
+        orderId: paymentRow.orderId,
+        providerStatus,
+        reconciliationRequired: true,
+      };
+    }
+
+    throw error;
+  }
 
   await ensureInvoiceForPaidOrder(paymentRow.orderId).catch(() => null);
+
+  await notifyAdminsOfPaidOrder(paymentRow.orderId).catch((error) => {
+    console.error("[payfast-itn] paid-order admin notification failed", {
+      error: error instanceof Error ? error.message : "unknown_error",
+      orderId: paymentRow.orderId,
+    });
+  });
 
   if (completion.newlyCompleted) {
     await sendJurgensDeliveryStatusNotification({
@@ -617,6 +858,7 @@ export async function processPayFastItn({
 
   try {
     const result = await processPayFastItnFields({
+      auditEventId,
       clientIp,
       fields,
       onStage: (nextStage) => {

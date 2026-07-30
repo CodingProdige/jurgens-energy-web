@@ -66,6 +66,10 @@ export const orders = pgTable("orders", {
   campaignAttributionSnapshot: jsonb(
     "campaign_attribution_snapshot",
   ).$type<CampaignAttributionSnapshot>(),
+  checkoutRequestId: uuid("checkout_request_id").unique(),
+  checkoutRequestFingerprint: varchar("checkout_request_fingerprint", {
+    length: 64,
+  }),
   checkoutTokenHash: varchar("checkout_token_hash", { length: 64 }),
   currency: varchar("currency", { length: 3 }).notNull().default("ZAR"),
   status: orderStatus("status").notNull().default("pending"),
@@ -74,6 +78,7 @@ export const orders = pgTable("orders", {
     .notNull()
     .default("0"),
   grandTotal: numeric("grand_total", { precision: 12, scale: 2 }).notNull(),
+  paymentExpiresAt: timestamp("payment_expires_at", { mode: "date" }),
   paidAt: timestamp("paid_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
