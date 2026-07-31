@@ -200,7 +200,12 @@ export async function getCheckoutDeliveryQuotes(
       fingerprint,
       groups,
     };
-  } catch {
+  } catch (error) {
+    console.error("[checkout-delivery] Failed to create customer shipping quote", {
+      error,
+      fingerprint,
+    });
+
     return unavailable("Delivery is temporarily unavailable. Please try again.");
   }
 }

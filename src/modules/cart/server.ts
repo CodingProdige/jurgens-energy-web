@@ -32,7 +32,7 @@ function toMediaUrl(
   relativePath: string | null,
   thumbnailRelativePath: string | null,
 ) {
-  const path = thumbnailRelativePath ?? relativePath;
+  const path = relativePath ?? thumbnailRelativePath;
 
   return path ? getMediaPublicUrl(path) : null;
 }

@@ -1,5 +1,7 @@
 import "server-only";
 
+import crypto from "node:crypto";
+
 import { z } from "zod";
 
 import { db } from "@/src/db";
@@ -27,15 +29,6 @@ const parcelItemSchema = z
     variantId: z.string().uuid(),
     weightGrams: z.coerce.number().finite().positive().optional(),
     widthMm: z.coerce.number().finite().positive().optional(),
-  })
-  .superRefine((item, context) => {
-    if (item.fulfillmentMode === "courier_guy" && !item.sellerId) {
-      context.addIssue({
-        code: "custom",
-        message: "Courier items must belong to a seller.",
-        path: ["sellerId"],
-      });
-    }
   });
 
 const customerShippingQuoteSchema = z.object({
@@ -94,7 +87,7 @@ export async function createCustomerShippingQuote(input: {
         providerRatesVisibleToCustomer: false,
         zoneId: parsed.jurgensZoneId ?? null,
       },
-      providerRateId: `customer-shipping-policy-${parsed.checkoutFingerprint}`,
+      providerRateId: `customer-shipping-policy-${parsed.checkoutFingerprint}-${crypto.randomUUID()}`,
       serviceLevel: "standard_delivery",
       serviceName,
     })

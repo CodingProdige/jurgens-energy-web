@@ -1273,6 +1273,11 @@ function ProductMediaLightbox({
     : -1;
   const displayIndex = activeIndex >= 0 ? activeIndex + 1 : 1;
   const hasMultipleMedia = galleryMedia.length > 1;
+  const lightboxSwipeRef = useRef({
+    pointerId: -1,
+    startX: 0,
+    startY: 0,
+  });
 
   useEffect(() => {
     if (!isOpen || !hasMultipleMedia) {
@@ -1296,10 +1301,71 @@ function ProductMediaLightbox({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [hasMultipleMedia, isOpen, onNext, onPrevious]);
 
+  function handleLightboxPointerDown(
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) {
+    if (!hasMultipleMedia || event.pointerType !== "touch") {
+      return;
+    }
+
+    lightboxSwipeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Some mobile browsers reject capture while media controls are active.
+    }
+  }
+
+  function handleLightboxPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (
+      !hasMultipleMedia ||
+      lightboxSwipeRef.current.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    const deltaX = event.clientX - lightboxSwipeRef.current.startX;
+    const deltaY = event.clientY - lightboxSwipeRef.current.startY;
+    lightboxSwipeRef.current.pointerId = -1;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
+      return;
+    }
+
+    if (deltaX > 0) {
+      onPrevious();
+    } else {
+      onNext();
+    }
+  }
+
+  function handleLightboxPointerCancel(
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) {
+    if (lightboxSwipeRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    lightboxSwipeRef.current.pointerId = -1;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className="h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[min(96rem,calc(100vw-1rem))] max-w-none border border-white/10 bg-[#080808] p-0 text-white ring-white/15 sm:max-w-none"
+        className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-screen translate-x-0 translate-y-0 rounded-none border-0 bg-[#080808] p-0 text-white ring-white/15 sm:left-1/2 sm:top-1/2 sm:h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-1rem)] sm:w-[min(96rem,calc(100vw-1rem))] sm:max-w-none sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:border sm:border-white/10"
         overlayClassName="bg-black/70 backdrop-blur-sm"
         showCloseButton={false}
       >
@@ -1315,9 +1381,9 @@ function ProductMediaLightbox({
           <span className="sr-only">Close media gallery</span>
         </DialogClose>
 
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto]">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] sm:grid-rows-[auto_minmax(0,1fr)_auto]">
           <header className="min-w-0 border-b border-white/10 px-4 py-3 pr-16 sm:px-5">
-            <p className="truncate text-sm font-black text-white">
+            <p className="max-w-full truncate text-sm font-black text-white sm:text-base">
               {productTitle}
             </p>
             <p className="mt-1 text-xs font-semibold text-white/60">
@@ -1325,11 +1391,15 @@ function ProductMediaLightbox({
             </p>
           </header>
 
-          <div className="relative grid min-h-0 place-items-center overflow-hidden bg-[#080808] [container-type:size]">
+          <div
+            className="relative grid min-h-0 touch-pan-y place-items-center overflow-hidden bg-[#080808]"
+            onPointerCancel={handleLightboxPointerCancel}
+            onPointerDown={handleLightboxPointerDown}
+            onPointerUp={handleLightboxPointerUp}
+          >
             <div
-              className="relative aspect-[1/1] max-h-full max-w-full overflow-hidden"
+              className="relative size-full max-h-full max-w-full overflow-hidden"
               data-product-lightbox-media-container=""
-              style={{ width: "min(100%, 100cqh)" }}
             >
               {selectedMedia ? (
                 selectedMedia.kind === "video" ? (
@@ -1372,7 +1442,7 @@ function ProductMediaLightbox({
               <>
                 <button
                   aria-label="Previous product media"
-                  className="absolute left-3 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/35 sm:left-5"
+                  className="absolute left-3 top-1/2 z-20 hidden size-11 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/35 sm:left-5 sm:grid"
                   onClick={onPrevious}
                   type="button"
                 >
@@ -1380,18 +1450,21 @@ function ProductMediaLightbox({
                 </button>
                 <button
                   aria-label="Next product media"
-                  className="absolute right-3 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/35 sm:right-5"
+                  className="absolute right-3 top-1/2 z-20 hidden size-11 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/35 sm:right-5 sm:grid"
                   onClick={onNext}
                   type="button"
                 >
                   <ChevronRightIcon className="size-6" />
                 </button>
+                <span className="absolute bottom-4 right-4 z-20 rounded-full bg-white/18 px-2.5 py-1 text-xs font-black leading-none text-white shadow-sm backdrop-blur-sm sm:hidden">
+                  {displayIndex}/{galleryMedia.length}
+                </span>
               </>
             ) : null}
           </div>
 
           {hasMultipleMedia ? (
-            <div className="border-t border-white/10 bg-[#080808]/95 px-4 py-3 sm:px-5">
+            <div className="hidden border-t border-white/10 bg-[#080808]/95 px-4 py-3 sm:block sm:px-5">
               <ProductMediaThumbnailStrip
                 activeMediaId={selectedMedia?.id ?? null}
                 galleryMedia={galleryMedia}
