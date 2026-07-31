@@ -17,7 +17,7 @@ export const dashboardControlClass =
   "border-slate-300 bg-white text-zinc-950 shadow-none dark:border-white/18 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10";
 
 export const dashboardPanelClass =
-  "rounded-lg border border-slate-300 bg-white shadow-sm dark:border-white/18 dark:bg-[#151719] dark:shadow-black/30";
+  "min-w-0 rounded-lg border border-slate-300 bg-white shadow-sm dark:border-white/18 dark:bg-[#151719] dark:shadow-black/30";
 
 export const dashboardTableHeaderRowClass =
   "border-slate-300 hover:bg-transparent dark:border-white/18";
@@ -40,7 +40,7 @@ export const dashboardTableMutedTextClass =
   "text-sm text-slate-700 dark:text-zinc-300";
 
 export const dashboardTableContainerClass =
-  "[&_[data-slot=table-container]]:overflow-visible md:[&_[data-slot=table-container]]:overflow-x-auto";
+  "overflow-hidden [&_[data-slot=table-container]]:min-w-0 [&_[data-slot=table-container]]:max-w-full [&_[data-slot=table-container]]:overflow-x-auto [&_[data-slot=table-container]]:overscroll-x-contain [&_[data-slot=table-container]]:[scrollbar-width:thin]";
 
 export const dashboardTableClass = "table-fixed md:min-w-[920px] md:table-auto";
 

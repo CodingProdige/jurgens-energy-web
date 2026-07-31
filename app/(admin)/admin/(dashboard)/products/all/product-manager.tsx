@@ -976,14 +976,14 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
         title="All products"
       />
 
-      <div className="grid gap-4">
+      <div className="grid min-w-0 gap-4">
         <DashboardCompactMetrics
           metrics={productMetrics}
           storageKey="jurgens:admin:all-product-metrics"
         />
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full md:max-w-md">
+        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative min-w-0 w-full md:max-w-md">
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <DashboardInput
               className="pl-9"
@@ -995,7 +995,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
               value={searchTerm}
             />
           </div>
-          <div className="grid grid-cols-2 gap-2 md:flex md:items-center">
+          <div className="grid min-w-0 grid-cols-2 gap-2 md:flex md:shrink-0 md:items-center">
             <DashboardButton nativeButton={false} render={<Link href="/products/new" />}>
               <PlusIcon className="size-3.5" />
               New product
@@ -1068,25 +1068,27 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           className={cn(
             dashboardPanelClass,
             dashboardTableContainerClass,
-            "overflow-visible",
+            "min-w-0",
           )}
         >
-          <Table className={dashboardTableClass}>
+          <Table className={cn(dashboardTableClass, "md:min-w-[960px] md:table-fixed")}>
             <TableHeader>
               <TableRow className={dashboardTableHeaderRowClass}>
-                <TableHead className={dashboardTableHeadClass}>Product</TableHead>
+                <TableHead className={cn(dashboardTableHeadClass, "w-[52%]")}>
+                  Product
+                </TableHead>
                 <TableHead
-                  className={cn(dashboardTableHeadClass, "hidden lg:table-cell")}
+                  className={cn(dashboardTableHeadClass, "hidden w-28 lg:table-cell")}
                 >
                   Status
                 </TableHead>
                 <TableHead
-                  className={cn(dashboardTableHeadClass, "hidden lg:table-cell")}
+                  className={cn(dashboardTableHeadClass, "hidden w-44 lg:table-cell")}
                 >
                   Fulfillment
                 </TableHead>
                 <TableHead
-                  className={cn(dashboardTableHeadClass, "hidden xl:table-cell")}
+                  className={cn(dashboardTableHeadClass, "hidden w-36 xl:table-cell")}
                 >
                   Updated
                 </TableHead>
