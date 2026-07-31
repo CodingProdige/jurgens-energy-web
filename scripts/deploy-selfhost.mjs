@@ -31,14 +31,6 @@ run("docker", [...composeOpsArgs, "build", "web", "migrate"]);
 
 run("docker", [...composeBaseArgs, "up", "-d", "postgres", "redis"]);
 run("docker", [...composeOpsArgs, "run", "--rm", "migrate"]);
-run("docker", [
-  ...composeOpsArgs,
-  "run",
-  "--rm",
-  "migrate",
-  "node",
-  "scripts/seed-catalog.mjs",
-]);
 
 const hasTunnelToken = Boolean(process.env.CLOUDFLARE_TUNNEL_TOKEN?.trim());
 const upArgs = [...composeBaseArgs];

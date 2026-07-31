@@ -7,6 +7,15 @@ if (!databaseUrl) {
 }
 
 const sql = postgres(databaseUrl, { max: 1 });
+const forceReseed = process.argv.includes("--force");
+
+if (!forceReseed) {
+  await sql.end();
+  console.log(
+    "Catalog taxonomy and brand seeding is disabled to preserve admin-managed categories and brands. Re-run with --force only when intentionally resetting the preset taxonomy.",
+  );
+  process.exit(0);
+}
 
 function slugify(value) {
   return value

@@ -17,7 +17,7 @@ FROM node:22-alpine AS migrate
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules/postgres ./node_modules/postgres
-COPY scripts/migrate.mjs scripts/seed-catalog.mjs ./scripts/
+COPY scripts/migrate.mjs ./scripts/
 COPY src/db/migrations ./src/db/migrations
 CMD ["node", "scripts/migrate.mjs"]
 
