@@ -15,6 +15,7 @@ import {
   PencilIcon,
   PlusIcon,
   SearchIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react";
 
@@ -67,7 +68,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { updateAdminProductStatus } from "@/app/(admin)/admin/(dashboard)/products/all/actions";
+import {
+  deleteOrArchiveAdminProduct,
+  updateAdminProductStatus,
+} from "@/app/(admin)/admin/(dashboard)/products/all/actions";
 import type {
   AdminProductRow,
   AdminProductReviewStatus,
@@ -739,7 +743,13 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
   const [pendingStatusProductId, setPendingStatusProductId] = useState<
     string | null
   >(null);
+  const [pendingDeleteProduct, setPendingDeleteProduct] =
+    useState<AdminProductRow | null>(null);
+  const [pendingDeleteProductId, setPendingDeleteProductId] = useState<
+    string | null
+  >(null);
   const [, startStatusTransition] = useTransition();
+  const [, startDeleteTransition] = useTransition();
 
   const productMetrics = useMemo<DashboardMetricDefinition[]>(
     () => [
@@ -916,6 +926,43 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           setPendingStatusProductId(null);
           setStatusFeedback({
             message: "Product status could not be updated.",
+            tone: "error",
+          });
+        });
+    });
+  }
+
+  function handleDeleteOrArchiveProduct() {
+    if (!pendingDeleteProduct) {
+      return;
+    }
+
+    const product = pendingDeleteProduct;
+
+    setStatusFeedback(null);
+    setPendingDeleteProductId(product.id);
+    startDeleteTransition(() => {
+      void deleteOrArchiveAdminProduct({ productId: product.id })
+        .then((result) => {
+          setPendingDeleteProductId(null);
+          setStatusFeedback({
+            message:
+              result.message ??
+              (result.ok
+                ? "Product deleted or archived."
+                : "Product could not be deleted."),
+            tone: result.ok ? "success" : "error",
+          });
+
+          if (result.ok) {
+            setPendingDeleteProduct(null);
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          setPendingDeleteProductId(null);
+          setStatusFeedback({
+            message: "Product could not be deleted or archived.",
             tone: "error",
           });
         });
@@ -1139,6 +1186,19 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                                 : "Set as draft"}
                             </button>
                           ) : null}
+                          <button
+                            className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-600 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60 dark:text-red-300 dark:hover:bg-red-500/10"
+                            disabled={pendingDeleteProductId === product.id}
+                            onClick={() => setPendingDeleteProduct(product)}
+                            type="button"
+                          >
+                            {pendingDeleteProductId === product.id ? (
+                              <Loader2Icon className="size-4 animate-spin" />
+                            ) : (
+                              <Trash2Icon className="size-4" />
+                            )}
+                            Delete or archive
+                          </button>
                         </DashboardRowActionMenu>
                       </div>
                     </TableCell>
@@ -1191,6 +1251,54 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           </DialogHeader>
           {viewProduct ? <ProductDetails product={viewProduct} /> : null}
           <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(pendingDeleteProduct)}
+        onOpenChange={(open) => {
+          if (!open && !pendingDeleteProductId) {
+            setPendingDeleteProduct(null);
+          }
+        }}
+      >
+        <DialogContent className="border border-red-200 bg-white text-zinc-950 shadow-2xl dark:border-red-400/25 dark:bg-[#101214] dark:text-white">
+          <DialogHeader>
+            <DialogTitle>Delete or archive product?</DialogTitle>
+            <DialogDescription>
+              Products with no order history are permanently deleted. Products
+              with order history are archived so past orders remain accurate.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-100">
+              {pendingDeleteProduct?.title ?? "This product"} will be removed
+              from the live catalogue immediately if this action succeeds.
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-md border border-red-600 bg-red-600 px-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={Boolean(pendingDeleteProductId)}
+              onClick={handleDeleteOrArchiveProduct}
+              type="button"
+            >
+              {pendingDeleteProductId ? (
+                <Loader2Icon className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Trash2Icon className="mr-2 size-4" />
+              )}
+              Delete / archive
+            </button>
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-zinc-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:hover:bg-white/10"
+              disabled={Boolean(pendingDeleteProductId)}
+              onClick={() => setPendingDeleteProduct(null)}
+              type="button"
+            >
+              Cancel
+            </button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

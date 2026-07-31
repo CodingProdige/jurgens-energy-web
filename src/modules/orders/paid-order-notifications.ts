@@ -12,6 +12,7 @@ import {
 } from "@/src/modules/notifications/dispatch-claims";
 import { notify } from "@/src/modules/notifications/templates";
 
+const adminCreatedOrderEvent = "admin.order.created";
 const adminPaidOrderEvent = "admin.order.paid";
 
 function formatMoney(value: string, currency: string) {
@@ -31,28 +32,7 @@ function notificationResultSucceeded(
   );
 }
 
-export async function notifyAdminsOfPaidOrder(orderId: string) {
-  const [order] = await db
-    .select({
-      currency: orders.currency,
-      customerName: orders.customerName,
-      grandTotal: orders.grandTotal,
-      id: orders.id,
-      orderNumber: orders.orderNumber,
-      status: orders.status,
-    })
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1);
-
-  if (!order || !["paid", "fulfilled"].includes(order.status)) {
-    return {
-      notified: 0,
-      skipped: true,
-      reason: order ? "order_not_paid" : "order_not_found",
-    } as const;
-  }
-
+async function getAdminOrderNotificationRecipientIds() {
   const [capabilityRecipientIds, platformAdminRows] = await Promise.all([
     getAdminStaffUserIdsWithCapability("admin.orders.manage"),
     db
@@ -68,24 +48,78 @@ export async function notifyAdminsOfPaidOrder(orderId: string) {
         ),
       ),
   ]);
-  const recipientUserIds = Array.from(
+
+  return Array.from(
     new Set([
       ...capabilityRecipientIds,
       ...platformAdminRows.map((row) => row.userId),
     ]),
   );
-  const data = {
-    customer_name: order.customerName,
-    order_id: order.id,
-    order_number: order.orderNumber,
-    order_total: formatMoney(order.grandTotal, order.currency),
+}
+
+async function getOrderNotificationData(orderId: string) {
+  const [order] = await db
+    .select({
+      currency: orders.currency,
+      customerName: orders.customerName,
+      grandTotal: orders.grandTotal,
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      status: orders.status,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!order) {
+    return null;
+  }
+
+  return {
+    data: {
+      customer_name: order.customerName,
+      order_id: order.id,
+      order_number: order.orderNumber,
+      order_total: formatMoney(order.grandTotal, order.currency),
+    },
+    order,
   };
+}
+
+async function notifyAdminsOfOrder({
+  dedupePrefix,
+  eventKey,
+  logLabel,
+  orderId,
+  requirePaidOrder,
+}: {
+  dedupePrefix: string;
+  eventKey: string;
+  logLabel: string;
+  orderId: string;
+  requirePaidOrder: boolean;
+}) {
+  const orderData = await getOrderNotificationData(orderId);
+
+  if (
+    !orderData ||
+    (requirePaidOrder &&
+      !["paid", "fulfilled"].includes(orderData.order.status))
+  ) {
+    return {
+      notified: 0,
+      skipped: true,
+      reason: orderData ? "order_not_paid" : "order_not_found",
+    } as const;
+  }
+
+  const recipientUserIds = await getAdminOrderNotificationRecipientIds();
   const results = await Promise.allSettled(
     recipientUserIds.map(async (recipientUserId) => {
       const claim = await claimNotificationDispatch({
-        dedupeKey: `admin-paid-order:${order.id}:${recipientUserId}`,
-        eventKey: adminPaidOrderEvent,
-        payload: { orderId: order.id, recipientUserId },
+        dedupeKey: `${dedupePrefix}:${orderData.order.id}:${recipientUserId}`,
+        eventKey,
+        payload: { orderId: orderData.order.id, recipientUserId },
       });
 
       if (!claim.claimed) {
@@ -94,8 +128,8 @@ export async function notifyAdminsOfPaidOrder(orderId: string) {
 
       try {
         const result = await notify({
-          data,
-          event: adminPaidOrderEvent,
+          data: orderData.data,
+          event: eventKey,
           recipientUserId,
         });
 
@@ -124,7 +158,9 @@ export async function notifyAdminsOfPaidOrder(orderId: string) {
   results.forEach((result, index) => {
     if (result.status === "rejected") {
       console.error(
-        `Failed to notify admin ${recipientUserIds[index] ?? "unknown"} about paid order ${order.id}.`,
+        `Failed to notify admin ${
+          recipientUserIds[index] ?? "unknown"
+        } about ${logLabel} order ${orderData.order.id}.`,
         result.reason,
       );
     }
@@ -135,4 +171,24 @@ export async function notifyAdminsOfPaidOrder(orderId: string) {
     recipients: recipientUserIds.length,
     skipped: recipientUserIds.length === 0,
   } as const;
+}
+
+export async function notifyAdminsOfCreatedOrder(orderId: string) {
+  return notifyAdminsOfOrder({
+    dedupePrefix: "admin-created-order",
+    eventKey: adminCreatedOrderEvent,
+    logLabel: "created",
+    orderId,
+    requirePaidOrder: false,
+  });
+}
+
+export async function notifyAdminsOfPaidOrder(orderId: string) {
+  return notifyAdminsOfOrder({
+    dedupePrefix: "admin-paid-order",
+    eventKey: adminPaidOrderEvent,
+    logLabel: "paid",
+    orderId,
+    requirePaidOrder: true,
+  });
 }

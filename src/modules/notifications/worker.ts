@@ -2,7 +2,10 @@ import "server-only";
 
 import { getRetryableNotificationDispatches } from "@/src/modules/notifications/dispatch-claims";
 import { reconcileOutstandingOrderFulfillment } from "@/src/modules/orders/fulfillment";
-import { notifyAdminsOfPaidOrder } from "@/src/modules/orders/paid-order-notifications";
+import {
+  notifyAdminsOfCreatedOrder,
+  notifyAdminsOfPaidOrder,
+} from "@/src/modules/orders/paid-order-notifications";
 import { sendJurgensDeliveryStatusNotification } from "@/src/modules/orders/jurgens-delivery-notifications";
 import {
   notifyAdminsOfOpenPaymentReconciliationExceptions,
@@ -70,6 +73,13 @@ export async function processNotificationDispatchRetries() {
       tasks.set(
         `paid-order:${row.payload.orderId}`,
         () => notifyAdminsOfPaidOrder(row.payload.orderId),
+      );
+    }
+
+    if (row.eventKey === "admin.order.created" && row.payload.orderId) {
+      tasks.set(
+        `created-order:${row.payload.orderId}`,
+        () => notifyAdminsOfCreatedOrder(row.payload.orderId),
       );
     }
 

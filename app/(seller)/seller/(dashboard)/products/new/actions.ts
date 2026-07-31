@@ -10,6 +10,7 @@ import { getExchangeRequirementText as buildExchangeRequirementText } from "@/sr
 import { db } from "@/src/db";
 import {
   auditLogs,
+  brandRequests,
   brands,
   categories,
   media,
@@ -1025,7 +1026,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
   const brandName = draft.brandName?.trim();
   const brandSlug = brandName ? slugify(brandName) : "";
   let brandId: string | null = null;
-  const brandRequestId: string | null = null;
+  let brandRequestId: string | null = null;
 
   if (!brandName || !brandSlug) {
     if (draft.status === "draft") {
@@ -1046,6 +1047,24 @@ export async function saveProductDraft(input: ProductDraftInput) {
     if (!existingBrand) {
       if (draft.status === "draft") {
         brandId = null;
+        const [existingBrandRequest] = await db
+          .select({ id: brandRequests.id })
+          .from(brandRequests)
+          .where(eq(brandRequests.slug, brandSlug))
+          .orderBy(brandRequests.createdAt)
+          .limit(1);
+
+        brandRequestId =
+          existingBrandRequest?.id ??
+          (await db
+            .insert(brandRequests)
+            .values({
+              brandName,
+              requestedByUserId: session.user.id,
+              slug: brandSlug,
+            })
+            .returning({ id: brandRequests.id })
+            .then(([request]) => request.id));
       } else {
         return {
           ok: false,
@@ -1056,6 +1075,10 @@ export async function saveProductDraft(input: ProductDraftInput) {
     } else {
       brandId = existingBrand.id;
     }
+  }
+
+  if (brandId) {
+    brandRequestId = null;
   }
 
   if (draft.status !== "draft" && !brandId) {

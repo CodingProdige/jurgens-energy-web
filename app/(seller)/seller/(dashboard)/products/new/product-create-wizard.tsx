@@ -3,6 +3,7 @@
 import type { ClipboardEvent, CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertTriangleIcon,
@@ -87,6 +88,9 @@ import {
   importProductLinkMedia,
   saveProductDraft,
 } from "@/app/(seller)/seller/(dashboard)/products/new/actions";
+import {
+  deleteOrArchiveAdminProduct,
+} from "@/app/(admin)/admin/(dashboard)/products/all/actions";
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import { normalizeMediaSelectionIds } from "@/src/modules/media/selection";
 import { getVariantProfitability } from "@/src/modules/products/cost-price";
@@ -1694,6 +1698,7 @@ export function ProductCreateWizard({
     variantCostPricesById: Record<string, string>;
   };
 }) {
+  const router = useRouter();
   const initialVariantOptions =
     initialProduct?.optionSchema.length
       ? initialProduct.optionSchema.map((option, index) => ({
@@ -1830,6 +1835,8 @@ export function ProductCreateWizard({
   const [isGeneratingDescription, startDescriptionTransition] =
     useTransition();
   const [isSavingDraft, startSaveDraftTransition] = useTransition();
+  const [isDeletingProduct, startDeleteProductTransition] = useTransition();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [productPublishStatus, setProductPublishStatus] =
     useState<ProductPublishStatus>(
       getInitialProductPublishStatus(initialProduct?.status),
@@ -1843,6 +1850,13 @@ export function ProductCreateWizard({
     initialProduct && !canFullyEditProduct && !canSaveOperationalFields,
   );
   const saveDisabled = productIsLocked || isSavingDraft;
+  const canDeleteOrArchiveProduct = Boolean(
+    initialProduct &&
+      enableGoogleCommerceSettings &&
+      !["archived", "admin_suspended", "pending_review"].includes(
+        initialProduct.status,
+      ),
+  );
 
   const categoriesById = useMemo(
     () => new Map(data.categories.map((category) => [category.id, category])),
@@ -2937,7 +2951,10 @@ export function ProductCreateWizard({
     startSaveDraftTransition(() => {
       void saveProductDraft(getProductDraftInput(status)).then((result) => {
         if (result.ok) {
-          setDraftProductId(result.productId ?? draftProductId);
+          const savedProductId = result.productId ?? draftProductId;
+          const wasUnsavedProduct = !draftProductId && Boolean(result.productId);
+
+          setDraftProductId(savedProductId);
           setProductPublishStatus(status);
           if (!productName.trim() && result.productTitle) {
             setProductName(result.productTitle);
@@ -2963,6 +2980,10 @@ export function ProductCreateWizard({
             message: result.message ?? "Product saved.",
             tone: "success",
           });
+          if (wasUnsavedProduct && savedProductId) {
+            router.replace(`/products/${savedProductId}/edit`);
+            router.refresh();
+          }
           return;
         }
 
@@ -2971,6 +2992,39 @@ export function ProductCreateWizard({
           tone: "error",
         });
       });
+    });
+  }
+
+  function handleDeleteOrArchiveProduct() {
+    if (!initialProduct) {
+      return;
+    }
+
+    setDraftSaveFeedback(null);
+    startDeleteProductTransition(() => {
+      void deleteOrArchiveAdminProduct({ productId: initialProduct.id })
+        .then((result) => {
+          setDraftSaveFeedback({
+            message:
+              result.message ??
+              (result.ok
+                ? "Product deleted or archived."
+                : "Product could not be deleted."),
+            tone: result.ok ? "success" : "error",
+          });
+
+          if (result.ok) {
+            setIsDeleteDialogOpen(false);
+            router.replace("/products");
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          setDraftSaveFeedback({
+            message: "Product could not be deleted or archived.",
+            tone: "error",
+          });
+        });
     });
   }
 
@@ -3228,6 +3282,21 @@ export function ProductCreateWizard({
           <DashboardButton nativeButton={false} render={<Link href="/products" />}>
             Cancel
           </DashboardButton>
+          {canDeleteOrArchiveProduct ? (
+            <DashboardButton
+              className="border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:border-red-400/25 dark:bg-white/[0.03] dark:text-red-300 dark:hover:bg-red-500/10"
+              disabled={isDeletingProduct || isSavingDraft}
+              onClick={() => setIsDeleteDialogOpen(true)}
+              type="button"
+            >
+              {isDeletingProduct ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2Icon className="size-3.5" />
+              )}
+              Delete / archive
+            </DashboardButton>
+          ) : null}
           <DashboardButton
             disabled={fullListingControlsDisabled || isSavingDraft}
             onClick={() => {
@@ -5096,6 +5165,21 @@ export function ProductCreateWizard({
         <DashboardButton nativeButton={false} render={<Link href="/products" />}>
           Cancel
         </DashboardButton>
+        {canDeleteOrArchiveProduct ? (
+          <DashboardButton
+            className="border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:border-red-400/25 dark:bg-white/[0.03] dark:text-red-300 dark:hover:bg-red-500/10"
+            disabled={isDeletingProduct || isSavingDraft}
+            onClick={() => setIsDeleteDialogOpen(true)}
+            type="button"
+          >
+            {isDeletingProduct ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : (
+              <Trash2Icon className="size-3.5" />
+            )}
+            Delete / archive
+          </DashboardButton>
+        ) : null}
         <DashboardButton
           disabled={saveDisabled}
           onClick={() => handleSaveProduct("draft")}
@@ -5122,6 +5206,55 @@ export function ProductCreateWizard({
           {isSavingDraft ? "Saving..." : "Save active"}
         </DashboardButton>
       </div>
+
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!isDeletingProduct) {
+            setIsDeleteDialogOpen(open);
+          }
+        }}
+      >
+        <DialogContent className="border border-red-200 bg-white text-zinc-950 shadow-2xl dark:border-red-400/25 dark:bg-[#101214] dark:text-white">
+          <DialogHeader>
+            <DialogTitle>Delete or archive product?</DialogTitle>
+            <DialogDescription>
+              Products with no order history are permanently deleted. Products
+              with order history are archived so past orders stay intact.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-100">
+              {initialProduct?.productName ?? "This product"} will disappear
+              from the live catalogue immediately if archived or deleted.
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              className="h-9 rounded-md border-red-600 bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"
+              disabled={isDeletingProduct}
+              onClick={handleDeleteOrArchiveProduct}
+              type="button"
+            >
+              {isDeletingProduct ? (
+                <Loader2Icon className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Trash2Icon className="mr-2 size-4" />
+              )}
+              Delete / archive
+            </Button>
+            <Button
+              className="h-9 rounded-md px-3 text-sm"
+              disabled={isDeletingProduct}
+              onClick={() => setIsDeleteDialogOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(activeExpandedVariant)}

@@ -44,6 +44,7 @@ import {
   isPendingCheckoutOpen,
 } from "@/src/modules/inventory/lifecycle";
 import { reserveOrderInventory } from "@/src/modules/inventory/reservations";
+import { notifyAdminsOfCreatedOrder } from "@/src/modules/orders/paid-order-notifications";
 import { evaluateCustomerDelivery } from "@/src/modules/shipping/customer-delivery-evaluation";
 import { customerShippingSnapshotMatchesCart } from "@/src/modules/shipping/customer-shipping-snapshot";
 import {
@@ -829,6 +830,13 @@ export async function createHostedCheckoutOrder(
     }
 
     return { ...order, paymentId: payment.id };
+  });
+
+  await notifyAdminsOfCreatedOrder(created.id).catch((error) => {
+    console.error("[checkout] order-created admin notification failed", {
+      error: error instanceof Error ? error.message : "unknown_error",
+      orderId: created.id,
+    });
   });
 
   return {
