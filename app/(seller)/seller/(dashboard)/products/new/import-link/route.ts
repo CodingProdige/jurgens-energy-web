@@ -4,6 +4,10 @@ import * as cheerio from "cheerio";
 import { z } from "zod";
 
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import {
+  productRichDescriptionMaxLength,
+  productShortDescriptionMaxLength,
+} from "@/src/modules/products/product-description";
 
 type ImportedProductImage = {
   alt: string;
@@ -358,9 +362,12 @@ function extractProductData(html: string, sourceUrl: string): ImportedProductSca
     barcode,
     brandName,
     compareAtPrice,
-    description: description.slice(0, 400),
+    description: description.slice(0, productShortDescriptionMaxLength),
     images: collectImages({ $, baseUrl: sourceUrl, product, productName }),
-    longDescription: toHtmlDescription(description).slice(0, 12000),
+    longDescription: toHtmlDescription(description).slice(
+      0,
+      productRichDescriptionMaxLength,
+    ),
     manufacturerMpn,
     price,
     productName,

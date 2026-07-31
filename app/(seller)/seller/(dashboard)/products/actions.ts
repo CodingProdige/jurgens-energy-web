@@ -23,6 +23,11 @@ import {
   saveProductDraft,
 } from "@/app/(seller)/seller/(dashboard)/products/new/actions";
 import { notifyAdminsProductSubmitted } from "@/src/modules/notifications/events";
+import {
+  productRichDescriptionLimitMessage,
+  productRichDescriptionMaxLength,
+  productShortDescriptionMaxLength,
+} from "@/src/modules/products/product-description";
 
 export type SellerProductMutationState = {
   error?: string;
@@ -67,7 +72,11 @@ const csvImportRowSchema = z.object({
   continueSellingOutOfStock: z.boolean().default(false),
   decision: z.enum(["import", "replace_draft", "skip"]).default("import"),
   fulfillmentMode: fulfillmentModeSchema.default("seller_fulfilled"),
-  fullDescription: z.string().trim().max(12000).optional(),
+  fullDescription: z
+    .string()
+    .trim()
+    .max(productRichDescriptionMaxLength, productRichDescriptionLimitMessage)
+    .optional(),
   heightMm: z.string().trim().max(40).optional(),
   id: z.string().trim().min(1).max(80),
   lengthMm: z.string().trim().max(40).optional(),
@@ -84,7 +93,11 @@ const csvImportRowSchema = z.object({
   price: z.string().trim().max(40).optional(),
   productName: z.string().trim().min(1).max(240),
   rowNumber: z.number().int().positive(),
-  shortDescription: z.string().trim().max(400).optional(),
+  shortDescription: z
+    .string()
+    .trim()
+    .max(productShortDescriptionMaxLength)
+    .optional(),
   sku: z.string().trim().min(1).max(50),
   stock: z.string().trim().max(20).optional(),
   weightGrams: z.string().trim().max(40).optional(),
@@ -96,7 +109,11 @@ const linkImportDraftSchema = z.object({
   barcode: z.string().trim().max(120).optional(),
   brandName: z.string().trim().max(120).optional(),
   compareAtPrice: z.string().trim().max(40).optional(),
-  description: z.string().trim().max(400).optional(),
+  description: z
+    .string()
+    .trim()
+    .max(productShortDescriptionMaxLength)
+    .optional(),
   images: z
     .array(
       z.object({
@@ -106,7 +123,10 @@ const linkImportDraftSchema = z.object({
     )
     .max(10)
     .default([]),
-  longDescription: z.string().max(12000).optional(),
+  longDescription: z
+    .string()
+    .max(productRichDescriptionMaxLength, productRichDescriptionLimitMessage)
+    .optional(),
   price: z.string().trim().max(40).optional(),
   productName: z.string().trim().min(1).max(240),
   sku: z.string().trim().max(50).optional(),

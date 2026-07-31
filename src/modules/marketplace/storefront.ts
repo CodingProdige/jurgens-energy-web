@@ -12,6 +12,7 @@ import {
   storefrontCategoryVisibilityOptions,
   storefrontCollectionLayouts,
   storefrontSectionCodePrefixes,
+  storefrontSectionLabels,
   storefrontSectionTypes,
   storefrontTitleTags,
   type StorefrontSection,
@@ -19,6 +20,8 @@ import {
 } from "@/src/modules/marketplace/storefront-types";
 
 export const storefrontHomePageSlug = "home";
+const maxStorefrontCollectionItems = 24;
+const maxStorefrontBlogPosts = 12;
 
 export type StorefrontAdminPage = {
   draftSections: StorefrontSection[];
@@ -219,7 +222,14 @@ const productCollectionSectionSchema = sectionBaseSchema.extend({
       actions: z.array(buttonActionSchema).max(6).optional(),
       eyebrow: boundedText(80),
       layout: collectionLayoutSchema.default("grid"),
-      productLimit: z.coerce.number().int().min(1).max(12),
+      productLimit: z.coerce
+        .number()
+        .int()
+        .min(1, "Product limit must be at least 1.")
+        .max(
+          maxStorefrontCollectionItems,
+          `Product limit must be ${maxStorefrontCollectionItems} or fewer.`,
+        ),
       productSource: productSourceSchema,
       selectedBrandIds: z.array(boundedText(80)).max(24).default([]),
       selectedCategoryIds: z.array(boundedText(80)).max(24).default([]),
@@ -252,7 +262,14 @@ const categoryCollectionSectionSchema = sectionBaseSchema.extend({
       )
       .max(48)
       .default([]),
-    categoryLimit: z.coerce.number().int().min(1).max(24),
+    categoryLimit: z.coerce
+      .number()
+      .int()
+      .min(1, "Category limit must be at least 1.")
+      .max(
+        maxStorefrontCollectionItems,
+        `Category limit must be ${maxStorefrontCollectionItems} or fewer.`,
+      ),
     categoryVisibility: categoryVisibilitySchema.default("with_products"),
     eyebrow: boundedText(80),
     imageSource: categoryImageSourceSchema.default("first_product"),
@@ -268,7 +285,14 @@ const categoryCollectionSectionSchema = sectionBaseSchema.extend({
 const brandCollectionSectionSchema = sectionBaseSchema.extend({
   settings: z.object({
     actions: z.array(buttonActionSchema).max(6).default([]),
-    brandLimit: z.coerce.number().int().min(1).max(24),
+    brandLimit: z.coerce
+      .number()
+      .int()
+      .min(1, "Brand limit must be at least 1.")
+      .max(
+        maxStorefrontCollectionItems,
+        `Brand limit must be ${maxStorefrontCollectionItems} or fewer.`,
+      ),
     eyebrow: boundedText(80),
     layout: collectionLayoutSchema.default("grid"),
     selectedBrandIds: z.array(boundedText(80)).max(48).default([]),
@@ -284,7 +308,14 @@ const latestBlogPostsSectionSchema = sectionBaseSchema.extend({
     actions: z.array(buttonActionSchema).max(6).default([]),
     eyebrow: boundedText(80),
     layout: collectionLayoutSchema.default("grid"),
-    postLimit: z.coerce.number().int().min(1).max(12),
+    postLimit: z.coerce
+      .number()
+      .int()
+      .min(1, "Post limit must be at least 1.")
+      .max(
+        maxStorefrontBlogPosts,
+        `Post limit must be ${maxStorefrontBlogPosts} or fewer.`,
+      ),
     title: boundedText(120).min(1, "Blog section title is required."),
     titleSize: titleSizeSchema.default(24),
     titleTag: titleTagSchema.default("h2"),
@@ -381,15 +412,72 @@ function parseStoredSections(value: unknown) {
   );
 }
 
+function asRecord(value: unknown) {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+const storefrontValidationFieldLabels: Record<string, string> = {
+  brandLimit: "Brand limit",
+  categoryLimit: "Category limit",
+  categoryVisibility: "Category visibility",
+  postLimit: "Post limit",
+  productLimit: "Product limit",
+  productSource: "Product source",
+  selectedBrandIds: "Selected brands",
+  selectedCategoryIds: "Selected categories",
+  title: "Title",
+};
+
+function formatStorefrontValidationMessage(
+  error: z.ZodError,
+  value: unknown,
+) {
+  const issue = error.issues[0];
+
+  if (!issue) {
+    return "Check the storefront sections and try again.";
+  }
+
+  const sectionIndex = typeof issue.path[0] === "number" ? issue.path[0] : null;
+  const fieldKey = String(issue.path[issue.path.length - 1] ?? "");
+  const fieldLabel = storefrontValidationFieldLabels[fieldKey] ?? fieldKey;
+
+  if (sectionIndex === null || !Array.isArray(value)) {
+    return fieldLabel ? `${fieldLabel}: ${issue.message}` : issue.message;
+  }
+
+  const section = asRecord(value[sectionIndex]);
+  const settings = asRecord(section?.settings);
+  const sectionType =
+    typeof section?.type === "string" &&
+    section.type in storefrontSectionLabels
+      ? (section.type as StorefrontSectionType)
+      : null;
+  const sectionLabel = sectionType ? storefrontSectionLabels[sectionType] : null;
+  const sectionTitle =
+    typeof settings?.title === "string" && settings.title.trim()
+      ? settings.title.trim()
+      : `Section ${sectionIndex + 1}`;
+  const componentCode =
+    typeof section?.componentCode === "string" && section.componentCode.trim()
+      ? section.componentCode.trim()
+      : null;
+  const location = [sectionTitle, sectionLabel, componentCode]
+    .filter(Boolean)
+    .join(" · ");
+
+  return `${location}: ${fieldLabel ? `${fieldLabel}: ` : ""}${issue.message}`;
+}
+
 export function validateStorefrontSections(value: unknown) {
   const parsed = storefrontSectionsSchema.safeParse(value);
 
   if (!parsed.success) {
     return {
       ok: false,
-      message:
-        parsed.error.issues[0]?.message ??
-        "Check the storefront sections and try again.",
+      message: formatStorefrontValidationMessage(parsed.error, value),
     } as const;
   }
 

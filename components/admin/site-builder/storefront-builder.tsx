@@ -1522,7 +1522,7 @@ function ProductCollectionSettings({
       ) : null}
       <NumberField
         label="Product limit"
-        max={12}
+        max={24}
         min={1}
         onChange={(productLimit) =>
           updateSettings({ ...settings, productLimit })

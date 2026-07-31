@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { ClipboardEvent, CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -90,7 +90,14 @@ import {
 import type { AdminMediaAsset } from "@/src/modules/media/admin";
 import { normalizeMediaSelectionIds } from "@/src/modules/media/selection";
 import { getVariantProfitability } from "@/src/modules/products/cost-price";
-import { generatedProductDescriptionTextToHtml } from "@/src/modules/products/product-description";
+import {
+  generatedProductDescriptionTextToHtml,
+  productGeneratedLongDescriptionMaxLength,
+  productManualLongDescriptionMaxLength,
+  productRichDescriptionMaxLength,
+  productRichDescriptionWarningLength,
+  productShortDescriptionMaxLength,
+} from "@/src/modules/products/product-description";
 import type {
   GoogleFulfillmentChannel,
   SellerCreateProductData,
@@ -641,6 +648,10 @@ function getEditorTextLength(value: string) {
     .length;
 }
 
+function formatCharacterCount(value: number) {
+  return new Intl.NumberFormat("en-ZA").format(value);
+}
+
 function placeCaretAtEnd(element: HTMLElement) {
   element.focus();
   const range = document.createRange();
@@ -854,6 +865,10 @@ function ProductRichTextEditor({
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkHref, setLinkHref] = useState("");
   const textLength = getEditorTextLength(value);
+  const storedLength = value.length;
+  const isStoredLengthNearLimit =
+    storedLength >= productRichDescriptionWarningLength;
+  const isStoredLengthOverLimit = storedLength > productRichDescriptionMaxLength;
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -886,15 +901,62 @@ function ProductRichTextEditor({
       return;
     }
 
+    const nextHtml = editor.innerHTML;
     const nextLength = editor.textContent?.length ?? 0;
+    const isReducingVisibleText = nextLength <= textLength;
+    const isReducingStoredHtml = nextHtml.length <= storedLength;
 
-    if (nextLength > maxLength) {
+    if (
+      (nextLength > maxLength && !isReducingVisibleText) ||
+      (nextHtml.length > productRichDescriptionMaxLength &&
+        !isReducingStoredHtml)
+    ) {
       editor.innerHTML = value;
       placeCaretAtEnd(editor);
       return;
     }
 
-    onChange(editor.innerHTML);
+    onChange(nextHtml);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    if (disabled) {
+      return;
+    }
+
+    const pastedText = event.clipboardData.getData("text/plain");
+
+    if (!pastedText) {
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+
+    const selection = window.getSelection();
+    const selectedTextLength =
+      selection &&
+      editorRef.current &&
+      selection.rangeCount > 0 &&
+      editorRef.current.contains(selection.getRangeAt(0).commonAncestorContainer)
+        ? selection.toString().length
+        : 0;
+    const remainingTextLength = Math.max(
+      maxLength - Math.max(textLength - selectedTextLength, 0),
+      0,
+    );
+
+    if (remainingTextLength === 0) {
+      return;
+    }
+
+    editorRef.current?.focus();
+    document.execCommand(
+      "insertText",
+      false,
+      pastedText.slice(0, remainingTextLength),
+    );
+    handleInput();
   }
 
   function addLink() {
@@ -987,11 +1049,32 @@ function ProductRichTextEditor({
           contentEditable={!disabled}
           data-placeholder={placeholder}
           onInput={handleInput}
+          onPaste={handlePaste}
           role="textbox"
           suppressContentEditableWarning
         />
-        <div className="flex items-center justify-end border-t border-slate-200 px-3 py-2 text-xs text-slate-400 dark:border-white/10">
-          {textLength}/{maxLength}
+        <div
+          className={cn(
+            "flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-3 py-2 text-xs dark:border-white/10",
+            isStoredLengthOverLimit
+              ? "text-red-600 dark:text-red-300"
+              : isStoredLengthNearLimit
+                ? "text-amber-700 dark:text-amber-300"
+                : "text-slate-400 dark:text-zinc-500",
+          )}
+        >
+          <span className="min-w-0 truncate">
+            {isStoredLengthOverLimit
+              ? "Full description is too large to save."
+              : isStoredLengthNearLimit
+                ? "Large description — keep it clean and concise."
+                : "Full description size"}
+          </span>
+          <span className="shrink-0">
+            {formatCharacterCount(textLength)}/{formatCharacterCount(maxLength)}{" "}
+            text · {formatCharacterCount(storedLength)}/
+            {formatCharacterCount(productRichDescriptionMaxLength)} stored
+          </span>
         </div>
       </div>
       <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
@@ -2727,11 +2810,16 @@ export function ProductCreateWizard({
       }).then((result) => {
         if (result.ok && result.description) {
           if (kind === "short") {
-            setDescription(result.description.slice(0, 400));
+            setDescription(
+              result.description.slice(0, productShortDescriptionMaxLength),
+            );
           } else {
             setLongDescription(
               generatedProductDescriptionTextToHtml(
-                result.description.slice(0, 2000),
+                result.description.slice(
+                  0,
+                  productGeneratedLongDescriptionMaxLength,
+                ),
               ),
             );
           }
@@ -3041,7 +3129,9 @@ export function ProductCreateWizard({
     }
 
     if (importedProduct.description) {
-      setDescription(importedProduct.description.slice(0, 400));
+      setDescription(
+        importedProduct.description.slice(0, productShortDescriptionMaxLength),
+      );
     }
 
     if (importedProduct.longDescription) {
@@ -3481,13 +3571,13 @@ export function ProductCreateWizard({
                   <Textarea
                     className={cn(textareaClass, "pb-8")}
                     disabled={fullListingControlsDisabled}
-                    maxLength={400}
+                    maxLength={productShortDescriptionMaxLength}
                     onChange={(event) => setDescription(event.target.value)}
                     placeholder="Briefly describe your product"
                     value={description}
                   />
                   <span className="absolute bottom-3 right-3 text-xs text-slate-400">
-                    {description.length}/400
+                    {description.length}/{productShortDescriptionMaxLength}
                   </span>
                 </div>
               </div>
@@ -3508,7 +3598,7 @@ export function ProductCreateWizard({
                 </div>
                 <ProductRichTextEditor
                   disabled={fullListingControlsDisabled}
-                  maxLength={2000}
+                  maxLength={productManualLongDescriptionMaxLength}
                   onChange={setLongDescription}
                   placeholder="Describe the product in detail"
                   value={longDescription}

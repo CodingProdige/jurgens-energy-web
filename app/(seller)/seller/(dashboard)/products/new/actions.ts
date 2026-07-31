@@ -26,7 +26,13 @@ import {
   optionalCostPriceInputSchema,
   resolveOptionalCostPriceForSave,
 } from "@/src/modules/products/cost-price";
-import { buildProductDescriptionGenerationPrompt } from "@/src/modules/products/product-description";
+import {
+  buildProductDescriptionGenerationPrompt,
+  productGeneratedLongDescriptionMaxLength,
+  productRichDescriptionLimitMessage,
+  productRichDescriptionMaxLength,
+  productShortDescriptionMaxLength,
+} from "@/src/modules/products/product-description";
 import { reconcileProductVariantIdentities } from "@/src/modules/products/variant-reconciliation";
 import { fulfillmentModeSchema } from "@/src/modules/shipping";
 
@@ -35,7 +41,11 @@ const productDescriptionGenerationSchema = z.object({
   categoryName: z.string().trim().max(240).optional(),
   kind: z.enum(["short", "long"]),
   productName: z.string().trim().min(2).max(500),
-  shortDescription: z.string().trim().max(400).optional(),
+  shortDescription: z
+    .string()
+    .trim()
+    .max(productShortDescriptionMaxLength)
+    .optional(),
 });
 const importedMediaSchema = z.object({
   images: z
@@ -95,7 +105,11 @@ const productDraftSchema = z.object({
   compareAtPrice: z.string().trim().max(40).optional(),
   continueSellingOutOfStock: z.boolean().default(false),
   costPrice: optionalCostPriceInputSchema,
-  description: z.string().trim().max(400).optional(),
+  description: z
+    .string()
+    .trim()
+    .max(productShortDescriptionMaxLength)
+    .optional(),
   exchangeAcceptedReturnBrands: z
     .array(z.string().trim().min(1).max(80))
     .max(30)
@@ -109,7 +123,10 @@ const productDraftSchema = z.object({
   hasVariants: z.boolean().default(false),
   heightMm: z.string().trim().max(40).optional(),
   lengthMm: z.string().trim().max(40).optional(),
-  longDescription: z.string().max(12000).optional(),
+  longDescription: z
+    .string()
+    .max(productRichDescriptionMaxLength, productRichDescriptionLimitMessage)
+    .optional(),
   mediaIds: z.array(z.string().uuid()).max(10).default([]),
   manufacturerMpn: z.string().trim().max(70).optional(),
   optionSchema: z.array(productOptionSchema).max(20).default([]),
@@ -133,6 +150,63 @@ export type ImportedProductMediaState = {
   message?: string;
   ok?: boolean;
 };
+
+const productDraftValidationFieldLabels: Record<string, string> = {
+  barcode: "Barcode",
+  brandName: "Brand",
+  categoryId: "Category",
+  compareAtPrice: "Compare-at price",
+  costPrice: "Cost price",
+  description: "Short description",
+  exchangeAcceptedReturnBrands: "Exchange return brands",
+  exchangeConfirmationText: "Exchange confirmation text",
+  exchangeEmptyCylinderSize: "Exchange empty-cylinder size",
+  fulfillmentMode: "Fulfillment mode",
+  googleFulfillmentChannel: "Google fulfillment channel",
+  googleReturnPolicyLabel: "Google return policy label",
+  heightMm: "Height",
+  lengthMm: "Length",
+  longDescription: "Full description",
+  manufacturerMpn: "Manufacturer part number",
+  mediaIds: "Product media",
+  optionSchema: "Options",
+  optionValues: "Option values",
+  parcelPresetId: "Parcel preset",
+  price: "Price",
+  productId: "Product",
+  productName: "Product name",
+  sku: "SKU",
+  stock: "Stock",
+  variants: "Variants",
+  weightGrams: "Weight",
+  widthMm: "Width",
+};
+
+function formatProductDraftValidationMessage(error: z.ZodError) {
+  const issue = error.issues[0];
+
+  if (!issue) {
+    return "Check the product draft details.";
+  }
+
+  const [firstPath, secondPath, thirdPath] = issue.path;
+
+  if (firstPath === "variants" && typeof secondPath === "number") {
+    const nestedField =
+      typeof thirdPath === "string"
+        ? productDraftValidationFieldLabels[thirdPath] ?? thirdPath
+        : "details";
+
+    return `Variant ${secondPath + 1} ${nestedField}: ${issue.message}`;
+  }
+
+  const field =
+    typeof firstPath === "string"
+      ? productDraftValidationFieldLabels[firstPath]
+      : null;
+
+  return field ? `${field}: ${issue.message}` : issue.message;
+}
 
 function slugify(value: string) {
   return value
@@ -695,7 +769,9 @@ export async function generateProductDescription(input: {
 
     const description = clampGeneratedText(
       getResponseText(responsePayload),
-      isShort ? 400 : 2000,
+      isShort
+        ? productShortDescriptionMaxLength
+        : productGeneratedLongDescriptionMaxLength,
     );
 
     if (!description) {
@@ -736,8 +812,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
   if (!parsed.success) {
     return {
       ok: false,
-      message:
-        parsed.error.issues[0]?.message ?? "Check the product draft details.",
+      message: formatProductDraftValidationMessage(parsed.error),
     };
   }
 

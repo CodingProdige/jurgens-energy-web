@@ -1,5 +1,13 @@
 export type ProductDescriptionGenerationKind = "long" | "short";
 
+export const productShortDescriptionMaxLength = 400;
+export const productGeneratedLongDescriptionMaxLength = 2000;
+export const productManualLongDescriptionMaxLength = 8000;
+export const productRichDescriptionMaxLength = 60000;
+export const productRichDescriptionWarningLength = 54000;
+export const productRichDescriptionLimitMessage =
+  "Full description must be 60,000 characters or fewer.";
+
 export type ProductDescriptionBlock =
   | { level: 2 | 3; text: string; type: "heading" }
   | { items: string[]; type: "ordered-list" }
@@ -47,7 +55,7 @@ export function buildProductDescriptionGenerationPrompt(
   return {
     input: [
       ...productContext,
-      "Write a structured marketplace long description under 2000 characters.",
+      `Write a structured marketplace long description under ${productGeneratedLongDescriptionMaxLength} characters.`,
       "Use one concise opening paragraph followed by a ## Key features heading and 3 to 6 useful bullet points, each beginning with '- '.",
       "You may add one more short ## section only when the supplied product details support it.",
       "Use only paragraphs, headings beginning with '## ', and '- ' bullet lines. Do not use HTML, tables, code fences, bold markers, or a heading that repeats the product name.",
