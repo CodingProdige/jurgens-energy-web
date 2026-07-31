@@ -1421,14 +1421,14 @@ export function SellerProductManager({
     },
     {
       color: "#10b981",
-      description: "Products where every variant has parcel data for carrier booking.",
+      description: "Products where every variant has optional parcel data for Courier Guy booking.",
       id: "ready_for_rates",
       label: "Ready for dispatch",
       value: data.metrics.readyForRates,
     },
     {
       color: "#f59e0b",
-      description: "Variants missing weight, length, width, or height.",
+      description: "Variants missing optional weight, length, width, or height.",
       id: "missing_parcel_data",
       label: "Missing parcel data",
       value: data.metrics.missingParcelData,

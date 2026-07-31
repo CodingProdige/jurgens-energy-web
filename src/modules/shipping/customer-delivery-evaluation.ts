@@ -34,29 +34,26 @@ export type CustomerDeliveryEvaluation =
 
 function courierServiceabilityItems(
   items: ValidatedCartItem[],
-): CourierGuyServiceabilityItem[] | null {
+): CourierGuyServiceabilityItem[] {
   const courierItems = items.filter(
     (item) => item.fulfillmentMode === "seller_fulfilled",
   );
-  const invalidItem = courierItems.find(
-    (item) =>
-      !item.heightMm ||
-      !item.lengthMm ||
-      !item.weightGrams ||
-      !item.widthMm,
-  );
 
-  if (invalidItem) {
-    return null;
-  }
-
-  return courierItems.map((item) => ({
-    description: `${item.productTitle} - ${item.variantTitle}`,
-    heightMm: item.heightMm!,
-    lengthMm: item.lengthMm!,
-    weightGrams: item.weightGrams!,
-    widthMm: item.widthMm!,
-  }));
+  return courierItems
+    .filter(
+      (item) =>
+        item.heightMm &&
+        item.lengthMm &&
+        item.weightGrams &&
+        item.widthMm,
+    )
+    .map((item) => ({
+      description: `${item.productTitle} - ${item.variantTitle}`,
+      heightMm: item.heightMm!,
+      lengthMm: item.lengthMm!,
+      weightGrams: item.weightGrams!,
+      widthMm: item.widthMm!,
+    }));
 }
 
 export async function evaluateCustomerDelivery({
@@ -120,15 +117,7 @@ export async function evaluateCustomerDelivery({
 
   const courierItems = courierServiceabilityItems(items);
 
-  if (hasCourierItems && !courierItems) {
-    return {
-      eligible: false,
-      unavailableReason:
-        "A selected product is missing parcel measurements required for nationwide courier delivery.",
-    };
-  }
-
-  if (courierItems?.length) {
+  if (courierItems.length) {
     const courierAvailability = await checkCourierGuyServiceability({
       deliveryAddress,
       items: courierItems,

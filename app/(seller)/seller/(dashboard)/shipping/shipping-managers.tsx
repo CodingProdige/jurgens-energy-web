@@ -343,7 +343,7 @@ export function ParcelPresetsManager({
             <DialogHeader>
               <DialogTitle>{activeDialogPreset ? "Edit parcel preset" : "New parcel preset"}</DialogTitle>
               <DialogDescription>
-                Save reusable parcel metrics to reduce repeated typing and shipping rate errors.
+                Save reusable parcel metrics for known package sizes and Courier Guy booking.
               </DialogDescription>
             </DialogHeader>
             <DialogBody className="grid gap-4">

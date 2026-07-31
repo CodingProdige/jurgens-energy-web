@@ -16,7 +16,6 @@ import {
 } from "@/src/db/schema";
 import {
   fulfillmentModeSchema,
-  shippingParcelSchema,
 } from "@/src/modules/shipping";
 import { getPrimarySellerForUser } from "@/src/modules/sellers/dashboard";
 import {
@@ -30,6 +29,16 @@ export type SellerProductMutationState = {
   success?: string;
 };
 
+const optionalProductParcelMetricSchema = z.preprocess((value) => {
+  const normalized = String(value ?? "").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return Number(normalized);
+}, z.number().finite("Enter a valid parcel metric.").positive("Parcel metrics must be greater than zero.").nullable());
+
 const updateProductShippingSchema = z.object({
   fulfillmentMode: fulfillmentModeSchema,
   productId: z.string().uuid(),
@@ -37,7 +46,14 @@ const updateProductShippingSchema = z.object({
     .array(
       z.object({
         id: z.string().uuid(),
-        parcel: shippingParcelSchema,
+        parcel: z.object({
+          heightMm: optionalProductParcelMetricSchema,
+          isFragile: z.coerce.boolean().default(false),
+          lengthMm: optionalProductParcelMetricSchema,
+          shipsAlone: z.coerce.boolean().default(false),
+          weightGrams: optionalProductParcelMetricSchema,
+          widthMm: optionalProductParcelMetricSchema,
+        }),
       }),
     )
     .min(1, "At least one variant is required."),
@@ -546,15 +562,6 @@ export async function submitSavedSellerProductForReview(input: unknown) {
       );
     }
 
-    if (
-      !variant.weightGrams ||
-      !variant.lengthMm ||
-      !variant.widthMm ||
-      !variant.heightMm
-    ) {
-      return productActionResult(false, "Complete parcel data before submitting.");
-    }
-
     if (product.fulfillmentMode === "jurgens_fulfilled" && !variant.barcode) {
       return productActionResult(
         false,
@@ -656,14 +663,6 @@ export async function updateSellerProductOperationalFields(input: unknown) {
       );
     }
 
-    if (
-      !parseOptionalMetricInput(variant.weightGrams) ||
-      !parseOptionalMetricInput(variant.lengthMm) ||
-      !parseOptionalMetricInput(variant.widthMm) ||
-      !parseOptionalMetricInput(variant.heightMm)
-    ) {
-      return productActionResult(false, "Complete parcel data for every variant.");
-    }
   }
 
   await db.transaction(async (tx) => {
@@ -929,9 +928,6 @@ export async function checkSellerProductCsvImport(input: unknown) {
     }
     if (!row.price) {
       issues.push("VAT-inclusive price is missing.");
-    }
-    if (!row.weightGrams || !row.lengthMm || !row.widthMm || !row.heightMm) {
-      issues.push("Parcel weight and dimensions are incomplete.");
     }
     if (duplicateSkuInCsv) {
       issues.push("SKU is duplicated inside this CSV.");

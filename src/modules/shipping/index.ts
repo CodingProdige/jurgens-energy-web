@@ -10,21 +10,21 @@ export const shippingParcelSchema = z.object({
   heightMm: z.coerce
     .number()
     .finite("Height must be a valid number of millimetres.")
-    .positive("Height is required for shipping rates."),
+    .positive("Height must be greater than zero."),
   isFragile: z.coerce.boolean().default(false),
   lengthMm: z.coerce
     .number()
     .finite("Length must be a valid number of millimetres.")
-    .positive("Length is required for shipping rates."),
+    .positive("Length must be greater than zero."),
   shipsAlone: z.coerce.boolean().default(false),
   weightGrams: z.coerce
     .number()
     .finite("Weight must be a valid number of grams.")
-    .positive("Weight is required for shipping rates."),
+    .positive("Weight must be greater than zero."),
   widthMm: z.coerce
     .number()
     .finite("Width must be a valid number of millimetres.")
-    .positive("Width is required for shipping rates."),
+    .positive("Width must be greater than zero."),
 });
 
 export const fulfillmentModeSchema = z.enum([

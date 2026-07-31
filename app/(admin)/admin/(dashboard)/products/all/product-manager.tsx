@@ -781,7 +781,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
       },
       {
         color: "#f97316",
-        description: "Variants missing parcel data required for shipping rates.",
+        description: "Variants without optional parcel metrics for Courier Guy booking.",
         id: "missing-parcel-data",
         label: "Missing parcel data",
         value: metrics.missingParcelData,

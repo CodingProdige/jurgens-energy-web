@@ -162,7 +162,7 @@ export default async function SellerDashboardPage() {
               {
                 icon: BoxesIcon,
                 label: "Product parcel data",
-                text: "Every courier-eligible variant needs packed weight and dimensions for private carrier booking. Checkout uses the marketplace shipping price rules.",
+                text: "Add packed weight and dimensions when known to help with private Courier Guy booking. Checkout uses the marketplace shipping price rules.",
               },
               {
                 icon: TruckIcon,

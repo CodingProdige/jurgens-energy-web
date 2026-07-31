@@ -761,6 +761,29 @@ function FieldLabel({
   );
 }
 
+function DraftSaveFeedbackAlert({
+  feedback,
+}: {
+  feedback: DraftSaveFeedback;
+}) {
+  if (!feedback) {
+    return null;
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-2 text-sm",
+        feedback.tone === "success"
+          ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100"
+          : "border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100",
+      )}
+    >
+      {feedback.message}
+    </div>
+  );
+}
+
 function ColumnInfoTitle({
   children,
   info,
@@ -1935,7 +1958,7 @@ export function ProductCreateWizard({
             (variant.stock.trim() && variant.lowStockAlert.trim()),
         )
       : continueSellingOutOfStock || stock.trim();
-    const shippingReady = [weightGrams, lengthMm, widthMm, heightMm].every(
+    const parcelDataProvided = [weightGrams, lengthMm, widthMm, heightMm].some(
       (value) => Boolean(parsePositiveNumber(value)),
     );
 
@@ -1988,10 +2011,11 @@ export function ProductCreateWizard({
         title: "Inventory",
       },
       {
-        complete: shippingReady,
-        detail:
-          "Provide packed weight and dimensions for Courier Guy booking. Customer shipping is set by the marketplace rules.",
-        title: "Parcel data",
+        complete: true,
+        detail: parcelDataProvided
+          ? "Known parcel metrics will be saved for Courier Guy booking and waybills."
+          : "Add packed parcel metrics when you have them. They are optional while creating the listing.",
+        title: "Parcel data (optional)",
       },
       {
         complete: true,
@@ -2827,16 +2851,25 @@ export function ProductCreateWizard({
         if (result.ok) {
           setDraftProductId(result.productId ?? draftProductId);
           setProductPublishStatus(status);
+          if (!productName.trim() && result.productTitle) {
+            setProductName(result.productTitle);
+          }
           if (hasVariants) {
             setGeneratedVariants((current) =>
               current.map((variant, index) => ({
                 ...variant,
                 persistedVariantId:
                   result.variantIds?.[index] ?? variant.persistedVariantId,
+                sku: variant.sku.trim()
+                  ? variant.sku
+                  : result.variantSkus?.[index] ?? variant.sku,
               })),
             );
           } else {
             setSingleVariantId(result.variantIds?.[0] ?? singleVariantId);
+            if (!sku.trim() && result.variantSkus?.[0]) {
+              setSku(result.variantSkus[0]);
+            }
           }
           setDraftSaveFeedback({
             message: result.message ?? "Product saved.",
@@ -3151,18 +3184,7 @@ export function ProductCreateWizard({
             : `This product is currently ${initialProductStatus.replaceAll("_", " ")}. Full listing edits are locked for this status.`}
         </div>
       ) : null}
-      {draftSaveFeedback ? (
-        <div
-          className={cn(
-            "rounded-lg border px-3 py-2 text-sm",
-            draftSaveFeedback.tone === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100"
-              : "border-red-200 bg-red-50 text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-100",
-          )}
-        >
-          {draftSaveFeedback.message}
-        </div>
-      ) : null}
+      <DraftSaveFeedbackAlert feedback={draftSaveFeedback} />
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="grid gap-4">
@@ -3565,7 +3587,7 @@ export function ProductCreateWizard({
 
           <Panel
             title="Shipping"
-            description="Packed parcel data is used for private Courier Guy booking and waybills. Checkout charges the marketplace shipping rule, so carrier rate differences or adjustments do not change the customer price."
+            description="Add packed parcel metrics when known. They help with private Courier Guy booking and waybills, but are optional while creating the product and never change the customer-facing delivery price."
           >
             <div className="grid min-w-0 gap-4">
               <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -3635,8 +3657,8 @@ export function ProductCreateWizard({
               <div className="grid min-w-0 gap-4">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product weight in grams. Required for carrier booking and the private operational rate, not the customer shipping charge.">
-                      Weight (g) *
+                    <FieldLabel info="Optional packed product weight in grams. Add it when known to help with backend courier booking and waybills.">
+                      Weight (g)
                     </FieldLabel>
                     <Input
                       className={fieldClass}
@@ -3652,8 +3674,8 @@ export function ProductCreateWizard({
                     />
                   </label>
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product length in millimetres. Required for carrier booking, not customer pricing.">
-                      Length (mm) *
+                    <FieldLabel info="Optional packed product length in millimetres. Add it when known to help with backend courier booking and waybills.">
+                      Length (mm)
                     </FieldLabel>
                     <Input
                       className={fieldClass}
@@ -3669,8 +3691,8 @@ export function ProductCreateWizard({
                     />
                   </label>
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product width in millimetres. Required for carrier booking, not customer pricing.">
-                      Width (mm) *
+                    <FieldLabel info="Optional packed product width in millimetres. Add it when known to help with backend courier booking and waybills.">
+                      Width (mm)
                     </FieldLabel>
                     <Input
                       className={fieldClass}
@@ -3686,8 +3708,8 @@ export function ProductCreateWizard({
                     />
                   </label>
                   <label className="grid gap-1.5">
-                    <FieldLabel info="The packed product height in millimetres. Required for carrier booking, not customer pricing.">
-                      Height (mm) *
+                    <FieldLabel info="Optional packed product height in millimetres. Add it when known to help with backend courier booking and waybills.">
+                      Height (mm)
                     </FieldLabel>
                     <Input
                       className={fieldClass}
@@ -4977,6 +4999,8 @@ export function ProductCreateWizard({
           </div>
         )}
       </Panel>
+
+      <DraftSaveFeedbackAlert feedback={draftSaveFeedback} />
 
       <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-white/95 py-4 dark:border-white/10 dark:bg-[#0f1114]/95 sm:flex-row sm:justify-end">
         <DashboardButton nativeButton={false} render={<Link href="/products" />}>

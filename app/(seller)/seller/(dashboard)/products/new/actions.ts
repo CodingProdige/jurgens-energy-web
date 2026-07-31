@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -82,7 +82,7 @@ const productDraftVariantSchema = z.object({
   parcelPresetId: z.string().uuid().nullable().optional(),
   persistedVariantId: z.string().uuid().nullable().optional(),
   price: z.string().trim().max(40).optional(),
-  sku: z.string().trim().min(1).max(50),
+  sku: z.string().trim().max(50).optional().default(""),
   status: variantStatusSchema.default("active"),
   stock: z.string().trim().max(20).optional(),
   weightGrams: z.string().trim().max(40).optional(),
@@ -116,9 +116,9 @@ const productDraftSchema = z.object({
   parcelPresetId: z.string().uuid().nullable().optional(),
   price: z.string().trim().max(40).optional(),
   productId: z.string().uuid().nullable().optional(),
-  productName: z.string().trim().min(1).max(240),
+  productName: z.string().trim().max(240).optional().default(""),
   singleVariantId: z.string().uuid().nullable().optional(),
-  sku: z.string().trim().min(1).max(50),
+  sku: z.string().trim().max(50).optional().default(""),
   status: productPublishStatusSchema.default("active"),
   stock: z.string().trim().max(20).optional(),
   variants: z.array(productDraftVariantSchema).max(250).default([]),
@@ -182,6 +182,111 @@ function parseStock(value?: string) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
 }
 
+function getProductTitleForSave(inputTitle: string, existingTitle?: string | null) {
+  return (
+    inputTitle.trim() ||
+    existingTitle?.trim() ||
+    "Untitled product draft"
+  ).slice(0, 240);
+}
+
+function getDraftSku({
+  fallbackSku,
+  optionValues,
+  rowIndex,
+  seed,
+  title,
+}: {
+  fallbackSku?: string;
+  optionValues?: string[];
+  rowIndex: number;
+  seed: string;
+  title: string;
+}) {
+  const readable =
+    slugify(fallbackSku || optionValues?.join(" ") || title || "draft")
+      .replaceAll("-", "")
+      .toUpperCase()
+      .slice(0, 20) || "DRAFT";
+  const hash = createHash("sha1")
+    .update(`${seed}:${rowIndex}:${title}:${optionValues?.join("|") ?? ""}`)
+    .digest("hex")
+    .slice(0, 8)
+    .toUpperCase();
+
+  return `${readable}-${hash}`.slice(0, 50);
+}
+
+function getSkuForSave({
+  fallbackSku,
+  optionValues,
+  persistedVariantId,
+  productId,
+  rowIndex,
+  seed,
+  sku,
+  title,
+}: {
+  fallbackSku?: string;
+  optionValues?: string[];
+  persistedVariantId?: string | null;
+  productId?: string | null;
+  rowIndex: number;
+  seed: string;
+  sku?: string;
+  title: string;
+}) {
+  const trimmedSku = sku?.trim();
+
+  if (trimmedSku) {
+    return trimmedSku;
+  }
+
+  return getDraftSku({
+    fallbackSku,
+    optionValues,
+    rowIndex,
+    seed: persistedVariantId ?? productId ?? seed,
+    title,
+  });
+}
+
+function validateActiveProductInput(input: ParsedProductDraftInput) {
+  if (input.status !== "active") {
+    return null;
+  }
+
+  if (!input.productName.trim()) {
+    return "Enter a product name before saving this product as active.";
+  }
+
+  if (!input.categoryId) {
+    return "Select a category before saving this product as active.";
+  }
+
+  if (!input.brandName?.trim()) {
+    return "Select a preset brand before saving this product as active.";
+  }
+
+  if (input.hasVariants) {
+    if (input.variants.length === 0) {
+      return "Generate at least one variant before saving this product as active.";
+    }
+
+    if (input.variants.some((variant) => !variant.sku.trim())) {
+      return "Every variant needs a SKU before saving this product as active.";
+    }
+
+    return null;
+  }
+
+  if (!input.sku.trim()) {
+    return "Enter a SKU before saving this product as active.";
+  }
+
+  return null;
+}
+
 function normalizeExchangeBrands(brandsList: string[]) {
   const normalized = brandsList
     .map((brand) => brand.trim())
@@ -230,6 +335,10 @@ function buildVariantRows(
     sku: string;
   }> = [],
   resolvedVariantIds: Array<string | null> = [],
+  options: {
+    draftSkuSeed: string;
+    productTitle: string;
+  },
 ) {
   const existingVariantById = new Map(
     existingVariants.map((variant) => [variant.id, variant]),
@@ -246,10 +355,19 @@ function buildVariantRows(
       ? ("national_courier" as const)
       : ("local_lpg" as const);
 
-  if (input.hasVariants) {
+  if (input.hasVariants && input.variants.length > 0) {
     return input.variants.map((variant, index) => {
-      const sku = variant.sku.trim();
       const persistedVariantId = resolvedVariantIds[index] ?? null;
+      const sku = getSkuForSave({
+        fallbackSku: input.sku,
+        optionValues: variant.optionValues,
+        persistedVariantId,
+        productId: input.productId,
+        rowIndex: index,
+        seed: options.draftSkuSeed,
+        sku: variant.sku,
+        title: options.productTitle,
+      });
       const existingVariant = persistedVariantId
         ? existingVariantById.get(persistedVariantId)
         : existingVariantBySku.get(sku.toLowerCase());
@@ -303,7 +421,7 @@ function buildVariantRows(
         sku,
         status: variant.status,
         stockOnHand: parseStock(variant.stock),
-        title: variant.optionValues.join(" / ") || input.productName,
+        title: variant.optionValues.join(" / ") || options.productTitle,
         weightGrams:
           parseOptionalMetric(variant.weightGrams) ??
           parseOptionalMetric(input.weightGrams),
@@ -314,8 +432,15 @@ function buildVariantRows(
     });
   }
 
-  const sku = input.sku.trim();
   const persistedVariantId = resolvedVariantIds[0] ?? null;
+  const sku = getSkuForSave({
+    persistedVariantId,
+    productId: input.productId,
+    rowIndex: 0,
+    seed: options.draftSkuSeed,
+    sku: input.sku,
+    title: options.productTitle,
+  });
   const existingVariant = persistedVariantId
     ? existingVariantById.get(persistedVariantId)
     : existingVariantBySku.get(sku.toLowerCase()) ?? existingSingleVariant;
@@ -367,7 +492,7 @@ function buildVariantRows(
       sku,
       status: "active" as const,
       stockOnHand: parseStock(input.stock),
-      title: input.productName,
+      title: options.productTitle,
       weightGrams: parseOptionalMetric(input.weightGrams),
       widthMm: parseOptionalMetric(input.widthMm),
     },
@@ -623,6 +748,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
           .select({
             id: products.id,
             status: products.status,
+            title: products.title,
           })
           .from(products)
           .where(eq(products.id, draft.productId))
@@ -660,6 +786,21 @@ export async function saveProductDraft(input: ProductDraftInput) {
     };
   }
 
+  const activeValidationMessage = validateActiveProductInput(draft);
+
+  if (activeValidationMessage) {
+    return {
+      ok: false,
+      message: activeValidationMessage,
+    };
+  }
+
+  const productTitle = getProductTitleForSave(
+    draft.productName,
+    existingProduct?.title,
+  );
+  const draftSkuSeed = draft.productId ?? randomUUID();
+
   const submittedVariantIdentities = draft.hasVariants
     ? draft.variants.map((variant) => ({
         persistedVariantId: variant.persistedVariantId,
@@ -685,6 +826,10 @@ export async function saveProductDraft(input: ProductDraftInput) {
     draft,
     existingVariants,
     variantIdentityResult.resolvedVariantIds,
+    {
+      draftSkuSeed,
+      productTitle,
+    },
   );
 
   if (variantRows.length === 0) {
@@ -808,30 +953,45 @@ export async function saveProductDraft(input: ProductDraftInput) {
   const brandRequestId: string | null = null;
 
   if (!brandName || !brandSlug) {
+    if (draft.status === "draft") {
+      brandId = null;
+    } else {
+      return {
+        ok: false,
+        message: "Select a preset brand before saving this product.",
+      };
+    }
+  } else {
+    const [existingBrand] = await db
+      .select({ id: brands.id })
+      .from(brands)
+      .where(and(eq(brands.slug, brandSlug), eq(brands.status, "active")))
+      .limit(1);
+
+    if (!existingBrand) {
+      if (draft.status === "draft") {
+        brandId = null;
+      } else {
+        return {
+          ok: false,
+          message:
+            "Select an active preset brand from Catalog > Brands before saving this product.",
+        };
+      }
+    } else {
+      brandId = existingBrand.id;
+    }
+  }
+
+  if (draft.status !== "draft" && !brandId) {
     return {
       ok: false,
       message: "Select a preset brand before saving this product.",
     };
   }
 
-  const [existingBrand] = await db
-    .select({ id: brands.id })
-    .from(brands)
-    .where(and(eq(brands.slug, brandSlug), eq(brands.status, "active")))
-    .limit(1);
-
-  if (!existingBrand) {
-    return {
-      ok: false,
-      message:
-        "Select an active preset brand from Catalog > Brands before saving this product.",
-    };
-  }
-
-  brandId = existingBrand.id;
-
   const now = new Date();
-  const productSlug = await getUniqueProductSlug(draft.productName, draft.productId);
+  const productSlug = await getUniqueProductSlug(productTitle, draft.productId);
   const nextProductStatus = draft.status;
 
   let savedProduct: { productId: string; variantIds: string[] };
@@ -854,7 +1014,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
               shortDescription: draft.description || null,
               slug: productSlug,
               status: nextProductStatus,
-              title: draft.productName,
+              title: productTitle,
               updatedAt: now,
             })
             .returning({ id: products.id })
@@ -875,7 +1035,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
             shortDescription: draft.description || null,
             slug: productSlug,
             status: nextProductStatus,
-            title: draft.productName,
+            title: productTitle,
             updatedAt: now,
           })
           .where(eq(products.id, savedProductId));
@@ -1023,7 +1183,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
         entityType: "product",
         metadata: JSON.stringify({
           fromStatus: existingProduct?.status ?? null,
-          title: draft.productName,
+          title: productTitle,
           toStatus: nextProductStatus,
         }),
       });
@@ -1050,9 +1210,11 @@ export async function saveProductDraft(input: ProductDraftInput) {
     ok: true,
     message:
       nextProductStatus === "draft"
-        ? "Product saved as draft."
+        ? "Product saved as draft. You can complete the missing listing details later."
         : "Product saved as active.",
     productId: savedProduct.productId,
+    productTitle,
+    variantSkus: variantRows.map((variant) => variant.sku),
     variantIds: savedProduct.variantIds,
   };
 }

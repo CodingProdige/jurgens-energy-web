@@ -7,7 +7,7 @@ import { SellerProductManager } from "@/app/(seller)/seller/(dashboard)/products
 export const metadata: Metadata = {
   title: "Seller Products",
   description:
-    "Manage seller products, fulfillment mode, and parcel readiness for Jurgens Energy shipping rates.",
+    "Manage seller products, fulfillment mode, and optional parcel data for Jurgens Energy delivery operations.",
   robots: {
     index: false,
     follow: false,
