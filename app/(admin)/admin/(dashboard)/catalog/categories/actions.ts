@@ -84,6 +84,27 @@ async function requireCatalogManageAccess() {
   return access.session;
 }
 
+function revalidateCategoryConsumers() {
+  // Admin subdomain paths are rewritten to /admin/* internally. Next's
+  // revalidatePath must target the destination route, not the clean subdomain
+  // URL shown in the browser.
+  revalidatePath("/admin/catalog/categories");
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/all");
+  revalidatePath("/admin/products/new");
+  revalidatePath("/admin/products/[productId]/edit", "page");
+  revalidatePath("/admin/site-builder");
+
+  revalidatePath("/seller/products/new");
+  revalidatePath("/seller/products/[productId]/edit", "page");
+
+  revalidatePath("/");
+  revalidatePath("/products");
+  revalidatePath("/categories/[...path]", "page");
+  revalidatePath("/feeds/google-merchant.xml");
+  revalidatePath("/sitemap.xml");
+}
+
 async function getCategoryBranchIds(categoryPath: string, categoryId: string) {
   const branch = await db.query.categories.findMany({
     where: (category, { or, eq, like }) =>
@@ -241,7 +262,7 @@ export async function createCategory(
     throw error;
   }
 
-  revalidatePath("/catalog/categories");
+  revalidateCategoryConsumers();
 
   return { ok: true, message: "Category created." };
 }
@@ -401,7 +422,7 @@ export async function updateCategory(
     throw error;
   }
 
-  revalidatePath("/catalog/categories");
+  revalidateCategoryConsumers();
 
   return { ok: true, message: "Category updated." };
 }
@@ -458,7 +479,7 @@ export async function deleteCategory(
     await db.delete(categories).where(eq(categories.id, category.id));
   }
 
-  revalidatePath("/catalog/categories");
+  revalidateCategoryConsumers();
 
   return { ok: true, message: "Category deleted." };
 }
@@ -488,7 +509,7 @@ export async function toggleCategoryLock(categoryId: string) {
     })
     .where(eq(categories.id, parsed.data));
 
-  revalidatePath("/catalog/categories");
+  revalidateCategoryConsumers();
 
   return {
     ok: true,
@@ -564,7 +585,7 @@ export async function moveCategory(categoryId: string, direction: "up" | "down")
     }
   });
 
-  revalidatePath("/catalog/categories");
+  revalidateCategoryConsumers();
 
   return { ok: true, message: "Category order updated." };
 }

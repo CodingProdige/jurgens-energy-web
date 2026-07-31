@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 import { CategoryDashboard } from "@/app/(admin)/admin/(dashboard)/catalog/categories/category-manager";
 import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
@@ -15,6 +16,8 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminCategoriesPage() {
+  await connection();
+
   const access = await requireAdminCapability("admin.catalog.view");
 
   if (!access.ok) {
