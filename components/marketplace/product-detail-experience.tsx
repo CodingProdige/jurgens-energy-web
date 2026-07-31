@@ -183,6 +183,10 @@ export function ProductDetailExperience({
     sortedVariants[0] ??
     product.variants[0] ??
     null;
+  const selectedVariantImageUrl = selectedVariant?.imageUrl ?? null;
+  const selectedVariantMediaFocusKey = selectedVariant
+    ? `${selectedVariant.id}:${selectedVariantImageUrl ?? ""}`
+    : null;
   const galleryMedia = useMemo(
     () =>
       getProductGalleryMedia(
@@ -203,13 +207,16 @@ export function ProductDetailExperience({
   const [activeMediaId, setActiveMediaId] = useState<string | null>(
     getPreferredGalleryMediaId(
       galleryMedia,
-      selectedVariant?.imageUrl ?? product.coverImageUrl,
+      selectedVariantImageUrl ?? product.coverImageUrl,
     ),
   );
   const activeMedia =
     galleryMedia.find((item) => item.id === activeMediaId) ??
     galleryMedia[0] ??
     null;
+  const lastVariantMediaFocusKeyRef = useRef(
+    selectedVariantMediaFocusKey,
+  );
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [previouslyViewedProducts, setPreviouslyViewedProducts] = useState<
     MarketplaceProductCardData[]
@@ -243,17 +250,23 @@ export function ProductDetailExperience({
   }, [catalogProducts, product.id]);
 
   useEffect(() => {
-    if (selectedVariant?.imageUrl) {
-      const selectedMedia = findGalleryMediaForImageUrl(
-        galleryMedia,
-        selectedVariant.imageUrl,
-      );
-
-      if (selectedMedia) {
-        setActiveMediaId(selectedMedia.id);
-      }
+    if (
+      !selectedVariantImageUrl ||
+      selectedVariantMediaFocusKey === lastVariantMediaFocusKeyRef.current
+    ) {
+      return;
     }
-  }, [galleryMedia, selectedVariant?.imageUrl]);
+
+    const selectedMedia = findGalleryMediaForImageUrl(
+      galleryMedia,
+      selectedVariantImageUrl,
+    );
+
+    if (selectedMedia) {
+      lastVariantMediaFocusKeyRef.current = selectedVariantMediaFocusKey;
+      setActiveMediaId(selectedMedia.id);
+    }
+  }, [galleryMedia, selectedVariantImageUrl, selectedVariantMediaFocusKey]);
 
   useEffect(() => {
     if (
@@ -263,7 +276,7 @@ export function ProductDetailExperience({
       setActiveMediaId(
         getPreferredGalleryMediaId(
           galleryMedia,
-          selectedVariant?.imageUrl ?? product.coverImageUrl,
+          selectedVariantImageUrl ?? product.coverImageUrl,
         ),
       );
     }
@@ -271,7 +284,7 @@ export function ProductDetailExperience({
     activeMediaId,
     galleryMedia,
     product.coverImageUrl,
-    selectedVariant?.imageUrl,
+    selectedVariantImageUrl,
   ]);
 
   const selectedPrice = selectedVariant
@@ -445,6 +458,7 @@ function ProductGallery({
         {activeMedia ? (
           <>
             <ProductGalleryMediaContent
+              key={activeMedia.id}
               media={activeMedia}
               pauseVideo={isLightboxOpen}
               priority
