@@ -61,6 +61,7 @@ import {
   createDefaultStorefrontSection,
   storefrontActionVariants,
   storefrontCategoryImageSources,
+  storefrontCategoryScopeOptions,
   storefrontCategoryVisibilityOptions,
   storefrontCollectionLayouts,
   storefrontSectionCodePrefixes,
@@ -69,6 +70,7 @@ import {
   type StorefrontActionVariant,
   type StorefrontButtonAction,
   type StorefrontCategoryImageSource,
+  type StorefrontCategoryScope,
   type StorefrontCategoryVisibility,
   type StorefrontCollectionLayout,
   type StorefrontIconKey,
@@ -106,6 +108,17 @@ const collectionLayoutOptions: Array<{
 }> = storefrontCollectionLayouts.map((layout) => ({
   label: layout === "carousel" ? "Carousel" : "Grid",
   value: layout,
+}));
+
+const categoryScopeOptions: Array<{
+  label: string;
+  value: StorefrontCategoryScope;
+}> = storefrontCategoryScopeOptions.map((scope) => ({
+  label:
+    scope === "top_level"
+      ? "Top-level parent categories only"
+      : "All categories",
+  value: scope,
 }));
 
 const categoryVisibilityOptions: Array<{
@@ -1433,7 +1446,11 @@ function ProductCollectionSettings({
   updateSettings: (settings: StorefrontSection["settings"]) => void;
 }) {
   const settings = section.settings;
-  const categoryOptions = categories.map(toCategorySelectOption);
+  const categoryScope = settings.categoryScope ?? "all";
+  const categoryOptions = filterCategoriesByScope(
+    categories,
+    categoryScope,
+  ).map(toCategorySelectOption);
   const brandOptions = brands.map(toBrandSelectOption);
   const updateSettingsWithAutoAction = (
     nextSettings: typeof settings,
@@ -1497,16 +1514,40 @@ function ProductCollectionSettings({
         value={settings.productSource}
       />
       {settings.productSource === "category" ? (
-        <MultiSelectField
-          emptyLabel="No active categories found."
-          help="Leave empty to include every product with a category."
-          label="Categories"
-          onChange={(selectedCategoryIds) =>
-            updateSettingsWithAutoAction({ ...settings, selectedCategoryIds })
-          }
-          options={categoryOptions}
-          selectedValues={settings.selectedCategoryIds}
-        />
+        <>
+          <SelectField
+            label="Category scope"
+            onChange={(nextCategoryScope) => {
+              const scopedCategory = nextCategoryScope as StorefrontCategoryScope;
+
+              updateSettingsWithAutoAction({
+                ...settings,
+                categoryScope: scopedCategory,
+                selectedCategoryIds: pruneSelectedCategoryIdsForScope({
+                  categories,
+                  categoryScope: scopedCategory,
+                  selectedCategoryIds: settings.selectedCategoryIds,
+                }),
+              });
+            }}
+            options={categoryScopeOptions}
+            value={categoryScope}
+          />
+          <MultiSelectField
+            emptyLabel="No active categories found."
+            help={
+              categoryScope === "top_level"
+                ? "Leave empty to include products from every top-level parent category. Selecting a parent includes its subcategories."
+                : "Leave empty to include every product with a category."
+            }
+            label="Categories"
+            onChange={(selectedCategoryIds) =>
+              updateSettingsWithAutoAction({ ...settings, selectedCategoryIds })
+            }
+            options={categoryOptions}
+            selectedValues={settings.selectedCategoryIds}
+          />
+        </>
       ) : null}
       {settings.productSource === "brand" ? (
         <MultiSelectField
@@ -1675,10 +1716,15 @@ function CategoryCollectionSettings({
   updateSettings: (settings: StorefrontSection["settings"]) => void;
 }) {
   const settings = section.settings;
-  const categoryOptions = categories.map(toCategorySelectOption);
+  const categoryScope = settings.categoryScope ?? "all";
+  const categoryOptions = filterCategoriesByScope(
+    categories,
+    categoryScope,
+  ).map(toCategorySelectOption);
   const visibleCategories = getVisibleCategoryOptionsForImageOverrides({
     categories,
     categoryLimit: settings.categoryLimit,
+    categoryScope,
     categoryVisibility: settings.categoryVisibility,
     selectedCategoryIds: settings.selectedCategoryIds,
   });
@@ -1732,9 +1778,40 @@ function CategoryCollectionSettings({
         options={categoryVisibilityOptions}
         value={settings.categoryVisibility}
       />
+      <SelectField
+        label="Category scope"
+        onChange={(nextCategoryScope) => {
+          const scopedCategory = nextCategoryScope as StorefrontCategoryScope;
+          const selectedCategoryIds = pruneSelectedCategoryIdsForScope({
+            categories,
+            categoryScope: scopedCategory,
+            selectedCategoryIds: settings.selectedCategoryIds,
+          });
+          const scopedCategoryIdSet = new Set(
+            filterCategoriesByScope(categories, scopedCategory).map(
+              (category) => category.id,
+            ),
+          );
+
+          updateSettings({
+            ...settings,
+            categoryImages: settings.categoryImages.filter((image) =>
+              scopedCategoryIdSet.has(image.categoryId),
+            ),
+            categoryScope: scopedCategory,
+            selectedCategoryIds,
+          });
+        }}
+        options={categoryScopeOptions}
+        value={categoryScope}
+      />
       <MultiSelectField
         emptyLabel="No active categories found."
-        help="Leave empty to use all categories matching the visibility setting."
+        help={
+          categoryScope === "top_level"
+            ? "Leave empty to use all top-level parent categories matching the visibility setting."
+            : "Leave empty to use all categories matching the visibility setting."
+        }
         label="Categories"
         onChange={(selectedCategoryIds) =>
           updateSettings({ ...settings, selectedCategoryIds })
@@ -1946,20 +2023,57 @@ function toBrandSelectOption(brand: MarketplaceBrandSummary): MultiSelectOption 
   };
 }
 
+function filterCategoriesByScope(
+  categories: MarketplaceCategorySummary[],
+  categoryScope: StorefrontCategoryScope,
+) {
+  if (categoryScope !== "top_level") {
+    return categories;
+  }
+
+  return categories.filter((category) => !category.path.includes("/"));
+}
+
+function pruneSelectedCategoryIdsForScope({
+  categories,
+  categoryScope,
+  selectedCategoryIds,
+}: {
+  categories: MarketplaceCategorySummary[];
+  categoryScope: StorefrontCategoryScope;
+  selectedCategoryIds: string[];
+}) {
+  if (categoryScope !== "top_level") {
+    return selectedCategoryIds;
+  }
+
+  const topLevelCategoryIds = new Set(
+    filterCategoriesByScope(categories, categoryScope).map(
+      (category) => category.id,
+    ),
+  );
+
+  return selectedCategoryIds.filter((categoryId) =>
+    topLevelCategoryIds.has(categoryId),
+  );
+}
+
 function getVisibleCategoryOptionsForImageOverrides({
   categories,
   categoryLimit,
+  categoryScope,
   categoryVisibility,
   selectedCategoryIds,
 }: {
   categories: MarketplaceCategorySummary[];
   categoryLimit: number;
+  categoryScope: StorefrontCategoryScope;
   categoryVisibility: StorefrontCategoryVisibility;
   selectedCategoryIds: string[];
 }) {
   const selectedCategoryIdSet = new Set(selectedCategoryIds);
 
-  return categories
+  return filterCategoriesByScope(categories, categoryScope)
     .filter(
       (category) =>
         selectedCategoryIdSet.size === 0 ||

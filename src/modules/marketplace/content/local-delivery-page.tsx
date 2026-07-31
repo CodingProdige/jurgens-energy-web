@@ -100,16 +100,16 @@ export async function LocalDeliveryPage() {
 
       <ContentHero
         breadcrumbLabel="LPG delivery"
-        description={`Shop eligible LPG cylinders, exchange options and gas accessories online. Courier-eligible goods can ship nationwide within South Africa; Jurgens-delivered products are confirmed from the delivery postcode at checkout. ${deliveryTimingDescription}`}
+        description={`Shop eligible LPG cylinders, exchange options and gas accessories online for delivery in South Africa. ${deliveryTimingDescription} ${deliveryFeeDescription}`}
         eyebrow="South Africa delivery"
         icon={TruckIcon}
-        title="South African delivery, confirmed at checkout."
+        title="Nationwide delivery, clear timing."
       />
 
       <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-7 sm:py-12 lg:px-10 lg:py-16">
         <section className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start lg:gap-14">
           <ContentSectionHeading
-            description="Choose the exact product online, review the delivery fee before payment and track the order through one checkout. Product-specific safety and handover requirements remain visible throughout."
+            description="Choose your product, enter your South African delivery address, and review the standard delivery fee before payment."
             eyebrow="Simple online ordering"
             title="From checkout to your door."
           />
@@ -120,9 +120,8 @@ export async function LocalDeliveryPage() {
               accessory you need.
             </NumberedStep>
             <NumberedStep number="02" title="Review delivery">
-              Enter your complete South African delivery address and confirm
-              product eligibility and the single order-level delivery fee before
-              payment.
+              Enter your South African delivery address and review the delivery
+              fee before payment.
             </NumberedStep>
             <NumberedStep number="03" title="Receive your order">
               {deliveryTimingDescription}
@@ -133,7 +132,7 @@ export async function LocalDeliveryPage() {
         <section className="mt-14 grid gap-4 border-y border-[#deded7] py-10 dark:border-white/10 sm:mt-20 sm:grid-cols-2 sm:py-14 lg:grid-cols-4">
           {[
             {
-              copy: "Courier-eligible goods can ship nationwide; a Jurgens-delivered product requires an eligible delivery postcode.",
+              copy: "Courier-eligible goods can ship nationwide. Jurgens-delivered products use eligible postcode areas.",
               icon: MapPinnedIcon,
               title: "South Africa coverage",
             },
@@ -150,7 +149,7 @@ export async function LocalDeliveryPage() {
             {
               copy: deliveryFeeDescription,
               icon: ShieldCheckIcon,
-              title: "One order fee",
+              title: "Delivery fee",
             },
           ].map((item) => {
             const Icon = item.icon;
@@ -176,7 +175,7 @@ export async function LocalDeliveryPage() {
 
         <section className="mt-14 sm:mt-20">
           <ContentSectionHeading
-            description="These products are currently prepared for Jurgens Energy fulfilment. Stock, postcode eligibility and any exchange requirements are confirmed during checkout."
+            description="Stock, delivery eligibility and any exchange requirements are confirmed during checkout."
             eyebrow="Shop online"
             title="LPG products for delivery."
           />

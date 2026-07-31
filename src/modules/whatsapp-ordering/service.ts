@@ -107,8 +107,6 @@ const southAfricaDeliveryFacts = [
   "Jurgens Energy is an online store.",
   "Courier-eligible products can be delivered nationwide within South Africa.",
   "Products marked for Jurgens delivery require an eligible delivery postcode.",
-  "One configured VAT-inclusive flat delivery fee applies per eligible order.",
-  "An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches its threshold.",
   "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
 ] as const;
 const checkoutLinkExpiryLabel = "1 hour";
@@ -2105,7 +2103,8 @@ async function answerDeliveryAreas() {
   return [
     "Delivery is available to eligible addresses within South Africa.",
     ...getSouthAfricaDeliveryTimingFacts(settings),
-    "Exact product eligibility and delivery fees are confirmed at checkout from the complete delivery address.",
+    getPublicDeliveryFeeDescription(settings),
+    "Checkout confirms product delivery eligibility from the complete delivery address.",
   ].join("\n");
 }
 
@@ -2113,9 +2112,9 @@ async function answerShippingRates() {
   const settings = await getMarketplaceSettings();
 
   return [
-    "Delivery fees are shown at checkout after you enter the complete South African delivery address.",
     "Delivery is available to eligible addresses within South Africa.",
     ...getSouthAfricaDeliveryTimingFacts(settings),
+    getPublicDeliveryFeeDescription(settings),
   ].join("\n");
 }
 
@@ -2923,10 +2922,10 @@ async function checkJurgensDeliveryInquiry({
   if (!postalCode) {
     const settings = await getMarketplaceSettings();
     const reply = [
-      `Delivery for ${itemLabel} is confirmed at checkout from the complete South African delivery address.`,
       "Delivery is available to eligible addresses within South Africa.",
       ...getSouthAfricaDeliveryTimingFacts(settings),
-      "The delivery fee will be shown before payment.",
+      getPublicDeliveryFeeDescription(settings),
+      `Checkout confirms delivery eligibility for ${itemLabel} from the complete delivery address.`,
       nextStep,
     ]
       .filter(Boolean)
@@ -2965,7 +2964,7 @@ async function checkJurgensDeliveryInquiry({
       `Yes — delivery is available for ${itemLabel} to the address you supplied.`,
       "Delivery is available to eligible addresses within South Africa.",
       ...getSouthAfricaDeliveryTimingFacts(settings),
-      "The delivery fee will be shown at checkout.",
+      getPublicDeliveryFeeDescription(settings),
       nextStep,
     ]
       .filter(Boolean)
@@ -3106,16 +3105,15 @@ async function checkNationwideCourierDeliveryInquiry({
   });
   const priceMessage =
     price.rule === "free_shipping_over"
-      ? `This item and quantity meet the current free-shipping threshold, so the order delivery fee would be ${formatZarAmount(0)} if the checkout subtotal remains eligible.`
-      : `The current VAT-inclusive order delivery fee is ${formatZarAmount(price.amount)}.`;
+      ? `Delivery would be ${formatZarAmount(0)} for this item and quantity if the checkout subtotal remains eligible.`
+      : `Standard delivery would be ${formatZarAmount(price.amount)}, VAT included.`;
   const thresholdMessage =
     price.freeOverAmount === null
       ? null
-      : `Free shipping currently applies from a qualifying product subtotal of ${formatZarAmount(price.freeOverAmount)}.`;
+      : `Free delivery over ${formatZarAmount(price.freeOverAmount)}.`;
   const reply = [
     `Yes — ${itemLabel} is courier-eligible for nationwide delivery to the South African address you supplied.`,
     ...getSouthAfricaDeliveryTimingFacts(settings),
-    "One configured VAT-inclusive flat delivery fee applies per eligible order.",
     priceMessage,
     thresholdMessage,
     getDeliveryResultNextStep(context.conversationState, item),
@@ -3688,7 +3686,7 @@ async function getWhatsappKnowledgeFacts(
         row.continueSellingOutOfStock || row.stockOnHand > 0
           ? "currently available to order"
           : "currently out of stock";
-      return `${row.brandName ? `${row.brandName} ` : ""}${row.productTitle}${variantLabel}: ${formatMoney(row.price)}, ${stock}, delivery availability and fees confirmed at checkout${row.requiresExchangeEmpty ? ", exchange requires an eligible empty cylinder handover" : ""}${row.categoryPath ? `, category ${row.categoryPath}` : ""}. ${row.shortDescription?.slice(0, 220) ?? ""} Product page: ${createStoreUrl(`/products/${row.productSlug}`)}`;
+      return `${row.brandName ? `${row.brandName} ` : ""}${row.productTitle}${variantLabel}: ${formatMoney(row.price)}, ${stock}, South Africa delivery available where eligible${row.requiresExchangeEmpty ? ", exchange requires an eligible empty cylinder handover" : ""}${row.categoryPath ? `, category ${row.categoryPath}` : ""}. ${row.shortDescription?.slice(0, 220) ?? ""} Product page: ${createStoreUrl(`/products/${row.productSlug}`)}`;
     }),
   ].filter((fact): fact is string => Boolean(fact));
 
@@ -3778,7 +3776,7 @@ async function answerSupportQuestion({
               "Jurgens Energy is a South African online store for LPG cylinders, eligible cylinder exchanges and gas-related products.",
               "Delivery is available to eligible addresses within South Africa.",
               ...getSouthAfricaDeliveryTimingFacts(settings),
-              "Delivery fees are shown at checkout.",
+              getPublicDeliveryFeeDescription(settings),
             ].join(" "));
       }
     case "contact":
@@ -3948,7 +3946,8 @@ async function checkDeliveryAreaForAgent(
     facts: [
       ...southAfricaDeliveryFacts,
       ...getSouthAfricaDeliveryTimingFacts(settings),
-      "Exact product eligibility is confirmed at checkout from the customer's complete South African delivery address.",
+      getPublicDeliveryFeeDescription(settings),
+      "Checkout confirms product delivery eligibility from the customer's complete South African delivery address.",
     ],
     status: "checkout_confirmation_required",
   });

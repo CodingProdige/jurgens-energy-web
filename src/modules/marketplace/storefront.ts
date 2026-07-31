@@ -9,6 +9,7 @@ import {
   defaultStorefrontSections,
   storefrontActionVariants,
   storefrontCategoryImageSources,
+  storefrontCategoryScopeOptions,
   storefrontCategoryVisibilityOptions,
   storefrontCollectionLayouts,
   storefrontSectionCodePrefixes,
@@ -118,6 +119,7 @@ const productSourceSchema = z.enum([
   "full_cylinders",
 ]);
 const collectionLayoutSchema = z.enum(storefrontCollectionLayouts);
+const categoryScopeSchema = z.enum(storefrontCategoryScopeOptions);
 const categoryVisibilitySchema = z.enum(storefrontCategoryVisibilityOptions);
 const categoryImageSourceSchema = z.enum(storefrontCategoryImageSources);
 
@@ -231,6 +233,7 @@ const productCollectionSectionSchema = sectionBaseSchema.extend({
           `Product limit must be ${maxStorefrontCollectionItems} or fewer.`,
         ),
       productSource: productSourceSchema,
+      categoryScope: categoryScopeSchema.default("all"),
       selectedBrandIds: z.array(boundedText(80)).max(24).default([]),
       selectedCategoryIds: z.array(boundedText(80)).max(24).default([]),
       title: boundedText(120).min(1, "Product collection title is required."),
@@ -270,6 +273,7 @@ const categoryCollectionSectionSchema = sectionBaseSchema.extend({
         maxStorefrontCollectionItems,
         `Category limit must be ${maxStorefrontCollectionItems} or fewer.`,
       ),
+    categoryScope: categoryScopeSchema.default("all"),
     categoryVisibility: categoryVisibilitySchema.default("with_products"),
     eyebrow: boundedText(80),
     imageSource: categoryImageSourceSchema.default("first_product"),
@@ -421,6 +425,7 @@ function asRecord(value: unknown) {
 const storefrontValidationFieldLabels: Record<string, string> = {
   brandLimit: "Brand limit",
   categoryLimit: "Category limit",
+  categoryScope: "Category scope",
   categoryVisibility: "Category visibility",
   postLimit: "Post limit",
   productLimit: "Product limit",

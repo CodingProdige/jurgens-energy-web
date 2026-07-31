@@ -24,7 +24,7 @@ export const publicDeliveryTiming = {
 } as const;
 
 export const publicDeliveryTimingDescription =
-  `Delivery normally takes ${formatPublicBusinessDayRange(publicDeliveryTiming.totalMinBusinessDays, publicDeliveryTiming.totalMaxBusinessDays)} after payment confirmation.`;
+  `Usually arrives within ${formatPublicBusinessDayRange(publicDeliveryTiming.totalMinBusinessDays, publicDeliveryTiming.totalMaxBusinessDays)} after payment confirmation.`;
 
 export const publicProductDeliveryTimingLabel =
   formatPublicBusinessDayRange(
@@ -75,7 +75,7 @@ export function getPublicDeliveryTimingDescription(
 ) {
   const timing = getPublicDeliveryTiming(settings);
 
-  return `Delivery normally takes ${formatPublicBusinessDayRange(
+  return `Usually arrives within ${formatPublicBusinessDayRange(
     timing.totalMinBusinessDays,
     timing.totalMaxBusinessDays,
   )} after payment confirmation.`;
@@ -134,7 +134,7 @@ export function getPublicDeliveryFeeDescription(
   settings: PublicShippingSettings,
 ) {
   if (!settings.shippingEnabled) {
-    return "Online delivery is currently unavailable. The applicable delivery fee will be shown before payment when delivery is available again.";
+    return "Online delivery is currently unavailable.";
   }
 
   const flatRate = roundMoney(Math.max(0, settings.shippingFlatRate));
@@ -144,16 +144,16 @@ export function getPublicDeliveryFeeDescription(
       : roundMoney(Math.max(0, settings.shippingFreeOverAmount));
 
   if (flatRate === 0) {
-    return "Standard delivery is currently free for eligible orders.";
+    return "Standard delivery is free for eligible orders.";
   }
 
   const flatRateCopy = formatZar(flatRate);
 
   if (freeOverAmount !== null && freeOverAmount > 0) {
-    return `The current VAT-inclusive standard delivery fee is ${flatRateCopy} per eligible order. Delivery is free when the qualifying product subtotal reaches ${formatZar(freeOverAmount)}.`;
+    return `Standard delivery is ${flatRateCopy}, VAT included. Free delivery over ${formatZar(freeOverAmount)}.`;
   }
 
-  return `The current VAT-inclusive standard delivery fee is ${flatRateCopy} per eligible order.`;
+  return `Standard delivery is ${flatRateCopy}, VAT included.`;
 }
 
 function formatZar(value: number) {

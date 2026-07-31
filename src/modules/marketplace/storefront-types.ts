@@ -46,6 +46,11 @@ export const storefrontCategoryVisibilityOptions = [
 export type StorefrontCategoryVisibility =
   (typeof storefrontCategoryVisibilityOptions)[number];
 
+export const storefrontCategoryScopeOptions = ["all", "top_level"] as const;
+
+export type StorefrontCategoryScope =
+  (typeof storefrontCategoryScopeOptions)[number];
+
 export const storefrontCategoryImageSources = [
   "first_product",
   "custom",
@@ -139,6 +144,7 @@ export type StorefrontProductCollectionSection = StorefrontSectionBase<
     layout: StorefrontCollectionLayout;
     productLimit: number;
     productSource: StorefrontProductSource;
+    categoryScope: StorefrontCategoryScope;
     selectedBrandIds: string[];
     selectedCategoryIds: string[];
     actions: StorefrontButtonAction[];
@@ -158,6 +164,7 @@ export type StorefrontCategoryCollectionSection = StorefrontSectionBase<
       imageUrl: string;
     }>;
     categoryLimit: number;
+    categoryScope: StorefrontCategoryScope;
     categoryVisibility: StorefrontCategoryVisibility;
     eyebrow: string;
     imageSource: StorefrontCategoryImageSource;
@@ -257,7 +264,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
         },
       ],
       copy:
-        "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
+        "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Usually arrives within 1–4 business days after payment confirmation.",
       heading:
         "Buy full LPG cylinders, exchange empty cylinders, and shop gas accessories.",
       headingSize: 52,
@@ -346,6 +353,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       layout: "grid",
       productLimit: 4,
       productSource: "accessories",
+      categoryScope: "all",
       selectedBrandIds: [],
       selectedCategoryIds: [],
       title: "Shop Gas Accessories",
@@ -362,6 +370,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       actions: [],
       categoryImages: [],
       categoryLimit: 8,
+      categoryScope: "top_level",
       categoryVisibility: "with_products",
       eyebrow: "Shop by category",
       imageSource: "first_product",
@@ -419,8 +428,8 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       features: [
         {
           icon: "delivery",
-          text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
-          title: "Delivery availability",
+          text: "Usually arrives within 1–4 business days after payment confirmation.",
+          title: "South Africa delivery",
         },
         {
           icon: "certified",

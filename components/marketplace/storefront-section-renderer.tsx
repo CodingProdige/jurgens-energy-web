@@ -29,6 +29,7 @@ import type {
   StorefrontBrandCollectionSection,
   StorefrontButtonAction,
   StorefrontCategoryCollectionSection,
+  StorefrontCategoryScope,
   StorefrontCylinderShowcaseSection,
   StorefrontFeatureGridSection,
   StorefrontHeroSection,
@@ -114,6 +115,7 @@ function renderStorefrontSection({
   if (section.type === "product_collection") {
     return (
       <StorefrontProductCollectionSectionView
+        categories={categories}
         products={products}
         section={section}
       />
@@ -251,14 +253,17 @@ function StorefrontCylinderShowcaseSectionView({
 }
 
 function StorefrontProductCollectionSectionView({
+  categories,
   products,
   section,
 }: {
+  categories: MarketplaceCategorySummary[];
   products: MarketplaceProductCardData[];
   section: StorefrontProductCollectionSection;
 }) {
   const { settings } = section;
   const selectedProducts = filterStorefrontProducts({
+    categories,
     products,
     selectedBrandIds: settings.selectedBrandIds,
     selectedCategoryIds: settings.selectedCategoryIds,
@@ -296,7 +301,10 @@ function StorefrontCategoryCollectionSectionView({
 }) {
   const { settings } = section;
   const selectedCategoryIdSet = new Set(settings.selectedCategoryIds);
-  const selectedCategories = categories
+  const selectedCategories = filterCategoriesByScope(
+    categories,
+    settings.categoryScope ?? "all",
+  )
     .filter(
       (category) =>
         selectedCategoryIdSet.size === 0 ||
@@ -501,6 +509,17 @@ function StorefrontCollectionHeader({
       />
     </div>
   );
+}
+
+function filterCategoriesByScope(
+  categories: MarketplaceCategorySummary[],
+  categoryScope: StorefrontCategoryScope,
+) {
+  if (categoryScope !== "top_level") {
+    return categories;
+  }
+
+  return categories.filter((category) => !category.path.includes("/"));
 }
 
 function getCollectionSectionId(

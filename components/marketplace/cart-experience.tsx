@@ -601,7 +601,7 @@ export function CartExperience() {
             </p>
             <p className="flex items-center gap-2">
               <TruckIcon className="size-4 text-[#ff5a1f]" />
-              One delivery fee per order; free-shipping rules may apply
+              Standard delivery fee; free delivery may apply
             </p>
           </div>
         </div>

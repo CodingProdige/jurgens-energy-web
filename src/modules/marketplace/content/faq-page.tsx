@@ -48,10 +48,9 @@ const faqGroups: FaqGroup[] = [
         answer: (
           <>
             Courier-eligible products can be delivered nationwide within South
-            Africa. Products marked for Jurgens delivery require a postcode in an
-            active Jurgens service area. Enter your complete delivery address at
-            checkout to confirm eligibility. The postcode check does not change
-            the order-level delivery fee. Read the full{" "}
+            Africa. Jurgens-delivered products use eligible postcode areas.
+            Enter your complete delivery address at checkout to confirm
+            availability. Read the full{" "}
             <Link
               className="font-bold text-[#ff5a1f] hover:underline"
               href="/delivery-information"
@@ -66,11 +65,8 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Checkout applies one configured VAT-inclusive flat delivery fee per
-            eligible order, not separate Jurgens and courier fees. When an active
-            free-shipping rule applies and the qualifying product subtotal reaches
-            its threshold, the delivery fee is reduced to zero. The final delivery
-            fee is shown before payment.
+            Standard delivery is VAT-inclusive. If the order qualifies for free
+            delivery, checkout reduces the delivery fee to zero before payment.
           </>
         ),
         question: "How is the delivery fee calculated?",
@@ -204,8 +200,8 @@ const faqGroups: FaqGroup[] = [
         answer: (
           <>
             Store product prices are VAT-inclusive unless a product clearly states
-            otherwise. The order-level delivery fee is also VAT-inclusive.
-            Delivery, handling, deposit, exchange or other applicable charges are
+            otherwise. The standard delivery fee is also VAT-inclusive.
+            Delivery, deposit, exchange or other applicable charges are
             displayed separately before the order is confirmed where they apply.
           </>
         ),
@@ -272,12 +268,12 @@ const faqStructuredDataItems = [
   {
     question: "Where do you deliver?",
     answer:
-      "Courier-eligible products can be delivered nationwide within South Africa. Products marked for Jurgens delivery require a postcode in an active Jurgens service area. Checkout uses the complete delivery address to confirm eligibility, but the postcode check does not change the order-level delivery fee.",
+      "Courier-eligible products can be delivered nationwide within South Africa. Jurgens-delivered products use eligible postcode areas. Checkout confirms availability from the complete delivery address.",
   },
   {
     question: "How is the delivery fee calculated?",
     answer:
-      "Checkout applies one configured VAT-inclusive flat delivery fee per eligible order, not separate Jurgens and courier fees. If an active free-shipping rule applies and the qualifying product subtotal reaches its threshold, the delivery fee is reduced to zero. The final delivery fee is shown before payment.",
+      "Standard delivery is VAT-inclusive. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
   },
   {
     question: deliveryTimingQuestion,
@@ -291,7 +287,7 @@ const faqStructuredDataItems = [
   {
     question: "Do displayed prices include VAT?",
     answer:
-      "Store product prices are VAT-inclusive unless a product clearly states otherwise. The order-level delivery fee is also VAT-inclusive. Applicable delivery, handling, deposit, exchange or other charges are displayed separately before the order is confirmed.",
+      "Store product prices are VAT-inclusive unless a product clearly states otherwise. The standard delivery fee is also VAT-inclusive. Applicable delivery, deposit, exchange or other charges are displayed separately before the order is confirmed.",
   },
   {
     question: "How do returns and refunds work?",
@@ -315,7 +311,7 @@ export function createFaqStructuredDataItems(
     if (item.question === deliveryTimingQuestion) {
       return {
         ...item,
-        answer: `${deliveryTimingDescription} Orders placed after the 2:00 PM SAST cutoff begin processing on the next business day. Stock, transport capacity, weather, traffic, access and LPG safety requirements can affect timing.`,
+        answer: `${deliveryTimingDescription} Orders placed after the 2:00 PM SAST cutoff start processing on the next business day.`,
       };
     }
 
@@ -347,9 +343,7 @@ export function FaqPage({
             <>
               {deliveryTimingDescription} Our order cutoff is 2:00 PM SAST on
               business days, and an order placed after the cutoff begins
-              processing on the next business day. Stock, courier or vehicle
-              capacity, weather, traffic, access and LPG safety requirements can
-              affect timing.
+              processing on the next business day.
             </>
           ),
         };

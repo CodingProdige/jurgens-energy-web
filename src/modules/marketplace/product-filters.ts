@@ -1,4 +1,5 @@
 import type {
+  MarketplaceCategorySummary,
   MarketplaceProductCard,
 } from "@/src/modules/marketplace/catalog";
 import type {
@@ -53,11 +54,13 @@ export function isAccessoryProduct(product: MarketplaceProductCard) {
 }
 
 export function filterStorefrontProducts({
+  categories = [],
   products,
   selectedBrandIds = [],
   selectedCategoryIds = [],
   source,
 }: {
+  categories?: MarketplaceCategorySummary[];
   products: MarketplaceProductCard[];
   selectedBrandIds?: string[];
   selectedCategoryIds?: string[];
@@ -76,12 +79,29 @@ export function filterStorefrontProducts({
 
   if (source === "category") {
     const selectedCategoryIdSet = new Set(selectedCategoryIds);
+    const selectedCategoryPaths = categories
+      .filter((category) => selectedCategoryIdSet.has(category.id))
+      .map((category) => category.path);
 
     return selectedCategoryIdSet.size > 0
       ? products.filter(
-          (product) =>
-            product.category !== null &&
-            selectedCategoryIdSet.has(product.category.id),
+          (product) => {
+            const productCategory = product.category;
+
+            if (!productCategory) {
+              return false;
+            }
+
+            if (selectedCategoryIdSet.has(productCategory.id)) {
+              return true;
+            }
+
+            return selectedCategoryPaths.some(
+              (categoryPath) =>
+                productCategory.path === categoryPath ||
+                productCategory.path.startsWith(`${categoryPath}/`),
+            );
+          },
         )
       : products.filter((product) => product.category !== null);
   }

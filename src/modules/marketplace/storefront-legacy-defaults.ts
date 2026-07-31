@@ -1,10 +1,10 @@
 import type { StorefrontSection } from "./storefront-types";
 
 const eligibleAddressHeroCopy =
-  "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.";
-const eligibleAddressFeatureTitle = "Delivery availability";
+  "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Usually arrives within 1–4 business days after payment confirmation.";
+const eligibleAddressFeatureTitle = "South Africa delivery";
 const eligibleAddressFeatureText =
-  "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.";
+  "Usually arrives within 1–4 business days after payment confirmation.";
 
 const legacyHeroCopyReplacements: Readonly<Record<string, string>> = {
   "Safe, certified and delivered to your home or business.":
@@ -130,8 +130,6 @@ export function applyStorefrontDeliveryTiming(
   sections: StorefrontSection[],
   deliveryTimingDescription: string,
 ) {
-  const replacementText = `${deliveryTimingDescription} Checkout confirms address eligibility.`;
-
   return sections.map((section): StorefrontSection => {
     if (section.type !== "feature_grid") {
       return section;
@@ -145,7 +143,7 @@ export function applyStorefrontDeliveryTiming(
           ...feature,
           text:
             feature.text === eligibleAddressFeatureText
-              ? replacementText
+              ? deliveryTimingDescription
               : feature.text,
         })),
       },

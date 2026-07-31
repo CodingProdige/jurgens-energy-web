@@ -172,7 +172,7 @@ export async function runJurgensWhatsappAgentTurn({
       AgentAuthorizationContext
     >({
       description:
-        "Retrieve the verified nationwide South African delivery policy, the single order-level flat fee/free-shipping rule, and postcode eligibility for Jurgens-delivered products.",
+        "Retrieve the verified nationwide South African delivery policy, standard delivery fee, free-delivery threshold, and postcode eligibility for Jurgens-delivered products.",
       execute: ({ value }) =>
         execute(() => adapters.checkDeliveryArea(value)),
       name: "check_delivery_area",
@@ -341,7 +341,7 @@ export async function runJurgensWhatsappAgentTurn({
       "Jurgens Energy is the sole seller in this store.",
       "Courier-eligible products can be delivered nationwide within South Africa.",
       "Products marked for Jurgens delivery require an eligible delivery postcode.",
-      "One configured VAT-inclusive flat delivery fee applies per eligible order. An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches its threshold.",
+      "Use the current standard delivery fee and free-delivery threshold returned by the delivery policy tool. Keep delivery fee wording short and customer-facing.",
       "Carrier rates and carrier costs are private operational data. Never quote or expose them, and never imply they can change the amount charged after checkout.",
       "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
       "For a cylinder order, use propose_order rather than writing an offer from memory.",

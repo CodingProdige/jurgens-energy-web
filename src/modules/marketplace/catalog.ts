@@ -997,6 +997,7 @@ export async function getMarketplaceCategories(): Promise<
       .select({
         id: categories.id,
         name: categories.name,
+        parentId: categories.parentId,
         path: categories.path,
         slug: categories.slug,
         sortOrder: categories.sortOrder,
@@ -1009,27 +1010,35 @@ export async function getMarketplaceCategories(): Promise<
   const coverByProductId = await getCoverUrlsByProductId(
     productRows.map((row) => row.id),
   );
+  const categoryById = new Map(categoryRows.map((row) => [row.id, row]));
   const productMetaByCategoryId = new Map<
     string,
     { firstProductImageUrl: string | null; productCount: number }
   >();
 
   for (const row of productRows) {
-    if (!row.categoryId) {
-      continue;
+    let category = row.categoryId ? categoryById.get(row.categoryId) : undefined;
+    const visitedCategoryIds = new Set<string>();
+
+    while (category && !visitedCategoryIds.has(category.id)) {
+      visitedCategoryIds.add(category.id);
+
+      const current = productMetaByCategoryId.get(category.id) ?? {
+        firstProductImageUrl: null,
+        productCount: 0,
+      };
+      const firstProductImageUrl =
+        current.firstProductImageUrl ?? coverByProductId.get(row.id) ?? null;
+
+      productMetaByCategoryId.set(category.id, {
+        firstProductImageUrl,
+        productCount: current.productCount + 1,
+      });
+
+      category = category.parentId
+        ? categoryById.get(category.parentId)
+        : undefined;
     }
-
-    const current = productMetaByCategoryId.get(row.categoryId) ?? {
-      firstProductImageUrl: null,
-      productCount: 0,
-    };
-    const firstProductImageUrl =
-      current.firstProductImageUrl ?? coverByProductId.get(row.id) ?? null;
-
-    productMetaByCategoryId.set(row.categoryId, {
-      firstProductImageUrl,
-      productCount: current.productCount + 1,
-    });
   }
 
   return categoryRows.map((row) => {
