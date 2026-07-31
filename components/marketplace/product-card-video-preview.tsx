@@ -271,6 +271,8 @@ export function ProductCardVideoPreview({
     );
     const connection = getBrowserNetworkConnection();
     let isInsidePreview = false;
+    let isPreviewInAutoplayBand =
+      typeof IntersectionObserver === "undefined";
     let hoverAutoplayAllowed = false;
 
     const stopHoverPlayback = () => {
@@ -299,6 +301,7 @@ export function ProductCardVideoPreview({
     const scheduleHoverPlayback = () => {
       if (
         !hoverAutoplayAllowed ||
+        !isPreviewInAutoplayBand ||
         hasErroredRef.current ||
         playbackIntentRef.current === "touch" ||
         hoverDelayRef.current
@@ -309,11 +312,36 @@ export function ProductCardVideoPreview({
       hoverDelayRef.current = setTimeout(() => {
         hoverDelayRef.current = null;
 
-        if (isInsidePreview && hoverAutoplayAllowed) {
+        if (
+          isInsidePreview &&
+          hoverAutoplayAllowed &&
+          isPreviewInAutoplayBand
+        ) {
           startPlayback("hover");
         }
       }, PRODUCT_CARD_VIDEO_HOVER_DELAY_MS);
     };
+
+    const autoplayBandObserver =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(
+            ([entry]) => {
+              isPreviewInAutoplayBand = Boolean(entry?.isIntersecting);
+
+              if (!isPreviewInAutoplayBand) {
+                stopHoverPlayback();
+                return;
+              }
+
+              if (isInsidePreview) {
+                scheduleHoverPlayback();
+              }
+            },
+            {
+              rootMargin: "-35% 0px -35% 0px",
+            },
+          );
 
     const evaluatePointerPosition = (event: PointerEvent) => {
       if (event.pointerType !== "mouse") {
@@ -347,6 +375,7 @@ export function ProductCardVideoPreview({
     article.addEventListener("pointerenter", evaluatePointerPosition);
     article.addEventListener("pointermove", evaluatePointerPosition);
     article.addEventListener("pointerleave", handlePointerLeave);
+    autoplayBandObserver?.observe(container);
     fineHoverQuery.addEventListener("change", updateHoverAutoplayEligibility);
     reducedMotionQuery.addEventListener(
       "change",
@@ -359,6 +388,7 @@ export function ProductCardVideoPreview({
       article.removeEventListener("pointerenter", evaluatePointerPosition);
       article.removeEventListener("pointermove", evaluatePointerPosition);
       article.removeEventListener("pointerleave", handlePointerLeave);
+      autoplayBandObserver?.disconnect();
       fineHoverQuery.removeEventListener(
         "change",
         updateHoverAutoplayEligibility,

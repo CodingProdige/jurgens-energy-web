@@ -218,7 +218,9 @@ export function ProgressiveProductGrid({
           void loadNextPage();
         }
       },
-      { rootMargin: "700px 0px" },
+      {
+        rootMargin: "0px 0px -45% 0px",
+      },
     );
 
     observer.observe(sentinel);

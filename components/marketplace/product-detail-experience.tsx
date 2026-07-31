@@ -14,8 +14,10 @@ import {
 import {
   CheckIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
   CreditCardIcon,
   FileTextIcon,
   FlameIcon,
@@ -444,86 +446,207 @@ function ProductGallery({
   productTitle: string;
   sizeLabel: string | null;
 }) {
-  return (
-    <div className="grid min-w-0 gap-3 lg:sticky lg:top-36 lg:self-start">
-      <div
-        className="relative aspect-[1/1] w-full overflow-hidden border-b border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-white/[0.04] sm:rounded-lg sm:border sm:shadow-sm"
-        data-product-gallery-media-container=""
-      >
-        {sizeLabel ? (
-          <span className="absolute left-4 top-4 z-10 rounded-md bg-white px-3 py-1.5 text-sm font-black text-[#080808] shadow-sm dark:bg-[#1a1a1a] dark:text-[#f7f7f2]">
-            {sizeLabel}
-          </span>
-        ) : null}
-        {activeMedia ? (
-          <>
-            <ProductGalleryMediaContent
-              key={activeMedia.id}
-              media={activeMedia}
-              pauseVideo={isLightboxOpen}
-              priority
-              productTitle={productTitle}
-            />
-            {activeMedia.kind === "image" ? (
-              <button
-                aria-label="Open larger product image gallery"
-                className="absolute inset-0 z-[2] cursor-zoom-in focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-[#ff5a1f]/35"
-                onClick={onOpenGallery}
-                type="button"
-              />
-            ) : null}
-          </>
-        ) : (
-          <div className="grid size-full place-items-center text-sm font-semibold text-slate-500">
-            Jurgens Energy
-          </div>
-        )}
-        {galleryMedia.length > 1 ? (
-          <>
-            <button
-              aria-label="Previous product media"
-              className="absolute left-4 top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/92 text-[#080808] shadow-sm transition hover:bg-white dark:bg-[#1a1a1a]/90 dark:text-[#f7f7f2]"
-              onClick={onPrevious}
-              type="button"
-            >
-              <ChevronLeftIcon className="size-5" />
-            </button>
-            <button
-              aria-label="Next product media"
-              className="absolute right-4 top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-white/92 text-[#080808] shadow-sm transition hover:bg-white dark:bg-[#1a1a1a]/90 dark:text-[#f7f7f2]"
-              onClick={onNext}
-              type="button"
-            >
-              <ChevronRightIcon className="size-5" />
-            </button>
-          </>
-        ) : null}
-        <button
-          aria-label={
-            activeMedia?.kind === "video"
-              ? "Open product video in larger gallery"
-              : "Zoom product image"
-          }
-          className={cn(
-            "absolute right-4 z-20 grid size-10 place-items-center rounded-full bg-white/92 text-[#080808] shadow-sm transition hover:bg-white dark:bg-[#1a1a1a]/90 dark:text-[#f7f7f2]",
-            activeMedia?.kind === "video" ? "top-4" : "bottom-4",
-          )}
-          onClick={onOpenGallery}
-          type="button"
-        >
-          <ZoomInIcon className="size-5" />
-        </button>
-      </div>
+  const gallerySwipeRef = useRef({
+    pointerId: -1,
+    startX: 0,
+    startY: 0,
+  });
+  const suppressGalleryOpenClickRef = useRef(false);
+  const suppressGalleryOpenResetTimeoutRef = useRef<
+    ReturnType<typeof setTimeout> | null
+  >(null);
+  const hasMultipleMedia = galleryMedia.length > 1;
+  const activeIndex = activeMedia
+    ? Math.max(
+        0,
+        galleryMedia.findIndex((media) => media.id === activeMedia.id),
+      )
+    : 0;
 
-      {galleryMedia.length > 1 ? (
-        <ProductMediaThumbnailStrip
+  useEffect(
+    () => () => {
+      if (suppressGalleryOpenResetTimeoutRef.current) {
+        clearTimeout(suppressGalleryOpenResetTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  function handleMediaPointerDown(
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) {
+    if (!hasMultipleMedia || event.pointerType !== "touch") {
+      return;
+    }
+
+    gallerySwipeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Safari can reject capture while native media controls are active.
+    }
+  }
+
+  function handleMediaPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (
+      !hasMultipleMedia ||
+      gallerySwipeRef.current.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    const deltaX = event.clientX - gallerySwipeRef.current.startX;
+    const deltaY = event.clientY - gallerySwipeRef.current.startY;
+    gallerySwipeRef.current.pointerId = -1;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
+      return;
+    }
+
+    suppressGalleryOpenClickRef.current = true;
+    if (suppressGalleryOpenResetTimeoutRef.current) {
+      clearTimeout(suppressGalleryOpenResetTimeoutRef.current);
+    }
+    suppressGalleryOpenResetTimeoutRef.current = setTimeout(() => {
+      suppressGalleryOpenClickRef.current = false;
+      suppressGalleryOpenResetTimeoutRef.current = null;
+    }, 250);
+
+    if (deltaX > 0) {
+      onPrevious();
+    } else {
+      onNext();
+    }
+  }
+
+  function handleMediaPointerCancel(event: ReactPointerEvent<HTMLDivElement>) {
+    if (gallerySwipeRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    gallerySwipeRef.current.pointerId = -1;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleOpenGalleryClick(event: ReactMouseEvent<HTMLButtonElement>) {
+    if (suppressGalleryOpenClickRef.current) {
+      suppressGalleryOpenClickRef.current = false;
+      if (suppressGalleryOpenResetTimeoutRef.current) {
+        clearTimeout(suppressGalleryOpenResetTimeoutRef.current);
+        suppressGalleryOpenResetTimeoutRef.current = null;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    onOpenGallery();
+  }
+
+  return (
+    <div
+      className={cn(
+        "grid min-w-0 gap-3 lg:sticky lg:top-36 lg:self-start lg:items-start",
+        hasMultipleMedia && "lg:grid-cols-[5.75rem_minmax(0,1fr)]",
+      )}
+    >
+      {hasMultipleMedia ? (
+        <ProductMediaThumbnailRail
           activeMediaId={activeMedia?.id ?? null}
           galleryMedia={galleryMedia}
           onSelectMedia={onSelectMedia}
           productTitle={productTitle}
-          tone="light"
         />
       ) : null}
+
+      <div className="grid min-w-0 gap-3">
+        <div
+          className="relative aspect-[1/1] w-full touch-pan-y overflow-hidden border-b border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-white/[0.04] sm:rounded-lg sm:border sm:shadow-sm"
+          data-product-gallery-media-container=""
+          onPointerCancel={handleMediaPointerCancel}
+          onPointerDown={handleMediaPointerDown}
+          onPointerUp={handleMediaPointerUp}
+        >
+          {sizeLabel ? (
+            <span className="absolute left-4 top-4 z-10 rounded-md bg-white px-3 py-1.5 text-sm font-black text-[#080808] shadow-sm dark:bg-[#1a1a1a] dark:text-[#f7f7f2]">
+              {sizeLabel}
+            </span>
+          ) : null}
+          {activeMedia ? (
+            <>
+              <ProductGalleryMediaContent
+                key={activeMedia.id}
+                media={activeMedia}
+                pauseVideo={isLightboxOpen}
+                priority
+                productTitle={productTitle}
+              />
+              {activeMedia.kind === "image" ? (
+                <button
+                  aria-label="Open larger product image gallery"
+                  className="absolute inset-0 z-[2] cursor-zoom-in focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-[#ff5a1f]/35"
+                  onClick={handleOpenGalleryClick}
+                  type="button"
+                />
+              ) : null}
+            </>
+          ) : (
+            <div className="grid size-full place-items-center text-sm font-semibold text-slate-500">
+              Jurgens Energy
+            </div>
+          )}
+          {hasMultipleMedia ? (
+            <>
+              <button
+                aria-label="Previous product media"
+                className="absolute left-4 top-1/2 z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full bg-white/92 text-[#080808] shadow-sm transition hover:bg-white dark:bg-[#1a1a1a]/90 dark:text-[#f7f7f2] sm:grid"
+                onClick={onPrevious}
+                type="button"
+              >
+                <ChevronLeftIcon className="size-5" />
+              </button>
+              <button
+                aria-label="Next product media"
+                className="absolute right-4 top-1/2 z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full bg-white/92 text-[#080808] shadow-sm transition hover:bg-white dark:bg-[#1a1a1a]/90 dark:text-[#f7f7f2] sm:grid"
+                onClick={onNext}
+                type="button"
+              >
+                <ChevronRightIcon className="size-5" />
+              </button>
+              <span className="absolute bottom-4 right-4 z-20 rounded-full bg-[#080808]/62 px-2.5 py-1 text-xs font-black leading-none text-white shadow-sm backdrop-blur-sm sm:hidden">
+                {activeIndex + 1}/{galleryMedia.length}
+              </span>
+            </>
+          ) : null}
+          <button
+            aria-label={
+              activeMedia?.kind === "video"
+                ? "Open product video in larger gallery"
+                : "Zoom product image"
+            }
+            className={cn(
+              "absolute right-4 z-20 hidden size-10 place-items-center rounded-full bg-white/92 text-[#080808] shadow-sm transition hover:bg-white dark:bg-[#1a1a1a]/90 dark:text-[#f7f7f2] sm:grid",
+              activeMedia?.kind === "video" ? "top-4" : "bottom-4",
+            )}
+            onClick={onOpenGallery}
+            type="button"
+          >
+            <ZoomInIcon className="size-5" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -575,6 +698,159 @@ function ProductGalleryMediaContent({
       sizes="(min-width: 1024px) 680px, calc(100vw - 2rem)"
       src={media.url}
     />
+  );
+}
+
+function ProductMediaThumbnailRail({
+  activeMediaId,
+  galleryMedia,
+  onSelectMedia,
+  productTitle,
+}: {
+  activeMediaId: string | null;
+  galleryMedia: MarketplaceProductMedia[];
+  onSelectMedia: (mediaId: string) => void;
+  productTitle: string;
+}) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [canScrollBackward, setCanScrollBackward] = useState(false);
+  const [canScrollForward, setCanScrollForward] = useState(false);
+  const activeIndex = Math.max(
+    0,
+    galleryMedia.findIndex((media) => media.id === activeMediaId),
+  );
+
+  const updateScrollState = useCallback(() => {
+    const rail = railRef.current;
+
+    if (!rail) {
+      return;
+    }
+
+    const maximumScrollTop = Math.max(0, rail.scrollHeight - rail.clientHeight);
+
+    setCanScrollBackward(rail.scrollTop > 2);
+    setCanScrollForward(rail.scrollTop < maximumScrollTop - 2);
+  }, []);
+
+  useEffect(() => {
+    const rail = railRef.current;
+
+    if (!rail) {
+      return;
+    }
+
+    updateScrollState();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateScrollState);
+
+    resizeObserver?.observe(rail);
+    window.addEventListener("resize", updateScrollState);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [galleryMedia.length, updateScrollState]);
+
+  useEffect(() => {
+    const rail = railRef.current;
+
+    if (!rail || !activeMediaId) {
+      return;
+    }
+
+    const activeThumbnail = Array.from(
+      rail.querySelectorAll<HTMLElement>("[data-product-media-thumbnail]"),
+    ).find((thumbnail) => thumbnail.dataset.mediaId === activeMediaId);
+
+    activeThumbnail?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+
+    const animationFrame = window.requestAnimationFrame(updateScrollState);
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [activeMediaId, updateScrollState]);
+
+  function scrollRail(direction: -1 | 1) {
+    const rail = railRef.current;
+
+    if (!rail) {
+      return;
+    }
+
+    rail.scrollBy({
+      behavior: "smooth",
+      top: direction * Math.max(88, rail.clientHeight * 0.72),
+    });
+  }
+
+  return (
+    <div className="hidden min-w-0 lg:grid lg:content-start lg:gap-2">
+      <button
+        aria-label="Scroll product media thumbnails upward"
+        className="grid h-7 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-white/[0.06] dark:text-[#f7f7f2]"
+        disabled={!canScrollBackward}
+        onClick={() => scrollRail(-1)}
+        type="button"
+      >
+        <ChevronUpIcon className="size-4" />
+      </button>
+
+      <div
+        aria-label="Product media thumbnails"
+        className="flex max-h-[min(42rem,calc(100vh-13rem))] flex-col gap-2 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={updateScrollState}
+        ref={railRef}
+        role="group"
+      >
+        {galleryMedia.map((media, index) => (
+          <button
+            aria-label={`Show product ${media.kind} ${index + 1}`}
+            aria-pressed={activeMediaId === media.id}
+            className={cn(
+              "relative aspect-[1/1] w-full shrink-0 overflow-hidden rounded-md border bg-white transition focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:bg-white/[0.04]",
+              activeMediaId === media.id
+                ? "border-[#ff5a1f] ring-2 ring-[#ff5a1f]/15"
+                : "border-[#e8e8e2] hover:border-[#ff5a1f]/45 dark:border-white/10",
+            )}
+            data-media-id={media.id}
+            data-product-media-thumbnail=""
+            key={media.id}
+            onClick={() => onSelectMedia(media.id)}
+            type="button"
+          >
+            <ProductMediaThumbnail
+              media={media}
+              productTitle={productTitle}
+              sizes="96px"
+            />
+          </button>
+        ))}
+      </div>
+
+      <button
+        aria-label="Scroll product media thumbnails downward"
+        className="grid h-7 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-white/[0.06] dark:text-[#f7f7f2]"
+        disabled={!canScrollForward}
+        onClick={() => scrollRail(1)}
+        type="button"
+      >
+        <ChevronDownIcon className="size-4" />
+      </button>
+
+      <p
+        aria-live="polite"
+        className="text-center text-[10px] font-black uppercase leading-none text-[#6a6a63] dark:text-zinc-300"
+      >
+        {activeIndex + 1}/{galleryMedia.length}
+      </p>
+    </div>
   );
 }
 
@@ -1280,7 +1556,7 @@ function ProductBuyBox({
         topSoldVariantId={topSoldVariantId}
       />
 
-      <aside className="hidden h-fit min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-[#e8e8e2] bg-white p-4 shadow-[0_16px_40px_rgba(8,8,8,0.05)] dark:border-white/10 dark:bg-white/[0.04] sm:gap-5 sm:p-5 lg:grid">
+      <aside className="hidden h-fit min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-[#e8e8e2] bg-white p-4 shadow-[0_16px_40px_rgba(8,8,8,0.05)] dark:border-white/10 dark:bg-white/[0.04] sm:gap-5 sm:p-5 lg:sticky lg:top-36 lg:grid lg:self-start">
       <div className="grid gap-3 border-b border-[#ecece6] pb-4 dark:border-white/10 sm:pb-5">
         <div>
           <ProductConversionHeader

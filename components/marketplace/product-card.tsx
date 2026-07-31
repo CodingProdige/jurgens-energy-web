@@ -38,6 +38,7 @@ export function MarketplaceProductCard({
       className="marketplace-product-card-media object-contain"
       fill
       quality={90}
+      loading="eager"
       sizes="(min-width: 1280px) 220px, (min-width: 768px) 25vw, 50vw"
       src={displayImageUrl}
     />
