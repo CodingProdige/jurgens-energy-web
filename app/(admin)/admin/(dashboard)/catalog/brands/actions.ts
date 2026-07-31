@@ -134,6 +134,28 @@ async function requireCatalogManageAccess() {
   return access.session;
 }
 
+function revalidateBrandConsumers() {
+  // Admin subdomain paths are rewritten to /admin/* internally. Invalidate the
+  // destination routes so other logged-in sessions and product pickers get the
+  // fresh brand list.
+  revalidatePath("/admin/catalog/brands");
+  revalidatePath("/admin/catalog/brand-requests");
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/all");
+  revalidatePath("/admin/products/new");
+  revalidatePath("/admin/products/[productId]/edit", "page");
+
+  revalidatePath("/seller/products/new");
+  revalidatePath("/seller/products/[productId]/edit", "page");
+
+  revalidatePath("/");
+  revalidatePath("/products");
+  revalidatePath("/brands");
+  revalidatePath("/brands/[slug]", "page");
+  revalidatePath("/feeds/google-merchant.xml");
+  revalidatePath("/sitemap.xml");
+}
+
 async function brandHasProducts(brandId: string, activeOnly = false) {
   const product = await db.query.products.findFirst({
     where: (table, { and, eq }) =>
@@ -327,7 +349,7 @@ export async function createBrand(
     throw error;
   }
 
-  revalidatePath("/catalog/brands");
+  revalidateBrandConsumers();
 
   return { ok: true, message: "Brand created." };
 }
@@ -419,7 +441,7 @@ export async function updateBrand(
     throw error;
   }
 
-  revalidatePath("/catalog/brands");
+  revalidateBrandConsumers();
 
   return { ok: true, message: "Brand updated." };
 }
@@ -457,7 +479,7 @@ export async function deleteBrand(
 
   await db.delete(brands).where(eq(brands.id, existing.id));
 
-  revalidatePath("/catalog/brands");
+  revalidateBrandConsumers();
 
   return { ok: true, message: "Brand deleted." };
 }

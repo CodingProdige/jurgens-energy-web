@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 
 import { ProductCreateWizard } from "@/app/(seller)/seller/(dashboard)/products/new/product-create-wizard";
 import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
@@ -24,6 +25,8 @@ export default async function EditAdminProductPage({
 }: {
   params: Promise<{ productId: string }>;
 }) {
+  await connection();
+
   const [{ productId }, access] = await Promise.all([
     params,
     requireAdminCapability("admin.catalog.manage"),

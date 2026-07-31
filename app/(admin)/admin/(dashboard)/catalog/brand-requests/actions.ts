@@ -55,6 +55,19 @@ async function requireCatalogManageAccess() {
   return access.session;
 }
 
+function revalidateBrandRequestConsumers() {
+  revalidatePath("/admin/catalog/brand-requests");
+  revalidatePath("/admin/catalog/brands");
+  revalidatePath("/admin/products/new");
+  revalidatePath("/admin/products/[productId]/edit", "page");
+  revalidatePath("/seller/products/new");
+  revalidatePath("/seller/products/[productId]/edit", "page");
+  revalidatePath("/brands");
+  revalidatePath("/brands/[slug]", "page");
+  revalidatePath("/feeds/google-merchant.xml");
+  revalidatePath("/sitemap.xml");
+}
+
 export async function approveBrandRequest(
   _state: BrandRequestMutationState,
   formData: FormData,
@@ -129,8 +142,7 @@ export async function approveBrandRequest(
     throw error;
   }
 
-  revalidatePath("/catalog/brand-requests");
-  revalidatePath("/catalog/brands");
+  revalidateBrandRequestConsumers();
 
   return { ok: true, message: "Brand request approved." };
 }
@@ -175,7 +187,7 @@ export async function rejectBrandRequest(
     })
     .where(eq(brandRequests.id, request.id));
 
-  revalidatePath("/catalog/brand-requests");
+  revalidateBrandRequestConsumers();
 
   return { ok: true, message: "Brand request rejected." };
 }
@@ -192,7 +204,7 @@ export async function deleteBrandRequest(
   }
 
   await db.delete(brandRequests).where(eq(brandRequests.id, parsed.data.id));
-  revalidatePath("/catalog/brand-requests");
+  revalidateBrandRequestConsumers();
 
   return { ok: true, message: "Brand request deleted." };
 }
@@ -250,7 +262,7 @@ export async function createBrandRequestForTesting(
     throw error;
   }
 
-  revalidatePath("/catalog/brand-requests");
+  revalidateBrandRequestConsumers();
 
   return { ok: true, message: "Brand request created." };
 }

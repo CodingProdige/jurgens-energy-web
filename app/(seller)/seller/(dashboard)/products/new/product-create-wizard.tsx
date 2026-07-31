@@ -1834,6 +1834,8 @@ export function ProductCreateWizard({
   >(initialProduct?.fulfillmentMode ?? "seller_fulfilled");
   const [isGeneratingDescription, startDescriptionTransition] =
     useTransition();
+  const [isRefreshingCatalogLists, startRefreshCatalogListsTransition] =
+    useTransition();
   const [isSavingDraft, startSaveDraftTransition] = useTransition();
   const [isDeletingProduct, startDeleteProductTransition] = useTransition();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -3461,9 +3463,29 @@ export function ProductCreateWizard({
               </label>
 
               <div className="grid gap-1.5">
-                <FieldLabel info="Select a parent category first, then optionally choose more specific subcategories.">
-                  Category *
-                </FieldLabel>
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <FieldLabel info="Select a parent category first, then optionally choose more specific subcategories.">
+                    Category *
+                  </FieldLabel>
+                  <button
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-orange-200 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-300 dark:hover:border-orange-400/40 dark:hover:text-orange-200"
+                    disabled={isRefreshingCatalogLists}
+                    onClick={() => {
+                      startRefreshCatalogListsTransition(() => {
+                        router.refresh();
+                      });
+                    }}
+                    type="button"
+                  >
+                    <RefreshCwIcon
+                      className={cn(
+                        "size-3.5",
+                        isRefreshingCatalogLists ? "animate-spin" : "",
+                      )}
+                    />
+                    Refresh list
+                  </button>
+                </div>
                 <div className="grid min-w-0 gap-2">
                   {categorySelectorLevels.map((level, index) => {
                     const canClearLevel = index > 0 && Boolean(level.value);

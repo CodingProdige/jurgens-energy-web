@@ -182,7 +182,7 @@ export async function uploadAdminMedia(
       );
     }
 
-    revalidatePath("/catalog/brands");
+    revalidatePath("/admin/catalog/brands");
 
     return {
       asset: assets[0],
@@ -228,7 +228,7 @@ export async function updateAdminMediaMetadata(
       ownerUserId: session.user.id,
     });
 
-    revalidatePath("/catalog/brands");
+    revalidatePath("/admin/catalog/brands");
     revalidatePath("/feeds/google-merchant.xml");
 
     return { asset, ok: true, message: "Media details saved." };
@@ -301,7 +301,7 @@ export async function deleteAdminMediaAsset(
       .map((relativePath) => removeMediaFile(relativePath)),
   );
 
-  revalidatePath("/catalog/brands");
+  revalidatePath("/admin/catalog/brands");
 
   return {
     deletedId: asset.id,
@@ -336,7 +336,7 @@ export async function createAdminMediaFolder(
       slug: mediaFolders.slug,
     });
 
-  revalidatePath("/catalog/brands");
+  revalidatePath("/admin/catalog/brands");
 
   return { folder, ok: true, message: "Folder created." };
 }
@@ -377,7 +377,7 @@ export async function renameAdminMediaFolder(
     return { ok: false, message: "Folder was not found." };
   }
 
-  revalidatePath("/catalog/brands");
+  revalidatePath("/admin/catalog/brands");
 
   return { folder, ok: true, message: "Folder renamed." };
 }
@@ -407,7 +407,7 @@ export async function deleteAdminMediaFolder(
     return { ok: false, message: "Folder was not found." };
   }
 
-  revalidatePath("/catalog/brands");
+  revalidatePath("/admin/catalog/brands");
 
   return { ok: true, message: "Folder deleted." };
 }
@@ -482,7 +482,7 @@ export async function setAdminMediaAssetFolders(input: {
     );
   }
 
-  revalidatePath("/catalog/brands");
+  revalidatePath("/admin/catalog/brands");
 
   return {
     folderId: folderIds[0] ?? null,

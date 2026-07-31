@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 import { requireSellerDashboardAccess } from "@/src/modules/auth/permissions";
 import { getSellerCreateProductData } from "@/src/modules/sellers/product-create";
@@ -14,6 +15,8 @@ export const metadata: Metadata = {
 };
 
 export default async function NewSellerProductPage() {
+  await connection();
+
   const session = await requireSellerDashboardAccess();
   const data = await getSellerCreateProductData(session.user.id);
 

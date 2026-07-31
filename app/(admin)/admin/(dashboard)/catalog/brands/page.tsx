@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 import { BrandDashboard } from "@/app/(admin)/admin/(dashboard)/catalog/brands/brand-manager";
 import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
@@ -16,6 +17,8 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminBrandsPage() {
+  await connection();
+
   const access = await requireAdminCapability("admin.catalog.view");
 
   if (!access.ok) {

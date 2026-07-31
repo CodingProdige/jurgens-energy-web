@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 import { ProductCreateWizard } from "@/app/(seller)/seller/(dashboard)/products/new/product-create-wizard";
 import { requireSellerDashboardAccess } from "@/src/modules/auth/permissions";
@@ -22,6 +23,8 @@ export default async function EditSellerProductPage({
 }: {
   params: Promise<{ productId: string }>;
 }) {
+  await connection();
+
   const [{ productId }, session] = await Promise.all([
     params,
     requireSellerDashboardAccess(),
