@@ -1,13 +1,134 @@
-import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
-import { roundMoney } from "@/src/modules/shipping/customer-shipping-policy";
+import type { MarketplaceSettings } from "./settings.ts";
+import { roundMoney } from "../shipping/customer-shipping-policy.ts";
 
 type PublicShippingSettings = Pick<
   MarketplaceSettings,
   "shippingEnabled" | "shippingFlatRate" | "shippingFreeOverAmount"
 >;
 
+type PublicDeliveryTimingSettings = Pick<
+  MarketplaceSettings,
+  | "shippingHandlingMaxBusinessDays"
+  | "shippingHandlingMinBusinessDays"
+  | "shippingTransitMaxBusinessDays"
+  | "shippingTransitMinBusinessDays"
+>;
+
+export const publicDeliveryTiming = {
+  handlingMaxBusinessDays: 1,
+  handlingMinBusinessDays: 0,
+  totalMaxBusinessDays: 4,
+  totalMinBusinessDays: 1,
+  transitMaxBusinessDays: 3,
+  transitMinBusinessDays: 1,
+} as const;
+
 export const publicDeliveryTimingDescription =
-  "Handling normally takes 0–1 business day after payment confirmation. Transit time depends on the destination, parcel and delivery service. Any available delivery estimate is communicated in the order updates or tracking details.";
+  `Delivery normally takes ${formatPublicBusinessDayRange(publicDeliveryTiming.totalMinBusinessDays, publicDeliveryTiming.totalMaxBusinessDays)} after payment confirmation.`;
+
+export const publicProductDeliveryTimingLabel =
+  formatPublicBusinessDayRange(
+    publicDeliveryTiming.totalMinBusinessDays,
+    publicDeliveryTiming.totalMaxBusinessDays,
+  );
+
+export function getPublicDeliveryTiming(
+  settings: PublicDeliveryTimingSettings,
+) {
+  const handlingMinBusinessDays = normalizeBusinessDays(
+    settings.shippingHandlingMinBusinessDays,
+    publicDeliveryTiming.handlingMinBusinessDays,
+  );
+  const handlingMaxBusinessDays = Math.max(
+    handlingMinBusinessDays,
+    normalizeBusinessDays(
+      settings.shippingHandlingMaxBusinessDays,
+      publicDeliveryTiming.handlingMaxBusinessDays,
+    ),
+  );
+  const transitMinBusinessDays = normalizeBusinessDays(
+    settings.shippingTransitMinBusinessDays,
+    publicDeliveryTiming.transitMinBusinessDays,
+  );
+  const transitMaxBusinessDays = Math.max(
+    transitMinBusinessDays,
+    normalizeBusinessDays(
+      settings.shippingTransitMaxBusinessDays,
+      publicDeliveryTiming.transitMaxBusinessDays,
+    ),
+  );
+
+  return {
+    handlingMaxBusinessDays,
+    handlingMinBusinessDays,
+    totalMaxBusinessDays:
+      handlingMaxBusinessDays + transitMaxBusinessDays,
+    totalMinBusinessDays:
+      handlingMinBusinessDays + transitMinBusinessDays,
+    transitMaxBusinessDays,
+    transitMinBusinessDays,
+  };
+}
+
+export function getPublicDeliveryTimingDescription(
+  settings: PublicDeliveryTimingSettings,
+) {
+  const timing = getPublicDeliveryTiming(settings);
+
+  return `Delivery normally takes ${formatPublicBusinessDayRange(
+    timing.totalMinBusinessDays,
+    timing.totalMaxBusinessDays,
+  )} after payment confirmation.`;
+}
+
+export function getPublicProductDeliveryTimingLabel(
+  settings: PublicDeliveryTimingSettings,
+) {
+  const timing = getPublicDeliveryTiming(settings);
+
+  return formatPublicBusinessDayRange(
+    timing.totalMinBusinessDays,
+    timing.totalMaxBusinessDays,
+  );
+}
+
+export function formatPublicBusinessDayRange(minimum: number, maximum: number) {
+  if (minimum === maximum) {
+    return `${minimum} business ${minimum === 1 ? "day" : "days"}`;
+  }
+
+  return `${minimum}–${maximum} business days`;
+}
+
+export function getPublicProductDeliveryCopy(input: {
+  fulfillmentMode: "jurgens_fulfilled" | "seller_fulfilled";
+  shippingEnabled: boolean;
+} & PublicDeliveryTimingSettings) {
+  if (!input.shippingEnabled) {
+    return {
+      available: false,
+      benefit: "Online delivery is currently unavailable",
+      detail: "Delivery currently unavailable",
+      label: "Online delivery unavailable",
+    };
+  }
+
+  const timing = getPublicDeliveryTiming(input);
+  const timingLabel = formatPublicBusinessDayRange(
+    timing.totalMinBusinessDays,
+    timing.totalMaxBusinessDays,
+  );
+
+  return {
+    available: true,
+    benefit: `Usually arrives within ${timingLabel}`,
+    detail: timingLabel,
+    label:
+      input.fulfillmentMode === "jurgens_fulfilled"
+        ? "Jurgens delivery areas"
+        : "Nationwide delivery",
+  };
+}
 
 export function getPublicDeliveryFeeDescription(
   settings: PublicShippingSettings,
@@ -42,4 +163,8 @@ function formatZar(value: number) {
     minimumFractionDigits: 2,
     style: "currency",
   }).format(value);
+}
+
+function normalizeBusinessDays(value: number, fallback: number) {
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
 }

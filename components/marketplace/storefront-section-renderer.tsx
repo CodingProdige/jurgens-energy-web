@@ -531,7 +531,7 @@ function ProductCollectionList({
         "mt-2.5 px-1.5 sm:mt-5 sm:px-0",
         isCarousel
           ? "flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
-          : "grid grid-cols-2 items-start gap-1.5 sm:gap-4 md:grid-cols-4",
+          : "grid grid-cols-2 items-stretch gap-1.5 sm:gap-4 md:grid-cols-4",
       )}
     >
       {products.length > 0 ? (
@@ -539,7 +539,7 @@ function ProductCollectionList({
           <div
             className={
               isCarousel
-                ? "w-[46%] min-w-[8.5rem] max-w-[13rem] snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
+                ? "flex w-[46%] min-w-[8.5rem] max-w-[13rem] snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
                 : undefined
             }
             key={product.id}

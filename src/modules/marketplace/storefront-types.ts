@@ -419,7 +419,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       features: [
         {
           icon: "delivery",
-          text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+          text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
           title: "Delivery availability",
         },
         {

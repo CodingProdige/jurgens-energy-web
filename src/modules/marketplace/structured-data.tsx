@@ -3,6 +3,10 @@ import type { CustomerSupportContactDetails } from "@/src/modules/customer-suppo
 import { createMarketplaceBusinessAddress } from "@/src/modules/marketplace/business-structured-address";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import { shouldPublishGoogleMerchantOffer } from "@/src/modules/marketplace/google-feed-utils";
+import {
+  getPublicDeliveryTiming,
+  getPublicDeliveryTimingDescription,
+} from "@/src/modules/marketplace/public-delivery-copy";
 import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
 import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 
@@ -203,6 +207,16 @@ export function createProductStructuredData(
         ? `${product.title} - ${exactVariant.title}`
         : product.title,
     offers: offer,
+    aggregateRating:
+      product.averageRating && product.reviewCount > 0
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: product.averageRating.toFixed(2),
+            reviewCount: product.reviewCount,
+            bestRating: 5,
+            worstRating: 1,
+          }
+        : undefined,
     sku: exactVariant?.sku,
     url: exactVariantUrl ?? productUrl,
   };
@@ -307,9 +321,40 @@ function createNationwideShippingServiceStructuredData(
       : normalizeCurrencyAmount(settings.shippingFreeOverAmount);
   const hasFreeShippingThreshold =
     flatRate > 0 && freeOverAmount !== null && freeOverAmount > 0;
+  const deliveryTiming = getPublicDeliveryTiming(settings);
+  const deliveryTimingDescription =
+    getPublicDeliveryTimingDescription(settings);
   const shippingDestination = {
     "@type": "DefinedRegion",
     addressCountry: "ZA",
+  };
+  const businessDays = [
+    "https://schema.org/Monday",
+    "https://schema.org/Tuesday",
+    "https://schema.org/Wednesday",
+    "https://schema.org/Thursday",
+    "https://schema.org/Friday",
+  ];
+  const handlingTime = {
+    "@type": "ServicePeriod",
+    businessDays,
+    cutoffTime: "14:00:00+02:00",
+    duration: {
+      "@type": "QuantitativeValue",
+      maxValue: deliveryTiming.handlingMaxBusinessDays,
+      minValue: deliveryTiming.handlingMinBusinessDays,
+      unitCode: "DAY",
+    },
+  };
+  const transitTime = {
+    "@type": "ServicePeriod",
+    businessDays,
+    duration: {
+      "@type": "QuantitativeValue",
+      maxValue: deliveryTiming.transitMaxBusinessDays,
+      minValue: deliveryTiming.transitMinBusinessDays,
+      unitCode: "DAY",
+    },
   };
   const shippingConditions = hasFreeShippingThreshold
     ? [
@@ -327,6 +372,7 @@ function createNationwideShippingServiceStructuredData(
             currency: "ZAR",
             value: flatRate,
           },
+          transitTime,
         },
         {
           "@type": "ShippingConditions",
@@ -341,6 +387,7 @@ function createNationwideShippingServiceStructuredData(
             currency: "ZAR",
             value: 0,
           },
+          transitTime,
         },
       ]
     : [
@@ -352,6 +399,7 @@ function createNationwideShippingServiceStructuredData(
             currency: "ZAR",
             value: flatRate,
           },
+          transitTime,
         },
       ];
   const feeDescription = hasFreeShippingThreshold
@@ -363,8 +411,9 @@ function createNationwideShippingServiceStructuredData(
   return {
     "@id": `${createMarketplaceCanonicalUrl("/")}#standard-shipping-service`,
     "@type": "ShippingService",
-    description: `Nationwide delivery within South Africa. ${feeDescription}`,
+    description: `Nationwide delivery within South Africa. ${deliveryTimingDescription} ${feeDescription}`,
     fulfillmentType: "https://schema.org/FulfillmentTypeDelivery",
+    handlingTime,
     name: "Standard nationwide South Africa delivery",
     shippingConditions,
     url: createMarketplaceCanonicalUrl("/lpg-delivery"),

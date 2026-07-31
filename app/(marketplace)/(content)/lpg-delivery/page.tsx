@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
 
 import { LocalDeliveryPage } from "@/src/modules/marketplace/content/local-delivery-page";
+import { getPublicDeliveryTimingDescription } from "@/src/modules/marketplace/public-delivery-copy";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return getStaticPageMetadata("lpg-delivery");
+  const settings = await getMarketplaceSettings();
+
+  return getStaticPageMetadata("lpg-delivery", {
+    description: `Order LPG online for eligible South African addresses. ${getPublicDeliveryTimingDescription(settings)} Checkout confirms delivery availability and fees.`,
+  });
 }
 
 export default function LocalDeliveryRoute() {

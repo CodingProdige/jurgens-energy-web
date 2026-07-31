@@ -624,6 +624,34 @@
       "when": 1787047200000,
       "tag": "0088_google_places",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1787133600000,
+      "tag": "0089_video_preview_renditions",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1787220000000,
+      "tag": "0090_crisp_image_renditions",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1787306400000,
+      "tag": "0091_delivery_timing_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1787392800000,
+      "tag": "0092_product_customer_reviews",
+      "breakpoints": true
     }
   ]
 }

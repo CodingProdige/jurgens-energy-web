@@ -51,6 +51,8 @@ export type GoogleMerchantFeedItem = {
   itemGroupTitle: string | null;
   includedDestinations: GoogleMerchantDestination[];
   link: string;
+  maxHandlingTime: number;
+  minHandlingTime: number;
   mpn: string | null;
   price: string;
   productType: string | null;
@@ -279,6 +281,8 @@ export async function getGoogleMerchantFeedItems() {
           : null,
         includedDestinations: destinations.included,
         link: link.toString(),
+        maxHandlingTime: settings.shippingHandlingMaxBusinessDays,
+        minHandlingTime: settings.shippingHandlingMinBusinessDays,
         mpn,
         price: formatGooglePrice(isOnSale ? compareAtPrice : currentPrice),
         productType: row.categoryPath
@@ -343,6 +347,8 @@ function renderGoogleMerchantFeedItem(item: GoogleMerchantFeedItem) {
         `      <g:excluded_destination>${destination}</g:excluded_destination>`,
     ),
     `      <g:shipping_label>${escapeXml(item.shippingLabel)}</g:shipping_label>`,
+    `      <g:min_handling_time>${item.minHandlingTime}</g:min_handling_time>`,
+    `      <g:max_handling_time>${item.maxHandlingTime}</g:max_handling_time>`,
     `      <g:custom_label_0>${escapeXml(item.customLabel0)}</g:custom_label_0>`,
     ...(item.returnPolicyLabel
       ? [

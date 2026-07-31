@@ -362,6 +362,18 @@ function SettingsSection({
           shippingEnabled={settings.shippingEnabled}
           shippingFlatRate={settings.shippingFlatRate}
           shippingFreeOverAmount={settings.shippingFreeOverAmount}
+          shippingHandlingMaxBusinessDays={
+            settings.shippingHandlingMaxBusinessDays
+          }
+          shippingHandlingMinBusinessDays={
+            settings.shippingHandlingMinBusinessDays
+          }
+          shippingTransitMaxBusinessDays={
+            settings.shippingTransitMaxBusinessDays
+          }
+          shippingTransitMinBusinessDays={
+            settings.shippingTransitMinBusinessDays
+          }
         />
       </DashboardPanel>
     );

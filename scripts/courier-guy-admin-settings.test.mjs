@@ -20,6 +20,13 @@ const settingsSource = readFileSync(
   new URL("../src/modules/marketplace/settings.ts", import.meta.url),
   "utf8",
 );
+const actionsSource = readFileSync(
+  new URL(
+    "../app/(admin)/admin/(dashboard)/settings/platform/actions.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 function sourceBetween(source, start, end) {
   const startIndex = source.indexOf(start);
@@ -144,6 +151,84 @@ test("secret visibility toggles the populated input between password and text", 
   assert.ok(
     secretInput.includes(
       "onClick={()=>setIsVisible((current)=>!current)}",
+    ),
+  );
+});
+
+test("delivery timing settings persist through the shipping admin contract", () => {
+  const shippingSection = withoutWhitespace(
+    sourceBetween(
+      pageSource,
+      'if (section === "shipping")',
+      'if (section === "whatsapp-ordering")',
+    ),
+  );
+  const shippingForm = withoutWhitespace(
+    sourceBetween(
+      formSource,
+      "type NationwideShippingSettingsFormProps",
+      "function JurgensDeliveryZoneDialog",
+    ),
+  );
+  const shippingAction = withoutWhitespace(
+    sourceBetween(
+      actionsSource,
+      "const shippingSettingsBaseSchema",
+      "const whatsappOptionalTimeSchema",
+    ),
+  );
+  const shippingSubmit = withoutWhitespace(
+    sourceBetween(
+      actionsSource,
+      "export async function updateShippingIntegrationSettings",
+      "export async function updateCourierGuyCredentialSettings",
+    ),
+  );
+  const timingDefaults = {
+    shippingHandlingMaxBusinessDays: 1,
+    shippingHandlingMinBusinessDays: 0,
+    shippingTransitMaxBusinessDays: 3,
+    shippingTransitMinBusinessDays: 1,
+  };
+  const normalizedSettings = withoutWhitespace(settingsSource);
+
+  for (const [field, defaultValue] of Object.entries(timingDefaults)) {
+    assert.ok(
+      normalizedSettings.includes(`${field}:${defaultValue},`),
+      `${field} must have its delivery-policy default`,
+    );
+    assert.ok(
+      normalizedSettings.includes(`${field}:marketplaceSettings.${field}`),
+      `${field} must load from persisted marketplace settings`,
+    );
+    assert.ok(
+      shippingSection.includes(`${field}={settings.${field}}`),
+      `${field} must be passed to the shipping form`,
+    );
+    assert.ok(
+      shippingForm.includes(`${field}:number;`),
+      `${field} must be accepted by the shipping form`,
+    );
+    assert.ok(
+      shippingForm.includes(`name="${field}"`),
+      `${field} must have a submitted number input`,
+    );
+    assert.ok(
+      shippingSubmit.includes(`formData.get("${field}")`),
+      `${field} must be read by the shipping action`,
+    );
+  }
+
+  assert.ok(shippingAction.includes(".int().min(0).max(30)"));
+  assert.ok(shippingAction.includes(".int().min(0).max(60)"));
+  assert.ok(
+    shippingAction.includes(
+      "shippingHandlingMinBusinessDays<=settings.shippingHandlingMaxBusinessDays",
+    ),
+  );
+  assert.ok(
+    shippingAction.includes(
+      "shippingTransitMinBusinessDays<=settings.shippingTransitMaxBusinessDays",
     ),
   );
 });

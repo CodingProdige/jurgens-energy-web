@@ -4,7 +4,7 @@ const eligibleAddressHeroCopy =
   "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.";
 const eligibleAddressFeatureTitle = "Delivery availability";
 const eligibleAddressFeatureText =
-  "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.";
+  "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.";
 
 const legacyHeroCopyReplacements: Readonly<Record<string, string>> = {
   "Safe, certified and delivered to your home or business.":
@@ -123,5 +123,32 @@ export function replaceLegacyDefaultStorefrontClaims(
     }
 
     return section;
+  });
+}
+
+export function applyStorefrontDeliveryTiming(
+  sections: StorefrontSection[],
+  deliveryTimingDescription: string,
+) {
+  const replacementText = `${deliveryTimingDescription} Checkout confirms address eligibility.`;
+
+  return sections.map((section): StorefrontSection => {
+    if (section.type !== "feature_grid") {
+      return section;
+    }
+
+    return {
+      ...section,
+      settings: {
+        ...section.settings,
+        features: section.settings.features.map((feature) => ({
+          ...feature,
+          text:
+            feature.text === eligibleAddressFeatureText
+              ? replacementText
+              : feature.text,
+        })),
+      },
+    };
   });
 }

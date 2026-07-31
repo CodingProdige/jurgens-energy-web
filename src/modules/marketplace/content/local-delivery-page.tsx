@@ -19,8 +19,10 @@ import {
 } from "@/src/modules/marketplace/content/content-page";
 import { getMarketplaceCatalog } from "@/src/modules/marketplace/catalog";
 import {
+  formatPublicBusinessDayRange,
   getPublicDeliveryFeeDescription,
-  publicDeliveryTimingDescription,
+  getPublicDeliveryTiming,
+  getPublicDeliveryTimingDescription,
 } from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import {
@@ -30,26 +32,29 @@ import {
   MarketplaceJsonLd,
 } from "@/src/modules/marketplace/structured-data";
 
-function createDeliveryFaqItems(deliveryFeeDescription: string) {
+function createDeliveryFaqItems(
+  deliveryFeeDescription: string,
+  deliveryTimingDescription: string,
+) {
   return [
-  {
-    question: "Where does Jurgens Energy deliver?",
-    answer:
-      "Courier-eligible products can be delivered nationwide within South Africa. Products marked for Jurgens delivery require a postcode in an active Jurgens service area. Checkout confirms eligibility from the complete delivery address.",
-  },
-  {
-    question: "How long does delivery take?",
-    answer: publicDeliveryTimingDescription,
-  },
-  {
-    question: "How much does delivery cost?",
-    answer: deliveryFeeDescription,
-  },
-  {
-    question: "Can I exchange an empty LPG cylinder during delivery?",
-    answer:
-      "Yes, when the selected option supports exchanges and the empty cylinder meets the displayed size, type and condition requirements.",
-  },
+    {
+      question: "Where does Jurgens Energy deliver?",
+      answer:
+        "Courier-eligible products can be delivered nationwide within South Africa. Products marked for Jurgens delivery require a postcode in an active Jurgens service area. Checkout confirms eligibility from the complete delivery address.",
+    },
+    {
+      question: "How long does delivery take?",
+      answer: deliveryTimingDescription,
+    },
+    {
+      question: "How much does delivery cost?",
+      answer: deliveryFeeDescription,
+    },
+    {
+      question: "Can I exchange an empty LPG cylinder during delivery?",
+      answer:
+        "Yes, when the selected option supports exchanges and the empty cylinder meets the displayed size, type and condition requirements.",
+    },
   ] as const;
 }
 
@@ -66,7 +71,17 @@ export async function LocalDeliveryPage() {
     ? createMarketplaceWhatsAppHref(settings.whatsappBusinessPhoneNumber)
     : null;
   const deliveryFeeDescription = getPublicDeliveryFeeDescription(settings);
-  const deliveryFaqItems = createDeliveryFaqItems(deliveryFeeDescription);
+  const deliveryTiming = getPublicDeliveryTiming(settings);
+  const deliveryTimingDescription =
+    getPublicDeliveryTimingDescription(settings);
+  const deliveryTimingLabel = formatPublicBusinessDayRange(
+    deliveryTiming.totalMinBusinessDays,
+    deliveryTiming.totalMaxBusinessDays,
+  );
+  const deliveryFaqItems = createDeliveryFaqItems(
+    deliveryFeeDescription,
+    deliveryTimingDescription,
+  );
   const shippingStructuredData =
     createDeliveryServiceStructuredData(settings);
 
@@ -85,7 +100,7 @@ export async function LocalDeliveryPage() {
 
       <ContentHero
         breadcrumbLabel="LPG delivery"
-        description="Shop eligible LPG cylinders, exchange options and gas accessories online. Courier-eligible goods can ship nationwide within South Africa; Jurgens-delivered products are confirmed from the delivery postcode at checkout. Transit time depends on the destination and delivery service."
+        description={`Shop eligible LPG cylinders, exchange options and gas accessories online. Courier-eligible goods can ship nationwide within South Africa; Jurgens-delivered products are confirmed from the delivery postcode at checkout. ${deliveryTimingDescription}`}
         eyebrow="South Africa delivery"
         icon={TruckIcon}
         title="South African delivery, confirmed at checkout."
@@ -110,8 +125,7 @@ export async function LocalDeliveryPage() {
               payment.
             </NumberedStep>
             <NumberedStep number="03" title="Receive your order">
-              Handling normally takes 0–1 business day. Transit time and tracking
-              depend on the destination and delivery service.
+              {deliveryTimingDescription}
             </NumberedStep>
           </div>
         </section>
@@ -124,9 +138,9 @@ export async function LocalDeliveryPage() {
               title: "South Africa coverage",
             },
             {
-              copy: "Handling normally takes 0–1 business day after payment confirmation. Transit time depends on the destination and delivery service.",
+              copy: deliveryTimingDescription,
               icon: Clock3Icon,
-              title: "Service-based timing",
+              title: deliveryTimingLabel,
             },
             {
               copy: "Exchange pricing is shown only when the required empty-cylinder handover is supported.",

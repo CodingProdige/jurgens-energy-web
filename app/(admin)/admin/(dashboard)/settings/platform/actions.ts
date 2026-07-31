@@ -419,7 +419,7 @@ export async function updateChatGptIntegrationSettings(
 
 const mediaSettingsSchema = z.object({
   freeStorageQuotaMb: z.coerce.number().int().min(50).max(102400),
-  imageCompressionQuality: z.coerce.number().int().min(40).max(92),
+  imageCompressionQuality: z.coerce.number().int().min(70).max(100),
   maxImageWidth: z.coerce.number().int().min(800).max(5000),
   maxUploadFileMb: z.coerce.number().int().min(1).max(100),
   maxVideoUploadFileMb: z.coerce.number().int().min(10).max(2048),
@@ -518,7 +518,7 @@ export async function updatePayFastPaymentSettings(
   return result;
 }
 
-const shippingSettingsSchema = z.object({
+const shippingSettingsBaseSchema = z.object({
   courierGuyDefaultServiceCode: z
     .string()
     .trim()
@@ -603,9 +603,35 @@ const shippingSettingsSchema = z.object({
       value === "" || value === null || value === undefined ? null : value,
     z.coerce.number().finite().positive().max(1_000_000).nullable(),
   ),
+  shippingHandlingMaxBusinessDays: z.coerce.number().int().min(0).max(30),
+  shippingHandlingMinBusinessDays: z.coerce.number().int().min(0).max(30),
+  shippingTransitMaxBusinessDays: z.coerce.number().int().min(0).max(60),
+  shippingTransitMinBusinessDays: z.coerce.number().int().min(0).max(60),
 });
 
-const courierGuyCredentialSettingsSchema = shippingSettingsSchema.pick({
+const shippingSettingsSchema = shippingSettingsBaseSchema
+  .refine(
+    (settings) =>
+      settings.shippingHandlingMinBusinessDays <=
+      settings.shippingHandlingMaxBusinessDays,
+    {
+      message:
+        "Handling minimum business days cannot exceed the handling maximum.",
+      path: ["shippingHandlingMaxBusinessDays"],
+    },
+  )
+  .refine(
+    (settings) =>
+      settings.shippingTransitMinBusinessDays <=
+      settings.shippingTransitMaxBusinessDays,
+    {
+      message:
+        "Transit minimum business days cannot exceed the transit maximum.",
+      path: ["shippingTransitMaxBusinessDays"],
+    },
+  );
+
+const courierGuyCredentialSettingsSchema = shippingSettingsBaseSchema.pick({
   courierGuyLiveAccountCode: true,
   courierGuyLiveApiKey: true,
   courierGuyMode: true,
@@ -873,6 +899,14 @@ export async function updateShippingIntegrationSettings(
     shippingEnabled: formData.get("shippingEnabled") === "on",
     shippingFlatRate: formData.get("shippingFlatRate"),
     shippingFreeOverAmount: formData.get("shippingFreeOverAmount"),
+    shippingHandlingMaxBusinessDays:
+      formData.get("shippingHandlingMaxBusinessDays") ?? "1",
+    shippingHandlingMinBusinessDays:
+      formData.get("shippingHandlingMinBusinessDays") ?? "0",
+    shippingTransitMaxBusinessDays:
+      formData.get("shippingTransitMaxBusinessDays") ?? "3",
+    shippingTransitMinBusinessDays:
+      formData.get("shippingTransitMinBusinessDays") ?? "1",
   });
 
   if (!parsed.success) {
@@ -896,6 +930,8 @@ export async function updateShippingIntegrationSettings(
   revalidatePath("/faq");
   revalidatePath("/feeds/google-merchant.xml");
   revalidatePath("/lpg-delivery");
+  revalidatePath("/products");
+  revalidatePath("/products/[slug]", "page");
   revalidatePath("/settings/platform");
 
   return result;

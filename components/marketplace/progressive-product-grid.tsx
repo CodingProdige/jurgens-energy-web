@@ -238,7 +238,7 @@ export function ProgressiveProductGrid({
 
   return (
     <div aria-busy={isLoading} className="min-w-0">
-      <section className="grid w-full min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-1.5 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+      <section className="grid w-full min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] items-stretch gap-1.5 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
         {products.map((product) => (
           <MarketplaceProductCard key={product.id} product={product} />
         ))}

@@ -157,6 +157,7 @@ export async function getCheckoutDeliveryQuotes(
         ...toProviderAddress(parsed.deliveryAddress),
         country: "ZA",
       },
+      deliveryInformation: evaluation.deliveryInformation,
       items: cart.items.map((item) => ({
         description: `${item.productTitle} - ${item.variantTitle}`,
         fulfillmentMode: getCheckoutFulfillmentProvider(item),

@@ -4,7 +4,10 @@ import {
   createFaqStructuredDataItems,
   FaqPage,
 } from "@/src/modules/marketplace/content/faq-page";
-import { getPublicDeliveryFeeDescription } from "@/src/modules/marketplace/public-delivery-copy";
+import {
+  getPublicDeliveryFeeDescription,
+  getPublicDeliveryTimingDescription,
+} from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 import {
@@ -18,16 +21,20 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function FaqRoute() {
-  const deliveryFeeDescription = getPublicDeliveryFeeDescription(
-    await getMarketplaceSettings(),
-  );
+  const settings = await getMarketplaceSettings();
+  const deliveryFeeDescription = getPublicDeliveryFeeDescription(settings);
+  const deliveryTimingDescription =
+    getPublicDeliveryTimingDescription(settings);
 
   return (
     <>
       <MarketplaceJsonLd
         data={[
           createFaqStructuredData(
-            createFaqStructuredDataItems(deliveryFeeDescription),
+            createFaqStructuredDataItems(
+              deliveryFeeDescription,
+              deliveryTimingDescription,
+            ),
           ),
           createBreadcrumbStructuredData([
             { name: "Home", path: "/" },
@@ -35,7 +42,10 @@ export default async function FaqRoute() {
           ]),
         ]}
       />
-      <FaqPage deliveryFeeDescription={deliveryFeeDescription} />
+      <FaqPage
+        deliveryFeeDescription={deliveryFeeDescription}
+        deliveryTimingDescription={deliveryTimingDescription}
+      />
     </>
   );
 }

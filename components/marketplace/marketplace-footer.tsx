@@ -24,32 +24,38 @@ import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { getMarketplaceShopMenuData } from "@/src/modules/marketplace/catalog";
 import { policyLinks } from "@/src/modules/marketplace/policies/links";
+import { getPublicDeliveryTimingDescription } from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { findShopMenuCategory } from "@/src/modules/marketplace/shop-menu-categories";
 
-const footerServices = [
-  {
-    description:
-      "Availability is confirmed at checkout; transit timing depends on the delivery service.",
-    icon: TruckIcon,
-    title: "Delivery Availability",
-  },
-  {
-    description: "Eligibility and cylinder handover checks apply where required.",
-    icon: ShieldCheckIcon,
-    title: "Safety-First Handling",
-  },
-  {
-    description: "Clear payment, invoice and delivery status updates.",
-    icon: UsersIcon,
-    title: "Clear Order Updates",
-  },
-  {
-    description: "We're here to help before, during and after delivery.",
-    icon: HeadphonesIcon,
-    title: "Customer Support",
-  },
-] as const;
+function createFooterServices(deliveryTimingDescription: string) {
+  const eligibleDeliveryTimingDescription =
+    deliveryTimingDescription.replace(/^Delivery/, "Eligible delivery");
+
+  return [
+    {
+      description: eligibleDeliveryTimingDescription,
+      icon: TruckIcon,
+      title: "Nationwide Delivery",
+    },
+    {
+      description:
+        "Eligibility and cylinder handover checks apply where required.",
+      icon: ShieldCheckIcon,
+      title: "Safety-First Handling",
+    },
+    {
+      description: "Clear payment, invoice and delivery status updates.",
+      icon: UsersIcon,
+      title: "Clear Order Updates",
+    },
+    {
+      description: "We're here to help before, during and after delivery.",
+      icon: HeadphonesIcon,
+      title: "Customer Support",
+    },
+  ] as const;
+}
 
 const footerPolicyLinks = policyLinks.map(
   ({ href, label }) => [label, href] as const,
@@ -87,6 +93,9 @@ export async function MarketplaceFooter() {
       category.slug.toLowerCase().includes("accessor"),
   );
   const whatsappUrl = createWhatsappUrl(support.whatsappPhone);
+  const footerServices = createFooterServices(
+    getPublicDeliveryTimingDescription(settings),
+  );
   const socialLinks = [
     settings.facebookUrl
       ? { href: settings.facebookUrl, icon: FacebookMark, label: "Facebook" }

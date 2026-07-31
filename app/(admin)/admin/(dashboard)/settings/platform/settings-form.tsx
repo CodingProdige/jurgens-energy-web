@@ -1322,6 +1322,10 @@ export function MediaStorageSettingsForm({
             max={5000}
             defaultValue={maxImageWidth}
           />
+          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            Images retain their proportions and are only reduced when wider
+            than this. 2560 px supports crisp high-density product views.
+          </p>
         </div>
 
         <div className="grid gap-2">
@@ -1347,13 +1351,14 @@ export function MediaStorageSettingsForm({
             id="imageCompressionQuality"
             name="imageCompressionQuality"
             type="number"
-            min={40}
-            max={92}
+            min={70}
+            max={100}
             defaultValue={imageCompressionQuality}
           />
           <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-            Images are converted to WebP, resized, stripped of metadata, and
-            compressed at this quality.
+            Images are converted to high-quality WebP. Use 90 for crisp product
+            detail while keeping files practical; this applies to future
+            uploads.
           </p>
         </div>
 
@@ -2740,7 +2745,49 @@ type NationwideShippingSettingsFormProps = {
   shippingEnabled: boolean;
   shippingFlatRate: number;
   shippingFreeOverAmount: number | null;
+  shippingHandlingMaxBusinessDays: number;
+  shippingHandlingMinBusinessDays: number;
+  shippingTransitMaxBusinessDays: number;
+  shippingTransitMinBusinessDays: number;
 };
+
+function getDeliveryTimingPreview({
+  handlingMaximum,
+  handlingMinimum,
+  transitMaximum,
+  transitMinimum,
+}: {
+  handlingMaximum: string;
+  handlingMinimum: string;
+  transitMaximum: string;
+  transitMinimum: string;
+}) {
+  const rawValues = [
+    handlingMinimum,
+    handlingMaximum,
+    transitMinimum,
+    transitMaximum,
+  ];
+  const values = rawValues.map(Number);
+
+  if (
+    rawValues.some((value) => value.trim() === "") ||
+    values.some((value) => !Number.isInteger(value) || value < 0) ||
+    values[0]! > values[1]! ||
+    values[2]! > values[3]!
+  ) {
+    return null;
+  }
+
+  const minimum = values[0]! + values[2]!;
+  const maximum = values[1]! + values[3]!;
+  const range =
+    minimum === maximum
+      ? `${minimum} business ${minimum === 1 ? "day" : "days"}`
+      : `${minimum}–${maximum} business days`;
+
+  return `${range} after payment confirmation.`;
+}
 
 export function NationwideShippingSettingsForm({
   courierGuyDefaultServiceCode,
@@ -2764,6 +2811,10 @@ export function NationwideShippingSettingsForm({
   shippingEnabled,
   shippingFlatRate,
   shippingFreeOverAmount,
+  shippingHandlingMaxBusinessDays,
+  shippingHandlingMinBusinessDays,
+  shippingTransitMaxBusinessDays,
+  shippingTransitMinBusinessDays,
 }: NationwideShippingSettingsFormProps) {
   const [shippingEnabledValue, setShippingEnabledValue] =
     useState(shippingEnabled);
@@ -2772,6 +2823,22 @@ export function NationwideShippingSettingsForm({
   );
   const [shippingFreeOverAmountValue, setShippingFreeOverAmountValue] =
     useState(shippingFreeOverAmount === null ? "" : String(shippingFreeOverAmount));
+  const [
+    shippingHandlingMinBusinessDaysValue,
+    setShippingHandlingMinBusinessDaysValue,
+  ] = useState(String(shippingHandlingMinBusinessDays));
+  const [
+    shippingHandlingMaxBusinessDaysValue,
+    setShippingHandlingMaxBusinessDaysValue,
+  ] = useState(String(shippingHandlingMaxBusinessDays));
+  const [
+    shippingTransitMinBusinessDaysValue,
+    setShippingTransitMinBusinessDaysValue,
+  ] = useState(String(shippingTransitMinBusinessDays));
+  const [
+    shippingTransitMaxBusinessDaysValue,
+    setShippingTransitMaxBusinessDaysValue,
+  ] = useState(String(shippingTransitMaxBusinessDays));
   const [jurgensDeliveryCutoffTimeValue, setJurgensDeliveryCutoffTimeValue] =
     useState(jurgensDeliveryCutoffTime);
   const [courierGuyEnabledValue, setCourierGuyEnabledValue] =
@@ -2818,6 +2885,12 @@ export function NationwideShippingSettingsForm({
     credentialState.courierGuyCredentials?.hasWebhookToken ??
     state.courierGuyCredentials?.hasWebhookToken ??
     hasCourierGuyWebhookToken;
+  const deliveryTimingPreview = getDeliveryTimingPreview({
+    handlingMaximum: shippingHandlingMaxBusinessDaysValue,
+    handlingMinimum: shippingHandlingMinBusinessDaysValue,
+    transitMaximum: shippingTransitMaxBusinessDaysValue,
+    transitMinimum: shippingTransitMinBusinessDaysValue,
+  });
   const courierGuyWebhookSubscriptionUrl = (() => {
     const url = new URL(courierGuyWebhookUrl);
 
@@ -2927,13 +3000,105 @@ export function NationwideShippingSettingsForm({
             />
           </div>
 
+          <fieldset className="grid gap-3 rounded-lg border border-zinc-200 p-3 dark:border-white/10">
+            <legend className="px-1 text-sm font-semibold text-zinc-950 dark:text-white">
+              Delivery timing (business days)
+            </legend>
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Handling covers payment confirmation through dispatch or courier
+              handoff. Transit covers handoff through delivery to the customer.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-2">
+                <Label htmlFor="shippingHandlingMinBusinessDays">
+                  Handling minimum
+                </Label>
+                <Input
+                  id="shippingHandlingMinBusinessDays"
+                  max={30}
+                  min={0}
+                  name="shippingHandlingMinBusinessDays"
+                  onChange={(event) =>
+                    setShippingHandlingMinBusinessDaysValue(event.target.value)
+                  }
+                  required
+                  step={1}
+                  type="number"
+                  value={shippingHandlingMinBusinessDaysValue}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="shippingHandlingMaxBusinessDays">
+                  Handling maximum
+                </Label>
+                <Input
+                  id="shippingHandlingMaxBusinessDays"
+                  max={30}
+                  min={0}
+                  name="shippingHandlingMaxBusinessDays"
+                  onChange={(event) =>
+                    setShippingHandlingMaxBusinessDaysValue(event.target.value)
+                  }
+                  required
+                  step={1}
+                  type="number"
+                  value={shippingHandlingMaxBusinessDaysValue}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="shippingTransitMinBusinessDays">
+                  Transit minimum
+                </Label>
+                <Input
+                  id="shippingTransitMinBusinessDays"
+                  max={60}
+                  min={0}
+                  name="shippingTransitMinBusinessDays"
+                  onChange={(event) =>
+                    setShippingTransitMinBusinessDaysValue(event.target.value)
+                  }
+                  required
+                  step={1}
+                  type="number"
+                  value={shippingTransitMinBusinessDaysValue}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="shippingTransitMaxBusinessDays">
+                  Transit maximum
+                </Label>
+                <Input
+                  id="shippingTransitMaxBusinessDays"
+                  max={60}
+                  min={0}
+                  name="shippingTransitMaxBusinessDays"
+                  onChange={(event) =>
+                    setShippingTransitMaxBusinessDaysValue(event.target.value)
+                  }
+                  required
+                  step={1}
+                  type="number"
+                  value={shippingTransitMaxBusinessDaysValue}
+                />
+              </div>
+            </div>
+            <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <span className="font-bold">Public delivery window:</span>{" "}
+              {deliveryTimingPreview ??
+                "Enter valid minimum and maximum ranges to preview the customer promise."}
+            </div>
+          </fieldset>
+
           <Alert>
             <TriangleAlertIcon />
             <AlertTitle>Keep Google Merchant Center in sync</AlertTitle>
             <AlertDescription>
               Configure one account-level Standard shipping service for South
               Africa with this same flat fee and free-shipping threshold. Do
-              not enable carrier-calculated rates—the checkout amount is the
+              not enable carrier-calculated rates. The product feed publishes
+              the saved handling range. Keep the account-level handling fallback
+              and transit range equal to the values above; their combined range
+              is the customer delivery promise. The checkout amount is the
               customer-facing source of truth.
             </AlertDescription>
           </Alert>

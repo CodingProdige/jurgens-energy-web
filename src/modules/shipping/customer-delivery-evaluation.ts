@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ValidatedCartItem } from "@/src/modules/cart/contracts";
 import type { CheckoutDeliveryAddress } from "@/src/modules/checkout/contracts";
+import { getPublicDeliveryTimingDescription } from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import {
   countCourierGuyUnits,
@@ -20,6 +21,7 @@ import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens
 export type CustomerDeliveryEvaluation =
   | {
       eligible: true;
+      deliveryInformation: string;
       hasCourierItems: boolean;
       hasJurgensItems: boolean;
       jurgensZoneId: string | null;
@@ -159,6 +161,7 @@ export async function evaluateCustomerDelivery({
   try {
     return {
       eligible: true,
+      deliveryInformation: getPublicDeliveryTimingDescription(settings),
       hasCourierItems,
       hasJurgensItems,
       jurgensZoneId,

@@ -26,12 +26,13 @@ import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import {
   getMarketplaceSettings,
   getOpenAiIntegrationConfig,
+  type MarketplaceSettings,
 } from "@/src/modules/marketplace/settings";
 import {
-  deliveryInformation,
+  createDeliveryInformationDocument,
+  createTermsAndConditionsDocument,
   privacyPolicy,
   returnsAndRefundsPolicy,
-  termsAndConditions,
   type PolicyDocument,
 } from "@/src/modules/marketplace/policies/documents";
 import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
@@ -88,6 +89,10 @@ import {
   matchesWhatsappPendingOfferContext,
 } from "@/src/modules/whatsapp-ordering/pending-offer-follow-up";
 import type { LocalCartInput } from "@/src/modules/cart";
+import {
+  getPublicDeliveryFeeDescription,
+  getPublicDeliveryTimingDescription,
+} from "@/src/modules/marketplace/public-delivery-copy";
 
 const zarCurrencyContext = {
   country: "ZA",
@@ -98,11 +103,6 @@ const zarCurrencyContext = {
 } as const;
 const draftTtlMs = 60 * 60 * 1000;
 const publicProductStatuses = new Set(["active", "live"]);
-const southAfricaDeliveryTimingFacts = [
-  "Handling takes 0–1 business day after payment confirmation.",
-  "The order cutoff is 2:00 PM SAST; orders placed after the cutoff start processing on the next business day.",
-  "Transit time after dispatch depends on the destination, parcel and delivery service. Any available estimate is communicated in the order updates or tracking details.",
-] as const;
 const southAfricaDeliveryFacts = [
   "Jurgens Energy is an online store.",
   "Courier-eligible products can be delivered nationwide within South Africa.",
@@ -112,6 +112,13 @@ const southAfricaDeliveryFacts = [
   "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
 ] as const;
 const checkoutLinkExpiryLabel = "1 hour";
+
+function getSouthAfricaDeliveryTimingFacts(settings: MarketplaceSettings) {
+  return [
+    getPublicDeliveryTimingDescription(settings),
+    "The order cutoff is 2:00 PM SAST; orders placed after the cutoff start processing on the next business day.",
+  ] as const;
+}
 
 function formatZarAmount(value: number) {
   return new Intl.NumberFormat("en-ZA", {
@@ -2093,18 +2100,22 @@ async function answerOrderStatus({
 }
 
 async function answerDeliveryAreas() {
+  const settings = await getMarketplaceSettings();
+
   return [
     "Delivery is available to eligible addresses within South Africa.",
-    ...southAfricaDeliveryTimingFacts,
+    ...getSouthAfricaDeliveryTimingFacts(settings),
     "Exact product eligibility and delivery fees are confirmed at checkout from the complete delivery address.",
   ].join("\n");
 }
 
 async function answerShippingRates() {
+  const settings = await getMarketplaceSettings();
+
   return [
     "Delivery fees are shown at checkout after you enter the complete South African delivery address.",
     "Delivery is available to eligible addresses within South Africa.",
-    ...southAfricaDeliveryTimingFacts,
+    ...getSouthAfricaDeliveryTimingFacts(settings),
   ].join("\n");
 }
 
@@ -2910,10 +2921,11 @@ async function checkJurgensDeliveryInquiry({
   const postalCode = inquiry.postalCode ?? inquiry.address?.postalCode ?? null;
 
   if (!postalCode) {
+    const settings = await getMarketplaceSettings();
     const reply = [
       `Delivery for ${itemLabel} is confirmed at checkout from the complete South African delivery address.`,
       "Delivery is available to eligible addresses within South Africa.",
-      ...southAfricaDeliveryTimingFacts,
+      ...getSouthAfricaDeliveryTimingFacts(settings),
       "The delivery fee will be shown before payment.",
       nextStep,
     ]
@@ -2948,10 +2960,11 @@ async function checkJurgensDeliveryInquiry({
     });
   }
   if (availability.eligible) {
+    const settings = await getMarketplaceSettings();
     const reply = [
       `Yes — delivery is available for ${itemLabel} to the address you supplied.`,
       "Delivery is available to eligible addresses within South Africa.",
-      ...southAfricaDeliveryTimingFacts,
+      ...getSouthAfricaDeliveryTimingFacts(settings),
       "The delivery fee will be shown at checkout.",
       nextStep,
     ]
@@ -3101,6 +3114,7 @@ async function checkNationwideCourierDeliveryInquiry({
       : `Free shipping currently applies from a qualifying product subtotal of ${formatZarAmount(price.freeOverAmount)}.`;
   const reply = [
     `Yes — ${itemLabel} is courier-eligible for nationwide delivery to the South African address you supplied.`,
+    ...getSouthAfricaDeliveryTimingFacts(settings),
     "One configured VAT-inclusive flat delivery fee applies per eligible order.",
     priceMessage,
     thresholdMessage,
@@ -3598,8 +3612,11 @@ async function handleDeliveryInquiryMessage(
   return null;
 }
 
-async function getWhatsappKnowledgeFacts(question: string) {
-  const [support, catalogRows] = await Promise.all([
+async function getWhatsappKnowledgeFacts(
+  question: string,
+  existingSettings?: MarketplaceSettings,
+) {
+  const [support, catalogRows, settings] = await Promise.all([
     getCustomerSupportContactDetails(),
     db
       .select({
@@ -3627,11 +3644,13 @@ async function getWhatsappKnowledgeFacts(question: string) {
       )
       .orderBy(asc(products.title), asc(productVariants.price))
       .limit(28),
+    existingSettings ?? getMarketplaceSettings(),
   ]);
   const publicName = support.businessName;
   const facts = [
     `${publicName} is a South African online store for LPG cylinders, eligible cylinder exchanges, and gas-related products.`,
     ...southAfricaDeliveryFacts,
+    ...getSouthAfricaDeliveryTimingFacts(settings),
     support.legalName && support.legalName !== publicName
       ? `${publicName} is the trading name of ${support.legalName}.`
       : null,
@@ -3659,7 +3678,7 @@ async function getWhatsappKnowledgeFacts(question: string) {
     `Shipping and delivery policy: ${createStoreUrl("/delivery-information")}`,
     `Frequently asked questions: ${createStoreUrl("/faq")}`,
     `Returns and refunds policy: ${createStoreUrl("/returns-and-refunds")}`,
-    ...getRelevantPolicyFacts(question),
+    ...getRelevantPolicyFacts(question, settings),
     ...catalogRows.map((row) => {
       const variantLabel =
         row.variantTitle && row.variantTitle !== row.productTitle
@@ -3676,12 +3695,20 @@ async function getWhatsappKnowledgeFacts(question: string) {
   return facts.slice(0, 40);
 }
 
-function getRelevantPolicyFacts(question: string) {
+function getRelevantPolicyFacts(
+  question: string,
+  settings: MarketplaceSettings,
+) {
   const normalizedQuestion = normalizeText(question);
   const relevantDocuments: PolicyDocument[] = [];
 
   if (/\b(?:deliver|delivery|shipping|courier|handover|exchange)\b/.test(normalizedQuestion)) {
-    relevantDocuments.push(deliveryInformation);
+    relevantDocuments.push(
+      createDeliveryInformationDocument(
+        getPublicDeliveryFeeDescription(settings),
+        settings,
+      ),
+    );
   }
 
   if (/\b(?:return|refund|cancel|cancellation|damaged|defective)\b/.test(normalizedQuestion)) {
@@ -3693,7 +3720,7 @@ function getRelevantPolicyFacts(question: string) {
   }
 
   if (/\b(?:terms|condition|legal|agreement)\b/.test(normalizedQuestion)) {
-    relevantDocuments.push(termsAndConditions);
+    relevantDocuments.push(createTermsAndConditionsDocument(settings));
   }
 
   return relevantDocuments.flatMap((document) => [
@@ -3738,8 +3765,9 @@ async function answerSupportQuestion({
       return textReply(`You can create a Jurgens Energy online-store account here: ${createStoreUrl("/register")}. If you already have one, sign in here: ${createStoreUrl("/sign-in")}.`);
     case "business_info":
       {
+        const settings = await getMarketplaceSettings();
         const answer = await answerWhatsappQuestionWithAi({
-          knowledgeFacts: await getWhatsappKnowledgeFacts(question),
+          knowledgeFacts: await getWhatsappKnowledgeFacts(question, settings),
           question,
           recentTurns,
         });
@@ -3749,7 +3777,7 @@ async function answerSupportQuestion({
           : textReply([
               "Jurgens Energy is a South African online store for LPG cylinders, eligible cylinder exchanges and gas-related products.",
               "Delivery is available to eligible addresses within South Africa.",
-              ...southAfricaDeliveryTimingFacts,
+              ...getSouthAfricaDeliveryTimingFacts(settings),
               "Delivery fees are shown at checkout.",
             ].join(" "));
       }
@@ -3766,8 +3794,9 @@ async function answerSupportQuestion({
     case "unknown":
     default:
       {
+        const settings = await getMarketplaceSettings();
         const answer = await answerWhatsappQuestionWithAi({
-          knowledgeFacts: await getWhatsappKnowledgeFacts(question),
+          knowledgeFacts: await getWhatsappKnowledgeFacts(question, settings),
           question,
           recentTurns,
         });
@@ -3908,7 +3937,9 @@ function withWhatsappMemory({
   };
 }
 
-async function checkDeliveryAreaForAgent(): Promise<WhatsappAgentAdapterResult> {
+async function checkDeliveryAreaForAgent(
+  settings: MarketplaceSettings,
+): Promise<WhatsappAgentAdapterResult> {
   return createWhatsappAgentAdapterResult({
     data: {
       countryCode: "ZA",
@@ -3916,6 +3947,7 @@ async function checkDeliveryAreaForAgent(): Promise<WhatsappAgentAdapterResult> 
     },
     facts: [
       ...southAfricaDeliveryFacts,
+      ...getSouthAfricaDeliveryTimingFacts(settings),
       "Exact product eligibility is confirmed at checkout from the customer's complete South African delivery address.",
     ],
     status: "checkout_confirmation_required",
@@ -4226,7 +4258,10 @@ async function tryProcessWhatsappMessageWithAgent({
   provider: WhatsappProvider;
   userId: string | null;
 }): Promise<WhatsappAssistantResult | null> {
-  const openAiConfig = await getOpenAiIntegrationConfig();
+  const [openAiConfig, settings] = await Promise.all([
+    getOpenAiIntegrationConfig(),
+    getMarketplaceSettings(),
+  ]);
 
   if (!openAiConfig.isConfigured || !openAiConfig.apiKey) {
     return null;
@@ -4273,7 +4308,7 @@ async function tryProcessWhatsappMessageWithAgent({
         status: "cancelled",
       });
     },
-    checkDeliveryArea: () => checkDeliveryAreaForAgent(),
+    checkDeliveryArea: () => checkDeliveryAreaForAgent(settings),
     confirmOrderAndCreateCheckout: () =>
       confirmWhatsappOrderForAgent({
         conversationId,
@@ -4284,7 +4319,7 @@ async function tryProcessWhatsappMessageWithAgent({
       }),
     getBusinessInformation: async (question: string) =>
       createWhatsappAgentAdapterResult({
-        facts: await getWhatsappKnowledgeFacts(question),
+        facts: await getWhatsappKnowledgeFacts(question, settings),
         status: "verified",
       }),
     getLatestInvoice: async () => {

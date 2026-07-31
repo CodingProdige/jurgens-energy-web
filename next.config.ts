@@ -6,6 +6,9 @@ const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.trycloudflare.com"],
+  images: {
+    qualities: [75, 90],
+  },
   output: "standalone",
   poweredByHeader: false,
   turbopack: {

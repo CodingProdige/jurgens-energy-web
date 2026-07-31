@@ -98,7 +98,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "lpg-delivery": {
     defaultDescription:
-      "Shop LPG online for delivery to eligible South African addresses confirmed at checkout. Transit timing depends on the destination and delivery service.",
+      "Order LPG online for delivery to eligible South African addresses. Checkout confirms current delivery timing, availability, fees and exchange requirements.",
     defaultTitle: "LPG Delivery in South Africa",
     key: "lpg-delivery",
     label: "LPG delivery",
@@ -118,7 +118,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "delivery-information": {
     defaultDescription:
-      "Read our South Africa Shipping & Delivery Policy, including handling, delivery fees, address eligibility and service-dependent transit timing.",
+      "Read our South Africa Shipping & Delivery Policy for current delivery timing, fees, address eligibility, order handling and delivery support.",
     defaultTitle: "Shipping & Delivery Policy",
     key: "delivery-information",
     label: "Shipping & delivery policy",

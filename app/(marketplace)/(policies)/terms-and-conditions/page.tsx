@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 
 import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { PolicyPage } from "@/src/modules/marketplace/policies/policy-page";
-import { termsAndConditions } from "@/src/modules/marketplace/policies/documents";
+import { createTermsAndConditionsDocument } from "@/src/modules/marketplace/policies/documents";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -10,12 +11,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsAndConditionsPage() {
-  const businessIdentity = await getPublicBusinessIdentity();
+  const [businessIdentity, settings] = await Promise.all([
+    getPublicBusinessIdentity(),
+    getMarketplaceSettings(),
+  ]);
 
   return (
     <PolicyPage
       businessIdentity={businessIdentity}
-      document={termsAndConditions}
+      document={createTermsAndConditionsDocument(settings)}
     />
   );
 }

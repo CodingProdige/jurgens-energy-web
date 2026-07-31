@@ -323,7 +323,11 @@ export type MarketplaceSettings = {
   shippingEnabled: boolean;
   shippingFlatRate: number;
   shippingFreeOverAmount: number | null;
+  shippingHandlingMaxBusinessDays: number;
+  shippingHandlingMinBusinessDays: number;
   shippingMarginBps: number;
+  shippingTransitMaxBusinessDays: number;
+  shippingTransitMinBusinessDays: number;
   payfastLiveMerchantId: string | null;
   payfastMode: "live" | "sandbox";
   payfastOnsiteEnabled: boolean;
@@ -437,9 +441,9 @@ const defaultSettings: MarketplaceSettings = {
   googleTagManagerId: null,
   hasGooglePlacesApiKey: false,
   hasOpenAiApiKey: Boolean(env.OPENAI_API_KEY),
-  imageCompressionQuality: 78,
+  imageCompressionQuality: 90,
   instagramUrl: null,
-  maxImageWidth: 2000,
+  maxImageWidth: 2560,
   maxUploadFileMb: 10,
   maxVideoUploadFileMb: 100,
   maxVideoWidth: 1280,
@@ -465,7 +469,11 @@ const defaultSettings: MarketplaceSettings = {
   shippingEnabled: false,
   shippingFlatRate: 0,
   shippingFreeOverAmount: null,
+  shippingHandlingMaxBusinessDays: 1,
+  shippingHandlingMinBusinessDays: 0,
   shippingMarginBps: 0,
+  shippingTransitMaxBusinessDays: 3,
+  shippingTransitMinBusinessDays: 1,
   payfastLiveMerchantId: null,
   payfastMode: "sandbox",
   payfastOnsiteEnabled: false,
@@ -605,7 +613,15 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       shippingEnabled: marketplaceSettings.shippingEnabled,
       shippingFlatRate: marketplaceSettings.shippingFlatRate,
       shippingFreeOverAmount: marketplaceSettings.shippingFreeOverAmount,
+      shippingHandlingMaxBusinessDays:
+        marketplaceSettings.shippingHandlingMaxBusinessDays,
+      shippingHandlingMinBusinessDays:
+        marketplaceSettings.shippingHandlingMinBusinessDays,
       shippingMarginBps: marketplaceSettings.shippingMarginBps,
+      shippingTransitMaxBusinessDays:
+        marketplaceSettings.shippingTransitMaxBusinessDays,
+      shippingTransitMinBusinessDays:
+        marketplaceSettings.shippingTransitMinBusinessDays,
       jurgensDeliveryCutoffTime: marketplaceSettings.jurgensDeliveryCutoffTime,
       payfastLiveMerchantId: marketplaceSettings.payfastLiveMerchantId,
       payfastLiveMerchantKeyEncrypted:
@@ -1184,6 +1200,10 @@ export async function updateMarketplaceShippingSettings({
   shippingEnabled,
   shippingFlatRate,
   shippingFreeOverAmount,
+  shippingHandlingMaxBusinessDays,
+  shippingHandlingMinBusinessDays,
+  shippingTransitMaxBusinessDays,
+  shippingTransitMinBusinessDays,
 }: {
   actorUserId: string;
   courierGuyDefaultServiceCode?: string;
@@ -1205,6 +1225,10 @@ export async function updateMarketplaceShippingSettings({
   shippingEnabled: boolean;
   shippingFlatRate: number;
   shippingFreeOverAmount: number | null;
+  shippingHandlingMaxBusinessDays: number;
+  shippingHandlingMinBusinessDays: number;
+  shippingTransitMaxBusinessDays: number;
+  shippingTransitMinBusinessDays: number;
 }) {
   const normalizedDropoffProvider = courierGuyDropoffProvider.trim();
   const normalizedSubmittedPickupPointLabel =
@@ -1246,6 +1270,34 @@ export async function updateMarketplaceShippingSettings({
     return {
       ok: false,
       message: "Flat shipping must be between R0 and R1,000,000.",
+    };
+  }
+
+  if (
+    !Number.isInteger(shippingHandlingMinBusinessDays) ||
+    !Number.isInteger(shippingHandlingMaxBusinessDays) ||
+    shippingHandlingMinBusinessDays < 0 ||
+    shippingHandlingMaxBusinessDays > 30 ||
+    shippingHandlingMinBusinessDays > shippingHandlingMaxBusinessDays
+  ) {
+    return {
+      ok: false,
+      message:
+        "Handling time must use whole business days from 0 to 30, with the minimum no greater than the maximum.",
+    };
+  }
+
+  if (
+    !Number.isInteger(shippingTransitMinBusinessDays) ||
+    !Number.isInteger(shippingTransitMaxBusinessDays) ||
+    shippingTransitMinBusinessDays < 0 ||
+    shippingTransitMaxBusinessDays > 60 ||
+    shippingTransitMinBusinessDays > shippingTransitMaxBusinessDays
+  ) {
+    return {
+      ok: false,
+      message:
+        "Transit time must use whole business days from 0 to 60, with the minimum no greater than the maximum.",
     };
   }
 
@@ -1491,7 +1543,11 @@ export async function updateMarketplaceShippingSettings({
     shippingEnabled,
     shippingFlatRate: Number(shippingFlatRate.toFixed(2)),
     shippingFreeOverAmount: normalizedFreeShippingAmount,
+    shippingHandlingMaxBusinessDays,
+    shippingHandlingMinBusinessDays,
     shippingMarginBps: 0,
+    shippingTransitMaxBusinessDays,
+    shippingTransitMinBusinessDays,
     updatedAt: now,
   };
 
@@ -1516,6 +1572,10 @@ export async function updateMarketplaceShippingSettings({
         courierGuySandboxAccountCode: normalizedSandboxAccountCode,
         freeShippingEnabled: shippingFreeOverAmount !== null,
         shippingEnabled,
+        shippingHandlingMaxBusinessDays,
+        shippingHandlingMinBusinessDays,
+        shippingTransitMaxBusinessDays,
+        shippingTransitMinBusinessDays,
       }),
     });
   });

@@ -77,11 +77,14 @@ function ExchangeableProductCard({
       href={`/products/${product.slug}`}
       onClick={onNavigate}
     >
-      <span className="relative grid h-14 w-16 shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.08]">
+      <span
+        className="relative grid aspect-[1/1] size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.08]"
+        data-shop-menu-product-media-container=""
+      >
         {product.imageUrl ? (
           <Image
             alt=""
-            className="object-cover"
+            className="object-contain"
             fill
             sizes="64px"
             src={product.imageUrl}

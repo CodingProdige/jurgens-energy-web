@@ -12,6 +12,10 @@ import {
   orderItems,
   orders,
   payments,
+  productReviewStatuses,
+  products,
+  productVariants,
+  reviews,
   shipmentEvents,
   shipments,
   users,
@@ -36,6 +40,9 @@ export type CustomerOrderStatus =
   | "paid"
   | "pending"
   | "refunded";
+
+export type CustomerProductReviewStatus =
+  (typeof productReviewStatuses)[number];
 
 export type CustomerOrderSummary = {
   createdAt: Date;
@@ -71,14 +78,29 @@ export type CustomerOrderDetail = {
   grandTotal: number;
   id: string;
   items: Array<{
+    canReview: boolean;
     deliveryLabel: string | null;
     exchangeEmptyConfirmed: boolean;
     id: string;
     lineTotal: number;
+    productId: string;
+    productSlug: string;
+    productTitle: string;
     purchaseType: string;
     quantity: number;
+    review: {
+      body: string | null;
+      createdAt: Date;
+      id: string;
+      rating: number;
+      rejectedReason: string | null;
+      status: CustomerProductReviewStatus;
+      title: string | null;
+      updatedAt: Date;
+    } | null;
     title: string;
     unitPrice: number;
+    variantId: string;
   }>;
   orderNumber: string;
   paidAt: Date | null;
@@ -362,12 +384,18 @@ export const getCustomerOrderDetail = cache(
             deliveryLabel: orderItems.deliveryLabelSnapshot,
             exchangeEmptyConfirmed: orderItems.exchangeEmptyConfirmed,
             id: orderItems.id,
+            productId: productVariants.productId,
+            productSlug: products.slug,
+            productTitle: products.title,
             purchaseType: orderItems.purchaseType,
             quantity: orderItems.quantity,
             title: orderItems.title,
             unitPrice: orderItems.unitPrice,
+            variantId: orderItems.variantId,
           })
           .from(orderItems)
+          .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+          .innerJoin(products, eq(products.id, productVariants.productId))
           .where(eq(orderItems.orderId, order.id)),
         db
           .select({
@@ -421,7 +449,34 @@ export const getCustomerOrderDetail = cache(
             .from(shipmentEvents)
             .where(inArray(shipmentEvents.shipmentId, shipmentIds))
             .orderBy(asc(shipmentEvents.occurredAt))
-        : [];
+      : [];
+    const reviewRows = await db
+      .select({
+        body: reviews.body,
+        createdAt: reviews.createdAt,
+        id: reviews.id,
+        orderItemId: reviews.orderItemId,
+        rating: reviews.rating,
+        rejectedReason: reviews.rejectedReason,
+        status: reviews.status,
+        title: reviews.title,
+        updatedAt: reviews.updatedAt,
+      })
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.orderId, order.id),
+          eq(reviews.userId, account.id),
+        ),
+      );
+    const reviewsByOrderItemId = new Map(
+      reviewRows
+        .filter((review) => review.orderItemId)
+        .map((review) => [review.orderItemId!, review]),
+    );
+    const canReviewOrder =
+      order.status === "fulfilled" ||
+      shipmentRows.some((shipment) => shipment.status === "delivered");
     const eventsByShipmentId = new Map<
       string,
       CustomerOrderDetail["shipments"][number]["events"]
@@ -475,8 +530,10 @@ export const getCustomerOrderDetail = cache(
       id: order.id,
       items: itemRows.map((item) => ({
         ...item,
+        canReview: canReviewOrder,
         deliveryLabel: toPublicDeliveryLabel(item.deliveryLabel),
         lineTotal: toMoney(item.unitPrice) * item.quantity,
+        review: reviewsByOrderItemId.get(item.id) ?? null,
         unitPrice: toMoney(item.unitPrice),
       })),
       orderNumber: order.orderNumber,

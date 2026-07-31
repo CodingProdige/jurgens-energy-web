@@ -37,8 +37,10 @@ const storeCategories = [
 
 export function AboutPage({
   businessIdentity,
+  deliveryTimingDescription,
 }: {
   businessIdentity: PublicBusinessIdentity;
+  deliveryTimingDescription: string;
 }) {
   return (
     <article>
@@ -92,10 +94,9 @@ export function AboutPage({
               <p className="mt-1 text-[13px] leading-6 text-[#62625c] dark:text-[#bdbdb5]">
                 Jurgens Energy does not operate a customer-facing physical
                 store. Delivery is available to eligible addresses within South
-                Africa, as confirmed at checkout. Handling takes 0–1 business
-                day after payment confirmation, with a 2:00 PM SAST order
-                cut-off. Transit timing after dispatch depends on the
-                destination, parcel and delivery service.
+                Africa, as confirmed at checkout.{" "}
+                {deliveryTimingDescription} Our order cut-off is 2:00 PM
+                SAST on business days.
               </p>
             </div>
           </div>

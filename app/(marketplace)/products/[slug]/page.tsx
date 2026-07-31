@@ -11,6 +11,7 @@ import {
   ProductDetailExperience,
   type MarketplaceProductDetailView,
 } from "@/components/marketplace/product-detail-experience";
+import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { getCurrencyContext } from "@/src/modules/currency/server";
 import {
   getMarketplaceCatalog,
@@ -22,6 +23,7 @@ import {
   compactMarketplaceMetadataDescription,
   createMarketplaceDynamicPageMetadata,
 } from "@/src/modules/marketplace/dynamic-page-metadata";
+import { getPublicProductDeliveryCopy } from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import {
   createBreadcrumbStructuredData,
@@ -86,7 +88,8 @@ export default async function ProductPage({
     notFound();
   }
 
-  const [catalog, settings] = await Promise.all([
+  const [businessIdentity, catalog, settings] = await Promise.all([
+    getPublicBusinessIdentity(),
     getMarketplaceCatalog({
       currencyContext,
       limit: 48,
@@ -108,6 +111,16 @@ export default async function ProductPage({
   )
     ? requestedVariantId
     : undefined;
+  const deliveryCopy = getPublicProductDeliveryCopy({
+    fulfillmentMode: product.fulfillmentMode,
+    shippingHandlingMaxBusinessDays:
+      settings.shippingHandlingMaxBusinessDays,
+    shippingHandlingMinBusinessDays:
+      settings.shippingHandlingMinBusinessDays,
+    shippingEnabled: settings.shippingEnabled,
+    shippingTransitMaxBusinessDays: settings.shippingTransitMaxBusinessDays,
+    shippingTransitMinBusinessDays: settings.shippingTransitMinBusinessDays,
+  });
 
   return (
     <MarketplaceGate>
@@ -162,10 +175,12 @@ export default async function ProductPage({
         <ProductDetailExperience
           catalogProducts={catalog.products}
           currencyContext={currencyContext}
+          deliveryCopy={deliveryCopy}
           initialVariantId={initialVariantId}
           jurgensDeliveryCutoffTime={settings.jurgensDeliveryCutoffTime}
           product={productView}
           relatedProducts={moreInCategoryProducts}
+          sellerName={businessIdentity.tradingName}
         />
       </main>
       <MarketplaceFooter />
@@ -177,6 +192,7 @@ function toProductDetailView(
   product: MarketplaceProductDetail,
 ): MarketplaceProductDetailView {
   return {
+    averageRating: product.averageRating,
     barcode: product.barcode,
     brandId: product.brandId,
     brandName: product.brandName,
@@ -193,12 +209,19 @@ function toProductDetailView(
     imageUrls: product.imageUrls,
     inStock: product.inStock,
     isOnSale: product.isOnSale,
+    mediaItems: product.mediaItems,
     optionSchema: product.optionSchema,
     priceLabel: product.priceLabel,
+    previewVideo: product.previewVideo,
     quickAddVariantId: product.quickAddVariantId,
+    ratingSummary: product.ratingSummary,
+    reviewCount: product.reviewCount,
+    reviews: product.reviews,
     shortDescription: product.shortDescription,
     slug: product.slug,
+    soldQuantity: product.soldQuantity,
     title: product.title,
+    totalSoldQuantity: product.totalSoldQuantity,
     variantCount: product.variantCount,
     variants: product.variants,
   };

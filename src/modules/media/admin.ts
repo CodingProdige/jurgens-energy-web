@@ -28,6 +28,12 @@ import {
   updateDigitalSourceTypeXmp,
   type MediaDigitalSourceType,
 } from "@/src/modules/media/digital-source";
+import {
+  createImageRenditions,
+  defaultImageCompressionQuality,
+  defaultMaxImageWidth,
+} from "@/src/modules/media/image-renditions";
+import { buildFullLengthVideoPreviewFfmpegArgs } from "@/src/modules/media/video-preview";
 
 const acceptedImageTypes = new Set([
   "image/avif",
@@ -125,8 +131,9 @@ export async function getMediaStorageSettings(): Promise<MediaStorageSettings> {
 
   return {
     freeStorageQuotaMb: settings?.freeStorageQuotaMb ?? 512,
-    imageCompressionQuality: settings?.imageCompressionQuality ?? 78,
-    maxImageWidth: settings?.maxImageWidth ?? 2000,
+    imageCompressionQuality:
+      settings?.imageCompressionQuality ?? defaultImageCompressionQuality,
+    maxImageWidth: settings?.maxImageWidth ?? defaultMaxImageWidth,
     maxUploadFileMb: settings?.maxUploadFileMb ?? 10,
     maxVideoUploadFileMb: settings?.maxVideoUploadFileMb ?? 100,
     maxVideoWidth: settings?.maxVideoWidth ?? 1280,
@@ -175,7 +182,9 @@ export async function getScopedMediaLibrary(scope: MediaLibraryScope) {
     .limit(120);
 
   const [{ totalByteSize }] = await db
-    .select({ totalByteSize: sql<number>`coalesce(sum(${media.byteSize}), 0)` })
+    .select({
+      totalByteSize: sql<number>`coalesce(sum(${media.byteSize} + coalesce(${media.previewByteSize}, 0)), 0)`,
+    })
     .from(media)
     .where(whereClause);
 
@@ -254,8 +263,6 @@ export async function processAndStoreImageUpload(input: {
       ? extractMediaDigitalSourceType(sourceXmp)
       : input.digitalSourceType;
   const outputXmp = updateDigitalSourceTypeXmp(null, digitalSourceType);
-  const width = metadata.width ?? null;
-  const height = metadata.height ?? null;
   const outputRelativePath = createMediaRelativePath({
     mimeType: "image/webp",
     scope: input.scope,
@@ -264,27 +271,14 @@ export async function processAndStoreImageUpload(input: {
     mimeType: "image/webp",
     scope: `${input.scope}-thumbs`,
   });
-  const outputPipeline = image
-    .resize({
-      fit: "inside",
-      width: settings.maxImageWidth,
-      withoutEnlargement: true,
-    })
-    .webp({ effort: 5, quality: settings.imageCompressionQuality });
-  const thumbnailPipeline = sharp(sourceBuffer, { failOn: "none" })
-    .rotate()
-    .resize({ fit: "cover", height: 360, width: 480 })
-    .webp({ effort: 4, quality: 72 });
-
-  if (outputXmp) {
-    outputPipeline.withXmp(outputXmp);
-    thumbnailPipeline.withXmp(outputXmp);
-  }
-
-  const [outputBuffer, thumbnailBuffer] = await Promise.all([
-    outputPipeline.toBuffer(),
-    thumbnailPipeline.toBuffer(),
-  ]);
+  const renditions = await createImageRenditions({
+    imageCompressionQuality: settings.imageCompressionQuality,
+    maxImageWidth: settings.maxImageWidth,
+    outputXmp,
+    sourceBuffer,
+  });
+  const outputBuffer = renditions.optimized.buffer;
+  const thumbnailBuffer = renditions.thumbnail.buffer;
 
   await assertStorageQuotaAfterOptimization({
     excludeAssetId: input.excludeAssetId,
@@ -306,7 +300,7 @@ export async function processAndStoreImageUpload(input: {
         byteSize: outputBuffer.byteLength,
         contentHash: sourceHash,
         digitalSourceType,
-        height,
+        height: renditions.optimized.height,
         isPublic: true,
         mimeType: "image/webp",
         originalByteSize: input.file.size,
@@ -316,7 +310,7 @@ export async function processAndStoreImageUpload(input: {
         relativePath: outputRelativePath,
         thumbnailRelativePath,
         updatedAt: new Date(),
-        width,
+        width: renditions.optimized.width,
       })
       .returning({
         altText: media.altText,
@@ -481,6 +475,7 @@ export async function processAndStoreVideoUpload(input: {
   const tempDir = path.join(os.tmpdir(), `jurgens-energy-media-${randomUUID()}`);
   const inputPath = path.join(tempDir, sanitizeFileName(input.file.name));
   const outputPath = path.join(tempDir, "optimized.mp4");
+  const previewPath = path.join(tempDir, "preview.mp4");
   const posterPath = path.join(tempDir, "poster.jpg");
   const outputRelativePath = createMediaRelativePath({
     mimeType: "video/mp4",
@@ -489,6 +484,10 @@ export async function processAndStoreVideoUpload(input: {
   const posterRelativePath = createMediaRelativePath({
     mimeType: "image/webp",
     scope: `${input.scope}-thumbs`,
+  });
+  const previewRelativePath = createMediaRelativePath({
+    mimeType: "video/mp4",
+    scope: `${input.scope}-previews`,
   });
 
   await mkdir(tempDir, { recursive: true });
@@ -520,6 +519,15 @@ export async function processAndStoreVideoUpload(input: {
       outputPath,
     ]);
 
+    await runFfmpeg(
+      buildFullLengthVideoPreviewFfmpegArgs({
+        inputPath: outputPath,
+        maxVideoWidth: settings.maxVideoWidth,
+        outputPath: previewPath,
+        videoCompressionCrf: settings.videoCompressionCrf,
+      }),
+    );
+
     await runFfmpeg([
       "-y",
       "-ss",
@@ -534,6 +542,7 @@ export async function processAndStoreVideoUpload(input: {
     ]);
 
     const outputBuffer = await readFile(outputPath);
+    const previewBuffer = await readFile(previewPath);
     const posterBuffer = await sharp(await readFile(posterPath), {
       failOn: "none",
     })
@@ -541,64 +550,72 @@ export async function processAndStoreVideoUpload(input: {
       .webp({ effort: 4, quality: 76 })
       .toBuffer();
 
-    await writeMediaFile(outputRelativePath, outputBuffer);
-    await writeMediaFile(posterRelativePath, posterBuffer);
+    await assertStorageQuotaAfterOptimization({
+      excludeAssetId: input.excludeAssetId,
+      fileCount: 1,
+      optimizedBytes: outputBuffer.byteLength + previewBuffer.byteLength,
+      ownerUserId: input.ownerUserId,
+      scope: input.scope,
+      settings,
+    });
+
+    const storedPaths = [
+      outputRelativePath,
+      posterRelativePath,
+      previewRelativePath,
+    ];
 
     try {
-      await assertStorageQuotaAfterOptimization({
-        excludeAssetId: input.excludeAssetId,
-        fileCount: 1,
-        optimizedBytes: outputBuffer.byteLength,
-        ownerUserId: input.ownerUserId,
-        scope: input.scope,
-        settings,
-      });
+      await writeMediaFile(outputRelativePath, outputBuffer);
+      await writeMediaFile(posterRelativePath, posterBuffer);
+      await writeMediaFile(previewRelativePath, previewBuffer);
+
+      const [asset] = await db
+        .insert(media)
+        .values({
+          altText: input.altText?.trim() || null,
+          byteSize: outputBuffer.byteLength,
+          contentHash: sourceHash,
+          durationMs: probe.durationMs,
+          height: probe.height,
+          isPublic: true,
+          mimeType: "video/mp4",
+          originalByteSize: input.file.size,
+          originalFileName: sanitizeFileName(input.file.name),
+          originalMimeType: input.file.type,
+          ownerUserId: input.ownerUserId,
+          previewByteSize: previewBuffer.byteLength,
+          previewRelativePath,
+          relativePath: outputRelativePath,
+          thumbnailRelativePath: posterRelativePath,
+          updatedAt: new Date(),
+          width: probe.width,
+        })
+        .returning({
+          altText: media.altText,
+          byteSize: media.byteSize,
+          createdAt: media.createdAt,
+          digitalSourceType: media.digitalSourceType,
+          durationMs: media.durationMs,
+          height: media.height,
+          id: media.id,
+          folderId: media.folderId,
+          mimeType: media.mimeType,
+          originalByteSize: media.originalByteSize,
+          originalFileName: media.originalFileName,
+          relativePath: media.relativePath,
+          tags: media.tags,
+          thumbnailRelativePath: media.thumbnailRelativePath,
+          width: media.width,
+        });
+
+      return toAdminMediaAsset(asset);
     } catch (error) {
-      await Promise.all([
-        removeMediaFile(outputRelativePath),
-        removeMediaFile(posterRelativePath),
-      ]);
+      await Promise.allSettled(
+        storedPaths.map((relativePath) => removeMediaFile(relativePath)),
+      );
       throw error;
     }
-
-    const [asset] = await db
-      .insert(media)
-      .values({
-        altText: input.altText?.trim() || null,
-        byteSize: outputBuffer.byteLength,
-        contentHash: sourceHash,
-        durationMs: probe.durationMs,
-        height: probe.height,
-        isPublic: true,
-        mimeType: "video/mp4",
-        originalByteSize: input.file.size,
-        originalFileName: sanitizeFileName(input.file.name),
-        originalMimeType: input.file.type,
-        ownerUserId: input.ownerUserId,
-        relativePath: outputRelativePath,
-        thumbnailRelativePath: posterRelativePath,
-        updatedAt: new Date(),
-        width: probe.width,
-      })
-      .returning({
-        altText: media.altText,
-        byteSize: media.byteSize,
-        createdAt: media.createdAt,
-        digitalSourceType: media.digitalSourceType,
-        durationMs: media.durationMs,
-        height: media.height,
-        id: media.id,
-        folderId: media.folderId,
-        mimeType: media.mimeType,
-        originalByteSize: media.originalByteSize,
-        originalFileName: media.originalFileName,
-        relativePath: media.relativePath,
-        tags: media.tags,
-        thumbnailRelativePath: media.thumbnailRelativePath,
-        width: media.width,
-      });
-
-    return toAdminMediaAsset(asset);
   } finally {
     await rm(tempDir, { force: true, recursive: true });
   }
@@ -725,6 +742,7 @@ export async function replaceStoredMediaAsset(input: {
       digitalSourceType: media.digitalSourceType,
       folderId: media.folderId,
       id: media.id,
+      previewRelativePath: media.previewRelativePath,
       relativePath: media.relativePath,
       thumbnailRelativePath: media.thumbnailRelativePath,
     })
@@ -760,6 +778,8 @@ export async function replaceStoredMediaAsset(input: {
       originalByteSize: media.originalByteSize,
       originalFileName: media.originalFileName,
       originalMimeType: media.originalMimeType,
+      previewByteSize: media.previewByteSize,
+      previewRelativePath: media.previewRelativePath,
       relativePath: media.relativePath,
       thumbnailRelativePath: media.thumbnailRelativePath,
       width: media.width,
@@ -772,28 +792,72 @@ export async function replaceStoredMediaAsset(input: {
     throw new Error("Could not prepare replacement media.");
   }
 
-  await db
-    .update(media)
-    .set({
-      byteSize: replacementRow.byteSize,
-      contentHash: replacementRow.contentHash,
-      digitalSourceType: replacementRow.digitalSourceType,
-      durationMs: replacementRow.durationMs,
-      height: replacementRow.height,
-      mimeType: replacementRow.mimeType,
-      originalByteSize: replacementRow.originalByteSize,
-      originalFileName: replacementRow.originalFileName,
-      originalMimeType: replacementRow.originalMimeType,
-      relativePath: replacementRow.relativePath,
-      thumbnailRelativePath: replacementRow.thumbnailRelativePath,
-      updatedAt: new Date(),
-      width: replacementRow.width,
-    })
-    .where(eq(media.id, currentAsset.id));
+  const replacementPaths = [
+    replacementRow.relativePath,
+    replacementRow.thumbnailRelativePath,
+    replacementRow.previewRelativePath,
+  ].filter((relativePath): relativePath is string => Boolean(relativePath));
 
-  await db.delete(media).where(eq(media.id, replacement.id));
-  await Promise.all(
-    [currentAsset.relativePath, currentAsset.thumbnailRelativePath]
+  try {
+    await db.transaction(async (tx) => {
+      const updatedRows = await tx
+        .update(media)
+        .set({
+          byteSize: replacementRow.byteSize,
+          contentHash: replacementRow.contentHash,
+          digitalSourceType: replacementRow.digitalSourceType,
+          durationMs: replacementRow.durationMs,
+          height: replacementRow.height,
+          mimeType: replacementRow.mimeType,
+          originalByteSize: replacementRow.originalByteSize,
+          originalFileName: replacementRow.originalFileName,
+          originalMimeType: replacementRow.originalMimeType,
+          previewByteSize: replacementRow.previewByteSize,
+          previewRelativePath: replacementRow.previewRelativePath,
+          relativePath: replacementRow.relativePath,
+          thumbnailRelativePath: replacementRow.thumbnailRelativePath,
+          updatedAt: new Date(),
+          width: replacementRow.width,
+        })
+        .where(eq(media.id, currentAsset.id))
+        .returning({ id: media.id });
+
+      if (updatedRows.length !== 1) {
+        throw new Error(
+          "The media asset changed while its file was being replaced. Try again.",
+        );
+      }
+
+      await tx.delete(media).where(eq(media.id, replacement.id));
+    });
+  } catch (error) {
+    try {
+      const deletedReplacement = await db
+        .delete(media)
+        .where(eq(media.id, replacement.id))
+        .returning({ id: media.id });
+
+      if (deletedReplacement.length === 1) {
+        await Promise.allSettled(
+          replacementPaths.map((relativePath) =>
+            removeMediaFile(relativePath),
+          ),
+        );
+      }
+    } catch {
+      // Preserve the replacement row and files together when cleanup cannot
+      // be completed safely. The library can still manage that asset.
+    }
+
+    throw error;
+  }
+
+  await Promise.allSettled(
+    [
+      currentAsset.relativePath,
+      currentAsset.thumbnailRelativePath,
+      currentAsset.previewRelativePath,
+    ]
       .filter((relativePath): relativePath is string => Boolean(relativePath))
       .map((relativePath) => removeMediaFile(relativePath)),
   );
@@ -1055,7 +1119,9 @@ async function getUsedStorageBytes(input: {
       );
 
   const [{ totalByteSize }] = await db
-    .select({ totalByteSize: sql<number>`coalesce(sum(${media.byteSize}), 0)` })
+    .select({
+      totalByteSize: sql<number>`coalesce(sum(${media.byteSize} + coalesce(${media.previewByteSize}, 0)), 0)`,
+    })
     .from(media)
     .where(whereClause);
 

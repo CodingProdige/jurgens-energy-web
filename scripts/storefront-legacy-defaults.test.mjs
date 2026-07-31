@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { replaceLegacyDefaultStorefrontClaims } from "../src/modules/marketplace/storefront-legacy-defaults.ts";
+import {
+  applyStorefrontDeliveryTiming,
+  replaceLegacyDefaultStorefrontClaims,
+} from "../src/modules/marketplace/storefront-legacy-defaults.ts";
 
 test("historical default storefront claims are replaced exactly", () => {
   const sections = [
@@ -83,7 +86,7 @@ test("historical default storefront claims are replaced exactly", () => {
     result[2].settings.features.map(({ text, title }) => ({ text, title })),
     [
       {
-        text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+        text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
         title: "Delivery availability",
       },
       {
@@ -182,7 +185,7 @@ test("the previous neutral defaults are upgraded to the South Africa store copy"
   );
   assert.deepEqual(result[1].settings.features[0], {
     icon: "delivery",
-    text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+    text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
     title: "Delivery availability",
   });
   assert.equal(
@@ -236,7 +239,49 @@ test("the previous South Africa defaults are upgraded to checkout-qualified deli
   );
   assert.deepEqual(result[1].settings.features[0], {
     icon: "delivery",
-    text: "Availability is confirmed at checkout; transit timing depends on the destination and delivery service.",
+    text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
     title: "Delivery availability",
   });
+});
+
+test("saved timing replaces only the recognized public storefront default", () => {
+  const sections = [
+    {
+      enabled: true,
+      id: "features",
+      settings: {
+        eyebrow: "South African online LPG store",
+        features: [
+          {
+            icon: "delivery",
+            text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
+            title: "Delivery availability",
+          },
+          {
+            icon: "support",
+            text: "Our custom delivery promise stays untouched.",
+            title: "Custom copy",
+          },
+        ],
+        title: "Clear delivery",
+        titleSize: 30,
+        titleTag: "h2",
+      },
+      type: "feature_grid",
+    },
+  ];
+
+  const result = applyStorefrontDeliveryTiming(
+    sections,
+    "Delivery normally takes 3–7 business days after payment confirmation.",
+  );
+
+  assert.equal(
+    result[0].settings.features[0].text,
+    "Delivery normally takes 3–7 business days after payment confirmation. Checkout confirms address eligibility.",
+  );
+  assert.equal(
+    result[0].settings.features[1].text,
+    "Our custom delivery promise stays untouched.",
+  );
 });

@@ -11,6 +11,7 @@ import {
   productMedia,
   productVariants,
   products,
+  reviews,
 } from "@/src/db/schema";
 import {
   convertFromZar,
@@ -20,8 +21,18 @@ import {
 } from "@/src/modules/currency";
 import type { MarketplaceCatalogFilters } from "@/src/modules/marketplace/catalog-filters";
 import { isMarketplaceVariantOnSale } from "@/src/modules/marketplace/catalog-sale";
+import {
+  getMarketplaceProductImageUrl,
+  selectMarketplaceProductCardMedia,
+  type MarketplaceProductPreviewVideo,
+} from "@/src/modules/marketplace/product-card-media";
 import { filterPopulatedShopMenuCategories } from "@/src/modules/marketplace/shop-menu-categories";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
+import {
+  getEmptyProductRatingSummary,
+  getProductRatingSummariesByProductId,
+  type ProductRatingSummary,
+} from "@/src/modules/reviews";
 
 const publicProductStatuses = ["live", "active"] as const;
 
@@ -77,6 +88,7 @@ export type MarketplaceShopMenuData = {
 };
 
 export type MarketplaceProductCard = {
+  averageRating: number | null;
   brandId: string | null;
   brandName: string | null;
   brandSlug: string | null;
@@ -90,9 +102,12 @@ export type MarketplaceProductCard = {
   inStock: boolean;
   isOnSale: boolean;
   priceLabel: string;
+  previewVideo: MarketplaceProductPreviewVideo | null;
   quickAddVariantId: string | null;
+  reviewCount: number;
   shortDescription: string | null;
   slug: string;
+  soldQuantity: number;
   title: string;
   variantCount: number;
 };
@@ -120,12 +135,35 @@ export type MarketplaceVariant = {
   title: string;
 };
 
+export type MarketplaceProductMedia = {
+  altText: string | null;
+  id: string;
+  kind: "image" | "video";
+  mimeType: string;
+  posterUrl: string | null;
+  url: string;
+};
+
+export type MarketplacePublicProductReview = {
+  body: string | null;
+  createdAt: Date;
+  customerDisplayName: string | null;
+  id: string;
+  isVerifiedPurchase: boolean;
+  rating: number;
+  title: string | null;
+};
+
 export type MarketplaceProductDetail = MarketplaceProductCard & {
   barcode: string | null;
   description: string | null;
   fullDescription: string | null;
   imageUrls: string[];
+  mediaItems: MarketplaceProductMedia[];
   optionSchema: MarketplaceProductOptionSchema[];
+  ratingSummary: ProductRatingSummary;
+  reviews: MarketplacePublicProductReview[];
+  totalSoldQuantity: number;
   updatedAt: Date;
   variants: MarketplaceVariant[];
 };
@@ -279,15 +317,18 @@ function toCategory(row: {
   };
 }
 
-async function getCoverUrlsByProductId(productIds: string[]) {
-  const coverByProductId = new Map<string, string | null>();
-
+async function getProductCardMediaByProductId(productIds: string[]) {
   if (productIds.length === 0) {
-    return coverByProductId;
+    return selectMarketplaceProductCardMedia([]);
   }
 
-  const coverRows = await db
+  const mediaRows = await db
     .select({
+      durationMs: media.durationMs,
+      isCover: productMedia.isCover,
+      isPublic: media.isPublic,
+      mimeType: media.mimeType,
+      previewRelativePath: media.previewRelativePath,
       productId: productMedia.productId,
       relativePath: media.relativePath,
       sortOrder: productMedia.sortOrder,
@@ -295,19 +336,63 @@ async function getCoverUrlsByProductId(productIds: string[]) {
     })
     .from(productMedia)
     .innerJoin(media, eq(media.id, productMedia.mediaId))
-    .where(inArray(productMedia.productId, productIds))
-    .orderBy(asc(productMedia.sortOrder));
+    .where(
+      and(
+        inArray(productMedia.productId, productIds),
+        eq(media.isPublic, true),
+      ),
+    )
+    .orderBy(
+      asc(productMedia.productId),
+      asc(productMedia.sortOrder),
+      asc(productMedia.mediaId),
+    );
 
-  for (const row of coverRows) {
-    if (!coverByProductId.has(row.productId)) {
-      coverByProductId.set(
-        row.productId,
-        toMediaUrl(row.relativePath, row.thumbnailRelativePath),
-      );
-    }
+  return selectMarketplaceProductCardMedia(mediaRows);
+}
+
+async function getCoverUrlsByProductId(productIds: string[]) {
+  const mediaByProductId = await getProductCardMediaByProductId(productIds);
+  const coverByProductId = new Map<string, string | null>();
+
+  for (const [productId, productMediaSelection] of mediaByProductId) {
+    coverByProductId.set(productId, productMediaSelection.coverImageUrl);
   }
 
   return coverByProductId;
+}
+
+async function getSoldQuantityByProductId(productIds: string[]) {
+  if (productIds.length === 0) {
+    return new Map<string, number>();
+  }
+
+  const salesRows = await db
+    .select({
+      productId: productVariants.productId,
+      soldQuantity: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+    })
+    .from(orderItems)
+    .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(
+      and(
+        inArray(productVariants.productId, productIds),
+        inArray(orders.status, ["paid", "fulfilled"]),
+      ),
+    )
+    .groupBy(productVariants.productId);
+
+  return new Map(
+    salesRows.map((row) => [row.productId, Number(row.soldQuantity) || 0]),
+  );
+}
+
+function getRatingSummary(
+  summaries: ReadonlyMap<string, ProductRatingSummary>,
+  productId: string,
+) {
+  return summaries.get(productId) ?? getEmptyProductRatingSummary();
 }
 
 export async function getMarketplaceCatalog({
@@ -358,7 +443,14 @@ export async function getMarketplaceCatalog({
     };
   }
 
-  const [variantRows, coverByProductId, categoriesList, brandsList] =
+  const [
+    variantRows,
+    productMediaByProductId,
+    ratingSummariesByProductId,
+    soldQuantityByProductId,
+    categoriesList,
+    brandsList,
+  ] =
     await Promise.all([
       db
         .select({
@@ -374,7 +466,9 @@ export async function getMarketplaceCatalog({
         .from(productVariants)
         .where(inArray(productVariants.productId, productIds))
         .orderBy(asc(productVariants.title)),
-      getCoverUrlsByProductId(productIds),
+      getProductCardMediaByProductId(productIds),
+      getProductRatingSummariesByProductId(productIds),
+      getSoldQuantityByProductId(productIds),
       getMarketplaceCategories(),
       getMarketplaceBrands(),
     ]);
@@ -404,22 +498,29 @@ export async function getMarketplaceCatalog({
 
   const productsList = filteredRows.map((row): MarketplaceProductCard => {
     const variants = variantsByProductId.get(row.id) ?? [];
+    const ratingSummary = getRatingSummary(ratingSummariesByProductId, row.id);
 
     return {
+      averageRating: ratingSummary.averageRating,
       brandId: row.brandId,
       brandName: row.brandName,
       brandSlug: row.brandSlug,
       category: toCategory(row),
-      coverImageUrl: coverByProductId.get(row.id) ?? null,
+      coverImageUrl:
+        productMediaByProductId.get(row.id)?.coverImageUrl ?? null,
       fulfillmentMode: row.fulfillmentMode,
       hasExchangeOption: variants.some((variant) => variant.requiresExchangeEmpty),
       id: row.id,
       inStock: variants.some(getVariantInStock),
       priceLabel: getPriceLabel(variants, currencyContext),
+      previewVideo:
+        productMediaByProductId.get(row.id)?.previewVideo ?? null,
       ...getProductCardSaleData(variants, currencyContext),
       quickAddVariantId: getQuickAddVariantId(variants),
+      reviewCount: ratingSummary.reviewCount,
       shortDescription: row.shortDescription,
       slug: row.slug,
+      soldQuantity: soldQuantityByProductId.get(row.id) ?? 0,
       title: row.title,
       variantCount: variants.length,
     };
@@ -477,6 +578,7 @@ type MarketplaceCatalogFilterVariant = {
 type MarketplaceCatalogFilterRecord = {
   maximumPrice: number | null;
   minimumPrice: number | null;
+  ratingSummary: ProductRatingSummary;
   row: Awaited<ReturnType<typeof getPublicProductsBaseRows>>[number];
   soldQuantity: number;
   variants: MarketplaceCatalogFilterVariant[];
@@ -738,27 +840,9 @@ export async function getMarketplaceCatalogPage({
   const activeVariantRows = variantRows.filter(
     (variant) => variant.status === "active" && variant.isActive,
   );
-  const salesRows =
-    productIds.length > 0
-      ? await db
-          .select({
-            productId: productVariants.productId,
-            soldQuantity: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
-          })
-          .from(orderItems)
-          .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
-          .innerJoin(orders, eq(orders.id, orderItems.orderId))
-          .where(
-            and(
-              inArray(productVariants.productId, productIds),
-              inArray(orders.status, ["paid", "fulfilled"]),
-            ),
-          )
-          .groupBy(productVariants.productId)
-      : [];
-  const soldQuantityByProductId = new Map(
-    salesRows.map((row) => [row.productId, Number(row.soldQuantity) || 0]),
-  );
+  const soldQuantityByProductId = await getSoldQuantityByProductId(productIds);
+  const ratingSummariesByProductId =
+    await getProductRatingSummariesByProductId(productIds);
   const variantsByProductId = new Map<string, MarketplaceCatalogFilterVariant[]>();
 
   for (const variant of activeVariantRows) {
@@ -776,6 +860,7 @@ export async function getMarketplaceCatalogPage({
     return {
       maximumPrice: prices.length > 0 ? Math.max(...prices) : null,
       minimumPrice: prices.length > 0 ? Math.min(...prices) : null,
+      ratingSummary: getRatingSummary(ratingSummariesByProductId, row.id),
       row,
       soldQuantity: soldQuantityByProductId.get(row.id) ?? 0,
       variants,
@@ -822,22 +907,29 @@ export async function getMarketplaceCatalogPage({
     page * pageSize,
   );
   const pageProductIds = paginatedRecords.map((record) => record.row.id);
-  const coverByProductId = await getCoverUrlsByProductId(pageProductIds);
+  const productMediaByProductId =
+    await getProductCardMediaByProductId(pageProductIds);
   const productsList = paginatedRecords.map((record): MarketplaceProductCard => ({
+    averageRating: record.ratingSummary.averageRating,
     brandId: record.row.brandId,
     brandName: record.row.brandName,
     brandSlug: record.row.brandSlug,
     category: toCategory(record.row),
-    coverImageUrl: coverByProductId.get(record.row.id) ?? null,
+    coverImageUrl:
+      productMediaByProductId.get(record.row.id)?.coverImageUrl ?? null,
     fulfillmentMode: record.row.fulfillmentMode,
     hasExchangeOption: getRecordExchangeSupported(record),
     id: record.row.id,
     inStock: getRecordInStock(record),
     priceLabel: getPriceLabel(record.variants, currencyContext),
+    previewVideo:
+      productMediaByProductId.get(record.row.id)?.previewVideo ?? null,
     ...getProductCardSaleData(record.variants, currencyContext),
     quickAddVariantId: getQuickAddVariantId(record.variants),
+    reviewCount: record.ratingSummary.reviewCount,
     shortDescription: record.row.shortDescription,
     slug: record.row.slug,
+    soldQuantity: record.soldQuantity,
     title: record.row.title,
     variantCount: record.variants.length,
   }));
@@ -1366,7 +1458,7 @@ export async function getMarketplaceProductBySlug(
     return null;
   }
 
-  const [variantRows, mediaRows] = await Promise.all([
+  const [variantRows, mediaRows, ratingSummariesByProductId] = await Promise.all([
     db
       .select({
         barcode: productVariants.barcode,
@@ -1390,44 +1482,120 @@ export async function getMarketplaceProductBySlug(
       .orderBy(asc(productVariants.title)),
     db
       .select({
+        altText: media.altText,
+        durationMs: media.durationMs,
+        id: media.id,
+        isCover: productMedia.isCover,
+        mimeType: media.mimeType,
+        previewRelativePath: media.previewRelativePath,
         relativePath: media.relativePath,
         sortOrder: productMedia.sortOrder,
         thumbnailRelativePath: media.thumbnailRelativePath,
       })
       .from(productMedia)
       .innerJoin(media, eq(media.id, productMedia.mediaId))
-      .where(eq(productMedia.productId, product.id))
+      .where(
+        and(
+          eq(productMedia.productId, product.id),
+          eq(media.isPublic, true),
+        ),
+      )
       .orderBy(asc(productMedia.sortOrder)),
+    getProductRatingSummariesByProductId([product.id]),
   ]);
-  const imageUrls = mediaRows
-    .map((row) => toMediaUrl(row.relativePath, row.thumbnailRelativePath))
-    .filter((url): url is string => Boolean(url));
+  const ratingSummary = getRatingSummary(
+    ratingSummariesByProductId,
+    product.id,
+  );
+  const mediaItems = mediaRows.flatMap(
+    (row): MarketplaceProductMedia[] => {
+      if (row.mimeType.startsWith("video/")) {
+        return [{
+          altText: row.altText,
+          id: row.id,
+          kind: "video",
+          mimeType: row.mimeType,
+          posterUrl: row.thumbnailRelativePath
+            ? getMediaPublicUrl(row.thumbnailRelativePath)
+            : null,
+          url: getMediaPublicUrl(row.relativePath),
+        }];
+      }
+
+      if (!row.mimeType.startsWith("image/")) {
+        return [];
+      }
+
+      const url = getMarketplaceProductImageUrl(row);
+
+      return url
+        ? [{
+            altText: row.altText,
+            id: row.id,
+            kind: "image",
+            mimeType: row.mimeType,
+            posterUrl: null,
+            url,
+          }]
+        : [];
+    },
+  );
+  const imageUrls = Array.from(
+    new Set(
+      mediaRows.flatMap((row): string[] => {
+        const imageUrl = getMarketplaceProductImageUrl(row);
+
+        return imageUrl ? [imageUrl] : [];
+      }),
+    ),
+  );
+  const coverMediaRow =
+    mediaRows.find((row) => row.isCover) ?? mediaRows[0] ?? null;
+  const coverImageUrl =
+    (coverMediaRow ? getMarketplaceProductImageUrl(coverMediaRow) : null) ??
+    imageUrls[0] ??
+    null;
+  const previewVideoRow =
+    mediaRows.find((row) => row.mimeType.startsWith("video/")) ?? null;
+  const previewVideo = previewVideoRow
+    ? {
+        durationMs: previewVideoRow.durationMs,
+        posterUrl: previewVideoRow.thumbnailRelativePath
+          ? getMediaPublicUrl(previewVideoRow.thumbnailRelativePath)
+          : null,
+        url: getMediaPublicUrl(
+          previewVideoRow.previewRelativePath ??
+            previewVideoRow.relativePath,
+        ),
+      }
+    : null;
   const activeVariantRows = variantRows.filter(
     (variant) => variant.status === "active",
   );
-  const activeVariantIds = activeVariantRows.map((variant) => variant.id);
-  const variantSalesRows =
-    activeVariantIds.length > 0
-      ? await db
-          .select({
-            soldQuantity: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
-            variantId: orderItems.variantId,
-          })
-          .from(orderItems)
-          .innerJoin(orders, eq(orders.id, orderItems.orderId))
-          .where(
-            and(
-              inArray(orderItems.variantId, activeVariantIds),
-              inArray(orders.status, ["paid", "fulfilled"]),
-            ),
-          )
-          .groupBy(orderItems.variantId)
-      : [];
+  const variantSalesRows = await db
+    .select({
+      soldQuantity: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int`,
+      variantId: orderItems.variantId,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .innerJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+    .where(
+      and(
+        eq(productVariants.productId, product.id),
+        inArray(orders.status, ["paid", "fulfilled"]),
+      ),
+    )
+    .groupBy(orderItems.variantId);
   const soldQuantityByVariantId = new Map(
     variantSalesRows.map((row) => [
       row.variantId,
       Number(row.soldQuantity) || 0,
     ]),
+  );
+  const totalSoldQuantity = variantSalesRows.reduce(
+    (total, row) => total + (Number(row.soldQuantity) || 0),
+    0,
   );
   const variantMediaIds = Array.from(
     new Set(
@@ -1441,16 +1609,22 @@ export async function getMarketplaceProductBySlug(
       ? await db
           .select({
             id: media.id,
+            mimeType: media.mimeType,
             relativePath: media.relativePath,
             thumbnailRelativePath: media.thumbnailRelativePath,
           })
           .from(media)
-          .where(inArray(media.id, variantMediaIds))
+          .where(
+            and(
+              inArray(media.id, variantMediaIds),
+              eq(media.isPublic, true),
+            ),
+          )
       : [];
   const variantMediaById = new Map(
     variantMediaRows.map((row) => [
       row.id,
-      toMediaUrl(row.relativePath, row.thumbnailRelativePath),
+      getMarketplaceProductImageUrl(row),
     ]),
   );
   const variants = activeVariantRows.map((variant): MarketplaceVariant => ({
@@ -1472,14 +1646,34 @@ export async function getMarketplaceProductBySlug(
     stockOnHand: variant.stockOnHand,
     title: variant.title,
   }));
+  const reviewRows = await db
+    .select({
+      body: reviews.body,
+      createdAt: reviews.createdAt,
+      customerDisplayName: reviews.customerDisplayName,
+      id: reviews.id,
+      isVerifiedPurchase: reviews.isVerifiedPurchase,
+      rating: reviews.rating,
+      title: reviews.title,
+    })
+    .from(reviews)
+    .where(
+      and(
+        eq(reviews.productId, product.id),
+        eq(reviews.status, "approved"),
+      ),
+    )
+    .orderBy(desc(reviews.approvedAt), desc(reviews.createdAt))
+    .limit(12);
 
   return {
+    averageRating: ratingSummary.averageRating,
     barcode: product.barcode,
     brandId: product.brandId,
     brandName: product.brandName,
     brandSlug: product.brandSlug,
     category: toCategory(product),
-    coverImageUrl: imageUrls[0] ?? null,
+    coverImageUrl,
     description: product.description,
     fulfillmentMode: product.fulfillmentMode,
     fullDescription: product.fullDescription,
@@ -1487,13 +1681,20 @@ export async function getMarketplaceProductBySlug(
     id: product.id,
     imageUrls,
     inStock: variants.some((variant) => variant.inStock),
+    mediaItems,
     optionSchema: product.optionSchema ?? [],
     priceLabel: getPriceLabel(variants, currencyContext),
+    previewVideo,
     ...getProductCardSaleData(variants, currencyContext),
     quickAddVariantId: getQuickAddVariantId(activeVariantRows),
+    ratingSummary,
+    reviewCount: ratingSummary.reviewCount,
+    reviews: reviewRows,
     shortDescription: product.shortDescription,
     slug: product.slug,
+    soldQuantity: totalSoldQuantity,
     title: product.title,
+    totalSoldQuantity,
     updatedAt: product.updatedAt,
     variantCount: variants.length,
     variants,

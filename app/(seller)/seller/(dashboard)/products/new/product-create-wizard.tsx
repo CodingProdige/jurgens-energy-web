@@ -1472,6 +1472,7 @@ function Panel({
 function MediaTile({
   asset,
   index,
+  isCardPreview,
   isCover,
   isDragging,
   onDragOver,
@@ -1482,6 +1483,7 @@ function MediaTile({
 }: {
   asset: AdminMediaAsset;
   index: number;
+  isCardPreview: boolean;
   isCover: boolean;
   isDragging: boolean;
   onDragOver: (event: React.DragEvent<HTMLDivElement>) => void;
@@ -1548,6 +1550,11 @@ function MediaTile({
       {isCover ? (
         <Badge className="absolute bottom-1 left-1 bg-emerald-700 text-white">
           Cover
+        </Badge>
+      ) : null}
+      {isCardPreview ? (
+        <Badge className="absolute bottom-1 right-1 bg-[#ff5a1f] text-white">
+          Card preview
         </Badge>
       ) : null}
       <button
@@ -1823,6 +1830,8 @@ export function ProductCreateWizard({
   const selectedMedia = selectedMediaIds
     .map((id) => mediaLibraryAssets.find((asset) => asset.id === id))
     .filter((asset): asset is AdminMediaAsset => Boolean(asset));
+  const cardPreviewVideoId =
+    selectedMedia.find((asset) => asset.mimeType.startsWith("video/"))?.id ?? null;
   const mediaById = new Map(mediaLibraryAssets.map((asset) => [asset.id, asset]));
   const mediaDialogSelectedAssetId =
     mediaSelectionTarget.type === "variant"
@@ -3726,12 +3735,21 @@ export function ProductCreateWizard({
               </span>
             </button>
 
+            {cardPreviewVideoId ? (
+              <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Product cards play the first video in this order from beginning to
+                end. Drag the videos to choose the card preview; only its encoding
+                is compressed for faster playback.
+              </p>
+            ) : null}
+
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {selectedMedia.map((asset, index) => (
                 <MediaTile
                   key={asset.id}
                   asset={asset}
                   index={index}
+                  isCardPreview={asset.id === cardPreviewVideoId}
                   isCover={index === 0}
                   isDragging={draggingMediaId === asset.id}
                   onDragOver={(event) => event.preventDefault()}

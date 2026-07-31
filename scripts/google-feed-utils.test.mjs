@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -7,6 +8,11 @@ import {
   getGoogleMerchantShippingLabel,
   shouldPublishGoogleMerchantOffer,
 } from "../src/modules/marketplace/google-feed-utils.ts";
+
+const googleMerchantFeedSource = readFileSync(
+  new URL("../src/modules/marketplace/google-merchant-feed.ts", import.meta.url),
+  "utf8",
+);
 
 const usableLiveDelivery = {
   courierGuyDropoffPickupPointId: "K0000",
@@ -112,4 +118,18 @@ test("keeps postcode-limited offers in the feed with their destination exclusion
     true,
   );
   assert.deepEqual(getGoogleMerchantDestinationControls("local_lpg").included, []);
+});
+
+test("publishes saved item handling time without overriding account-level shipping", () => {
+  assert.match(
+    googleMerchantFeedSource,
+    /<g:min_handling_time>\$\{item\.minHandlingTime\}<\/g:min_handling_time>/,
+  );
+  assert.match(
+    googleMerchantFeedSource,
+    /<g:max_handling_time>\$\{item\.maxHandlingTime\}<\/g:max_handling_time>/,
+  );
+  assert.doesNotMatch(googleMerchantFeedSource, /<g:shipping>/);
+  assert.doesNotMatch(googleMerchantFeedSource, /<g:min_transit_time>/);
+  assert.doesNotMatch(googleMerchantFeedSource, /<g:max_transit_time>/);
 });

@@ -8,6 +8,12 @@ import {
   policyLinks,
   type PolicyKind,
 } from "@/src/modules/marketplace/policies/links";
+import {
+  formatPublicBusinessDayRange,
+  getPublicDeliveryTiming,
+  getPublicDeliveryTimingDescription,
+} from "@/src/modules/marketplace/public-delivery-copy";
+import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
 
 export { policyLinks };
 export type { PolicyKind };
@@ -234,7 +240,7 @@ export const termsAndConditions: PolicyDocument = {
         "Courier-eligible products can be delivered nationwide to eligible addresses within South Africa. Products marked for Jurgens delivery are available only when the delivery postcode falls within an active Jurgens service area. Checkout cross-references the selected products and complete address before payment.",
         "An eligible order has one configured VAT-inclusive flat delivery fee, even when more than one fulfilment method is used. An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches the configured threshold. The final fee is shown before payment.",
         "Our handling time is 0–1 business day after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched that day. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.",
-        "Transit time after dispatch depends on the destination, parcel, delivery service and operating conditions. Any available delivery estimate is communicated in the order updates or tracking details and is not a guaranteed appointment unless we expressly confirm otherwise.",
+        "Eligible orders are normally delivered within 1–4 business days after payment confirmation. This published window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.",
         "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
         "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
         "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the eligible empty cylinder at the delivery handover.",
@@ -314,6 +320,38 @@ export const termsAndConditions: PolicyDocument = {
     },
   ],
 };
+
+export function createTermsAndConditionsDocument(
+  settings: MarketplaceSettings,
+): PolicyDocument {
+  const deliveryTiming = getPublicDeliveryTiming(settings);
+  const deliveryTimingDescription =
+    getPublicDeliveryTimingDescription(settings);
+  const handlingTimingLabel = formatPublicBusinessDayRange(
+    deliveryTiming.handlingMinBusinessDays,
+    deliveryTiming.handlingMaxBusinessDays,
+  );
+
+  return {
+    ...termsAndConditions,
+    sections: termsAndConditions.sections.map((section) =>
+      section.id === "delivery"
+        ? {
+            ...section,
+            paragraphs: [
+              "Courier-eligible products can be delivered nationwide to eligible addresses within South Africa. Products marked for Jurgens delivery are available only when the delivery postcode falls within an active Jurgens service area. Checkout cross-references the selected products and complete address before payment.",
+              "An eligible order has one configured VAT-inclusive flat delivery fee, even when more than one fulfilment method is used. An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches the configured threshold. The final fee is shown before payment.",
+              `Our handling time is ${handlingTimingLabel} after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched within that window. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.`,
+              `${deliveryTimingDescription} This published window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.`,
+              "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
+              "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
+              "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the eligible empty cylinder at the delivery handover.",
+            ],
+          }
+        : section,
+    ),
+  };
+}
 
 export const returnsAndRefundsPolicy: PolicyDocument = {
   description:
@@ -418,7 +456,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
 
 export const deliveryInformation: PolicyDocument = {
   description:
-    "Eligible South Africa orders normally have 0–1 business day handling. Transit time depends on the destination, parcel and delivery service.",
+    "This policy explains delivery coverage, fees, timing, safe handover and support for eligible South African orders.",
   eyebrow: "Getting your order",
   kind: "delivery",
   shortTitle: "Shipping & Delivery Policy",
@@ -447,9 +485,9 @@ export const deliveryInformation: PolicyDocument = {
       id: "timing",
       title: "3. Handling and shipping time",
       paragraphs: [
-        "Handling time is 0–1 business day after payment confirmation. This means an eligible order may be prepared and dispatched on the same business day or the next business day.",
+        "Handling begins after payment confirmation. Order preparation and dispatch take place within the published handling window.",
         "Our order cutoff is 2:00 PM South African Standard Time (SAST) on business days. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed. Orders placed on weekends or South African public holidays also begin processing on the next business day.",
-        "Transit time after dispatch depends on the destination, parcel, delivery service and operating conditions. Any available delivery estimate is communicated in the order updates or tracking details. Delivery dates and time windows are estimates unless we expressly confirm a fixed appointment.",
+        "The published delivery window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.",
         "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements.",
         "We will communicate a material delay and provide the available next step. If an accepted order cannot be fulfilled within an agreed or legally required period, you may have a right to cancel and receive the applicable refund.",
       ],
@@ -521,19 +559,47 @@ export const deliveryInformation: PolicyDocument = {
 
 export function createDeliveryInformationDocument(
   deliveryFeeDescription: string,
+  settings: MarketplaceSettings,
 ): PolicyDocument {
+  const deliveryTiming = getPublicDeliveryTiming(settings);
+  const deliveryTimingDescription =
+    getPublicDeliveryTimingDescription(settings);
+  const handlingTimingLabel = formatPublicBusinessDayRange(
+    deliveryTiming.handlingMinBusinessDays,
+    deliveryTiming.handlingMaxBusinessDays,
+  );
+
   return {
     ...deliveryInformation,
-    sections: deliveryInformation.sections.map((section) =>
-      section.id === "fees"
-        ? {
-            ...section,
-            paragraphs: [
-              deliveryFeeDescription,
-              "One order-level customer delivery fee applies even when an order requires both Jurgens delivery and courier delivery. The final delivery fee is always shown before payment, or communicated for approval during an assisted order.",
-            ],
-          }
-        : section,
+    description: deliveryTimingDescription.replace(
+      /^Delivery/,
+      "Eligible South Africa delivery",
     ),
+    sections: deliveryInformation.sections.map((section) => {
+      if (section.id === "fees") {
+        return {
+          ...section,
+          paragraphs: [
+            deliveryFeeDescription,
+            "One order-level customer delivery fee applies even when an order requires both Jurgens delivery and courier delivery. The final delivery fee is always shown before payment, or communicated for approval during an assisted order.",
+          ],
+        };
+      }
+
+      if (section.id === "timing") {
+        return {
+          ...section,
+          paragraphs: [
+            `Handling time is ${handlingTimingLabel} after payment confirmation. Order preparation and dispatch take place within this handling window.`,
+            "Our order cutoff is 2:00 PM South African Standard Time (SAST) on business days. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed. Orders placed on weekends or South African public holidays also begin processing on the next business day.",
+            `${deliveryTimingDescription} This published window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.`,
+            "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements.",
+            "We will communicate a material delay and provide the available next step. If an accepted order cannot be fulfilled within an agreed or legally required period, you may have a right to cancel and receive the applicable refund.",
+          ],
+        };
+      }
+
+      return section;
+    }),
   };
 }

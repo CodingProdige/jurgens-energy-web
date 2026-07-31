@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckIcon, ShoppingCartIcon } from "lucide-react";
+import { CheckIcon, PlusIcon, ShoppingCartIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -13,6 +13,9 @@ type ProductCardQuickAddButtonProps = {
   className?: string;
   product: MarketplaceProductCardData;
 };
+
+const quickAddPillClass =
+  "marketplace-card-quick-add inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-full border border-[#080808]/80 bg-white px-2 text-[#080808] shadow-[0_4px_12px_rgba(8,8,8,0.10)] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] hover:shadow-[0_8px_18px_rgba(255,90,31,0.18)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 active:scale-95 dark:border-[#f7f7f2]/80 dark:bg-[#f7f7f2] dark:text-[#080808] sm:h-8 sm:min-w-11";
 
 export function ProductCardQuickAddButton({
   className,
@@ -74,7 +77,7 @@ export function ProductCardQuickAddButton({
       <Link
         aria-label={`Choose options for ${product.title}`}
         className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-md bg-[#ff5a1f] text-white transition hover:bg-[#e84c15] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25",
+          quickAddPillClass,
           className,
         )}
         data-analytics-event="select_item"
@@ -85,7 +88,7 @@ export function ProductCardQuickAddButton({
         href={productHref}
         title="Choose options"
       >
-        <ShoppingCartIcon className="size-4" />
+        <QuickAddGlyph />
       </Link>
     );
   }
@@ -94,19 +97,31 @@ export function ProductCardQuickAddButton({
     <button
       aria-label={added ? `${product.title} added to cart` : `Add ${product.title} to cart`}
       className={cn(
-        "grid size-8 shrink-0 place-items-center rounded-md bg-[#ff5a1f] text-white transition hover:bg-[#e84c15] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25",
-        added && "bg-emerald-600 hover:bg-emerald-600",
+        quickAddPillClass,
+        added &&
+          "marketplace-card-quick-add-added border-emerald-600 bg-emerald-600 text-white hover:border-emerald-600 hover:bg-emerald-600 hover:text-white dark:border-emerald-600 dark:bg-emerald-600 dark:text-white",
         className,
       )}
       onClick={handleQuickAdd}
       title={added ? "Added" : "Add to cart"}
       type="button"
     >
-      {added ? (
-        <CheckIcon className="size-4" />
-      ) : (
-        <ShoppingCartIcon className="size-4" />
-      )}
+      <QuickAddGlyph added={added} />
     </button>
+  );
+}
+
+function QuickAddGlyph({ added = false }: { added?: boolean }) {
+  return (
+    <span className="relative inline-grid h-5 w-6 place-items-center">
+      {added ? (
+        <CheckIcon className="size-3.5 stroke-[2.6]" />
+      ) : (
+        <>
+          <ShoppingCartIcon className="size-3.5 stroke-[2.25]" />
+          <PlusIcon className="absolute -right-0.5 -top-0.5 size-2.5 text-[#080808] stroke-[3] dark:text-[#080808]" />
+        </>
+      )}
+    </span>
   );
 }

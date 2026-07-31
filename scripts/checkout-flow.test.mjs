@@ -30,6 +30,13 @@ const customerShippingQuoteSource = readFileSync(
   ),
   "utf8",
 );
+const customerDeliveryEvaluationSource = readFileSync(
+  new URL(
+    "../src/modules/shipping/customer-delivery-evaluation.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const orderReturnExperienceSource = readFileSync(
   new URL(
     "../components/marketplace/order-return-experience.tsx",
@@ -209,12 +216,13 @@ test("matches invoice line rounding and adds no VAT for free delivery", () => {
 test("keeps private courier costs out of customer-facing checkout copy", () => {
   const publicCheckoutSource = [
     checkoutExperienceSource,
+    customerDeliveryEvaluationSource,
     customerShippingQuoteSource,
   ].join("\n");
 
   assert.match(
     publicCheckoutSource,
-    /Delivery is available to eligible addresses throughout South Africa\./,
+    /deliveryInformation: getPublicDeliveryTimingDescription\(settings\)/,
   );
   assert.doesNotMatch(
     publicCheckoutSource,

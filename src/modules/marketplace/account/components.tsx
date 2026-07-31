@@ -26,6 +26,7 @@ import type {
   CustomerOrderDetail,
   CustomerOrderSummary,
 } from "@/src/modules/marketplace/account/data";
+import { ProductReviewForm } from "@/src/modules/marketplace/account/product-review-form";
 import { RetryPaymentButton } from "@/src/modules/marketplace/account/retry-payment-button";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-ZA", {
@@ -436,6 +437,7 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
                         Cylinder exchange · empty cylinder required
                       </p>
                     ) : null}
+                    <ProductReviewForm item={item} orderId={order.id} />
                   </div>
                   <strong className="tabular-nums sm:text-right">
                     {formatAccountMoney(item.lineTotal, order.currency)}

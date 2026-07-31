@@ -8,7 +8,9 @@ import { getPublishedBlogPosts } from "@/src/modules/blog";
 import { getCurrencyContext } from "@/src/modules/currency/server";
 import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
 import { getMarketplaceCatalog } from "@/src/modules/marketplace/catalog";
+import { getPublicDeliveryTimingDescription } from "@/src/modules/marketplace/public-delivery-copy";
 import { getPublishedStorefrontPage } from "@/src/modules/marketplace/storefront";
+import { applyStorefrontDeliveryTiming } from "@/src/modules/marketplace/storefront-legacy-defaults";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import {
   createMarketplaceBusinessStructuredData,
@@ -71,7 +73,10 @@ export default async function Home({
             blogPosts={blogPosts}
             categories={catalog.categories}
             products={catalog.products}
-            sections={storefrontPage.sections}
+            sections={applyStorefrontDeliveryTiming(
+              storefrontPage.sections,
+              getPublicDeliveryTimingDescription(settings),
+            )}
           />
         </main>
         <MarketplaceFooter />

@@ -24,6 +24,9 @@ type FaqGroup = {
   title: string;
 };
 
+const deliveryFeeQuestion = "How is the delivery fee calculated?";
+const deliveryTimingQuestion = "How quickly will my order arrive?";
+
 const faqGroups: FaqGroup[] = [
   {
     description:
@@ -73,19 +76,8 @@ const faqGroups: FaqGroup[] = [
         question: "How is the delivery fee calculated?",
       },
       {
-        answer: (
-          <>
-            Handling takes 0–1 business day after payment confirmation. Our order
-            cutoff is 2:00 PM SAST on business days, and an order placed after the
-            cutoff begins processing on the next business day. Handling does not
-            begin before payment is confirmed. Transit time after dispatch depends
-            on the destination, parcel and delivery service. Any available estimate
-            is communicated in the order updates or tracking details. Stock,
-            courier or vehicle capacity, weather, traffic, access and LPG safety
-            requirements can affect timing.
-          </>
-        ),
-        question: "How quickly will my order arrive?",
+        answer: null,
+        question: deliveryTimingQuestion,
       },
       {
         answer: (
@@ -271,7 +263,7 @@ const faqGroups: FaqGroup[] = [
   },
 ];
 
-export const faqStructuredDataItems = [
+const faqStructuredDataItems = [
   {
     question: "How do I place an order?",
     answer:
@@ -288,9 +280,8 @@ export const faqStructuredDataItems = [
       "Checkout applies one configured VAT-inclusive flat delivery fee per eligible order, not separate Jurgens and courier fees. If an active free-shipping rule applies and the qualifying product subtotal reaches its threshold, the delivery fee is reduced to zero. The final delivery fee is shown before payment.",
   },
   {
-    question: "How quickly will my order arrive?",
-    answer:
-      "Handling normally takes 0–1 business day after payment confirmation. Transit time after dispatch depends on the destination, parcel and delivery service. Any available estimate is communicated in the order updates or tracking details. Stock, transport capacity, weather, traffic, access and LPG safety requirements can affect timing.",
+    question: deliveryTimingQuestion,
+    answer: "",
   },
   {
     question: "How does a cylinder exchange work?",
@@ -311,32 +302,61 @@ export const faqStructuredDataItems = [
 
 export function createFaqStructuredDataItems(
   deliveryFeeDescription: string,
+  deliveryTimingDescription: string,
 ) {
-  return faqStructuredDataItems.map((item) =>
-    item.question === "How is the delivery fee calculated?"
-      ? {
-          ...item,
-          answer: deliveryFeeDescription,
-        }
-      : item,
-  );
+  return faqStructuredDataItems.map((item) => {
+    if (item.question === deliveryFeeQuestion) {
+      return {
+        ...item,
+        answer: deliveryFeeDescription,
+      };
+    }
+
+    if (item.question === deliveryTimingQuestion) {
+      return {
+        ...item,
+        answer: `${deliveryTimingDescription} Orders placed after the 2:00 PM SAST cutoff begin processing on the next business day. Stock, transport capacity, weather, traffic, access and LPG safety requirements can affect timing.`,
+      };
+    }
+
+    return item;
+  });
 }
 
 export function FaqPage({
   deliveryFeeDescription,
+  deliveryTimingDescription,
 }: {
   deliveryFeeDescription: string;
+  deliveryTimingDescription: string;
 }) {
   const resolvedFaqGroups = faqGroups.map((group) => ({
     ...group,
-    items: group.items.map((item) =>
-      item.question === "How is the delivery fee calculated?"
-        ? {
-            ...item,
-            answer: deliveryFeeDescription,
-          }
-        : item,
-    ),
+    items: group.items.map((item) => {
+      if (item.question === deliveryFeeQuestion) {
+        return {
+          ...item,
+          answer: deliveryFeeDescription,
+        };
+      }
+
+      if (item.question === deliveryTimingQuestion) {
+        return {
+          ...item,
+          answer: (
+            <>
+              {deliveryTimingDescription} Our order cutoff is 2:00 PM SAST on
+              business days, and an order placed after the cutoff begins
+              processing on the next business day. Stock, courier or vehicle
+              capacity, weather, traffic, access and LPG safety requirements can
+              affect timing.
+            </>
+          ),
+        };
+      }
+
+      return item;
+    }),
   }));
 
   return (

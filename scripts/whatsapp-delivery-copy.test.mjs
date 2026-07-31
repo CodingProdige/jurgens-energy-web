@@ -22,6 +22,33 @@ test("WhatsApp delivery replies distinguish national and Jurgens eligibility", (
   );
 });
 
+test("WhatsApp delivery replies use the saved public timing settings", () => {
+  assert.match(
+    whatsappServiceSource,
+    /getPublicDeliveryTimingDescription/,
+  );
+  assert.match(
+    whatsappServiceSource,
+    /function getSouthAfricaDeliveryTimingFacts\(settings: MarketplaceSettings\)/,
+  );
+  assert.match(
+    whatsappServiceSource,
+    /getPublicDeliveryTimingDescription\(settings\)/,
+  );
+  assert.match(
+    whatsappServiceSource,
+    /getWhatsappKnowledgeFacts\(question, settings\)/,
+  );
+  assert.doesNotMatch(
+    whatsappServiceSource,
+    /Transit time after dispatch depends/,
+  );
+  assert.doesNotMatch(
+    whatsappServiceSource,
+    /Eligible delivery normally takes 1–4 business days/,
+  );
+});
+
 test("WhatsApp delivery replies describe the customer fee, not a courier quote", () => {
   assert.match(
     whatsappServiceSource,

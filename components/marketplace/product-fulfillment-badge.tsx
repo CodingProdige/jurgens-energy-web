@@ -5,9 +5,11 @@ import { cn } from "@/lib/utils";
 import type { ProductFulfillmentMode } from "@/src/modules/shipping";
 
 export function MarketplaceProductFulfillmentBadge({
+  className,
   fulfillmentMode,
   label,
 }: {
+  className?: string;
   fulfillmentMode: ProductFulfillmentMode;
   label?: string;
 }) {
@@ -20,6 +22,7 @@ export function MarketplaceProductFulfillmentBadge({
         isJurgensFulfilled
           ? "bg-emerald-500 text-white"
           : "bg-[#1a1a1a] text-white dark:bg-[#f7f7f2] dark:text-[#080808]",
+        className,
       )}
     >
       <TruckIcon className="size-2.5 shrink-0 sm:size-3" />

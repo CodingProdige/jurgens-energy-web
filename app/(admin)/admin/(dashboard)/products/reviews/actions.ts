@@ -1,232 +1,210 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/src/db";
-import {
-  auditLogs,
-  productReviewEvents,
-  products,
-} from "@/src/db/schema";
+import { auditLogs, products, reviews } from "@/src/db/schema";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import { recalculateProductRatingSummary } from "@/src/modules/reviews";
 
-export type ProductReviewMutationState = {
-  message?: string;
-  ok?: boolean;
-};
-
-const productReviewSchema = z.object({
-  productId: z.string().uuid(),
+const reviewIdSchema = z.object({
+  reviewId: z.string().uuid(),
 });
 
-const requestChangesSchema = productReviewSchema.extend({
-  reason: z.string().trim().min(10, "Add a clear reason for the listing change.").max(1000),
+const rejectReviewSchema = reviewIdSchema.extend({
+  reason: z
+    .string()
+    .trim()
+    .max(1000, "Keep the moderation note under 1,000 characters.")
+    .optional()
+    .transform((value) => value || "Review did not meet product review guidelines."),
 });
 
-async function requireProductReviewManageAccess() {
+async function requireReviewModerationAccess() {
   const access = await requireAdminCapability("admin.catalog.manage");
 
   if (!access.ok) {
-    throw new Error("You do not have permission to review products.");
+    throw new Error("You do not have permission to moderate product reviews.");
   }
 
   return access.session;
 }
 
-async function findReviewableProduct(productId: string) {
-  const [product] = await db
+async function getModeratedReview(reviewId: string) {
+  const [review] = await db
     .select({
-      brandRequestId: products.brandRequestId,
-      fulfillmentMode: products.fulfillmentMode,
-      id: products.id,
-      status: products.status,
-      title: products.title,
+      id: reviews.id,
+      productId: reviews.productId,
+      productSlug: products.slug,
+      productTitle: products.title,
+      rating: reviews.rating,
+      status: reviews.status,
     })
-    .from(products)
-    .where(eq(products.id, productId))
+    .from(reviews)
+    .innerJoin(products, eq(products.id, reviews.productId))
+    .where(eq(reviews.id, reviewId))
     .limit(1);
 
-  return product;
+  return review;
 }
 
-async function writeProductReviewAuditLog({
-  action,
-  actorUserId,
-  entityId,
-  metadata,
-}: {
-  action: string;
-  actorUserId: string;
-  entityId: string;
-  metadata?: Record<string, unknown>;
-}) {
-  await db.insert(auditLogs).values({
-    action,
-    actorUserId,
-    entityId,
-    entityType: "product",
-    metadata: metadata ? JSON.stringify(metadata) : null,
-  });
+async function revalidateReviewSurfaces(productSlug: string) {
+  revalidatePath("/products/reviews");
+  revalidatePath("/products");
+  revalidatePath(`/products/${productSlug}`);
 }
 
-export async function approveProductReview(
-  _state: ProductReviewMutationState,
-  formData: FormData,
-): Promise<ProductReviewMutationState> {
-  const session = await requireProductReviewManageAccess();
-  const parsed = productReviewSchema.safeParse({
-    productId: formData.get("productId"),
+export async function approveCustomerProductReview(formData: FormData) {
+  const session = await requireReviewModerationAccess();
+  const parsed = reviewIdSchema.safeParse({
+    reviewId: formData.get("reviewId"),
   });
 
   if (!parsed.success) {
-    return { ok: false, message: "Product was not found." };
+    throw new Error("Review was not found.");
   }
 
-  const product = await findReviewableProduct(parsed.data.productId);
+  const review = await getModeratedReview(parsed.data.reviewId);
 
-  if (!product) {
-    return { ok: false, message: "Product was not found." };
+  if (!review) {
+    throw new Error("Review was not found.");
   }
 
-  if (product.status !== "pending_review") {
-    return {
-      ok: false,
-      message: "Only products pending review can be approved.",
-    };
-  }
-
-  if (product.brandRequestId) {
-    const request = await db.query.brandRequests.findFirst({
-      where: (table, { eq }) => eq(table.id, product.brandRequestId!),
-    });
-
-    if (request?.status === "pending") {
-      return {
-        ok: false,
-        message: "Approve or reject the linked brand request before approving this product.",
-      };
-    }
-  }
-
-  const nextStatus = "live";
+  const now = new Date();
 
   await db.transaction(async (tx) => {
     await tx
-      .update(products)
+      .update(reviews)
       .set({
-        status: nextStatus,
-        updatedAt: new Date(),
+        approvedAt: now,
+        hiddenAt: null,
+        moderatedByUserId: session.user.id,
+        rejectedAt: null,
+        rejectedReason: null,
+        status: "approved",
+        updatedAt: now,
       })
-      .where(
-        and(
-          eq(products.id, product.id),
-          eq(products.status, "pending_review"),
-        ),
-      );
+      .where(eq(reviews.id, review.id));
 
-    await tx.insert(productReviewEvents).values({
-      action: "approved",
-      actorUserId: session.user.id,
-      fromStatus: "pending_review",
-      note:
-        "Admin approved product and made it live.",
-      productId: product.id,
-      toStatus: nextStatus,
-    });
+    await recalculateProductRatingSummary(review.productId, tx);
 
     await tx.insert(auditLogs).values({
-      action: "product_review.approved",
+      action: "customer_product_review.approved",
       actorUserId: session.user.id,
-      entityId: product.id,
-      entityType: "product",
+      entityId: review.id,
+      entityType: "review",
       metadata: JSON.stringify({
-        fulfillmentMode: product.fulfillmentMode,
-        fromStatus: "pending_review",
-        title: product.title,
-        toStatus: nextStatus,
+        productId: review.productId,
+        productTitle: review.productTitle,
+        rating: review.rating,
+        statusBefore: review.status,
       }),
     });
   });
 
-  revalidatePath("/products/reviews");
-
-  return {
-    ok: true,
-    message: "Product approved and made live.",
-  };
+  await revalidateReviewSurfaces(review.productSlug);
 }
 
-export async function requestProductReviewChanges(
-  _state: ProductReviewMutationState,
-  formData: FormData,
-): Promise<ProductReviewMutationState> {
-  const session = await requireProductReviewManageAccess();
-  const parsed = requestChangesSchema.safeParse({
-    productId: formData.get("productId"),
+export async function rejectCustomerProductReview(formData: FormData) {
+  const session = await requireReviewModerationAccess();
+  const parsed = rejectReviewSchema.safeParse({
     reason: formData.get("reason"),
+    reviewId: formData.get("reviewId"),
   });
 
   if (!parsed.success) {
-    return {
-      ok: false,
-      message:
-        parsed.error.issues[0]?.message ??
-        "Add a clear reason for the listing change.",
-    };
+    throw new Error(
+      parsed.error.issues[0]?.message ?? "Review could not be rejected.",
+    );
   }
 
-  const product = await findReviewableProduct(parsed.data.productId);
+  const review = await getModeratedReview(parsed.data.reviewId);
 
-  if (!product) {
-    return { ok: false, message: "Product was not found." };
+  if (!review) {
+    throw new Error("Review was not found.");
   }
 
-  if (product.status !== "pending_review") {
-    return {
-      ok: false,
-      message: "Only products pending review can receive requested changes.",
-    };
-  }
+  const now = new Date();
 
   await db.transaction(async (tx) => {
     await tx
-      .update(products)
+      .update(reviews)
       .set({
-        status: "changes_requested",
-        updatedAt: new Date(),
+        hiddenAt: null,
+        moderatedByUserId: session.user.id,
+        rejectedAt: now,
+        rejectedReason: parsed.data.reason,
+        status: "rejected",
+        updatedAt: now,
       })
-      .where(
-        and(
-          eq(products.id, product.id),
-          eq(products.status, "pending_review"),
-        ),
-      );
+      .where(eq(reviews.id, review.id));
 
-    await tx.insert(productReviewEvents).values({
-      action: "changes_requested",
+    await recalculateProductRatingSummary(review.productId, tx);
+
+    await tx.insert(auditLogs).values({
+      action: "customer_product_review.rejected",
       actorUserId: session.user.id,
-      fromStatus: "pending_review",
-      note: parsed.data.reason,
-      productId: product.id,
-      toStatus: "changes_requested",
+      entityId: review.id,
+      entityType: "review",
+      metadata: JSON.stringify({
+        productId: review.productId,
+        productTitle: review.productTitle,
+        reason: parsed.data.reason,
+        rating: review.rating,
+        statusBefore: review.status,
+      }),
     });
   });
 
-  await writeProductReviewAuditLog({
-    action: "product_review.changes_requested",
-    actorUserId: session.user.id,
-    entityId: product.id,
-    metadata: {
-      fromStatus: "pending_review",
-      reason: parsed.data.reason,
-      title: product.title,
-      toStatus: "changes_requested",
-    },
+  await revalidateReviewSurfaces(review.productSlug);
+}
+
+export async function hideCustomerProductReview(formData: FormData) {
+  const session = await requireReviewModerationAccess();
+  const parsed = reviewIdSchema.safeParse({
+    reviewId: formData.get("reviewId"),
   });
 
-  revalidatePath("/products/reviews");
+  if (!parsed.success) {
+    throw new Error("Review was not found.");
+  }
 
-  return { ok: true, message: "Changes requested." };
+  const review = await getModeratedReview(parsed.data.reviewId);
+
+  if (!review) {
+    throw new Error("Review was not found.");
+  }
+
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(reviews)
+      .set({
+        hiddenAt: now,
+        moderatedByUserId: session.user.id,
+        status: "hidden",
+        updatedAt: now,
+      })
+      .where(eq(reviews.id, review.id));
+
+    await recalculateProductRatingSummary(review.productId, tx);
+
+    await tx.insert(auditLogs).values({
+      action: "customer_product_review.hidden",
+      actorUserId: session.user.id,
+      entityId: review.id,
+      entityType: "review",
+      metadata: JSON.stringify({
+        productId: review.productId,
+        productTitle: review.productTitle,
+        rating: review.rating,
+        statusBefore: review.status,
+      }),
+    });
+  });
+
+  await revalidateReviewSurfaces(review.productSlug);
 }

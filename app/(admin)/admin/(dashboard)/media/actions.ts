@@ -255,6 +255,7 @@ export async function deleteAdminMediaAsset(
   const [asset] = await db
     .select({
       id: media.id,
+      previewRelativePath: media.previewRelativePath,
       relativePath: media.relativePath,
       thumbnailRelativePath: media.thumbnailRelativePath,
     })
@@ -291,7 +292,11 @@ export async function deleteAdminMediaAsset(
   }
 
   await Promise.all(
-    [asset.relativePath, asset.thumbnailRelativePath]
+    [
+      asset.relativePath,
+      asset.thumbnailRelativePath,
+      asset.previewRelativePath,
+    ]
       .filter((relativePath): relativePath is string => Boolean(relativePath))
       .map((relativePath) => removeMediaFile(relativePath)),
   );

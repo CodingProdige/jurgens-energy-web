@@ -195,14 +195,26 @@ export async function getStaticPageSeoValue(
 
 export async function getStaticPageMetadata(
   pageKey: StaticSeoPageKey,
+  currentDefaults?: {
+    description?: string;
+    title?: string;
+  },
 ): Promise<Metadata> {
   const entry = getStaticSeoPageRegistryEntry(pageKey);
   const value = await getStaticPageSeoValue(pageKey);
+  const description =
+    !value.isCustomized && currentDefaults?.description
+      ? currentDefaults.description
+      : value.description;
+  const title =
+    !value.isCustomized && currentDefaults?.title
+      ? currentDefaults.title
+      : value.title;
 
   return createMarketplacePageMetadata({
-    description: value.description,
+    description,
     path: entry.path,
-    title: value.title,
+    title,
   });
 }
 

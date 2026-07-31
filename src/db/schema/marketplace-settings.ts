@@ -58,8 +58,8 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
     .default(100),
   imageCompressionQuality: integer("image_compression_quality")
     .notNull()
-    .default(78),
-  maxImageWidth: integer("max_image_width").notNull().default(2000),
+    .default(90),
+  maxImageWidth: integer("max_image_width").notNull().default(2560),
   maxVideoWidth: integer("max_video_width").notNull().default(1280),
   videoCompressionCrf: integer("video_compression_crf").notNull().default(28),
   stripeMode: varchar("stripe_mode", { length: 16 })
@@ -111,6 +111,26 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   }),
   shippingMarginBps: integer("shipping_margin_bps").notNull().default(0),
   shippingBufferBps: integer("shipping_buffer_bps").notNull().default(0),
+  shippingHandlingMinBusinessDays: integer(
+    "shipping_handling_min_business_days",
+  )
+    .notNull()
+    .default(0),
+  shippingHandlingMaxBusinessDays: integer(
+    "shipping_handling_max_business_days",
+  )
+    .notNull()
+    .default(1),
+  shippingTransitMinBusinessDays: integer(
+    "shipping_transit_min_business_days",
+  )
+    .notNull()
+    .default(1),
+  shippingTransitMaxBusinessDays: integer(
+    "shipping_transit_max_business_days",
+  )
+    .notNull()
+    .default(3),
   jurgensDeliveryCutoffTime: varchar("jurgens_delivery_cutoff_time", {
     length: 5,
   })
@@ -282,5 +302,13 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   shippingFreeOverNonnegative: check(
     "marketplace_settings_shipping_free_over_nonnegative",
     sql`${settings.shippingFreeOverAmount} IS NULL OR ${settings.shippingFreeOverAmount} > 0`,
+  ),
+  shippingHandlingBusinessDaysValid: check(
+    "marketplace_settings_shipping_handling_days_valid",
+    sql`${settings.shippingHandlingMinBusinessDays} >= 0 AND ${settings.shippingHandlingMaxBusinessDays} <= 30 AND ${settings.shippingHandlingMinBusinessDays} <= ${settings.shippingHandlingMaxBusinessDays}`,
+  ),
+  shippingTransitBusinessDaysValid: check(
+    "marketplace_settings_shipping_transit_days_valid",
+    sql`${settings.shippingTransitMinBusinessDays} >= 0 AND ${settings.shippingTransitMaxBusinessDays} <= 60 AND ${settings.shippingTransitMinBusinessDays} <= ${settings.shippingTransitMaxBusinessDays}`,
   ),
 }));

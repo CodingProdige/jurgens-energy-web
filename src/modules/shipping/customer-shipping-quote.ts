@@ -42,6 +42,7 @@ const customerShippingQuoteSchema = z.object({
   checkoutFingerprint: z.string().length(64),
   collectionAddress: z.record(z.string(), z.unknown()).optional(),
   deliveryAddress: addressSchema,
+  deliveryInformation: z.string().trim().min(1).max(300),
   items: z.array(parcelItemSchema).min(1),
   jurgensZoneId: z.string().uuid().nullable().optional(),
   price: z.object({
@@ -56,6 +57,7 @@ export async function createCustomerShippingQuote(input: {
   checkoutFingerprint: string;
   collectionAddress?: Record<string, unknown>;
   deliveryAddress: z.infer<typeof addressSchema>;
+  deliveryInformation: string;
   items: z.infer<typeof parcelItemSchema>[];
   jurgensZoneId?: string | null;
   price: CustomerShippingPrice;
@@ -85,6 +87,7 @@ export async function createCustomerShippingQuote(input: {
       providerPayload: {
         costDifferencePolicy: "absorbed_by_jurgens_energy",
         customerPriceRule: parsed.price.rule,
+        deliveryInformation: parsed.deliveryInformation,
         flatRate: parsed.price.flatRate,
         freeOverAmount: parsed.price.freeOverAmount,
         merchantCountry: "ZA",
@@ -101,8 +104,7 @@ export async function createCustomerShippingQuote(input: {
     expiresAt,
     option: {
       amountZar: parsed.price.amount,
-      deliveryInformation:
-        "Delivery is available to eligible addresses throughout South Africa.",
+      deliveryInformation: parsed.deliveryInformation,
       label: serviceName,
       provider: "manual" as const,
       quoteId: quote.id,
