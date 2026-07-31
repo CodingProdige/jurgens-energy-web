@@ -383,6 +383,7 @@ function CategoryMessage({ state }: { state: CategoryMutationState }) {
 
 function CategoryForm({
   category,
+  onSaved,
   options,
   parentCategory,
 }: {
@@ -391,6 +392,7 @@ function CategoryForm({
     siblingCount?: number;
     siblingPosition?: number;
   };
+  onSaved?: () => void;
   options: AdminCategoryOption[];
   parentCategory?: AdminCategory & { lineNumber?: string };
 }) {
@@ -408,6 +410,11 @@ function CategoryForm({
   const availabilityParentId = category
     ? category.parentId
     : (parentCategory?.id ?? selectedParentId) || null;
+  const selectedParentLabel =
+    selectedParentId
+      ? options.find((option) => option.id === selectedParentId)?.label ??
+        "Selected category"
+      : "Root category";
 
   useEffect(() => {
     const trimmedName = categoryName.trim();
@@ -429,6 +436,12 @@ function CategoryForm({
 
     return () => window.clearTimeout(timeoutId);
   }, [availabilityParentId, category?.id, categoryName]);
+
+  useEffect(() => {
+    if (state.ok) {
+      onSaved?.();
+    }
+  }, [onSaved, state.ok]);
 
   const isCategoryNameBlocked = availability?.available === false;
   return (
@@ -466,7 +479,9 @@ function CategoryForm({
               id="parentId"
               className={cn("w-full", modalSelectClass)}
             >
-              <SelectValue placeholder="Root category" />
+              <SelectValue className="min-w-0 truncate">
+                {selectedParentLabel}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent
               align="start"
@@ -1034,6 +1049,8 @@ export function CategoryDashboard({
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<CategoryFilters>(defaultFilters);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isRootCategoryDialogOpen, setIsRootCategoryDialogOpen] =
+    useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -1147,6 +1164,13 @@ export function CategoryDashboard({
 
   function openDeleteDialog(category: FlatCategory) {
     setActiveDeleteCategory(category);
+  }
+
+  function handleCategorySaved() {
+    setIsRootCategoryDialogOpen(false);
+    setActiveEditCategory(null);
+    setActiveSubcategoryParent(null);
+    router.refresh();
   }
 
   function toggleLock(category: FlatCategory) {
@@ -1277,6 +1301,14 @@ export function CategoryDashboard({
             <DashboardButton onClick={exportCategoriesCsv} type="button">
               <DownloadIcon className="size-3.5" />
               Export
+            </DashboardButton>
+            <DashboardButton
+              className={adminPrimaryClass}
+              onClick={() => setIsRootCategoryDialogOpen(true)}
+              type="button"
+            >
+              <PlusIcon className="size-3.5" />
+              Add category
             </DashboardButton>
           </div>
         </section>
@@ -1468,6 +1500,40 @@ export function CategoryDashboard({
                   </TableCell>
                 </TableRow>
               ))}
+              {pageRows.length === 0 ? (
+                <TableRow className={dashboardTableRowClass}>
+                  <TableCell
+                    className={cn(
+                      "px-5 py-12 text-center",
+                      dashboardTableCellClass,
+                    )}
+                    colSpan={7}
+                  >
+                    <div className="mx-auto grid max-w-md justify-items-center gap-3">
+                      <span className="grid size-11 place-items-center rounded-full bg-admin-primary/10 text-admin-primary">
+                        <FolderPlusIcon className="size-5" />
+                      </span>
+                      <div className="grid gap-1">
+                        <p className="text-sm font-bold text-zinc-950 dark:text-white">
+                          No categories found
+                        </p>
+                        <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                          Create a root category, or clear filters to show
+                          existing categories.
+                        </p>
+                      </div>
+                      <DashboardButton
+                        className={adminPrimaryClass}
+                        onClick={() => setIsRootCategoryDialogOpen(true)}
+                        type="button"
+                      >
+                        <PlusIcon className="size-3.5" />
+                        Add category
+                      </DashboardButton>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : null}
             </TableBody>
           </Table>
 
@@ -1559,6 +1625,26 @@ export function CategoryDashboard({
         </section>
 
         <Dialog
+          open={isRootCategoryDialogOpen}
+          onOpenChange={setIsRootCategoryDialogOpen}
+        >
+          <DialogContent className={modalContentClass}>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-zinc-950 dark:text-white">
+                Add category
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6 text-slate-600 dark:text-zinc-300">
+                Create a root category, or choose a parent category to nest it.
+              </DialogDescription>
+            </DialogHeader>
+            <CategoryForm
+              onSaved={handleCategorySaved}
+              options={options}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
           open={Boolean(activeEditCategory)}
           onOpenChange={(open) => {
             if (!open) {
@@ -1576,7 +1662,11 @@ export function CategoryDashboard({
               </DialogDescription>
             </DialogHeader>
             {activeEditCategory ? (
-              <CategoryForm category={activeEditCategory} options={options} />
+              <CategoryForm
+                category={activeEditCategory}
+                onSaved={handleCategorySaved}
+                options={options}
+              />
             ) : null}
           </DialogContent>
         </Dialog>
@@ -1600,6 +1690,7 @@ export function CategoryDashboard({
             </DialogHeader>
             {activeSubcategoryParent ? (
               <CategoryForm
+                onSaved={handleCategorySaved}
                 options={options}
                 parentCategory={activeSubcategoryParent}
               />
