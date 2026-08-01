@@ -14,7 +14,7 @@ import {
   UserCogIcon,
   ZapIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import {
   DashboardSurfaceShell,
@@ -163,6 +163,103 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
   },
 ];
 
+function getAdminNotificationNavCounts(
+  notificationCenter: NotificationCenterState,
+) {
+  const counts = {
+    contact: 0,
+    orders: 0,
+    reviews: 0,
+    shipping: 0,
+    whatsapp: 0,
+  };
+
+  for (const notification of notificationCenter.notifications) {
+    if (notification.readAt) {
+      continue;
+    }
+
+    const key = [
+      notification.type,
+      notification.title,
+      notification.actionUrl ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    if (key.includes("contact")) {
+      counts.contact += 1;
+      continue;
+    }
+
+    if (key.includes("whatsapp") || key.includes("conversation")) {
+      counts.whatsapp += 1;
+      continue;
+    }
+
+    if (key.includes("review")) {
+      counts.reviews += 1;
+      continue;
+    }
+
+    if (
+      key.includes("shipment") ||
+      key.includes("shipping") ||
+      key.includes("delivery")
+    ) {
+      counts.shipping += 1;
+      continue;
+    }
+
+    if (key.includes("order") || key.includes("payment")) {
+      counts.orders += 1;
+    }
+  }
+
+  return counts;
+}
+
+function formatNavBadge(value: number) {
+  if (value <= 0) {
+    return null;
+  }
+
+  return value > 99 ? "99+" : value;
+}
+
+function withAdminNotificationBadges(
+  items: DashboardSurfaceNavItem<AdminCapability>[],
+  counts: ReturnType<typeof getAdminNotificationNavCounts>,
+) {
+  return items.map((item) => {
+    const nextItem: DashboardSurfaceNavItem<AdminCapability> = { ...item };
+
+    if (item.label === "Orders") {
+      nextItem.badge = formatNavBadge(counts.orders);
+      nextItem.children = item.children?.map((child) =>
+        child.label === "All orders"
+          ? { ...child, badge: formatNavBadge(counts.orders) }
+          : child,
+      );
+    } else if (item.label === "Shipping") {
+      nextItem.badge = formatNavBadge(counts.shipping);
+    } else if (item.label === "WhatsApp") {
+      nextItem.badge = formatNavBadge(counts.whatsapp);
+    } else if (item.label === "Contact inquiries") {
+      nextItem.badge = formatNavBadge(counts.contact);
+    } else if (item.label === "Products") {
+      nextItem.badge = formatNavBadge(counts.reviews);
+      nextItem.children = item.children?.map((child) =>
+        child.label === "Reviews"
+          ? { ...child, badge: formatNavBadge(counts.reviews) }
+          : child,
+      );
+    }
+
+    return nextItem;
+  });
+}
+
 export function AdminDashboardShell({
   capabilities,
   children,
@@ -176,13 +273,22 @@ export function AdminDashboardShell({
   notificationCenter: NotificationCenterState;
   user: DashboardSurfaceUser;
 }) {
+  const navItemsWithBadges = useMemo(
+    () =>
+      withAdminNotificationBadges(
+        navItems,
+        getAdminNotificationNavCounts(notificationCenter),
+      ),
+    [notificationCenter],
+  );
+
   return (
     <DashboardSurfaceShell
       accent="amber"
       brandAriaLabel="Jurgens Energy admin dashboard"
       capabilities={capabilities}
       currencyPreference={currencyPreference}
-      navItems={navItems}
+      navItems={navItemsWithBadges}
       notificationCenter={notificationCenter}
       notificationCenterHref="/notifications"
       notificationSurface="admin"

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
   maxWhatsappEmailNotificationRecipients,
+  maxWhatsappOrderNotificationRecipients,
   openAiReasoningEfforts,
   updateMarketplaceComingSoonSettings,
   updateMarketplaceFooterSettings,
@@ -674,6 +675,30 @@ const whatsappEmailNotificationRecipientsSchema = z
       ),
   );
 
+const whatsappOrderNotificationRecipientsSchema = z
+  .string()
+  .max(3000, "Paid-order WhatsApp recipients are too long.")
+  .transform((value) =>
+    Array.from(
+      new Set(
+        value
+          .split(/[\n,]+/g)
+          .map((phone) =>
+            normalizePhoneNumber(phone.trim(), { defaultCountryCode: "ZA" }),
+          )
+          .filter((phone): phone is string => Boolean(phone)),
+      ),
+    ),
+  )
+  .pipe(
+    z
+      .array(z.string())
+      .max(
+        maxWhatsappOrderNotificationRecipients,
+        `Add no more than ${maxWhatsappOrderNotificationRecipients} paid-order WhatsApp alert recipients.`,
+      ),
+  );
+
 const whatsappSettingsSchema = z
   .object({
     apiKey: z
@@ -738,6 +763,8 @@ const whatsappSettingsSchema = z
         "Use the full https:// 360dialog API URL.",
       )
       .refine((value) => !value || value.length <= 500, "API URL is too long."),
+    orderNotificationRecipients: whatsappOrderNotificationRecipientsSchema,
+    orderNotificationsEnabled: z.coerce.boolean().default(false),
     provider: z.literal("360dialog"),
     webhookSigningSecret: z
       .string()
@@ -786,6 +813,18 @@ const whatsappSettingsSchema = z
         path: ["emailNotifyNewConversation"],
       });
     }
+
+    if (
+      settings.orderNotificationsEnabled &&
+      settings.orderNotificationRecipients.length === 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Add at least one internal WhatsApp phone number before enabling paid-order WhatsApp alerts.",
+        path: ["orderNotificationRecipients"],
+      });
+    }
   });
 
 export async function updateWhatsappOrderingSettings(
@@ -820,6 +859,11 @@ export async function updateWhatsappOrderingSettings(
     followUpSupportMessage: String(formData.get("followUpSupportMessage") ?? ""),
     followUpsEnabled: formData.get("followUpsEnabled") === "on",
     messageUrl: String(formData.get("messageUrl") ?? ""),
+    orderNotificationRecipients: String(
+      formData.get("orderNotificationRecipients") ?? "",
+    ),
+    orderNotificationsEnabled:
+      formData.get("orderNotificationsEnabled") === "on",
     provider: String(formData.get("provider") ?? "360dialog"),
     webhookSigningSecret: String(
       formData.get("webhookSigningSecret") ?? "",

@@ -27,11 +27,13 @@ import type { NotificationCenterState } from "@/src/modules/notifications/in-app
 export type DashboardSurfaceAccent = "amber" | "green";
 
 export type DashboardSurfaceNavItem<TCapability extends string = string> = {
+  badge?: number | string | null;
   label: string;
   href?: string;
   icon: ComponentType<{ className?: string }>;
   capability?: TCapability;
   children?: Array<{
+    badge?: number | string | null;
     capability?: TCapability;
     label: string;
     href?: string;
@@ -102,6 +104,22 @@ function SetupAttentionMarker() {
   return (
     <span className="pointer-events-none absolute left-1 top-1 text-amber-400 drop-shadow-sm">
       <StarIcon className="size-2.5 fill-current" />
+    </span>
+  );
+}
+
+function NavigationBadge({
+  value,
+}: {
+  value?: number | string | null;
+}) {
+  if (value === null || typeof value === "undefined" || value === 0) {
+    return null;
+  }
+
+  return (
+    <span className="ml-auto inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-[#ff5a1f] px-1.5 py-0.5 text-[10px] font-black leading-none text-white tabular-nums">
+      {value}
     </span>
   );
 }
@@ -212,19 +230,27 @@ function SurfaceNavList<TCapability extends string>({
                 )}
               >
                 {itemNeedsAttention ? <SetupAttentionMarker /> : null}
-                <span className="flex items-center gap-3">
-                  <Icon className={cn("size-4", isActive ? styles.icon : "text-current")} />
-                  {item.label}
+                <span className="flex min-w-0 items-center gap-3">
+                  <Icon
+                    className={cn(
+                      "size-4 shrink-0",
+                      isActive ? styles.icon : "text-current",
+                    )}
+                  />
+                  <span className="truncate">{item.label}</span>
                 </span>
-                <ChevronDownIcon
-                  className={cn(
-                    "size-4 transition-transform",
-                    isOpen && "rotate-180",
-                    isResponsive
-                      ? "text-zinc-500 dark:text-white/70"
-                      : "text-white/70",
-                  )}
-                />
+                <span className="flex shrink-0 items-center gap-2">
+                  <NavigationBadge value={item.badge} />
+                  <ChevronDownIcon
+                    className={cn(
+                      "size-4 transition-transform",
+                      isOpen && "rotate-180",
+                      isResponsive
+                        ? "text-zinc-500 dark:text-white/70"
+                        : "text-white/70",
+                    )}
+                  />
+                </span>
               </button>
               {isOpen ? (
                 <div
@@ -248,14 +274,15 @@ function SurfaceNavList<TCapability extends string>({
                         <span
                           key={child.label}
                           className={cn(
-                            "relative flex h-9 cursor-not-allowed items-center rounded-md px-3 text-sm opacity-50",
+                            "relative flex h-9 cursor-not-allowed items-center justify-between gap-2 rounded-md px-3 text-sm opacity-50",
                             isResponsive
                               ? "text-zinc-500 dark:text-white/58"
                               : "text-white/58",
                           )}
                         >
                           {childNeedsAttention ? <SetupAttentionMarker /> : null}
-                          {child.label}
+                          <span className="truncate">{child.label}</span>
+                          <NavigationBadge value={child.badge} />
                         </span>
                       );
                     }
@@ -266,7 +293,7 @@ function SurfaceNavList<TCapability extends string>({
                         href={child.href}
                         onClick={onNavigate}
                         className={cn(
-                          "relative flex h-9 items-center rounded-md px-3 text-sm transition",
+                          "relative flex h-9 items-center justify-between gap-2 rounded-md px-3 text-sm transition",
                           isResponsive
                             ? "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-white/58 dark:hover:bg-white/[0.06] dark:hover:text-white"
                             : "text-white/58 hover:bg-white/[0.05] hover:text-white",
@@ -275,7 +302,8 @@ function SurfaceNavList<TCapability extends string>({
                         )}
                       >
                         {childNeedsAttention ? <SetupAttentionMarker /> : null}
-                        {child.label}
+                        <span className="truncate">{child.label}</span>
+                        <NavigationBadge value={child.badge} />
                       </Link>
                     );
                   })}
@@ -293,14 +321,17 @@ function SurfaceNavList<TCapability extends string>({
           return (
             <span
               key={item.label}
-            className={cn(
-                "relative flex h-11 cursor-not-allowed items-center gap-3 rounded-lg px-3 text-sm font-medium opacity-45",
+              className={cn(
+                "relative flex h-11 cursor-not-allowed items-center justify-between gap-3 rounded-lg px-3 text-sm font-medium opacity-45",
                 inactiveClass,
               )}
             >
               {itemNeedsAttention ? <SetupAttentionMarker /> : null}
-              <Icon className="size-4" />
-              {item.label}
+              <span className="flex min-w-0 items-center gap-3">
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </span>
+              <NavigationBadge value={item.badge} />
             </span>
           );
         }
@@ -311,13 +342,16 @@ function SurfaceNavList<TCapability extends string>({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition",
+              "relative flex h-11 items-center justify-between gap-3 rounded-lg px-3 text-sm font-medium transition",
               isActive ? activeClass : inactiveClass,
             )}
           >
             {itemNeedsAttention ? <SetupAttentionMarker /> : null}
-            <Icon className={cn("size-4", isActive && styles.icon)} />
-            {item.label}
+            <span className="flex min-w-0 items-center gap-3">
+              <Icon className={cn("size-4 shrink-0", isActive && styles.icon)} />
+              <span className="truncate">{item.label}</span>
+            </span>
+            <NavigationBadge value={item.badge} />
           </Link>
         );
       })}

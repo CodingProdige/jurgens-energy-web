@@ -58,7 +58,11 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=replace-with-provider-verification-token
 WHATSAPP_WEBHOOK_SIGNING_SECRET=replace-with-a-separate-long-random-post-secret
 TWILIO_AUTH_TOKEN=replace-only-when-legacy-twilio-webhooks-are-enabled
 WHATSAPP_INVOICE_TEMPLATE_NAME=customer_invoice_issued
-WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en
+WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en_US
+WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_NAME=customer_order_paid
+WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_LANGUAGE=en_US
+WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_NAME=admin_order_paid_alert
+WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_LANGUAGE=en_US
 ```
 
 ## Self-Hosted Values
@@ -114,7 +118,11 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=replace-with-provider-verification-token
 WHATSAPP_WEBHOOK_SIGNING_SECRET=replace-with-a-separate-long-random-post-secret
 TWILIO_AUTH_TOKEN=replace-only-when-legacy-twilio-webhooks-are-enabled
 WHATSAPP_INVOICE_TEMPLATE_NAME=customer_invoice_issued
-WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en
+WHATSAPP_INVOICE_TEMPLATE_LANGUAGE=en_US
+WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_NAME=customer_order_paid
+WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_LANGUAGE=en_US
+WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_NAME=admin_order_paid_alert
+WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_LANGUAGE=en_US
 
 CLOUDFLARE_TUNNEL_TOKEN=replace-with-cloudflare-tunnel-token
 ```
@@ -188,11 +196,29 @@ The template named by `WHATSAPP_INVOICE_TEMPLATE_NAME` must contain a document
 header and five body placeholders in this exact order: customer name, order
 number, invoice number, invoice total, and secure invoice download URL. The
 default template name is `customer_invoice_issued` and the default language is
-`en`; both values must match the approved template in WhatsApp Manager.
-A suitable body is: `Hi {{1}}, thank you for order {{2}}. Your paid tax invoice
-{{3}} for {{4}} is attached. Secure download: {{5}}`. `APP_URL` must be publicly
+`en_US`; both values must match the approved template in WhatsApp Manager.
+A suitable body is: `Hi {{1}}, your Jurgens Energy VAT invoice {{3}} for order
+{{2}} is ready. Invoice total: {{4}}. You can also download it securely here:
+{{5}}. The PDF is attached for your records.`. `APP_URL` must be publicly
 reachable so WhatsApp can retrieve the token-protected PDF used by the document
 header.
+
+Paid-order WhatsApp confirmations use an approved text template named by
+`WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_NAME`. It must contain five body
+placeholders in this exact order: customer name, order number, order total,
+delivery window, and customer account order URL. A suitable body is:
+`Hi {{1}}, your Jurgens Energy payment for order {{2}} is confirmed. Total
+paid: {{3}}. Delivery: {{4}}. You can view your order here: {{5}}. We will send
+your VAT invoice as soon as it is ready.`.
+
+Internal paid-order WhatsApp alerts use an approved text template named by
+`WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_NAME`. It must contain five body
+placeholders in this exact order: order number, customer name, order total,
+delivery area, and admin order URL. A suitable body is: `Jurgens Energy
+paid-order alert. Order {{1}} was paid by {{2}}. Total paid: {{3}}. Delivery
+area: {{4}}. Open the admin order here: {{5}}. Please review fulfilment and
+shipment booking.`. Enable the recipients under **Admin → Settings → Platform →
+WhatsApp ordering**.
 
 Credit-note WhatsApp delivery uses a second approved document template named
 `customer_credit_note_issued`. Its document header receives the generated

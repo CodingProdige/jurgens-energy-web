@@ -9,6 +9,8 @@ import {
   creditNotes,
   invoiceLines,
   invoices,
+  notificationDeliveries,
+  notificationDispatchClaims,
   orderItems,
   orders,
   paymentReconciliationExceptions,
@@ -29,6 +31,27 @@ function toMoney(value: string | number | null | undefined) {
 }
 
 export type AdminOrderDetail = {
+  automation: {
+    notificationClaims: Array<{
+      attempts: number;
+      completedAt: Date | null;
+      createdAt: Date;
+      eventKey: string;
+      id: string;
+      lastError: string | null;
+      status: string;
+      updatedAt: Date;
+    }>;
+    notificationEmails: Array<{
+      createdAt: Date;
+      errorMessage: string | null;
+      id: string;
+      recipientEmail: string;
+      sentAt: Date | null;
+      status: string;
+      templateKey: string;
+    }>;
+  };
   campaignAttribution: CampaignAttributionSnapshot | null;
   createdAt: Date;
   currency: string;
@@ -70,6 +93,7 @@ export type AdminOrderDetail = {
         | "verification_required";
     }>;
     id: string;
+    emailSentAt: Date | null;
     invoiceNumber: string;
     issuedAt: Date;
     lines: Array<{
@@ -87,8 +111,12 @@ export type AdminOrderDetail = {
       taxRateBps: number;
       unitPriceIncludingTax: number;
     }>;
+    renderError: string | null;
+    renderedAt: Date | null;
+    renderStatus: "failed" | "pending" | "ready";
     status: "credited" | "issued" | "partially_credited";
     totalIncludingTax: number;
+    whatsappSentAt: Date | null;
   } | null;
   items: Array<{
     id: string;
@@ -169,9 +197,15 @@ export type AdminOrderDetail = {
   shipments: Array<{
     id: string;
     provider: string;
+    providerCostAmount: number | null;
+    providerCostCurrency: string | null;
+    providerEnvironment: "live" | "sandbox" | null;
     status: string;
     trackingNumber: string | null;
+    trackingUrl: string | null;
+    updatedAt: Date;
     waybillNumber: string | null;
+    waybillUrl: string | null;
   }>;
   shippingTotal: number;
   status: "cancelled" | "fulfilled" | "paid" | "pending" | "refunded";
@@ -220,6 +254,8 @@ export async function getAdminOrderDetail(
     reconciliationExceptionRows,
     shipmentRows,
     invoiceRows,
+    notificationClaimRows,
+    notificationEmailRows,
   ] =
     await Promise.all([
     db
@@ -314,24 +350,68 @@ export async function getAdminOrderDetail(
       .select({
         id: shipments.id,
         provider: shipments.provider,
+        providerCostAmount: shipments.providerCostAmount,
+        providerCostCurrency: shipments.providerCostCurrency,
+        providerEnvironment: shipments.providerEnvironment,
         status: shipments.status,
         trackingNumber: shipments.trackingNumber,
+        trackingUrl: shipments.trackingUrl,
+        updatedAt: shipments.updatedAt,
         waybillNumber: shipments.waybillNumber,
+        waybillUrl: shipments.waybillUrl,
       })
       .from(shipments)
       .where(eq(shipments.orderId, order.id))
       .orderBy(desc(shipments.createdAt)),
     db
       .select({
+        emailSentAt: invoices.emailSentAt,
         id: invoices.id,
         invoiceNumber: invoices.invoiceNumber,
         issuedAt: invoices.issuedAt,
+        renderError: invoices.renderError,
+        renderedAt: invoices.renderedAt,
+        renderStatus: invoices.renderStatus,
         status: invoices.status,
         totalIncludingTax: invoices.totalIncludingTax,
+        whatsappSentAt: invoices.whatsappSentAt,
       })
       .from(invoices)
       .where(eq(invoices.orderId, order.id))
       .limit(1),
+    db
+      .select({
+        attempts: notificationDispatchClaims.attempts,
+        completedAt: notificationDispatchClaims.completedAt,
+        createdAt: notificationDispatchClaims.createdAt,
+        eventKey: notificationDispatchClaims.eventKey,
+        id: notificationDispatchClaims.id,
+        lastError: notificationDispatchClaims.lastError,
+        status: notificationDispatchClaims.status,
+        updatedAt: notificationDispatchClaims.updatedAt,
+      })
+      .from(notificationDispatchClaims)
+      .where(
+        sql`${notificationDispatchClaims.payload}->>'orderId' = ${order.id}`,
+      )
+      .orderBy(desc(notificationDispatchClaims.createdAt))
+      .limit(50),
+    db
+      .select({
+        createdAt: notificationDeliveries.createdAt,
+        errorMessage: notificationDeliveries.errorMessage,
+        id: notificationDeliveries.id,
+        recipientEmail: notificationDeliveries.recipientEmail,
+        sentAt: notificationDeliveries.sentAt,
+        status: notificationDeliveries.status,
+        templateKey: notificationDeliveries.templateKey,
+      })
+      .from(notificationDeliveries)
+      .where(
+        sql`${notificationDeliveries.metadata} like ${`%"order_id":"${order.id}"%`}`,
+      )
+      .orderBy(desc(notificationDeliveries.createdAt))
+      .limit(50),
     ]);
   const refundFulfillmentByRefundId = new Map<
     string,
@@ -440,6 +520,10 @@ export async function getAdminOrderDetail(
   );
 
   return {
+    automation: {
+      notificationClaims: notificationClaimRows,
+      notificationEmails: notificationEmailRows,
+    },
     campaignAttribution: order.campaignAttribution,
     createdAt: order.createdAt,
     currency: order.currency,
@@ -457,6 +541,7 @@ export async function getAdminOrderDetail(
             ...creditNote,
             totalIncludingTax: toMoney(creditNote.totalIncludingTax),
           })),
+          emailSentAt: invoice.emailSentAt,
           id: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
           issuedAt: invoice.issuedAt,
@@ -481,8 +566,12 @@ export async function getAdminOrderDetail(
             taxAmount: toMoney(line.taxAmount),
             unitPriceIncludingTax: toMoney(line.unitPriceIncludingTax),
           })),
+          renderError: invoice.renderError,
+          renderedAt: invoice.renderedAt,
+          renderStatus: invoice.renderStatus,
           status: invoice.status,
           totalIncludingTax: toMoney(invoice.totalIncludingTax),
+          whatsappSentAt: invoice.whatsappSentAt,
         }
       : null,
     items: itemRows.map((item) => ({
@@ -523,7 +612,13 @@ export async function getAdminOrderDetail(
         0,
       ),
     })),
-    shipments: shipmentRows,
+    shipments: shipmentRows.map((shipment) => ({
+      ...shipment,
+      providerCostAmount:
+        shipment.providerCostAmount === null
+          ? null
+          : toMoney(shipment.providerCostAmount),
+    })),
     shippingTotal: toMoney(order.shippingTotal),
     status: order.status,
     subtotal: toMoney(order.subtotal),

@@ -36,6 +36,7 @@ import {
   releaseOrderInventory,
 } from "@/src/modules/inventory/reservations";
 import { notifyAdminsOfPaidOrder } from "@/src/modules/orders/paid-order-notifications";
+import { notifyCustomerOfPaidOrder } from "@/src/modules/orders/paid-order-customer-notifications";
 import {
   notifyAdminsOfPaymentReconciliationException,
   recordPaymentReconciliationException,
@@ -795,6 +796,13 @@ async function processPayFastItnFields({
   }
 
   await ensureInvoiceForPaidOrder(paymentRow.orderId).catch(() => null);
+
+  await notifyCustomerOfPaidOrder(paymentRow.orderId).catch((error) => {
+    console.error("[payfast-itn] paid-order customer notification failed", {
+      error: error instanceof Error ? error.message : "unknown_error",
+      orderId: paymentRow.orderId,
+    });
+  });
 
   await notifyAdminsOfPaidOrder(paymentRow.orderId).catch((error) => {
     console.error("[payfast-itn] paid-order admin notification failed", {

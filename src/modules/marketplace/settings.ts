@@ -20,6 +20,7 @@ import {
 import { env } from "@/src/config/env";
 import { hashPassword, verifyPassword } from "@/src/modules/auth/service";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
+import { normalizePhoneNumber } from "@/src/modules/phone";
 import { decryptSecret, encryptSecret } from "@/src/modules/security/secrets";
 import {
   COURIER_GUY_LIVE_API_BASE_URL,
@@ -61,6 +62,7 @@ export const defaultWhatsappFollowUpMessages = {
     "Hi, just checking in. Did you still need help with delivery, a gas order, or anything else from Jurgens Energy?",
 } as const;
 export const maxWhatsappEmailNotificationRecipients = 20;
+export const maxWhatsappOrderNotificationRecipients = 10;
 
 function getWhatsappWebhookUrl() {
   return new URL("/api/webhooks/whatsapp", env.APP_URL).toString();
@@ -215,6 +217,50 @@ function parseWhatsappEmailNotificationRecipients(
   ).slice(0, maxWhatsappEmailNotificationRecipients);
 }
 
+function normalizeWhatsappOrderNotificationRecipient(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return normalizePhoneNumber(value, { defaultCountryCode: "ZA" });
+}
+
+function parseWhatsappOrderNotificationRecipients(value: unknown) {
+  let recipients: unknown[] = [];
+
+  if (Array.isArray(value)) {
+    recipients = value;
+  } else if (typeof value === "string" && value.trim()) {
+    const trimmedValue = value.trim();
+    let parsedJsonArray = false;
+
+    if (trimmedValue.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmedValue) as unknown;
+
+        if (Array.isArray(parsed)) {
+          recipients = parsed;
+          parsedJsonArray = true;
+        }
+      } catch {
+        // Fall through to the newline/comma format.
+      }
+    }
+
+    if (!parsedJsonArray) {
+      recipients = value.split(/[\n,]+/g);
+    }
+  }
+
+  return Array.from(
+    new Set(
+      recipients
+        .map(normalizeWhatsappOrderNotificationRecipient)
+        .filter((phone): phone is string => Boolean(phone)),
+    ),
+  ).slice(0, maxWhatsappOrderNotificationRecipients);
+}
+
 async function resolvePaymentMethodBadges(
   value: string | null | undefined,
 ): Promise<MarketplacePaymentMethodBadge[]> {
@@ -358,6 +404,8 @@ export type MarketplaceSettings = {
   whatsappEmailNotificationsEnabled: boolean;
   whatsappEmailNotifyInboundMessage: boolean;
   whatsappEmailNotifyNewConversation: boolean;
+  whatsappOrderNotificationRecipients: string[];
+  whatsappOrderNotificationsEnabled: boolean;
   whatsappFollowUpDefaultMessage: string;
   whatsappFollowUpDelayMinutes: number;
   whatsappFollowUpDraftMessage: string;
@@ -509,6 +557,8 @@ const defaultSettings: MarketplaceSettings = {
   whatsappEmailNotificationsEnabled: false,
   whatsappEmailNotifyInboundMessage: true,
   whatsappEmailNotifyNewConversation: true,
+  whatsappOrderNotificationRecipients: [],
+  whatsappOrderNotificationsEnabled: false,
   whatsappFollowUpDefaultMessage: defaultWhatsappFollowUpMessages.default,
   whatsappFollowUpDelayMinutes: 30,
   whatsappFollowUpDraftMessage: defaultWhatsappFollowUpMessages.draft,
@@ -663,6 +713,10 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
         marketplaceSettings.whatsappEmailNotifyInboundMessage,
       whatsappEmailNotifyNewConversation:
         marketplaceSettings.whatsappEmailNotifyNewConversation,
+      whatsappOrderNotificationRecipients:
+        marketplaceSettings.whatsappOrderNotificationRecipients,
+      whatsappOrderNotificationsEnabled:
+        marketplaceSettings.whatsappOrderNotificationsEnabled,
       whatsappFollowUpDefaultMessage:
         marketplaceSettings.whatsappFollowUpDefaultMessage,
       whatsappFollowUpDelayMinutes:
@@ -830,6 +884,12 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       settings.whatsappEmailNotifyInboundMessage ?? true,
     whatsappEmailNotifyNewConversation:
       settings.whatsappEmailNotifyNewConversation ?? true,
+    whatsappOrderNotificationRecipients:
+      parseWhatsappOrderNotificationRecipients(
+        settings.whatsappOrderNotificationRecipients,
+      ),
+    whatsappOrderNotificationsEnabled:
+      settings.whatsappOrderNotificationsEnabled ?? false,
     whatsappFollowUpDefaultMessage:
       settings.whatsappFollowUpDefaultMessage ??
       defaultWhatsappFollowUpMessages.default,
@@ -1610,6 +1670,8 @@ export async function updateMarketplaceWhatsappSettings({
   followUpSupportMessage,
   followUpsEnabled,
   messageUrl,
+  orderNotificationRecipients,
+  orderNotificationsEnabled,
   provider,
   webhookSigningSecret,
   webhookVerifyToken,
@@ -1632,6 +1694,8 @@ export async function updateMarketplaceWhatsappSettings({
   followUpSupportMessage: string;
   followUpsEnabled: boolean;
   messageUrl?: string;
+  orderNotificationRecipients: string[];
+  orderNotificationsEnabled: boolean;
   provider: "360dialog";
   webhookSigningSecret?: string;
   webhookVerifyToken?: string;
@@ -1673,6 +1737,8 @@ export async function updateMarketplaceWhatsappSettings({
 
   const normalizedEmailNotificationRecipients =
     parseWhatsappEmailNotificationRecipients(emailNotificationRecipients);
+  const normalizedOrderNotificationRecipients =
+    parseWhatsappOrderNotificationRecipients(orderNotificationRecipients);
 
   if (
     emailNotificationsEnabled &&
@@ -1693,6 +1759,17 @@ export async function updateMarketplaceWhatsappSettings({
     return {
       ok: false,
       message: "Choose at least one WhatsApp email alert type.",
+    };
+  }
+
+  if (
+    orderNotificationsEnabled &&
+    normalizedOrderNotificationRecipients.length === 0
+  ) {
+    return {
+      ok: false,
+      message:
+        "Add at least one internal WhatsApp phone number before enabling paid-order WhatsApp alerts.",
     };
   }
 
@@ -1722,6 +1799,9 @@ export async function updateMarketplaceWhatsappSettings({
         whatsappFollowUpSupportMessage: followUpSupportMessage,
         whatsappFollowUpsEnabled: followUpsEnabled,
         whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
+        whatsappOrderNotificationRecipients:
+          normalizedOrderNotificationRecipients,
+        whatsappOrderNotificationsEnabled: orderNotificationsEnabled,
         whatsappOrderingEnabled: enabled,
         whatsappProvider: provider,
         whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
@@ -1752,6 +1832,9 @@ export async function updateMarketplaceWhatsappSettings({
           whatsappFollowUpSupportMessage: followUpSupportMessage,
           whatsappFollowUpsEnabled: followUpsEnabled,
           whatsappMessageUrl: messageUrl || defaultWhatsappMessageUrl,
+          whatsappOrderNotificationRecipients:
+            normalizedOrderNotificationRecipients,
+          whatsappOrderNotificationsEnabled: orderNotificationsEnabled,
           whatsappOrderingEnabled: enabled,
           whatsappProvider: provider,
           whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
@@ -1769,6 +1852,9 @@ export async function updateMarketplaceWhatsappSettings({
         emailNotifyInboundMessage,
         emailNotifyNewConversation,
         followUpsEnabled,
+        orderNotificationRecipientCount:
+          normalizedOrderNotificationRecipients.length,
+        orderNotificationsEnabled,
         orderingEnabled: enabled,
         recipientCount: normalizedEmailNotificationRecipients.length,
       }),
@@ -1791,6 +1877,18 @@ export async function getWhatsappEmailNotificationSettings(): Promise<{
     notifyInboundMessage: settings.whatsappEmailNotifyInboundMessage,
     notifyNewConversation: settings.whatsappEmailNotifyNewConversation,
     recipients: settings.whatsappEmailNotificationRecipients,
+  };
+}
+
+export async function getWhatsappOrderNotificationSettings(): Promise<{
+  enabled: boolean;
+  recipients: string[];
+}> {
+  const settings = await getMarketplaceSettings();
+
+  return {
+    enabled: settings.whatsappOrderNotificationsEnabled,
+    recipients: settings.whatsappOrderNotificationRecipients,
   };
 }
 

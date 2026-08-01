@@ -4,13 +4,20 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   BanknoteIcon,
+  BellRingIcon,
+  CheckCircle2Icon,
   DownloadIcon,
   FileTextIcon,
+  MailCheckIcon,
   MapPinIcon,
   MegaphoneIcon,
+  MessageCircleIcon,
   PackageIcon,
   RefreshCwIcon,
+  ReceiptTextIcon,
+  SendIcon,
   TriangleAlertIcon,
+  TruckIcon,
   UserRoundIcon,
 } from "lucide-react";
 
@@ -29,7 +36,10 @@ import {
   type AdminRefundableInvoiceLine,
 } from "@/app/(admin)/admin/(dashboard)/orders/[orderId]/refund-manager";
 import { retryCreditNoteDeliveryAction } from "@/app/(admin)/admin/(dashboard)/orders/[orderId]/actions";
-import { getAdminOrderDetail } from "@/src/modules/admin/order-detail";
+import {
+  getAdminOrderDetail,
+  type AdminOrderDetail,
+} from "@/src/modules/admin/order-detail";
 import { hasAdminCapability } from "@/src/modules/admin/staff";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
 
@@ -57,7 +67,17 @@ function humanize(value: string) {
 }
 
 function statusClass(status: string) {
-  if (["captured", "fulfilled", "paid", "ready"].includes(status)) {
+  if (
+    [
+      "captured",
+      "completed",
+      "delivered",
+      "fulfilled",
+      "paid",
+      "ready",
+      "sent",
+    ].includes(status)
+  ) {
     return "border-emerald-500/20 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300";
   }
 
@@ -65,7 +85,107 @@ function statusClass(status: string) {
     return "border-red-500/20 bg-red-500/12 text-red-700 dark:text-red-300";
   }
 
+  if (["skipped", "not_configured"].includes(status)) {
+    return "border-slate-500/20 bg-slate-500/10 text-slate-600 dark:text-zinc-300";
+  }
+
   return "border-amber-500/20 bg-amber-500/12 text-amber-700 dark:text-amber-300";
+}
+
+function latestNotificationClaim(
+  order: AdminOrderDetail,
+  eventKey: string,
+) {
+  return order.automation.notificationClaims.find(
+    (claim) => claim.eventKey === eventKey,
+  );
+}
+
+function latestNotificationEmail(
+  order: AdminOrderDetail,
+  templateKey: string,
+) {
+  return order.automation.notificationEmails.find(
+    (delivery) => delivery.templateKey === templateKey,
+  );
+}
+
+function formatMaybeDate(value: Date | null | undefined) {
+  return value ? dateFormatter.format(value) : null;
+}
+
+function getEmailAutomationStatus(
+  delivery: AdminOrderDetail["automation"]["notificationEmails"][number] | undefined,
+) {
+  if (!delivery) {
+    return {
+      detail: "No email delivery record yet.",
+      status: "pending",
+    };
+  }
+
+  return {
+    detail:
+      delivery.status === "sent"
+        ? `Sent to ${delivery.recipientEmail} ${formatMaybeDate(delivery.sentAt) ? `on ${formatMaybeDate(delivery.sentAt)}` : ""}`
+        : delivery.errorMessage ??
+          `Delivery record is ${humanize(delivery.status)} for ${delivery.recipientEmail}.`,
+    status: delivery.status,
+  };
+}
+
+function getClaimAutomationStatus(
+  claim: AdminOrderDetail["automation"]["notificationClaims"][number] | undefined,
+  missingDetail: string,
+) {
+  if (!claim) {
+    return {
+      detail: missingDetail,
+      status: "pending",
+    };
+  }
+
+  return {
+    detail:
+      claim.status === "sent"
+        ? `Completed ${formatMaybeDate(claim.completedAt) ?? formatMaybeDate(claim.updatedAt) ?? ""}.`
+        : claim.lastError ??
+          `Attempt ${claim.attempts} is ${humanize(claim.status)}.`,
+    status: claim.status,
+  };
+}
+
+function AutomationRow({
+  detail,
+  icon,
+  status,
+  title,
+}: {
+  detail: string;
+  icon: ReactNode;
+  status: string;
+  title: string;
+}) {
+  return (
+    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-md border border-slate-200 p-3 dark:border-white/10">
+      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-[#ff5a1f]/10 text-[#ff5a1f]">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-950 dark:text-white">
+            {title}
+          </p>
+          <Badge className={cn("rounded-md border capitalize", statusClass(status))}>
+            {humanize(status)}
+          </Badge>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+          {detail}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function PanelTitle({
@@ -177,6 +297,89 @@ export default async function AdminOrderDetailPage({
     requestedRestockQuantity: refund.requestedRestockQuantity,
     status: refund.status,
   }));
+  const customerConfirmationEmail = getEmailAutomationStatus(
+    latestNotificationEmail(order, "customer.order.paid"),
+  );
+  const customerWhatsappClaim =
+    latestNotificationClaim(order, "customer.order.paid.whatsapp");
+  const customerConfirmationWhatsapp = order.customer.phone.trim()
+    ? getClaimAutomationStatus(
+        customerWhatsappClaim,
+        "No customer WhatsApp dispatch has been recorded yet.",
+      )
+    : {
+        detail: "No customer WhatsApp number was captured for this order.",
+        status: "skipped",
+      };
+  const adminDashboardAlert = getClaimAutomationStatus(
+    latestNotificationClaim(order, "admin.order.paid"),
+    "No admin paid-order alert has been recorded yet.",
+  );
+  const internalWhatsappAlert = getClaimAutomationStatus(
+    latestNotificationClaim(order, "admin.order.paid.whatsapp"),
+    "No internal WhatsApp alert has been recorded yet. Check the WhatsApp paid-order alert settings if this should fire.",
+  );
+  const paymentCaptured =
+    order.paidAt || order.payments.some((payment) => payment.status === "captured")
+      ? {
+          detail: order.paidAt
+            ? `PayFast confirmed payment on ${dateFormatter.format(order.paidAt)}.`
+            : "A captured payment record exists.",
+          status: "captured",
+        }
+      : {
+          detail: "Payment has not been captured yet.",
+          status: order.status,
+        };
+  const invoiceAutomation = order.invoice
+    ? {
+        detail: [
+          order.invoice.renderedAt
+            ? `PDF ready ${dateFormatter.format(order.invoice.renderedAt)}`
+            : order.invoice.renderError
+              ? `PDF error: ${order.invoice.renderError}`
+              : "PDF is still being prepared",
+          order.invoice.emailSentAt
+            ? `email sent ${dateFormatter.format(order.invoice.emailSentAt)}`
+            : "email pending",
+          order.invoice.whatsappSentAt
+            ? `WhatsApp sent ${dateFormatter.format(order.invoice.whatsappSentAt)}`
+            : "WhatsApp pending or skipped",
+        ].join(" · "),
+        status: order.invoice.renderStatus,
+      }
+    : {
+        detail:
+          order.status === "paid" || order.status === "fulfilled"
+            ? "No invoice row exists yet; the invoice worker should create it."
+            : "Invoice generation waits until payment is captured.",
+        status:
+          order.status === "paid" || order.status === "fulfilled"
+            ? "pending"
+            : "skipped",
+      };
+  const primaryShipment = order.shipments[0] ?? null;
+  const fulfilmentAutomation = primaryShipment
+    ? {
+        detail: [
+          primaryShipment.waybillNumber
+            ? `Waybill ${primaryShipment.waybillNumber}`
+            : "Waybill not ready",
+          primaryShipment.providerEnvironment
+            ? `${primaryShipment.providerEnvironment} account`
+            : null,
+          primaryShipment.providerCostAmount !== null
+            ? `${money(primaryShipment.providerCostAmount)} courier cost`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        status: primaryShipment.status,
+      }
+    : {
+        detail: "No fulfilment record has been created for this order yet.",
+        status: "pending",
+      };
 
   return (
     <>
@@ -365,10 +568,35 @@ export default async function AdminOrderDetailPage({
               <div className="grid gap-4 px-5 py-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 p-4 dark:border-white/10">
                   <div>
-                    <p className="font-bold">{order.invoice.invoiceNumber}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold">{order.invoice.invoiceNumber}</p>
+                      <Badge
+                        className={cn(
+                          "rounded-md border capitalize",
+                          statusClass(order.invoice.renderStatus),
+                        )}
+                      >
+                        PDF {humanize(order.invoice.renderStatus)}
+                      </Badge>
+                    </div>
                     <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
                       Issued {dateFormatter.format(order.invoice.issuedAt)} · {humanize(order.invoice.status)}
                     </p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                      Email{" "}
+                      {order.invoice.emailSentAt
+                        ? `sent ${dateFormatter.format(order.invoice.emailSentAt)}`
+                        : "pending"}{" "}
+                      · WhatsApp{" "}
+                      {order.invoice.whatsappSentAt
+                        ? `sent ${dateFormatter.format(order.invoice.whatsappSentAt)}`
+                        : "pending or skipped"}
+                    </p>
+                    {order.invoice.renderError ? (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-300">
+                        {order.invoice.renderError}
+                      </p>
+                    ) : null}
                   </div>
                   <a
                     className={buttonVariants({
@@ -560,6 +788,57 @@ export default async function AdminOrderDetailPage({
               </p>
               <p>{address.countryCode}</p>
             </address>
+          </section>
+
+          <section className={cn("overflow-hidden", dashboardPanelClass)}>
+            <PanelTitle
+              icon={<BellRingIcon className="size-4" />}
+              title="Order automation"
+            />
+            <div className="grid gap-3 px-5 py-5">
+              <AutomationRow
+                detail={paymentCaptured.detail}
+                icon={<CheckCircle2Icon className="size-4" />}
+                status={paymentCaptured.status}
+                title="Payment captured"
+              />
+              <AutomationRow
+                detail={customerConfirmationEmail.detail}
+                icon={<MailCheckIcon className="size-4" />}
+                status={customerConfirmationEmail.status}
+                title="Customer confirmation email"
+              />
+              <AutomationRow
+                detail={customerConfirmationWhatsapp.detail}
+                icon={<MessageCircleIcon className="size-4" />}
+                status={customerConfirmationWhatsapp.status}
+                title="Customer WhatsApp confirmation"
+              />
+              <AutomationRow
+                detail={adminDashboardAlert.detail}
+                icon={<SendIcon className="size-4" />}
+                status={adminDashboardAlert.status}
+                title="Admin order alert"
+              />
+              <AutomationRow
+                detail={internalWhatsappAlert.detail}
+                icon={<MessageCircleIcon className="size-4" />}
+                status={internalWhatsappAlert.status}
+                title="Internal WhatsApp alert"
+              />
+              <AutomationRow
+                detail={invoiceAutomation.detail}
+                icon={<ReceiptTextIcon className="size-4" />}
+                status={invoiceAutomation.status}
+                title="VAT invoice"
+              />
+              <AutomationRow
+                detail={fulfilmentAutomation.detail}
+                icon={<TruckIcon className="size-4" />}
+                status={fulfilmentAutomation.status}
+                title="Fulfilment and waybill"
+              />
+            </div>
           </section>
 
           <section className={cn("overflow-hidden", dashboardPanelClass)}>

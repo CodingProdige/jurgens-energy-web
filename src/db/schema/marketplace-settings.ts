@@ -257,6 +257,17 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
     .$type<string[]>()
     .notNull()
     .default([]),
+  whatsappOrderNotificationsEnabled: boolean(
+    "whatsapp_order_notifications_enabled",
+  )
+    .notNull()
+    .default(false),
+  whatsappOrderNotificationRecipients: jsonb(
+    "whatsapp_order_notification_recipients",
+  )
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   whatsappFollowUpsEnabled: boolean("whatsapp_follow_ups_enabled")
     .notNull()
     .default(true),

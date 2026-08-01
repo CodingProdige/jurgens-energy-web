@@ -6,6 +6,10 @@ const whatsappServiceSource = readFileSync(
   new URL("../src/modules/whatsapp-ordering/service.ts", import.meta.url),
   "utf8",
 );
+const publicDeliveryCopySource = readFileSync(
+  new URL("../src/modules/marketplace/public-delivery-copy.ts", import.meta.url),
+  "utf8",
+);
 
 test("WhatsApp delivery replies distinguish national and Jurgens eligibility", () => {
   assert.doesNotMatch(
@@ -52,11 +56,15 @@ test("WhatsApp delivery replies use the saved public timing settings", () => {
 test("WhatsApp delivery replies describe the customer fee, not a courier quote", () => {
   assert.match(
     whatsappServiceSource,
-    /One configured VAT-inclusive flat delivery fee applies per eligible order\./,
+    /getPublicDeliveryFeeDescription\(settings\)/,
   );
   assert.match(
-    whatsappServiceSource,
-    /An active free-shipping rule may reduce that fee to zero when the qualifying product subtotal reaches its threshold\./,
+    publicDeliveryCopySource,
+    /Standard delivery is \$\{flatRateCopy\}, VAT included\./,
+  );
+  assert.match(
+    publicDeliveryCopySource,
+    /Free delivery over \$\{formatZar\(freeOverAmount\)\}\./,
   );
   assert.doesNotMatch(
     whatsappServiceSource,

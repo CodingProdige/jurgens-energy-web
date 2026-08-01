@@ -66,6 +66,7 @@ export function OrderReturnExperience({
   const [order, setOrder] = useState(initialOrder);
   const [pollError, setPollError] = useState(false);
   const [confirmationDelayed, setConfirmationDelayed] = useState(false);
+  const [invoiceDelayed, setInvoiceDelayed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const cleanedOrderIdRef = useRef<string | null>(null);
   const trackedPurchaseOrderIdRef = useRef<string | null>(null);
@@ -109,26 +110,35 @@ export function OrderReturnExperience({
   }, [refreshOrder]);
 
   useEffect(() => {
-    if (isFailed || (isPaid && invoiceReady)) {
+    if (invoiceReady) {
+      setInvoiceDelayed(false);
+    }
+  }, [invoiceReady]);
+
+  useEffect(() => {
+    if (isFailed || (isPaid && (invoiceReady || invoiceDelayed))) {
       return;
     }
 
     let attempt = 0;
+    const maxAttempts = isPaid ? 8 : 30;
     const intervalId = window.setInterval(() => {
       attempt += 1;
       void refreshOrder();
 
-      if (attempt >= 30) {
+      if (attempt >= maxAttempts) {
         window.clearInterval(intervalId);
 
-        if (!isPaid && !isFailed) {
+        if (isPaid && !invoiceReady) {
+          setInvoiceDelayed(true);
+        } else if (!isPaid && !isFailed) {
           setConfirmationDelayed(true);
         }
       }
     }, 2000);
 
     return () => window.clearInterval(intervalId);
-  }, [invoiceReady, isFailed, isPaid, refreshOrder]);
+  }, [invoiceDelayed, invoiceReady, isFailed, isPaid, refreshOrder]);
 
   useEffect(() => {
     if (
@@ -265,7 +275,7 @@ export function OrderReturnExperience({
       </h1>
       <p className="mt-2 text-sm leading-6 text-[#666660] dark:text-[#aaa9a1]">
         {isPaid
-          ? `Order ${order.orderNumber} is paid. Only the purchased products were removed from your cart.`
+          ? `Order ${order.orderNumber} is paid. We’ve started your order updates, and only the purchased products were removed from your cart.`
           : isFailed
             ? "Your products are still in the cart and can be checked out again."
             : confirmationDelayed
@@ -328,6 +338,8 @@ export function OrderReturnExperience({
           <span className="grid size-10 shrink-0 place-items-center rounded-md bg-[#ff5a1f]/10 text-[#ff5a1f]">
             {invoiceReady ? (
               <ReceiptTextIcon className="size-5" />
+            ) : invoiceDelayed ? (
+              <ReceiptTextIcon className="size-5" />
             ) : (
               <LoaderCircleIcon className="size-5 animate-spin" />
             )}
@@ -336,12 +348,16 @@ export function OrderReturnExperience({
             <p className="text-xs font-black">
               {invoiceReady && order.invoice
                 ? `VAT invoice ${order.invoice.invoiceNumber}`
-                : "Preparing your VAT invoice"}
+                : invoiceDelayed
+                  ? "VAT invoice is on its way"
+                  : "Preparing your VAT invoice"}
             </p>
             <p className="mt-1 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
               {invoiceReady
                 ? "A copy is also sent to your checkout email and WhatsApp number when those channels are configured."
-                : "This page updates automatically when the secure PDF is ready."}
+                : invoiceDelayed
+                  ? "You don’t need to wait here. We’ll email it, send it on WhatsApp when configured, and keep it in My orders shortly."
+                  : "This can take a moment. You can continue shopping — we’ll send it and keep it in your account as soon as it’s ready."}
             </p>
           </div>
           {invoiceReady && order.invoice ? (
@@ -378,6 +394,15 @@ export function OrderReturnExperience({
             />
             {isRefreshing ? "Refreshing status" : "Refresh status"}
           </Button>
+        ) : null}
+        {isPaid ? (
+          <Link
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d7d7cf] bg-white px-4 text-sm font-bold text-[#171714] transition hover:bg-[#f7f7f2] dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/[0.08]"
+            href={`/account/orders/${order.orderId}`}
+          >
+            <ReceiptTextIcon className="size-4" />
+            View order
+          </Link>
         ) : null}
         <Link
           className="inline-flex h-10 items-center gap-2 rounded-md bg-[#ff5a1f] px-4 text-sm font-bold text-white transition hover:bg-[#e84c15]"

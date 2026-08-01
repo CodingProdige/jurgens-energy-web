@@ -111,6 +111,13 @@ export type WhatsappDocumentTemplateInput = Readonly<{
   to: string;
 }>;
 
+export type WhatsappTextTemplateInput = Readonly<{
+  bodyParameters: readonly string[];
+  templateLanguage: string;
+  templateName: string;
+  to: string;
+}>;
+
 /**
  * Sends an approved WhatsApp template with a PDF/document header. Callers own
  * the exact approved body-variable contract and must pass parameters in that
@@ -170,6 +177,59 @@ export async function send360DialogDocumentTemplateMessage({
 }
 
 /**
+ * Sends an approved text-only WhatsApp template. This is used for order
+ * confirmations and internal paid-order alerts so delivery still works when
+ * there is no open customer-service window.
+ */
+export async function send360DialogTextTemplateMessage({
+  bodyParameters,
+  templateLanguage,
+  templateName,
+  to,
+}: WhatsappTextTemplateInput): Promise<WhatsappSendResult> {
+  const config = await getWhatsappIntegrationConfig();
+
+  if (!config.isConfigured || !config.apiKey) {
+    return { ok: false, reason: "not_configured", skipped: true };
+  }
+
+  const normalizedPhone = normalizeWhatsappAccountPhone(to);
+
+  if (!normalizedPhone) {
+    return { ok: false, reason: "invalid_recipient", skipped: true };
+  }
+
+  const components =
+    bodyParameters.length > 0
+      ? [
+          {
+            parameters: bodyParameters.map((text) => ({
+              text,
+              type: "text",
+            })),
+            type: "body",
+          },
+        ]
+      : [];
+
+  return send360DialogRequest({
+    apiKey: config.apiKey,
+    endpoint: getMessagesEndpoint(config.messageUrl),
+    payload: {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      template: {
+        components,
+        language: { code: templateLanguage },
+        name: templateName,
+      },
+      to: normalizedPhone.replace(/\D/g, ""),
+      type: "template",
+    },
+  });
+}
+
+/**
  * Sends the paid invoice through an approved WhatsApp template. Template
  * delivery is deliberately used instead of a free-form media message so this
  * remains valid when there is no open 24-hour customer-service window.
@@ -208,6 +268,77 @@ export async function send360DialogInvoiceTemplateMessage({
     document,
     templateLanguage: env.WHATSAPP_INVOICE_TEMPLATE_LANGUAGE,
     templateName: env.WHATSAPP_INVOICE_TEMPLATE_NAME,
+    to,
+  });
+}
+
+/**
+ * Sends the immediate paid-order confirmation through an approved text template.
+ *
+ * The configured template must have five body variables in this order:
+ * customer name, order number, order total, delivery window, and account order
+ * URL.
+ */
+export async function send360DialogOrderConfirmationTemplateMessage({
+  customerName,
+  deliveryWindow,
+  orderNumber,
+  orderTotal,
+  orderUrl,
+  to,
+}: {
+  customerName: string;
+  deliveryWindow: string;
+  orderNumber: string;
+  orderTotal: string;
+  orderUrl: string;
+  to: string;
+}): Promise<WhatsappSendResult> {
+  return send360DialogTextTemplateMessage({
+    bodyParameters: [
+      customerName,
+      orderNumber,
+      orderTotal,
+      deliveryWindow,
+      toAbsoluteMediaUrl(orderUrl),
+    ],
+    templateLanguage: env.WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_LANGUAGE,
+    templateName: env.WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_NAME,
+    to,
+  });
+}
+
+/**
+ * Sends an internal paid-order alert through an approved text template.
+ *
+ * The configured template must have five body variables in this order: order
+ * number, customer name, order total, delivery area, and admin order URL.
+ */
+export async function send360DialogAdminOrderAlertTemplateMessage({
+  adminOrderUrl,
+  customerName,
+  deliveryArea,
+  orderNumber,
+  orderTotal,
+  to,
+}: {
+  adminOrderUrl: string;
+  customerName: string;
+  deliveryArea: string;
+  orderNumber: string;
+  orderTotal: string;
+  to: string;
+}): Promise<WhatsappSendResult> {
+  return send360DialogTextTemplateMessage({
+    bodyParameters: [
+      orderNumber,
+      customerName,
+      orderTotal,
+      deliveryArea,
+      toAbsoluteMediaUrl(adminOrderUrl),
+    ],
+    templateLanguage: env.WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_LANGUAGE,
+    templateName: env.WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_NAME,
     to,
   });
 }

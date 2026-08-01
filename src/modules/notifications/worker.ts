@@ -5,7 +5,12 @@ import { reconcileOutstandingOrderFulfillment } from "@/src/modules/orders/fulfi
 import {
   notifyAdminsOfCreatedOrder,
   notifyAdminsOfPaidOrder,
+  notifyAdminsOfPaidOrderWhatsapp,
 } from "@/src/modules/orders/paid-order-notifications";
+import {
+  notifyCustomerOfPaidOrder,
+  paidOrderCustomerNotificationEvents,
+} from "@/src/modules/orders/paid-order-customer-notifications";
 import { sendJurgensDeliveryStatusNotification } from "@/src/modules/orders/jurgens-delivery-notifications";
 import {
   notifyAdminsOfOpenPaymentReconciliationExceptions,
@@ -72,7 +77,35 @@ export async function processNotificationDispatchRetries() {
     if (row.eventKey === "admin.order.paid" && row.payload.orderId) {
       tasks.set(
         `paid-order:${row.payload.orderId}`,
-        () => notifyAdminsOfPaidOrder(row.payload.orderId),
+        () =>
+          notifyAdminsOfPaidOrder(row.payload.orderId, { retryNow: true }),
+      );
+    }
+
+    if (
+      row.eventKey === "admin.order.paid.whatsapp" &&
+      row.payload.orderId
+    ) {
+      tasks.set(
+        `paid-order-whatsapp:${row.payload.orderId}`,
+        () =>
+          notifyAdminsOfPaidOrderWhatsapp(row.payload.orderId, {
+            retryNow: true,
+          }),
+      );
+    }
+
+    if (
+      (row.eventKey ===
+        paidOrderCustomerNotificationEvents.customerPaidOrderEvent ||
+        row.eventKey ===
+          paidOrderCustomerNotificationEvents.customerPaidOrderWhatsappEvent) &&
+      row.payload.orderId
+    ) {
+      tasks.set(
+        `customer-paid-order:${row.payload.orderId}`,
+        () =>
+          notifyCustomerOfPaidOrder(row.payload.orderId, { retryNow: true }),
       );
     }
 

@@ -407,6 +407,12 @@ function SettingsSection({
           whatsappEmailNotifyNewConversation={
             settings.whatsappEmailNotifyNewConversation
           }
+          whatsappOrderNotificationRecipients={
+            settings.whatsappOrderNotificationRecipients
+          }
+          whatsappOrderNotificationsEnabled={
+            settings.whatsappOrderNotificationsEnabled
+          }
           whatsappFollowUpDefaultMessage={
             settings.whatsappFollowUpDefaultMessage
           }

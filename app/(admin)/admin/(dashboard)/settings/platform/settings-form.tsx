@@ -1655,6 +1655,8 @@ type WhatsappOrderingSettingsFormProps = {
   whatsappEmailNotificationsEnabled: boolean;
   whatsappEmailNotifyInboundMessage: boolean;
   whatsappEmailNotifyNewConversation: boolean;
+  whatsappOrderNotificationRecipients: string[];
+  whatsappOrderNotificationsEnabled: boolean;
   whatsappFollowUpDefaultMessage: string;
   whatsappFollowUpDelayMinutes: number;
   whatsappFollowUpDraftMessage: string;
@@ -1680,6 +1682,8 @@ export function WhatsappOrderingSettingsForm({
   whatsappEmailNotificationsEnabled,
   whatsappEmailNotifyInboundMessage,
   whatsappEmailNotifyNewConversation,
+  whatsappOrderNotificationRecipients,
+  whatsappOrderNotificationsEnabled,
   whatsappFollowUpDefaultMessage,
   whatsappFollowUpDelayMinutes,
   whatsappFollowUpDraftMessage,
@@ -1701,6 +1705,8 @@ export function WhatsappOrderingSettingsForm({
   const [messageUrlValue, setMessageUrlValue] = useState(whatsappMessageUrl);
   const [emailNotificationsEnabledValue, setEmailNotificationsEnabledValue] =
     useState(whatsappEmailNotificationsEnabled);
+  const [orderNotificationsEnabledValue, setOrderNotificationsEnabledValue] =
+    useState(whatsappOrderNotificationsEnabled);
   const [followUpsEnabledValue, setFollowUpsEnabledValue] = useState(
     whatsappFollowUpsEnabled,
   );
@@ -2119,6 +2125,68 @@ export function WhatsappOrderingSettingsForm({
               Each alert includes the customer name or phone number, the inbound
               message, when it was received, and a direct link to open the
               conversation in the admin dashboard.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="whatsapp-paid-order-alerts"
+        className="scroll-mt-24 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]"
+      >
+        <div className="mb-5 flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#16a34a]/10 text-[#16a34a]">
+            <BellIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Paid-order WhatsApp alerts
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Send an internal WhatsApp template the moment PayFast confirms a
+              paid order. Use this for the team member who must book and hand
+              over the Courier Guy parcel.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={orderNotificationsEnabledValue}
+              name="orderNotificationsEnabled"
+              onCheckedChange={(checked) =>
+                setOrderNotificationsEnabledValue(checked === true)
+              }
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                Enable internal paid-order WhatsApp alerts
+              </span>
+              <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Requires an approved 360dialog template named{" "}
+                <code className="font-mono">admin_order_paid_alert</code> unless
+                the environment template name is changed.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid content-start gap-2">
+            <Label htmlFor="orderNotificationRecipients">
+              Internal WhatsApp recipients
+            </Label>
+            <Textarea
+              id="orderNotificationRecipients"
+              name="orderNotificationRecipients"
+              defaultValue={whatsappOrderNotificationRecipients.join("\n")}
+              rows={4}
+              className="min-h-28 resize-y"
+              placeholder={"+27 82 123 4567\n+27 68 000 0000"}
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Add up to 10 team phone numbers, one per line or comma-separated.
+              Numbers are normalized to South African WhatsApp format before
+              saving.
             </p>
           </div>
         </div>

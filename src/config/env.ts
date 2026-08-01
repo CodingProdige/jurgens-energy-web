@@ -18,12 +18,32 @@ const envSchema = z.object({
     .string()
     .trim()
     .regex(/^[a-z]{2,3}(?:_[A-Z]{2})?$/)
-    .default("en"),
+    .default("en_US"),
   WHATSAPP_INVOICE_TEMPLATE_NAME: z
     .string()
     .trim()
     .regex(/^[a-z0-9_]+$/)
     .default("customer_invoice_issued"),
+  WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_LANGUAGE: z
+    .string()
+    .trim()
+    .regex(/^[a-z]{2,3}(?:_[A-Z]{2})?$/)
+    .default("en_US"),
+  WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_NAME: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]+$/)
+    .default("customer_order_paid"),
+  WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_LANGUAGE: z
+    .string()
+    .trim()
+    .regex(/^[a-z]{2,3}(?:_[A-Z]{2})?$/)
+    .default("en_US"),
+  WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_NAME: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]+$/)
+    .default("admin_order_paid_alert"),
   REDIS_URL: z.string().min(1).default("redis://localhost:6380"),
   MEDIA_ROOT: z.string().min(1).default("./storage/jurgens-energy/media"),
   INVOICE_ROOT: z
@@ -61,6 +81,14 @@ export const env = envSchema.parse({
     process.env.WHATSAPP_INVOICE_TEMPLATE_LANGUAGE,
   WHATSAPP_INVOICE_TEMPLATE_NAME:
     process.env.WHATSAPP_INVOICE_TEMPLATE_NAME,
+  WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_LANGUAGE:
+    process.env.WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_LANGUAGE,
+  WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_NAME:
+    process.env.WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_NAME,
+  WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_LANGUAGE:
+    process.env.WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_LANGUAGE,
+  WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_NAME:
+    process.env.WHATSAPP_ADMIN_ORDER_ALERT_TEMPLATE_NAME,
   REDIS_URL: process.env.REDIS_URL,
   MEDIA_ROOT: process.env.MEDIA_ROOT,
   INVOICE_ROOT: process.env.INVOICE_ROOT,
