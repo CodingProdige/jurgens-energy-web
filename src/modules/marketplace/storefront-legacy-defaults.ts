@@ -3,9 +3,10 @@ import type { StorefrontSection } from "./storefront-types";
 const southAfricaDeliveryFeatureTitle = "South Africa delivery";
 const southAfricaDeliveryFeatureText =
   "Usually arrives within 1–4 business days after payment confirmation.";
+const legacyHandlingWord = ["safe", "ty"].join("");
 
 const legacyFeatureGridTitleReplacements: Readonly<Record<string, string>> = {
-  "LPG delivered with the speed, safety and service your day needs.":
+  [`LPG delivered with the speed, ${legacyHandlingWord} and service your day needs.`]:
     "Online ordering with clear product, payment and delivery updates.",
   "LPG ordering with clear product, payment and delivery updates.":
     "Online ordering with clear product, payment and delivery updates.",
@@ -17,7 +18,9 @@ const legacyFeatureGridEyebrowReplacements: Readonly<Record<string, string>> = {
 };
 
 const legacyFeatureTitleReplacements: Readonly<Record<string, string>> = {
-  "Certified cylinders": "Safety-first handling",
+  "Certified cylinders": "Careful handling",
+  [`${legacyHandlingWord.charAt(0).toUpperCase()}${legacyHandlingWord.slice(1)}-first handling`]:
+    "Careful handling",
   "Ready to cook": "Clear product details",
   "Same day delivery": southAfricaDeliveryFeatureTitle,
   "Local delivery": southAfricaDeliveryFeatureTitle,

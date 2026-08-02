@@ -94,7 +94,7 @@ export const privacyPolicy: PolicyDocument = {
       ],
       bullets: [
         "Create and manage accounts, carts, orders, payments, deliveries, cylinder exchanges, returns, and refunds.",
-        "Confirm availability, delivery details, safety requirements, and the status of an order.",
+        "Confirm availability, delivery details, product-specific requirements, and the status of an order.",
         "Respond to questions, investigate problems, prevent fraud or abuse, and secure the website and our records.",
         "Keep accounting, tax, audit, transaction, and compliance records.",
         "Measure and improve the store, products, communications, and customer experience.",
@@ -131,7 +131,7 @@ export const privacyPolicy: PolicyDocument = {
       title: "7. WhatsApp and electronic communications",
       paragraphs: [
         "When you contact us on WhatsApp, we use the conversation and your number to answer questions, support an order, and keep a record of the interaction. Automated replies may assist first, and a team member may take over a conversation. WhatsApp and Meta also process information under their own terms.",
-        "Service messages about an enquiry or order are different from marketing. We send electronic marketing only as permitted by law and provide a practical way to opt out. You may reply STOP or ask us through any listed contact channel to stop marketing. Opting out of marketing does not prevent essential order, safety, or account messages.",
+        "Service messages about an enquiry or order are different from marketing. We send electronic marketing only as permitted by law and provide a practical way to opt out. You may reply STOP or ask us through any listed contact channel to stop marketing. Opting out of marketing does not prevent essential order, delivery, or account messages.",
       ],
     },
     {
@@ -215,7 +215,7 @@ export const termsAndConditions: PolicyDocument = {
       title: "2. Product information and availability",
       paragraphs: [
         "We aim to describe products, sizes, brands, exchange options, compatibility, images, and stock accurately. Screen colours and product packaging may vary, and a manufacturer may make non-material changes. Please check dimensions, connections, appliance requirements, and intended use before ordering an accessory or LPG product.",
-        "Stock indicators are not a reservation. Products, exchange options, delivery services, and quantities remain subject to availability and any lawful safety or supply restrictions. We will contact you if an ordered item cannot be supplied as described.",
+        "Stock indicators are not a reservation. Products, exchange options, delivery services, and quantities remain subject to availability and any lawful product-specific supply restrictions. We will contact you if an ordered item cannot be supplied as described.",
       ],
     },
     {
@@ -232,7 +232,7 @@ export const termsAndConditions: PolicyDocument = {
       title: "4. Placing and accepting an order",
       paragraphs: [
         "Adding an item to a cart, submitting a checkout, or sending an order request through WhatsApp does not by itself guarantee acceptance. An order is accepted when we confirm that it has been accepted for fulfilment, dispatch, or delivery.",
-        "We may reasonably refuse or cancel an order before fulfilment because of unavailable stock, an unsupported delivery address, a failed or reversed payment, suspected fraud, an obvious catalogue error, a safety concern, or a legal restriction. If we cancel after receiving cleared payment, we will arrange the appropriate refund.",
+        "We may reasonably refuse or cancel an order before fulfilment because of unavailable stock, an unsupported delivery address, a failed or reversed payment, suspected fraud, an obvious catalogue error, a product-specific fulfilment concern, or a legal restriction. If we cancel after receiving cleared payment, we will arrange the appropriate refund.",
       ],
     },
     {
@@ -251,25 +251,25 @@ export const termsAndConditions: PolicyDocument = {
         "Checkout applies the published VAT-inclusive standard delivery fee to each order. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
         "Our handling time is 0–1 business day after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched that day. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.",
         "Orders are normally delivered within 1–4 business days after payment confirmation. This published window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.",
-        "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
+        "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and product-specific handling requirements can affect timing. We will communicate a material delay and explain the available next step.",
         "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
         "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the matching empty cylinder at the delivery handover.",
       ],
     },
     {
       id: "lpg-and-exchanges",
-      title: "7. LPG safety and cylinder exchanges",
+      title: "7. Product handling and cylinder exchanges",
       paragraphs: [
-        "LPG is hazardous if stored, transported, installed, or used incorrectly. Follow the product instructions and applicable safety rules, keep cylinders upright in a well-ventilated place away from ignition sources, and use a suitably qualified registered gas installer where installation is required.",
-        "For an exchange order, you must make the correct empty cylinder available at handover. The cylinder must meet the size, type and condition requirements shown with the product or confirmed before fulfilment, and it must be safe to handle.",
-        "We or a fulfilment partner may refuse to collect or exchange a cylinder that appears unsafe, damaged, modified, illegally filled, leaking, or otherwise cannot be accepted. Never refill, tamper with, vent, or repair a cylinder yourself. If you smell gas or suspect a leak, move away from ignition sources, follow emergency safety guidance, and contact the appropriate emergency or qualified gas service rather than using ordinary customer-support messaging as an emergency service.",
+        "Follow the product instructions, handover requirements and any installation rules that apply to the item. Use a suitably qualified registered installer where installation is required.",
+        "For an exchange order, you must make the correct empty cylinder available at handover. The cylinder must meet the size, type and condition requirements shown with the product or confirmed before fulfilment.",
+        "We or a fulfilment partner may refuse to collect or exchange a cylinder that does not meet the applicable exchange condition requirements. Never refill, tamper with, vent, or repair a cylinder yourself.",
       ],
     },
     {
       id: "cancellations-and-returns",
       title: "8. Cancellations, returns, and refunds",
       paragraphs: [
-        "Cancellation and return requests are handled under our Returns & Refunds Policy and applicable consumer law. Contact us as soon as possible with the order number. Do not send a filled cylinder, LPG, or another hazardous item through an ordinary parcel service; we will first confirm a safe return or collection method.",
+        "Cancellation and return requests are handled under our Returns & Refunds Policy and applicable consumer law. Contact us as soon as possible with the order number. Some product types require pre-authorised return handling; we will first confirm the approved return or collection method.",
         "Nothing in these terms removes a right or remedy that cannot lawfully be excluded under the Consumer Protection Act, the Electronic Communications and Transactions Act, or another applicable law.",
       ],
     },
@@ -278,7 +278,7 @@ export const termsAndConditions: PolicyDocument = {
       title: "9. Quality, defects, and warranties",
       paragraphs: [
         "Customers receive the statutory rights and implied warranty of quality that apply to the transaction. A manufacturer warranty, if offered, is additional and may have its own fair conditions. Misuse, unauthorised alteration, incorrect installation, accidental damage, and ordinary wear are assessed separately from a product defect, subject always to applicable law.",
-        "Report a suspected unsafe or defective product promptly and stop using it where continued use could create a risk. We may request photographs, serial or batch information, or an inspection so that the appropriate repair, replacement, refund, or safety response can be arranged.",
+        "Report a suspected defective product promptly. We may request photographs, serial or batch information, or an inspection so that the appropriate repair, replacement, refund, or support response can be arranged.",
       ],
     },
     {
@@ -309,7 +309,7 @@ export const termsAndConditions: PolicyDocument = {
       id: "privacy-and-messages",
       title: "13. Privacy and communications",
       paragraphs: [
-        "Our Privacy Policy explains how personal information is handled. By placing an order, you agree that we may send the service messages reasonably needed to confirm payment, delivery, cylinder exchange, return collection, safety, refund, or support information. Marketing communications follow separate consent and opt-out rules.",
+        "Our Privacy Policy explains how personal information is handled. By placing an order, you agree that we may send the service messages reasonably needed to confirm payment, delivery, cylinder exchange, return collection, refund, or support information. Marketing communications follow separate consent and opt-out rules.",
       ],
     },
     {
@@ -354,7 +354,7 @@ export function createTermsAndConditionsDocument(
               deliveryFeeDescription,
               `Our handling time is ${handlingTimingLabel} after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched within that window. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.`,
               `${deliveryTimingDescription} This published window includes handling and transit time.`,
-              "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
+              "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and product-specific handling requirements can affect timing. We will communicate a material delay and explain the available next step.",
               "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
               "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the matching empty cylinder at the delivery handover.",
             ],
@@ -377,7 +377,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "1. Start with a return request",
       paragraphs: [
         "This policy applies to orders delivered in South Africa. Contact us before returning any item and include your order number, the affected product, the reason for the request, and photographs where an item is damaged, incorrect, or defective. We will confirm the next step, return reference, approved courier method, collection method, or inspection arrangements.",
-        "Do not send LPG, a filled cylinder, or another hazardous item through an ordinary parcel service. Keep the item in a safe, ventilated location and wait for a pre-authorised safe collection plan.",
+        "Some product types require pre-authorised return handling. Wait for the approved return method before sending or handing over any item.",
       ],
     },
     {
@@ -393,8 +393,8 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "3. Cooling-off and store returns",
       paragraphs: [
         "Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within the applicable statutory period after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.",
-        "Separately, Jurgens Energy accepts qualifying goods for a voluntary change-of-mind return when you contact us within the published return window after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.",
-        "Contact us within the return window so that we can authorise the return courier or safe collection. Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.",
+        "Separately, Jurgens Energy accepts qualifying goods for a voluntary change-of-mind return when you contact us within the published return window after receiving them. Keep those goods unused, undamaged, complete, and in their original resaleable packaging where reasonably applicable.",
+        "Contact us within the return window so that we can authorise the return courier or collection. Product-specific handling rules may affect the return method, but this policy does not limit rights relating to an incorrect, damaged, or defective product or another right provided by law.",
       ],
     },
     {
@@ -402,32 +402,32 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "4. Requests outside the return window",
       paragraphs: [
         "Outside the published return window or another statutory return right, we may consider a request to return or exchange an unwanted product that is still new, unused, undamaged, complete, and in its original resaleable packaging. Any discretionary acceptance must be confirmed before the item is handed over.",
-        "We ordinarily cannot accept a discretionary change-of-mind return for gas that has been used or released, an item that has been installed or altered, a product missing parts, or an item that cannot safely or lawfully be restocked. Your rights for an incorrect, unsafe, or defective product remain unaffected.",
+        "We ordinarily cannot accept a discretionary change-of-mind return for consumable goods that have been used, an item that has been installed or altered, a product missing parts, or an item that cannot lawfully be restocked. Your rights for an incorrect, damaged, or defective product remain unaffected.",
       ],
     },
     {
       id: "wrong-damaged-or-incomplete",
       title: "5. Incorrect, damaged, or incomplete orders",
       paragraphs: [
-        "Check the order at handover where reasonably possible. If an item is visibly unsafe, leaking, seriously damaged, or not what you ordered, do not use it and tell the delivery representative or contact us immediately.",
+        "Check the order at handover where reasonably possible. If an item is visibly damaged or not what you ordered, tell the delivery representative or contact us immediately.",
         "Report concealed damage, missing parts, or an incorrect item as soon as reasonably possible after delivery. Once verified, Jurgens Energy will cover the qualifying return transport required by applicable law and arrange the appropriate correction, replacement, repair, or refund.",
       ],
     },
     {
-      id: "defective-or-unsafe",
-      title: "6. Defective or unsafe products",
+      id: "defective-products",
+      title: "6. Defective products",
       paragraphs: [
         "Under the Consumer Protection Act, qualifying goods that fail the applicable quality standards may be returned within six months after delivery, without penalty and at the supplier’s risk and expense. The consumer may direct the supplier to repair or replace the goods, or refund the price paid, subject to the Act.",
         "The statutory remedy does not treat ordinary wear, misuse, abuse, incorrect installation, or unauthorised alteration as a product defect. A manufacturer warranty may provide additional cover and does not replace your statutory rights.",
       ],
-      note: "Stop using any product that may be unsafe. For a suspected LPG leak, move away from ignition sources and obtain emergency or qualified gas assistance; do not rely on an online return request as an emergency response.",
+      note: "Contact us promptly with the order number and product details so the correct next step can be assessed.",
     },
     {
       id: "cylinder-exchanges",
       title: "7. Cylinder-exchange orders",
       paragraphs: [
-        "An exchange price assumes that the matching empty cylinder is available for collection at the same handover. Cylinder size, type and condition may affect whether it can be accepted. A driver or fulfilment partner may refuse a leaking, modified, severely damaged, illegally filled, or otherwise unsafe cylinder.",
-        "If the requested exchange cannot be completed, we will explain the available options, which may include correcting the order, paying the disclosed difference for another accepted option, rescheduling, or cancelling the affected item. If the delivered cylinder appears unsafe or incorrect, do not use it and contact us promptly for an inspection and appropriate remedy.",
+        "An exchange price assumes that the matching empty cylinder is available for collection at the same handover. Cylinder size, type and condition may affect whether it can be accepted. A driver or fulfilment partner may refuse a cylinder that does not meet the exchange condition requirements.",
+        "If the requested exchange cannot be completed, we will explain the available options, which may include correcting the order, paying the disclosed difference for another accepted option, rescheduling, or cancelling the affected item. If the delivered cylinder appears incorrect, contact us promptly for an inspection and appropriate remedy.",
       ],
     },
     {
@@ -435,7 +435,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "8. Approved return courier or collection",
       paragraphs: [
         "Jurgens Energy is an online-only store with no public walk-in shop, customer collection point, or returns counter. Do not travel to or send goods to a registered or administrative address. Wait for our written return authorisation and the approved courier or collection instructions.",
-        "LPG, filled cylinders, and other hazardous items are accepted only through a pre-authorised collection that follows the applicable safety rules; they must never be sent through ordinary mail. For an approved non-hazardous return, package the item securely and display the return reference we provide.",
+        "Some product types are accepted only through a pre-authorised collection or return method. For an approved parcel return, package the item securely and display the return reference we provide.",
         "Return all parts, manuals, accessories, promotional items, and original packaging reasonably available. Do not remove serial labels or attempt repairs before assessment. We may inspect the product to confirm identity, condition, use, completeness, and the reported problem. An inspection does not remove a statutory right.",
       ],
     },
@@ -444,7 +444,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "9. Return and collection costs",
       paragraphs: [
         "For a qualifying change-of-mind return, including an ECTA cooling-off cancellation where the law applies, the customer pays the direct return courier or approved collection cost. We do not charge a restocking fee for an approved return or exchange.",
-        "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, unsafe, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
+        "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
       ],
     },
     {
@@ -483,11 +483,11 @@ export function createReturnsAndRefundsPolicy(
   const acceptsDefectiveOnly =
     settings.returnsAcceptance === "defective_only";
   const exchangePolicy = settings.returnsExchangesEnabled
-    ? "Exchanges are accepted when the product condition, safety rules, stock availability, and applicable law allow it. Any exchange must be authorised before the item is handed over."
+    ? "Exchanges are accepted when the product condition, stock availability, and applicable law allow it. Any exchange must be authorised before the item is handed over."
     : "Exchanges are not currently offered unless required by law or expressly authorised for the specific order.";
-  const hazardousReturnNote = settings.returnsHazardousGoodsNoteEnabled
-    ? "LPG, filled cylinders, and other hazardous items are accepted only through a pre-authorised collection that follows the applicable safety rules; they must never be sent through ordinary mail."
-    : "For an approved non-hazardous return, package the item securely and display the return reference we provide.";
+  const productHandlingReturnNote = settings.returnsHazardousGoodsNoteEnabled
+    ? "Some product types are accepted only through a pre-authorised collection or return method."
+    : "For an approved parcel return, package the item securely and display the return reference we provide.";
 
   return {
     ...returnsAndRefundsPolicy,
@@ -500,13 +500,13 @@ export function createReturnsAndRefundsPolicy(
           paragraphs: [
             `Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within ${returnWindowLabel} after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.`,
             acceptsChangeOfMind
-              ? `Separately, Jurgens Energy accepts qualifying ${conditionLabel} for a voluntary change-of-mind return when you contact us within ${returnWindowLabel} after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.`
+              ? `Separately, Jurgens Energy accepts qualifying ${conditionLabel} for a voluntary change-of-mind return when you contact us within ${returnWindowLabel} after receiving them. Keep those goods unused, undamaged, complete, and in their original resaleable packaging where reasonably applicable.`
               : acceptsDefectiveOnly
-                ? "Voluntary change-of-mind returns are not accepted unless required by law. Incorrect, damaged, unsafe, or defective products remain covered by applicable statutory remedies."
-                : "Voluntary returns are not accepted unless required by law. Incorrect, damaged, unsafe, or defective products remain covered by applicable statutory remedies.",
+                ? "Voluntary change-of-mind returns are not accepted unless required by law. Incorrect, damaged, or defective products remain covered by applicable statutory remedies."
+                : "Voluntary returns are not accepted unless required by law. Incorrect, damaged, or defective products remain covered by applicable statutory remedies.",
             acceptsChangeOfMind
-              ? `Contact us within the return window so that we can authorise the return method. For a voluntary change-of-mind return, ${returnLabelResponsibility}. ${restockingFeeLabel} Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.`
-              : `Contact us promptly so that we can assess the request and confirm the lawful next step. ${restockingFeeLabel} Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.`,
+              ? `Contact us within the return window so that we can authorise the return method. For a voluntary change-of-mind return, ${returnLabelResponsibility}. ${restockingFeeLabel} Product-specific handling rules may affect the return method, but this policy does not limit rights relating to an incorrect, damaged, or defective product or another right provided by law.`
+              : `Contact us promptly so that we can assess the request and confirm the lawful next step. ${restockingFeeLabel} Product-specific handling rules may affect the return method, but this policy does not limit rights relating to an incorrect, damaged, or defective product or another right provided by law.`,
           ],
         };
       }
@@ -517,7 +517,7 @@ export function createReturnsAndRefundsPolicy(
           title: `4. Requests outside the ${returnWindowLabel} window`,
           paragraphs: [
             `Outside the ${returnWindowLabel} return window or another statutory return right, we may consider a request to return or exchange an unwanted product that is still ${conditionLabel}, undamaged, complete, and in its original resaleable packaging. Any discretionary acceptance must be confirmed before the item is handed over.`,
-            "We ordinarily cannot accept a discretionary change-of-mind return for gas that has been used or released, an item that has been installed or altered, a product missing parts, or an item that cannot safely or lawfully be restocked. Your rights for an incorrect, unsafe, or defective product remain unaffected.",
+            "We ordinarily cannot accept a discretionary change-of-mind return for consumable goods that have been used, an item that has been installed or altered, a product missing parts, or an item that cannot lawfully be restocked. Your rights for an incorrect, damaged, or defective product remain unaffected.",
           ],
         };
       }
@@ -538,7 +538,7 @@ export function createReturnsAndRefundsPolicy(
           title: "8. Approved return method",
           paragraphs: [
             "Jurgens Energy is an online-only store with no public walk-in shop, customer collection point, or returns counter. Do not travel to or send goods to a registered or administrative address. Wait for our written return authorisation and the approved courier or collection instructions.",
-            `Approved return method: ${returnMethodsLabel}. ${hazardousReturnNote}`,
+            `Approved return method: ${returnMethodsLabel}. ${productHandlingReturnNote}`,
             "Return all parts, manuals, accessories, promotional items, and original packaging reasonably available. Do not remove serial labels or attempt repairs before assessment. We may inspect the product to confirm identity, condition, use, completeness, and the reported problem. An inspection does not remove a statutory right.",
           ],
         };
@@ -551,7 +551,7 @@ export function createReturnsAndRefundsPolicy(
             acceptsChangeOfMind
               ? `For a qualifying change-of-mind return, including an ECTA cooling-off cancellation where the law applies, ${returnLabelResponsibility}. ${restockingFeeLabel}`
               : `${restockingFeeLabel} Return costs are assessed according to the approved reason and applicable law.`,
-            "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, unsafe, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
+            "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
           ],
         };
       }
@@ -586,7 +586,7 @@ export const deliveryInformation: PolicyDocument = {
         "Products set up for courier delivery can be delivered nationwide within South Africa. We do not offer international shipping.",
         "Products marked for Jurgens delivery use active Jurgens service-area postcodes. Those service areas do not change the customer delivery fee.",
         "Enter a complete South African delivery address, postcode and working telephone number at checkout, or provide them during an assisted order. Checkout shows the final delivery option before payment.",
-        "If a legal, safety, stock, or transport constraint means we cannot complete the delivery, we will contact you about a practical alternative or cancellation and refund of the affected order.",
+        "If a legal, stock, product-specific, or transport constraint means we cannot complete the delivery, we will contact you about a practical alternative or cancellation and refund of the affected order.",
         "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. Cylinder exchanges take place at the delivery handover when the matching empty cylinder is collected.",
       ],
     },
@@ -605,7 +605,7 @@ export const deliveryInformation: PolicyDocument = {
         "Handling begins after payment confirmation. Order preparation and dispatch take place within the published handling window.",
         "Our order cutoff is 2:00 PM South African Standard Time (SAST) on business days. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed. Orders placed on weekends or South African public holidays also begin processing on the next business day.",
         "The published delivery window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.",
-        "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements.",
+        "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and product-specific handling requirements.",
         "We will communicate a material delay and provide the available next step. If an accepted order cannot be fulfilled within an agreed or legally required period, you may have a right to cancel and receive the applicable refund.",
       ],
     },
@@ -613,21 +613,21 @@ export const deliveryInformation: PolicyDocument = {
       id: "before-arrival",
       title: "4. Before the delivery arrives",
       paragraphs: [
-        "Please make sure the delivery address and telephone number are correct and keep your phone available for reasonable delivery communication. The location must be safely accessible to the vehicle and delivery team.",
+        "Please make sure the delivery address and telephone number are correct and keep your phone available for reasonable delivery communication. The location must be accessible to the vehicle and delivery team.",
       ],
       bullets: [
         "An authorised adult must be available to receive and inspect the order.",
-        "Secure pets and clear a safe path to the handover point.",
+        "Secure pets and clear a path to the handover point.",
         "Tell us before dispatch about access controls, estates, stairs, restricted roads, loading rules, or other material access conditions.",
-        "For an exchange, disconnect the matching empty cylinder safely and have it upright and ready in a ventilated place accessible to the delivery team.",
-        "Do not present a leaking, modified, illegally filled, or unsafe cylinder for exchange.",
+        "For an exchange, have the matching empty cylinder upright and ready in a place accessible to the delivery team.",
+        "Do not present an empty cylinder that does not meet the stated exchange condition requirements.",
       ],
     },
     {
       id: "lpg-delivery",
-      title: "5. LPG and cylinder handover",
+      title: "5. Product and cylinder handover",
       paragraphs: [
-        "LPG orders require safe handling. Cylinders must remain upright, secured, and away from ignition sources. A delivery representative may pause or refuse a handover where access, storage, the receiving environment, or an exchange cylinder creates a material safety risk.",
+        "Some orders have product-specific handling requirements. Cylinders must remain upright and secured. A delivery representative may pause or refuse a handover where access, storage, the receiving environment, or an exchange cylinder does not meet the fulfilment requirements.",
         "A cylinder exchange is completed only when the correct matching empty cylinder is handed over. Exchange rules may consider size, type and condition. If the empty cylinder cannot be accepted, we will explain the available correction, price difference, reschedule, or cancellation options.",
         "Delivery does not include appliance installation or connection unless that service is expressly listed and confirmed. Work that legally requires a registered gas installer must be performed by a suitably qualified registered person.",
       ],
@@ -637,14 +637,14 @@ export const deliveryInformation: PolicyDocument = {
       title: "6. Handover and inspection",
       paragraphs: [
         "Where reasonably possible, check the product count, size, visible condition, seals, and accessories before accepting delivery. The recipient may be asked to confirm handover electronically or in writing.",
-        "Do not accept or use a cylinder that appears to leak, is seriously damaged, or does not match the order. Report missing, incorrect, or concealed damage as soon as reasonably possible and keep packaging or photographs that can help us investigate.",
+        "Report missing, incorrect, visible or concealed damage as soon as reasonably possible and keep packaging or photographs that can help us investigate.",
       ],
     },
     {
       id: "missed-delivery",
       title: "7. Missed or unsuccessful delivery",
       paragraphs: [
-        "A delivery may be unsuccessful if nobody is available, the address or contact details are incorrect, access is unsafe or blocked, required authorisation is missing, or an exchange cylinder is unavailable or cannot be accepted.",
+        "A delivery may be unsuccessful if nobody is available, the address or contact details are incorrect, access is blocked, required authorisation is missing, or an exchange cylinder is unavailable or cannot be accepted.",
         "We will contact you about redelivery, order correction, or cancellation. A reasonable additional delivery-attempt charge may apply where the failure was caused by incorrect customer information or unavailable access, but it will be disclosed before the next attempt and applied only where lawful.",
       ],
     },
@@ -653,14 +653,14 @@ export const deliveryInformation: PolicyDocument = {
       title: "8. Risk and authorised recipients",
       paragraphs: [
         "The goods remain at the supplier’s risk until accepted at the agreed delivery point, subject to applicable law. A person at the address who appears authorised to receive the order may be treated as the recipient unless you gave us different instructions that we accepted before delivery.",
-        "If you ask us to leave a non-hazardous parcel without attendance, that request must be accepted by us or the delivery provider first and may affect risk after the agreed safe-place handover. LPG cylinders will not be left unattended where doing so would be unsafe or contrary to the fulfilment provider’s rules.",
+        "If you ask us to leave a parcel without attendance, that request must be accepted by us or the delivery provider first and may affect risk after the agreed unattended handover. Some products cannot be left unattended where doing so conflicts with the fulfilment provider’s rules.",
       ],
     },
     {
       id: "delays-and-unavailability",
       title: "9. Delays, shortages, and events outside control",
       paragraphs: [
-        "Fuel or LPG shortages, road closures, severe weather, vehicle breakdowns, supplier disruption, public emergencies, or other events can affect delivery. We will take reasonable steps to communicate and rebook rather than leave an order unresolved.",
+        "Supplier shortages, road closures, severe weather, vehicle breakdowns, carrier disruption, or other events can affect delivery. We will take reasonable steps to communicate and rebook rather than leave an order unresolved.",
         "If products become unavailable after payment, we will offer a lawful practical option such as a revised delivery date, an agreed substitute, cancellation of the affected item, or a refund. We will not substitute a materially different product without your agreement.",
       ],
     },
@@ -710,7 +710,7 @@ export function createDeliveryInformationDocument(
             `Handling time is ${handlingTimingLabel} after payment confirmation. Order preparation and dispatch take place within this handling window.`,
             "Our order cutoff is 2:00 PM South African Standard Time (SAST) on business days. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed. Orders placed on weekends or South African public holidays also begin processing on the next business day.",
             `${deliveryTimingDescription} This published window includes handling and transit time.`,
-            "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements.",
+            "Timing can be affected by stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and product-specific handling requirements.",
             "We will communicate a material delay and provide the available next step. If an accepted order cannot be fulfilled within an agreed or legally required period, you may have a right to cancel and receive the applicable refund.",
           ],
         };

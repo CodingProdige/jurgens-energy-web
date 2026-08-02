@@ -134,21 +134,21 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            A leaking, modified, illegally filled, severely damaged or otherwise
-            unsafe cylinder may be refused. Do not try to repair, vent or refill it
-            yourself. Keep people and ignition sources away and get guidance from a
-            qualified LPG professional if the cylinder may be unsafe.
+            An empty cylinder must match the selected exchange option and be in
+            an acceptable exchange condition. If it does not meet the product
+            requirement at handover, the team will explain the available
+            correction, price difference, reschedule or cancellation options.
           </>
         ),
-        question: "Will a damaged or leaking cylinder be accepted?",
+        question: "Can any empty cylinder be accepted?",
       },
     ],
     title: "Cylinder exchange",
   },
   {
     description:
-      "Choosing compatible equipment and knowing when a registered practitioner is required.",
-    id: "products-safety",
+      "Choosing compatible equipment and knowing when professional installation is required.",
+    id: "product-guidance",
     items: [
       {
         answer: (
@@ -156,7 +156,7 @@ const faqGroups: FaqGroup[] = [
             Match the cylinder, regulator, hose, connection and appliance to the
             manufacturer’s specifications. Product names alone do not prove
             compatibility. If the appliance or installation requirement is unclear,
-            ask the manufacturer or a registered LPG practitioner before purchase
+            ask the manufacturer or a registered practitioner before purchase
             or connection.
           </>
         ),
@@ -165,32 +165,27 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Gas installation work should be completed by a practitioner registered
-            for the appropriate LPG scope. Ask to see the installer’s valid SAQCC Gas
-            registration and obtain the required Certificate of Conformity for the
-            completed installation. Our{" "}
-            <Link className="font-bold text-[#ff5a1f] hover:underline" href="/lpg-safety">
-              LPG safety guide
-            </Link>{" "}
-            has practical starting points and official resources.
+            Installation work should be completed by a practitioner registered
+            for the appropriate scope. Ask to see the installer’s valid
+            registration and obtain the required Certificate of Conformity where
+            that applies.
           </>
         ),
-        question: "Can I install an LPG appliance myself?",
+        question: "When do I need a registered installer?",
       },
       {
         answer: (
           <>
-            Do not use a naked flame. Follow the appliance and regulator
-            instructions and use a soapy-water solution on accessible joints; new
-            bubbles can indicate a leak. Close the supply if it is safe to do so,
-            stop using the equipment and contact a qualified LPG professional if
-            you suspect a leak.
+            Product pages explain included parts, option requirements and
+            compatibility notes where available. If the product page does not
+            answer the question, contact support before ordering so we can help
+            confirm the correct item or option.
           </>
         ),
-        question: "How can I check a connection for a leak?",
+        question: "Where do I check product requirements?",
       },
     ],
-    title: "Products & safety",
+    title: "Product guidance",
   },
   {
     description:
@@ -211,10 +206,10 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Stop using an item if continued use may create a safety risk. Contact
-            Jurgens Energy promptly with the order number, a clear description and,
-            where useful, photographs. The team may request product, serial, batch
-            or packaging details so the correct remedy can be assessed.
+            Contact Jurgens Energy promptly with the order number, a clear
+            description and, where useful, photographs. The team may request
+            product, serial, batch or packaging details so the correct remedy can
+            be assessed.
           </>
         ),
         question: "What if the item is incorrect, damaged or defective?",
@@ -367,7 +362,7 @@ export function FaqPage({
     <article>
       <ContentHero
         breadcrumbLabel="FAQs"
-        description="Clear answers to common questions about online orders, delivery, product-specific exchange requirements, product safety, returns and support."
+        description="Clear answers to common questions about online orders, delivery, product-specific exchange requirements, returns and support."
         eyebrow="Frequently asked questions"
         icon={MessageCircleQuestionIcon}
         title="Start with an answer."

@@ -114,11 +114,11 @@ export function getPublicReturnsSummary(settings: PublicReturnsSettings) {
   );
 
   if (settings.returnsAcceptance === "none") {
-    return `Returns are handled where required by law. Incorrect, damaged, unsafe, or defective goods remain protected by statutory remedies. ${getPublicRestockingFeeLabel(settings)}`;
+    return `Returns are handled where required by law. Incorrect, damaged, or defective goods remain protected by statutory remedies. ${getPublicRestockingFeeLabel(settings)}`;
   }
 
   if (settings.returnsAcceptance === "defective_only") {
-    return `Defective, damaged, unsafe, or incorrect goods can be returned under applicable law. Change-of-mind returns are not accepted unless required by law. ${getPublicRestockingFeeLabel(settings)}`;
+    return `Defective, damaged, or incorrect goods can be returned under applicable law. Change-of-mind returns are not accepted unless required by law. ${getPublicRestockingFeeLabel(settings)}`;
   }
 
   return `Qualifying ${conditionLabel} can be returned within ${windowLabel} after delivery. The customer pays the return courier for change-of-mind returns. ${getPublicRestockingFeeLabel(settings)}`;
@@ -128,13 +128,13 @@ export function getPublicReturnsFaqAnswer(settings: PublicReturnsSettings) {
   const summary = getPublicReturnsSummary(settings);
   const refundLabel = getPublicRefundProcessingLabel(settings);
   const exchangeCopy = settings.returnsExchangesEnabled
-    ? "Exchanges are accepted when the product and safety rules allow it."
+    ? "Exchanges are accepted when the product condition and stock availability allow it."
     : "Exchanges are not currently offered unless required by law.";
-  const hazardousCopy = settings.returnsHazardousGoodsNoteEnabled
-    ? " Contact us before returning anything, and never send LPG or a filled cylinder through an ordinary parcel service."
+  const restrictedReturnCopy = settings.returnsHazardousGoodsNoteEnabled
+    ? " Contact us before returning anything so we can confirm the approved return method."
     : " Contact us before returning anything.";
 
-  return `${summary} Jurgens Energy covers qualifying return transport for verified incorrect, damaged, unsafe or defective goods where required by law. Approved refunds are processed within ${refundLabel} after approval or inspection. ${exchangeCopy}${hazardousCopy}`;
+  return `${summary} Jurgens Energy covers qualifying return transport for verified incorrect, damaged or defective goods where required by law. Approved refunds are processed within ${refundLabel} after approval or inspection. ${exchangeCopy}${restrictedReturnCopy}`;
 }
 
 export function getMerchantCenterReturnPolicyRows(

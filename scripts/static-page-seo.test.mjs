@@ -13,7 +13,7 @@ import {
 } from "../src/modules/marketplace/static-page-seo/validation.ts";
 
 test("the static SEO registry is complete, unique and uses unsuffixed defaults", () => {
-  assert.equal(STATIC_SEO_PAGE_KEYS.length, 13);
+  assert.equal(STATIC_SEO_PAGE_KEYS.length, 12);
   assert.equal(
     new Set(STATIC_SEO_PAGE_KEYS.map((key) => STATIC_SEO_PAGE_REGISTRY[key].path))
       .size,

@@ -26,6 +26,7 @@ import type {
   MarketplaceShopMenuProduct,
 } from "@/src/modules/marketplace/catalog";
 import { MarketplaceWhatsAppIcon } from "@/components/marketplace/marketplace-whatsapp-button";
+import { cn } from "@/lib/utils";
 
 function categoryHref(category: MarketplaceShopMenuCategory) {
   return `/categories/${category.path}`;
@@ -108,9 +109,11 @@ function ExchangeableProductCard({
 }
 
 export function MarketplaceShopMenu({
+  active = false,
   data,
   whatsappHref,
 }: {
+  active?: boolean;
   data: MarketplaceShopMenuData;
   whatsappHref: string | null;
 }) {
@@ -236,7 +239,12 @@ export function MarketplaceShopMenu({
         aria-controls="marketplace-shop-mega-menu"
         aria-expanded={open}
         aria-haspopup="true"
-        className="group relative inline-flex h-[82px] items-center gap-1 text-[12px] font-black uppercase leading-none text-[#ff5a1f] transition hover:text-[#e84c15] focus-visible:outline-none focus-visible:text-[#e84c15]"
+        className={cn(
+          "group relative inline-flex h-[82px] items-center gap-1 text-[12px] font-black uppercase leading-none transition hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:text-[#ff5a1f]",
+          active || open
+            ? "text-[#ff5a1f]"
+            : "text-[#080808] dark:text-[#f7f7f2]",
+        )}
         onClick={() => {
           if (open) {
             closeMenu();
@@ -259,7 +267,7 @@ export function MarketplaceShopMenu({
         />
         <span
           className={`absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f] transition ${
-            open ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+            active || open ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
           }`}
         />
       </button>

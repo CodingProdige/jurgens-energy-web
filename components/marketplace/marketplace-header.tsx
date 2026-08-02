@@ -9,12 +9,12 @@ import {
 } from "@/components/marketplace/marketplace-account-menu";
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
 import { MarketplaceCartLink } from "@/components/marketplace/marketplace-cart-link";
+import { MarketplaceDesktopNav } from "@/components/marketplace/marketplace-desktop-nav";
 import { MarketplaceHeaderShell } from "@/components/marketplace/marketplace-header-shell";
 import {
   MarketplaceMobileMenu,
   type MarketplaceNavItem,
 } from "@/components/marketplace/marketplace-mobile-menu";
-import { MarketplaceShopMenu } from "@/components/marketplace/marketplace-shop-menu";
 import { createMarketplaceWhatsAppHref } from "@/components/marketplace/marketplace-whatsapp-button";
 import { marketplaceTrustItems } from "@/components/marketplace/marketplace-trust-items";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -116,26 +116,11 @@ export async function MarketplaceHeader() {
           <JurgensEnergyLogo className="hidden sm:inline-flex" compact={false} />
         </Link>
 
-        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-7 text-[12px] font-black uppercase text-[#080808] dark:text-[#f7f7f2] xl:flex 2xl:gap-8">
-          {navItems.map(([label, href]) =>
-            label === "Shop" ? (
-              <MarketplaceShopMenu
-                data={shopMenuData}
-                key={label}
-                whatsappHref={whatsappHref}
-              />
-            ) : (
-              <Link
-                className="group relative inline-flex h-[82px] items-center gap-1 transition hover:text-[#ff5a1f]"
-                href={href}
-                key={label}
-              >
-                <span>{label}</span>
-                <span className="absolute inset-x-0 bottom-5 h-0.5 scale-x-0 rounded-full bg-[#ff5a1f] transition group-hover:scale-x-100" />
-              </Link>
-            ),
-          )}
-        </nav>
+        <MarketplaceDesktopNav
+          navItems={navItems}
+          shopMenuData={shopMenuData}
+          whatsappHref={whatsappHref}
+        />
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <MarketplaceCartLink />

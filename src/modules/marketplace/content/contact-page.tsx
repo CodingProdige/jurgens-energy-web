@@ -177,16 +177,15 @@ export async function ContactPage({ action }: { action: ContactInquiryAction }) 
             </div>
           </section>
 
-          <section className="mt-4 rounded-lg border border-[#ff5a1f]/30 bg-[#fff4ee] p-4 dark:bg-[#ff5a1f]/10">
+          <section className="mt-4 rounded-lg border border-[#deded7] bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
             <div className="flex items-start gap-3">
               <AlertTriangleIcon className="mt-0.5 size-5 shrink-0 text-[#ff5a1f]" />
               <p className="text-[12px] leading-5 text-[#55554f] dark:text-[#cecec7]">
                 <strong className="font-black text-[#080808] dark:text-white">
-                  LPG emergency:
+                  Support scope:
                 </strong>{" "}
-                Move to safety and call 112 from a South African mobile for a
-                fire, strong gas smell or uncontrolled leak. Customer support
-                is not an emergency service.
+                Our team can help with online orders, products, delivery,
+                payments, returns and account questions during support hours.
               </p>
             </div>
           </section>

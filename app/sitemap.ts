@@ -175,16 +175,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }),
     sitemapEntry({
-      changeFrequency: "monthly",
-      lastModified: staticPageLastModified(
-        "lpg-safety",
-        contentPageLastModified,
-        staticSeoUpdatedAt,
-      ),
-      path: "/lpg-safety",
-      priority: 0.6,
-    }),
-    sitemapEntry({
       changeFrequency: "yearly",
       lastModified: staticPageLastModified(
         "privacy-policy",

@@ -39,7 +39,7 @@ function createFooterServices(deliveryTimingDescription: string) {
     {
       description: "Cylinder handover checks apply where required.",
       icon: ShieldCheckIcon,
-      title: "Safety-First Handling",
+      title: "Careful Handling",
     },
     {
       description: "Clear payment, invoice and delivery status updates.",
@@ -233,7 +233,6 @@ export async function MarketplaceFooter() {
               ["About Us", "/about"],
               ["Delivery", "/delivery-information"],
               ["Payments", "/payments"],
-              ["Product Safety", "/lpg-safety"],
               ["FAQs", "/faq"],
               ["Contact Us", "/contact"],
             ]}

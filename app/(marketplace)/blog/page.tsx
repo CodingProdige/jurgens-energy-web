@@ -26,11 +26,11 @@ export default async function BlogIndexPage() {
               Blog
             </p>
             <h1 className="mt-3 max-w-3xl text-[36px] font-black uppercase leading-tight tracking-normal sm:text-[52px]">
-              LPG advice, safety notes, and delivery updates.
+              Product guides, delivery updates, and store news.
             </h1>
             <p className="mt-4 max-w-xl text-[16px] font-semibold leading-7 text-[#4f4f49] dark:text-[#c8c8c0]">
               Practical guides from Jurgens Energy for homes and businesses
-              using LPG every day.
+              shopping online.
             </p>
           </section>
 

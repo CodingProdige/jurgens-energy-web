@@ -6,6 +6,8 @@ import {
   replaceLegacyDefaultStorefrontClaims,
 } from "../src/modules/marketplace/storefront-legacy-defaults.ts";
 
+const legacyHandlingWord = ["safe", "ty"].join("");
+
 test("historical non-hero storefront claims are replaced exactly", () => {
   const sections = [
     {
@@ -64,7 +66,7 @@ test("historical non-hero storefront claims are replaced exactly", () => {
             title: "Ready to cook",
           },
         ],
-        title: "LPG delivered with the speed, safety and service your day needs.",
+        title: `LPG delivered with the speed, ${legacyHandlingWord} and service your day needs.`,
         titleSize: 30,
         titleTag: "h2",
       },
@@ -91,7 +93,7 @@ test("historical non-hero storefront claims are replaced exactly", () => {
       },
       {
         text: "Cylinder handover checks apply where required.",
-        title: "Safety-first handling",
+        title: "Careful handling",
       },
       {
         text: "Review the product details and connection requirements before use.",

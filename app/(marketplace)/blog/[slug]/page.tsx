@@ -45,7 +45,7 @@ export async function generateMetadata({
   const description =
     post.seoDescription ??
     post.excerpt ??
-    "Read Jurgens Energy LPG advice, safety notes, and delivery updates.";
+    "Read Jurgens Energy product guides, delivery updates, and store news.";
 
   return createMarketplaceDynamicPageMetadata({
     article: {
@@ -93,7 +93,7 @@ export default async function BlogPostPage({
               description:
                 post.seoDescription ??
                 post.excerpt ??
-                "Jurgens Energy LPG advice, safety information and delivery updates.",
+                "Jurgens Energy product guides, delivery updates, and store news.",
               imageUrl: post.coverImageUrl,
               path: `/blog/${post.slug}`,
               title: post.title,

@@ -175,7 +175,7 @@ export async function SupportPage() {
         <section className="mt-14 grid gap-9 border-y border-[#deded7] py-10 dark:border-white/10 sm:mt-20 sm:py-14 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.75fr)] lg:gap-14">
           <div className="min-w-0">
             <ContentSectionHeading
-              description="Use these details for normal customer support. Emergency services should be contacted directly for urgent safety incidents."
+              description="Use these details for online order support, product questions, delivery help, payment queries and return requests."
               eyebrow="Contact options"
               title="Reach Jurgens Energy."
             />

@@ -434,7 +434,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
         {
           icon: "certified",
           text: "Cylinder handover checks apply where required.",
-          title: "Safety-first handling",
+          title: "Careful handling",
         },
         {
           icon: "flame",

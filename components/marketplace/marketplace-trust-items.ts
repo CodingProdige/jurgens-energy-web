@@ -10,7 +10,7 @@ export const marketplaceTrustItems = [
   {
     description: "Handled with care",
     icon: ShieldCheckIcon,
-    title: "Safety-First Handling",
+    title: "Careful Handling",
   },
   {
     description: "Nationwide across South Africa",

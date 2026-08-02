@@ -3061,7 +3061,7 @@ export function ReturnsPolicySettingsForm({
               </span>
               <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
                 Mirrors Merchant Center&apos;s exchange preference. Exchange
-                orders still follow LPG safety and handover rules.
+                orders still follow product-specific handover rules.
               </span>
             </span>
           </label>
@@ -3126,12 +3126,11 @@ export function ReturnsPolicySettingsForm({
           />
           <span>
             <span className="block font-semibold text-zinc-950 dark:text-white">
-              Show LPG safety return note
+              Show product-specific return handling note
             </span>
             <span className="mt-1 block text-xs leading-5 text-slate-600 dark:text-zinc-300">
-              Keeps the public policy clear that LPG, filled cylinders, and
-              hazardous goods need pre-authorised safe collection and must not
-              be posted through ordinary parcel services.
+              Keeps the public policy clear that some product types need a
+              pre-authorised return method before anything is sent or collected.
             </span>
           </span>
         </label>

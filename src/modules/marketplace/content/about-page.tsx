@@ -23,7 +23,7 @@ const storeCategories = [
   },
   {
     description:
-      "Select gas-related products and accessories with clear compatibility and safety notes where they apply.",
+      "Select gas-related products and accessories with clear compatibility and handling notes where they apply.",
     icon: ShieldCheckIcon,
     title: "Product-specific guidance",
   },

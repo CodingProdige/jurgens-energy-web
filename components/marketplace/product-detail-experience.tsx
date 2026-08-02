@@ -2861,7 +2861,7 @@ function VariantOptionCard({
 
 function MobileTrustTicker() {
   const items = [
-    { icon: ShieldCheckIcon, label: "Safety-first handling" },
+    { icon: ShieldCheckIcon, label: "Careful handling" },
     { icon: CreditCardIcon, label: "Secure payments" },
     { icon: FileTextIcon, label: "Includes VAT" },
   ] as const;
@@ -2994,7 +2994,7 @@ function CompactTrustRow({
           />
         </span>
         <span className="min-w-0 whitespace-nowrap">
-          {modalCompact ? "Safe handling" : "Safety-first handling"}
+          {modalCompact ? "Careful handling" : "Handled with care"}
         </span>
       </span>
       <span

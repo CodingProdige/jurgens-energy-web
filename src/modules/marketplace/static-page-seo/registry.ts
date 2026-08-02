@@ -7,7 +7,6 @@ export const STATIC_SEO_PAGE_KEYS = [
   "contact",
   "faq",
   "lpg-delivery",
-  "lpg-safety",
   "delivery-information",
   "privacy-policy",
   "returns-and-refunds",
@@ -58,8 +57,8 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   blog: {
     defaultDescription:
-      "Read practical Jurgens Energy articles about online shopping, delivery, product guidance, safety, support and customer updates.",
-    defaultTitle: "Product Advice, Delivery & Safety Guides",
+      "Read practical Jurgens Energy articles about online shopping, delivery, product guidance, support and customer updates across South Africa.",
+    defaultTitle: "Product Advice, Delivery & Shopping Guides",
     key: "blog",
     label: "Blog",
     path: "/blog",
@@ -105,16 +104,6 @@ export const STATIC_SEO_PAGE_REGISTRY = {
     path: "/lpg-delivery",
     scanFocus:
       "The online ordering flow, checkout-confirmed South African delivery, published timing, shipping costs and product-specific handover requirements.",
-  },
-  "lpg-safety": {
-    defaultDescription:
-      "Read essential LPG cylinder safety guidance for transport, storage, ventilation, leak checks and responsible use around your home or business.",
-    defaultTitle: "LPG Gas Safety, Storage & Cylinder Guidance",
-    key: "lpg-safety",
-    label: "LPG safety",
-    path: "/lpg-safety",
-    scanFocus:
-      "The safety advice actually published on the page. Do not introduce legal, technical or certification claims not present in the source.",
   },
   "delivery-information": {
     defaultDescription:

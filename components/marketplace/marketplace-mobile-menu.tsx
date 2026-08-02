@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   ChevronLeftIcon,
@@ -37,6 +38,7 @@ import type {
   MarketplaceShopMenuCategory,
   MarketplaceShopMenuData,
 } from "@/src/modules/marketplace/catalog";
+import { cn } from "@/lib/utils";
 
 export type MarketplaceNavItem = readonly [label: string, href: string];
 
@@ -64,6 +66,33 @@ function findCategoryByPath(
   }
 
   return null;
+}
+
+function normalizePath(path: string) {
+  if (path === "/") {
+    return path;
+  }
+
+  return path.replace(/\/+$/, "");
+}
+
+function isActiveNavItem(pathname: string, href: string, label: string) {
+  const currentPath = normalizePath(pathname);
+  const navPath = normalizePath(href);
+
+  if (navPath === "/") {
+    return currentPath === "/";
+  }
+
+  if (label === "Shop") {
+    return (
+      currentPath === "/products" ||
+      currentPath.startsWith("/products/") ||
+      currentPath.startsWith("/categories/")
+    );
+  }
+
+  return currentPath === navPath || currentPath.startsWith(`${navPath}/`);
 }
 
 function MobileShopPage({
@@ -206,6 +235,7 @@ export function MarketplaceMobileMenu({
   shopMenuData,
   whatsappHref,
 }: MarketplaceMobileMenuProps) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [shopPageOpen, setShopPageOpen] = useState(false);
   const [shopPath, setShopPath] = useState<string | null>(null);
@@ -315,10 +345,16 @@ export function MarketplaceMobileMenu({
             ) : null}
 
             <nav className="grid gap-1">
-              {navItems.map(([label, href]) =>
-                label === "Shop" ? (
+              {navItems.map(([label, href]) => {
+                const active = isActiveNavItem(pathname, href, label);
+
+                return label === "Shop" ? (
                   <button
-                    className="flex h-11 w-full items-center justify-between rounded-md px-2 text-left text-[13px] font-black uppercase text-[#080808] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                    className={cn(
+                      "flex h-11 w-full items-center justify-between rounded-md px-2 text-left text-[13px] font-black uppercase text-[#080808] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10",
+                      active &&
+                        "bg-[#fff2eb] text-[#ff5a1f] dark:bg-[#ff5a1f]/10 dark:text-[#ff8b60]",
+                    )}
                     key={label}
                     onClick={openShopPage}
                     type="button"
@@ -328,15 +364,20 @@ export function MarketplaceMobileMenu({
                   </button>
                 ) : (
                   <Link
-                    className="flex h-11 items-center justify-between rounded-md px-2 text-[13px] font-black uppercase text-[#080808] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "flex h-11 items-center justify-between rounded-md px-2 text-[13px] font-black uppercase text-[#080808] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10",
+                      active &&
+                        "bg-[#fff2eb] text-[#ff5a1f] dark:bg-[#ff5a1f]/10 dark:text-[#ff8b60]",
+                    )}
                     href={href}
                     key={label}
                     onClick={closeMenu}
                   >
                     <span>{label}</span>
                   </Link>
-                ),
-              )}
+                );
+              })}
               <Link
                 className="flex h-11 items-center gap-3 rounded-md px-2 text-[13px] font-black uppercase text-[#080808] transition hover:bg-[#f7f7f2] hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:bg-white/10"
                 href="/cart"
