@@ -264,7 +264,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
         },
       ],
       copy:
-        "JurgensEnergy.com is a South African online store. Delivery is available to eligible addresses nationwide and usually arrives within 1–4 business days after payment confirmation.",
+        "Jurgens Energy brings practical home, energy, appliance and lifestyle products into one simple online store, with clear pricing, secure checkout and delivery to eligible addresses across South Africa.",
       heading:
         "Shop home, energy and lifestyle products online.",
       headingSize: 52,

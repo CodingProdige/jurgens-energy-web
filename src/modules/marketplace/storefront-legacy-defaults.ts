@@ -1,19 +1,8 @@
 import type { StorefrontSection } from "./storefront-types";
 
-const eligibleAddressHeroCopy =
-  "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.";
 const eligibleAddressFeatureTitle = "South Africa delivery";
 const eligibleAddressFeatureText =
   "Usually arrives within 1–4 business days after payment confirmation.";
-
-const legacyHeroCopyReplacements: Readonly<Record<string, string>> = {
-  "Safe, certified and delivered to your home or business.":
-    eligibleAddressHeroCopy,
-  "LPG cylinders, exchange options and local delivery where available.":
-    eligibleAddressHeroCopy,
-  "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.":
-    eligibleAddressHeroCopy,
-};
 
 const legacyFeatureGridTitleReplacements: Readonly<Record<string, string>> = {
   "LPG delivered with the speed, safety and service your day needs.":
@@ -68,19 +57,6 @@ export function replaceLegacyDefaultStorefrontClaims(
   sections: StorefrontSection[],
 ) {
   return sections.map((section): StorefrontSection => {
-    if (section.type === "hero") {
-      return {
-        ...section,
-        settings: {
-          ...section.settings,
-          copy: replaceExactLegacyText(
-            section.settings.copy,
-            legacyHeroCopyReplacements,
-          ),
-        },
-      };
-    }
-
     if (section.type === "feature_grid") {
       return {
         ...section,

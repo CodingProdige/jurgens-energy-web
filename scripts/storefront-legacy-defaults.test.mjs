@@ -6,7 +6,7 @@ import {
   replaceLegacyDefaultStorefrontClaims,
 } from "../src/modules/marketplace/storefront-legacy-defaults.ts";
 
-test("historical default storefront claims are replaced exactly", () => {
+test("historical non-hero storefront claims are replaced exactly", () => {
   const sections = [
     {
       enabled: true,
@@ -76,7 +76,7 @@ test("historical default storefront claims are replaced exactly", () => {
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.",
+    "Safe, certified and delivered to your home or business.",
   );
   assert.equal(
     result[1].settings.steps[0].description,
@@ -140,7 +140,7 @@ test("similar admin-authored storefront copy is preserved", () => {
   );
 });
 
-test("the previous neutral defaults are upgraded to the South Africa store copy", () => {
+test("the previous neutral non-hero defaults are upgraded to the South Africa store copy", () => {
   const sections = [
     {
       enabled: true,
@@ -181,7 +181,7 @@ test("the previous neutral defaults are upgraded to the South Africa store copy"
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.",
+    "LPG cylinders, exchange options and local delivery where available.",
   );
   assert.deepEqual(result[1].settings.features[0], {
     icon: "delivery",
@@ -235,7 +235,7 @@ test("the previous South Africa defaults are upgraded to checkout-qualified deli
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.",
+    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories, with delivery within South Africa.",
   );
   assert.deepEqual(result[1].settings.features[0], {
     icon: "delivery",

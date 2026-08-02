@@ -176,8 +176,8 @@ export async function MarketplaceFooter() {
               About Jurgens Energy
             </h2>
             <p className="mt-2 max-w-sm text-[15px] font-black leading-5 text-[#1a1a1a] dark:text-[#f7f7f2]">
-              JurgensEnergy.com is a South African online store for home,
-              energy, outdoor, appliance and lifestyle products.
+              Jurgens Energy is a South African online store for home, energy,
+              outdoor, appliance and lifestyle products.
             </p>
             <p className="mt-3 max-w-sm text-[12px] leading-5 text-[#696963] dark:text-[#a8a89f]">
               Customers shop and pay online. Delivery is available throughout

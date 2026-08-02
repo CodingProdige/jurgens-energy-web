@@ -28,7 +28,7 @@ export type StaticSeoPageRegistryEntry = {
 export const STATIC_SEO_PAGE_REGISTRY = {
   home: {
     defaultDescription:
-      "Shop home, energy, outdoor, appliance and lifestyle products at JurgensEnergy.com. Delivery is available throughout South Africa and confirmed at checkout.",
+      "Shop home, energy, outdoor, appliance and lifestyle products with Jurgens Energy. Delivery is available throughout South Africa and confirmed at checkout.",
     defaultTitle: "South African Online Store",
     key: "home",
     label: "Homepage",
@@ -68,7 +68,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   about: {
     defaultDescription:
-      "JurgensEnergy.com is a South African online store. Customers can shop and pay online, with delivery eligibility confirmed at checkout.",
+      "Jurgens Energy is a South African online store. Customers can shop and pay online, with delivery eligibility confirmed at checkout.",
     defaultTitle: "About Jurgens Energy",
     key: "about",
     label: "About us",

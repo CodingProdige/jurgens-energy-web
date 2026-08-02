@@ -46,10 +46,10 @@ export function AboutPage({
     <article>
       <ContentHero
         breadcrumbLabel="About us"
-        description="JurgensEnergy.com is a South African online store. Customers can browse, order and pay online, with delivery available throughout South Africa and eligibility confirmed at checkout."
+        description="Jurgens Energy is a South African online store. Customers can browse, order and pay online, with delivery available throughout South Africa and eligibility confirmed at checkout."
         eyebrow="About Jurgens Energy"
         icon={FlameIcon}
-        title="JurgensEnergy.com is a South African online store."
+        title="Jurgens Energy is a South African online store."
       />
 
       <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-7 sm:py-12 lg:px-10 lg:py-16">

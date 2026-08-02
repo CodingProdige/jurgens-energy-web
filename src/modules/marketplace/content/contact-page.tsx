@@ -169,7 +169,7 @@ export async function ContactPage({ action }: { action: ContactInquiryAction }) 
                   Online-only store
                 </h3>
                 <p className="mt-2 text-[13px] leading-6 text-[#5f5f59] dark:text-[#bdbdb5]">
-                  JurgensEnergy.com has no public walk-in shop or returns
+                  Jurgens Energy has no public walk-in shop or returns
                   counter. Place orders online and contact us before sending an
                   approved return by courier.
                 </p>

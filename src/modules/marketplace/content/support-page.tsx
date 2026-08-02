@@ -239,7 +239,7 @@ export async function SupportPage() {
               Online-only support note
             </h2>
             <p className="mt-3 text-[13px] leading-6 text-[#5f5f59] dark:text-[#c3c3bb]">
-              JurgensEnergy.com is an online store. We do not operate a public
+              Jurgens Energy is an online store. We do not operate a public
               walk-in shop, customer collection counter or returns counter.
               Orders, payments and customer support are handled online.
             </p>
