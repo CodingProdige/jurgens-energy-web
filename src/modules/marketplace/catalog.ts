@@ -27,6 +27,7 @@ import {
   type MarketplaceProductPreviewVideo,
 } from "@/src/modules/marketplace/product-card-media";
 import {
+  getMarketplaceProductLowStockQuantity,
   getMarketplaceProductStockStatus,
   getMarketplaceVariantInStock,
   getMarketplaceVariantStockStatus,
@@ -107,6 +108,7 @@ export type MarketplaceProductCard = {
   id: string;
   inStock: boolean;
   isOnSale: boolean;
+  lowStockQuantity: number | null;
   priceLabel: string;
   previewVideo: MarketplaceProductPreviewVideo | null;
   quickAddVariantId: string | null;
@@ -518,6 +520,7 @@ export async function getMarketplaceCatalog({
       hasExchangeOption: variants.some((variant) => variant.requiresExchangeEmpty),
       id: row.id,
       inStock: variants.some(getVariantInStock),
+      lowStockQuantity: getMarketplaceProductLowStockQuantity(variants),
       priceLabel: getPriceLabel(variants, currencyContext),
       previewVideo:
         productMediaByProductId.get(row.id)?.previewVideo ?? null,
@@ -930,6 +933,7 @@ export async function getMarketplaceCatalogPage({
     hasExchangeOption: getRecordExchangeSupported(record),
     id: record.row.id,
     inStock: getRecordInStock(record),
+    lowStockQuantity: getMarketplaceProductLowStockQuantity(record.variants),
     priceLabel: getPriceLabel(record.variants, currencyContext),
     previewVideo:
       productMediaByProductId.get(record.row.id)?.previewVideo ?? null,
@@ -1703,6 +1707,7 @@ export async function getMarketplaceProductBySlug(
     id: product.id,
     imageUrls,
     inStock: variants.some((variant) => variant.inStock),
+    lowStockQuantity: getMarketplaceProductLowStockQuantity(activeVariantRows),
     mediaItems,
     optionSchema: product.optionSchema ?? [],
     priceLabel: getPriceLabel(variants, currencyContext),

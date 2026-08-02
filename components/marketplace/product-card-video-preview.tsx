@@ -517,7 +517,7 @@ export function ProductCardVideoPreview({
           <video
             aria-hidden="true"
             className={cn(
-              "marketplace-product-card-media absolute inset-0 size-full bg-[#f7f7f2] object-contain opacity-0 transition-opacity duration-200 motion-reduce:transition-none dark:bg-[#1a1a1a]",
+              "marketplace-product-card-media absolute inset-0 size-full bg-[#f7f7f2] object-cover opacity-0 transition-opacity duration-200 motion-reduce:transition-none dark:bg-[#1a1a1a]",
               playbackStatus === "playing" && "opacity-100",
             )}
             disablePictureInPicture

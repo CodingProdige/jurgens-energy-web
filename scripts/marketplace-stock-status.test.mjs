@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getMarketplaceProductLowStockQuantity,
   getMarketplaceProductStockStatus,
   getMarketplaceVariantStockStatus,
 } from "../src/modules/marketplace/stock-status.ts";
@@ -72,5 +73,43 @@ test("product stock is low only when no active variant has normal stock", () => 
       },
     ]),
     "low_stock",
+  );
+});
+
+test("product low-stock quantity totals only genuinely scarce stock", () => {
+  assert.equal(
+    getMarketplaceProductLowStockQuantity([
+      {
+        continueSellingOutOfStock: false,
+        lowStockAlert: 9,
+        stockOnHand: 9,
+      },
+    ]),
+    9,
+  );
+  assert.equal(
+    getMarketplaceProductLowStockQuantity([
+      {
+        continueSellingOutOfStock: false,
+        lowStockAlert: 9,
+        stockOnHand: 9,
+      },
+      {
+        continueSellingOutOfStock: false,
+        lowStockAlert: 3,
+        stockOnHand: 12,
+      },
+    ]),
+    null,
+  );
+  assert.equal(
+    getMarketplaceProductLowStockQuantity([
+      {
+        continueSellingOutOfStock: true,
+        lowStockAlert: 9,
+        stockOnHand: 0,
+      },
+    ]),
+    null,
   );
 });

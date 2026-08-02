@@ -28,6 +28,7 @@ export function MarketplaceProductCard({
     product.soldQuantity,
     soldLabel,
   );
+  const lowStockLabel = getProductCardLowStockLabel(product.lowStockQuantity);
   const displayImageUrl =
     product.coverImageUrl ?? product.previewVideo?.posterUrl ?? null;
   const imageBadgeStackClassName = cn(
@@ -39,7 +40,7 @@ export function MarketplaceProductCard({
   const productImage = displayImageUrl ? (
     <Image
       alt={product.title}
-      className="marketplace-product-card-media object-contain"
+      className="marketplace-product-card-media object-cover"
       fill
       quality={90}
       loading="eager"
@@ -156,7 +157,12 @@ export function MarketplaceProductCard({
             />
           </div>
 
-          <div className="flex min-w-0 flex-wrap gap-0.5 sm:gap-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-0.5 sm:gap-1">
+            {lowStockLabel ? (
+              <span className="inline-flex items-center whitespace-nowrap text-[8px] font-semibold leading-none text-[#ff5a1f] sm:text-[10px]">
+                {lowStockLabel}
+              </span>
+            ) : null}
             {product.variantCount > 1 ? (
               <span className="rounded-[3px] bg-[#f7f7f2] px-1 py-0.5 text-[7px] font-black uppercase leading-none text-[#6a6a63] dark:bg-white/10 dark:text-zinc-300 sm:px-1.5 sm:text-[9px]">
                 {product.variantCount} options
@@ -184,6 +190,14 @@ function getProductCardStockBadgeClassName(status: MarketplaceStockStatus) {
 
 function formatCardRating(value: number) {
   return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
+}
+
+function getProductCardLowStockLabel(quantity: number | null) {
+  if (!quantity) {
+    return null;
+  }
+
+  return quantity === 1 ? "Only 1 left" : `Only ${quantity} left`;
 }
 
 type ProductCardPerformanceBadge = {

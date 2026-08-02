@@ -209,6 +209,7 @@ function toProductDetailView(
     imageUrls: product.imageUrls,
     inStock: product.inStock,
     isOnSale: product.isOnSale,
+    lowStockQuantity: product.lowStockQuantity,
     mediaItems: product.mediaItems,
     optionSchema: product.optionSchema,
     priceLabel: product.priceLabel,

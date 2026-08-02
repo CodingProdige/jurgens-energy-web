@@ -549,7 +549,7 @@ function ProductCollectionList({
       className={cn(
         "mt-2.5 px-1.5 sm:mt-5 sm:px-0",
         isCarousel
-          ? "flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+          ? "-mx-1.5 flex snap-x snap-mandatory scroll-px-1.5 gap-1.5 overflow-x-auto px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:scroll-px-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:scroll-px-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
           : "grid grid-cols-2 items-stretch gap-1.5 sm:gap-4 md:grid-cols-4",
       )}
     >
@@ -558,7 +558,7 @@ function ProductCollectionList({
           <div
             className={
               isCarousel
-                ? "flex w-[46%] min-w-[8.5rem] max-w-[13rem] snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
+                ? "flex min-w-0 shrink-0 basis-[calc((100%_-_0.375rem)_/_2)] snap-start sm:basis-[calc((100%_-_3rem)_/_4)] xl:basis-[calc((100%_-_4rem)_/_5)]"
                 : undefined
             }
             key={product.id}

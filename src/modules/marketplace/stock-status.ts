@@ -61,6 +61,28 @@ export function getMarketplaceProductStockStatus(
   return "backorder";
 }
 
+export function getMarketplaceProductLowStockQuantity(
+  variants: readonly MarketplaceVariantStockInput[],
+) {
+  if (getMarketplaceProductStockStatus(variants) !== "low_stock") {
+    return null;
+  }
+
+  const quantity = variants.reduce((total, variant) => {
+    if (variant.continueSellingOutOfStock) {
+      return total;
+    }
+
+    if (getMarketplaceVariantStockStatus(variant) !== "low_stock") {
+      return total;
+    }
+
+    return total + Math.max(0, Math.floor(variant.stockOnHand));
+  }, 0);
+
+  return quantity > 0 ? quantity : null;
+}
+
 export function getMarketplaceStockStatusLabel(status: MarketplaceStockStatus) {
   return marketplaceStockStatusLabels[status];
 }
