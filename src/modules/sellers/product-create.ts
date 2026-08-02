@@ -76,6 +76,7 @@ export type SellerEditableProductData = {
   heightMm: string;
   id: string;
   lengthMm: string;
+  lowStockAlert: string;
   longDescription: string;
   mediaIds: string[];
   manufacturerMpn: string;
@@ -310,6 +311,7 @@ export async function getSellerEditableProductData({
     heightMm: formatEditableMetric(firstVariant?.heightMm ?? null),
     id: product.id,
     lengthMm: formatEditableMetric(firstVariant?.lengthMm ?? null),
+    lowStockAlert: String(firstVariant?.lowStockAlert ?? 5),
     longDescription: product.fullDescription ?? "",
     mediaIds: mediaRows.map((row) => row.mediaId),
     manufacturerMpn: firstVariant?.manufacturerMpn ?? "",

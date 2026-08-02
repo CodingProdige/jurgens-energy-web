@@ -133,6 +133,7 @@ const productDraftSchema = z.object({
   optionSchema: z.array(productOptionSchema).max(20).default([]),
   parcelPresetId: z.string().uuid().nullable().optional(),
   price: z.string().trim().max(40).optional(),
+  lowStockAlert: z.string().trim().max(20).optional(),
   productId: z.string().uuid().nullable().optional(),
   productName: z.string().trim().max(240).optional().default(""),
   singleVariantId: z.string().uuid().nullable().optional(),
@@ -255,6 +256,14 @@ function parseStock(value?: string) {
   const parsed = Number(value?.trim() || "0");
 
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
+function parseLowStockAlert(value?: string, fallback = 5) {
+  if (value === undefined) {
+    return parseStock(String(fallback));
+  }
+
+  return parseStock(value.trim() ? value : "5");
 }
 
 function getProductTitleForSave(inputTitle: string, existingTitle?: string | null) {
@@ -406,6 +415,7 @@ function buildVariantRows(
     googleFulfillmentChannel: "excluded" | "local_lpg" | "national_courier";
     googleReturnPolicyLabel: string | null;
     id: string;
+    lowStockAlert: number;
     manufacturerMpn: string | null;
     sku: string;
   }> = [],
@@ -483,7 +493,10 @@ function buildVariantRows(
         lengthMm:
           parseOptionalMetric(variant.lengthMm) ??
           parseOptionalMetric(input.lengthMm),
-        lowStockAlert: parseStock(variant.lowStockAlert || "5"),
+        lowStockAlert: parseLowStockAlert(
+          variant.lowStockAlert,
+          existingVariant?.lowStockAlert ?? 5,
+        ),
         manufacturerMpn:
           variant.manufacturerMpn === undefined
             ? existingVariant?.manufacturerMpn ?? null
@@ -554,7 +567,10 @@ function buildVariantRows(
       imageId: input.mediaIds[0] ?? null,
       isActive: true,
       lengthMm: parseOptionalMetric(input.lengthMm),
-      lowStockAlert: 5,
+      lowStockAlert: parseLowStockAlert(
+        input.lowStockAlert,
+        existingVariant?.lowStockAlert ?? existingSingleVariant?.lowStockAlert ?? 5,
+      ),
       manufacturerMpn:
         input.manufacturerMpn === undefined
           ? existingVariant?.manufacturerMpn ?? null
@@ -837,6 +853,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
               productVariants.googleFulfillmentChannel,
             googleReturnPolicyLabel: productVariants.googleReturnPolicyLabel,
             id: productVariants.id,
+            lowStockAlert: productVariants.lowStockAlert,
             manufacturerMpn: productVariants.manufacturerMpn,
             sku: productVariants.sku,
           })

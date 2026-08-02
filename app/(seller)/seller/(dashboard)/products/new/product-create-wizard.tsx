@@ -1763,6 +1763,9 @@ export function ProductCreateWizard({
     initialPrivateCosts?.productCostPrice ?? "",
   );
   const [stock, setStock] = useState(initialProduct?.stock ?? "0");
+  const [lowStockAlert, setLowStockAlert] = useState(
+    initialProduct?.lowStockAlert ?? "5",
+  );
   const [continueSellingOutOfStock, setContinueSellingOutOfStock] =
     useState(initialProduct?.continueSellingOutOfStock ?? false);
   const [exchangeRequiresEmpty, setExchangeRequiresEmpty] = useState(
@@ -2056,7 +2059,7 @@ export function ProductCreateWizard({
             variant.continueSellingOutOfStock ||
             (variant.stock.trim() && variant.lowStockAlert.trim()),
         )
-      : continueSellingOutOfStock || stock.trim();
+      : continueSellingOutOfStock || (stock.trim() && lowStockAlert.trim());
     const parcelDataProvided = [weightGrams, lengthMm, widthMm, heightMm].some(
       (value) => Boolean(parsePositiveNumber(value)),
     );
@@ -2141,6 +2144,7 @@ export function ProductCreateWizard({
     hasVariants,
     heightMm,
     lengthMm,
+    lowStockAlert,
     longDescription,
     price,
     productName,
@@ -2770,7 +2774,7 @@ export function ProductCreateWizard({
         id: makeId("variant"),
         imageId: selectedMediaIds[0] ?? null,
         lengthMm,
-        lowStockAlert: "5",
+        lowStockAlert,
         manufacturerMpn: "",
         notes: "",
         optionValues,
@@ -2898,6 +2902,7 @@ export function ProductCreateWizard({
       sku,
       status,
       stock,
+      lowStockAlert,
       variants: hasVariants
         ? generatedVariants.map((variant) => ({
             barcode: variant.barcode,
@@ -3739,10 +3744,15 @@ export function ProductCreateWizard({
                     continueSellingOutOfStock &&
                       "cursor-not-allowed bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-zinc-500",
                   )}
-                  defaultValue={5}
                   disabled={continueSellingOutOfStock}
+                  inputMode="numeric"
                   min={0}
+                  onChange={(event) =>
+                    setLowStockAlert(sanitizeStockInput(event.target.value))
+                  }
+                  pattern="[0-9]*"
                   type="number"
+                  value={lowStockAlert}
                 />
               </label>
             </div>

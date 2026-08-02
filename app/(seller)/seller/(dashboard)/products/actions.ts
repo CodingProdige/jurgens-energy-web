@@ -329,6 +329,14 @@ function parseStockInput(value?: string) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
 }
 
+function parseLowStockAlertInput(value?: string, fallback = 5) {
+  if (value === undefined) {
+    return parseStockInput(String(fallback));
+  }
+
+  return parseStockInput(value.trim() ? value : "5");
+}
+
 async function getCsvDuplicateContext(
   sellerId: string,
   rows: Array<z.infer<typeof csvImportRowSchema>>,
@@ -652,7 +660,10 @@ export async function updateSellerProductOperationalFields(input: unknown) {
   }
 
   const existingVariants = await db
-    .select({ id: productVariants.id })
+    .select({
+      id: productVariants.id,
+      lowStockAlert: productVariants.lowStockAlert,
+    })
     .from(productVariants)
     .where(
       and(
@@ -667,6 +678,10 @@ export async function updateSellerProductOperationalFields(input: unknown) {
   if (existingVariants.length !== parsed.data.variants.length) {
     return productActionResult(false, "One or more variants could not be confirmed.");
   }
+
+  const existingLowStockAlertById = new Map(
+    existingVariants.map((variant) => [variant.id, variant.lowStockAlert]),
+  );
 
   for (const variant of parsed.data.variants) {
     const price = parseRequiredMoneyInput(variant.price);
@@ -702,7 +717,10 @@ export async function updateSellerProductOperationalFields(input: unknown) {
           lowStockAlert:
             product.fulfillmentMode === "jurgens_fulfilled"
               ? 0
-              : parseStockInput(variant.lowStockAlert || "5"),
+              : parseLowStockAlertInput(
+                  variant.lowStockAlert,
+                  existingLowStockAlertById.get(variant.id) ?? 5,
+                ),
           price: parseRequiredMoneyInput(variant.price) ?? "0.00",
           shipsAlone: variant.shipsAlone,
           status: variant.status,
