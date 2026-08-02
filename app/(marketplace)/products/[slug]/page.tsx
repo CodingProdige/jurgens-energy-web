@@ -220,6 +220,7 @@ function toProductDetailView(
     shortDescription: product.shortDescription,
     slug: product.slug,
     soldQuantity: product.soldQuantity,
+    stockStatus: product.stockStatus,
     title: product.title,
     totalSoldQuantity: product.totalSoldQuantity,
     variantCount: product.variantCount,

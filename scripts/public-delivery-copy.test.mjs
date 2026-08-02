@@ -35,7 +35,7 @@ test("product delivery copy matches the published delivery window", () => {
   });
   assert.equal(
     publicDeliveryTimingDescription,
-    "Delivery normally takes 1–4 business days after payment confirmation.",
+    "Usually arrives within 1–4 business days after payment confirmation.",
   );
   assert.equal(publicProductDeliveryTimingLabel, "1–4 business days");
 
@@ -133,7 +133,7 @@ test("configured handling and transit ranges drive every public timing label", (
   );
   assert.equal(
     getPublicDeliveryTimingDescription(settings),
-    "Delivery normally takes 3–7 business days after payment confirmation.",
+    "Usually arrives within 3–7 business days after payment confirmation.",
   );
   assert.equal(formatPublicBusinessDayRange(1, 1), "1 business day");
 });

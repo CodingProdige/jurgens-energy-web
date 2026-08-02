@@ -68,6 +68,10 @@ import {
   getSoldQuantityLabel,
   isExchangeVariant,
 } from "@/src/modules/marketplace/product-variant-presentation";
+import {
+  getMarketplaceStockStatusLabel,
+  type MarketplaceStockStatus,
+} from "@/src/modules/marketplace/stock-status";
 import { parseProductDescription } from "@/src/modules/products/product-description";
 
 export type MarketplaceProductDetailView = Omit<
@@ -1558,6 +1562,7 @@ function ProductBuyBox({
     : null;
   const topSoldVariantId = getTopSoldVariantId(product.variants);
   const soldLabel = getSoldQuantityLabel(product.totalSoldQuantity);
+  const selectedStockStatus = selectedVariant?.stockStatus ?? product.stockStatus;
 
   useEffect(() => {
     setAdded(false);
@@ -1640,7 +1645,6 @@ function ProductBuyBox({
         deliveryAvailable={deliveryAvailable}
         deliveryBenefit={deliveryBenefit}
         deliveryDetail={deliveryDetail}
-        isInStock={selectedVariant?.inStock ?? product.inStock}
         onOpenOptions={() => setIsOptionsDialogOpen(true)}
         onSelectVariant={setSelectedVariantId}
         product={product}
@@ -1650,6 +1654,7 @@ function ProductBuyBox({
         selectedVariant={selectedVariant}
         selectedVariantId={selectedVariantId}
         soldLabel={soldLabel}
+        stockStatus={selectedStockStatus}
         topSoldVariantId={topSoldVariantId}
       />
 
@@ -1676,11 +1681,7 @@ function ProductBuyBox({
             Includes VAT
           </p>
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-            <Badge className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-300 sm:px-3 sm:text-xs">
-              {selectedVariant?.inStock ?? product.inStock
-                ? "In Stock"
-                : "Backorder"}
-            </Badge>
+            <ProductStockStatusBadge status={selectedStockStatus} />
           </div>
         </div>
 
@@ -1783,6 +1784,7 @@ function ProductBuyBox({
         setQuantity={setQuantity}
         setSelectedVariantId={setSelectedVariantId}
         soldLabel={soldLabel}
+        stockStatus={selectedStockStatus}
         topSoldVariantId={topSoldVariantId}
       />
 
@@ -1802,12 +1804,41 @@ function ProductBuyBox({
   );
 }
 
+function ProductStockStatusBadge({
+  className,
+  compact = false,
+  status,
+}: {
+  className?: string;
+  compact?: boolean;
+  status: MarketplaceStockStatus;
+}) {
+  return (
+    <Badge
+      className={cn(
+        "rounded-full font-black",
+        compact
+          ? "h-5 px-2 text-[10px]"
+          : "px-2.5 py-1 text-[11px] sm:px-3 sm:text-xs",
+        status === "low_stock" &&
+          "bg-[#ffb000] text-[#080808] dark:bg-[#ffb000] dark:text-[#080808]",
+        status === "in_stock" &&
+          "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-300",
+        status === "backorder" &&
+          "bg-[#1a1a1a] text-white dark:bg-[#f7f7f2] dark:text-[#080808]",
+        className,
+      )}
+    >
+      {getMarketplaceStockStatusLabel(status)}
+    </Badge>
+  );
+}
+
 function MobileProductPurchaseSummary({
   currencyContext,
   deliveryAvailable,
   deliveryBenefit,
   deliveryDetail,
-  isInStock,
   onOpenOptions,
   onSelectVariant,
   product,
@@ -1817,13 +1848,13 @@ function MobileProductPurchaseSummary({
   selectedVariant,
   selectedVariantId,
   soldLabel,
+  stockStatus,
   topSoldVariantId,
 }: {
   currencyContext: CurrencyContext;
   deliveryAvailable: boolean;
   deliveryBenefit: string;
   deliveryDetail: string;
-  isInStock: boolean;
   onOpenOptions: () => void;
   onSelectVariant: (variantId: string) => void;
   product: MarketplaceProductDetailView;
@@ -1833,6 +1864,7 @@ function MobileProductPurchaseSummary({
   selectedVariant: MarketplaceVariant | null;
   selectedVariantId: string;
   soldLabel: string | null;
+  stockStatus: MarketplaceStockStatus;
   topSoldVariantId: string | null;
 }) {
   const shortDescription = product.shortDescription
@@ -1866,16 +1898,7 @@ function MobileProductPurchaseSummary({
             Includes VAT
           </p>
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <Badge
-              className={cn(
-                "h-5 rounded-full px-2 text-[10px] font-black",
-                isInStock
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-300"
-                  : "bg-[#1a1a1a] text-white dark:bg-[#f7f7f2] dark:text-[#080808]",
-              )}
-            >
-              {isInStock ? "In Stock" : "Backorder"}
-            </Badge>
+            <ProductStockStatusBadge compact status={stockStatus} />
           </div>
         </div>
 
@@ -2532,6 +2555,7 @@ function ProductOptionsDialog({
   setQuantity,
   setSelectedVariantId,
   soldLabel,
+  stockStatus,
   topSoldVariantId,
 }: {
   added: boolean;
@@ -2554,6 +2578,7 @@ function ProductOptionsDialog({
   setQuantity: (quantity: number) => void;
   setSelectedVariantId: (variantId: string) => void;
   soldLabel: string | null;
+  stockStatus: MarketplaceStockStatus;
   topSoldVariantId: string | null;
 }) {
   const selectedImage = selectedVariant?.imageUrl ?? product.coverImageUrl;
@@ -2614,6 +2639,7 @@ function ProductOptionsDialog({
             <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
               <p>Includes VAT</p>
             </div>
+            <ProductStockStatusBadge className="mt-1" compact status={stockStatus} />
           </div>
           <DialogClose className="grid size-9 place-items-center rounded-full text-[#080808] transition hover:bg-[#f7f7f2] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/20 dark:text-[#f7f7f2] dark:hover:bg-white/10">
             <XIcon className="size-5" />

@@ -10,6 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { MarketplaceProductCard as MarketplaceProductCardData } from "@/src/modules/marketplace/catalog";
 import { getSoldQuantityLabel } from "@/src/modules/marketplace/product-variant-presentation";
+import {
+  getMarketplaceStockStatusLabel,
+  type MarketplaceStockStatus,
+} from "@/src/modules/marketplace/stock-status";
 
 export function MarketplaceProductCard({
   product,
@@ -95,13 +99,12 @@ export function MarketplaceProductCard({
             ) : null}
 
             <Badge
-              className={
-                product.inStock
-                  ? "h-[15px] rounded-l-none rounded-r-[3px] bg-[#ff5a1f] px-1 text-[6.5px] font-black uppercase leading-none text-white shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]"
-                  : "h-[15px] rounded-l-none rounded-r-[3px] bg-[#1a1a1a] px-1 text-[6.5px] font-black uppercase leading-none text-white shadow-[0_4px_8px_rgba(8,8,8,0.14)] dark:bg-[#f7f7f2] dark:text-[#080808] sm:h-4 sm:text-[8px]"
-              }
+              className={cn(
+                "h-[15px] rounded-l-none rounded-r-[3px] px-1 text-[6.5px] font-black uppercase leading-none shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]",
+                getProductCardStockBadgeClassName(product.stockStatus),
+              )}
             >
-              {product.inStock ? "In stock" : "Backorder"}
+              {getMarketplaceStockStatusLabel(product.stockStatus)}
             </Badge>
           </div>
           {product.isOnSale ? (
@@ -165,6 +168,18 @@ export function MarketplaceProductCard({
       </div>
     </article>
   );
+}
+
+function getProductCardStockBadgeClassName(status: MarketplaceStockStatus) {
+  if (status === "low_stock") {
+    return "bg-[#ffb000] text-[#080808]";
+  }
+
+  if (status === "in_stock") {
+    return "bg-[#ff5a1f] text-white";
+  }
+
+  return "bg-[#1a1a1a] text-white dark:bg-[#f7f7f2] dark:text-[#080808]";
 }
 
 function formatCardRating(value: number) {

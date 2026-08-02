@@ -26,6 +26,12 @@ import {
   selectMarketplaceProductCardMedia,
   type MarketplaceProductPreviewVideo,
 } from "@/src/modules/marketplace/product-card-media";
+import {
+  getMarketplaceProductStockStatus,
+  getMarketplaceVariantInStock,
+  getMarketplaceVariantStockStatus,
+  type MarketplaceStockStatus,
+} from "@/src/modules/marketplace/stock-status";
 import { filterPopulatedShopMenuCategories } from "@/src/modules/marketplace/shop-menu-categories";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import {
@@ -108,6 +114,7 @@ export type MarketplaceProductCard = {
   shortDescription: string | null;
   slug: string;
   soldQuantity: number;
+  stockStatus: MarketplaceStockStatus;
   title: string;
   variantCount: number;
 };
@@ -125,6 +132,7 @@ export type MarketplaceVariant = {
   id: string;
   imageUrl: string | null;
   inStock: boolean;
+  lowStockAlert: number;
   notes: string | null;
   optionValues: string[];
   price: string;
@@ -132,6 +140,7 @@ export type MarketplaceVariant = {
   sku: string;
   soldQuantity: number;
   stockOnHand: number;
+  stockStatus: MarketplaceStockStatus;
   title: string;
 };
 
@@ -184,12 +193,7 @@ function toMediaUrl(relativePath: string | null, thumbnailRelativePath: string |
   return path ? getMediaPublicUrl(path) : null;
 }
 
-function getVariantInStock(variant: {
-  continueSellingOutOfStock: boolean;
-  stockOnHand: number;
-}) {
-  return variant.continueSellingOutOfStock || variant.stockOnHand > 0;
-}
+const getVariantInStock = getMarketplaceVariantInStock;
 
 function getPriceLabel(
   variants: Array<{ price: string }>,
@@ -457,6 +461,7 @@ export async function getMarketplaceCatalog({
           compareAtPrice: productVariants.compareAtPrice,
           continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
           id: productVariants.id,
+          lowStockAlert: productVariants.lowStockAlert,
           price: productVariants.price,
           productId: productVariants.productId,
           requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
@@ -479,6 +484,7 @@ export async function getMarketplaceCatalog({
       compareAtPrice: string | null;
       continueSellingOutOfStock: boolean;
       id: string;
+      lowStockAlert: number;
       price: string;
       requiresExchangeEmpty: boolean;
       status: string;
@@ -521,6 +527,7 @@ export async function getMarketplaceCatalog({
       shortDescription: row.shortDescription,
       slug: row.slug,
       soldQuantity: soldQuantityByProductId.get(row.id) ?? 0,
+      stockStatus: getMarketplaceProductStockStatus(variants),
       title: row.title,
       variantCount: variants.length,
     };
@@ -568,6 +575,7 @@ type MarketplaceCatalogFilterVariant = {
   continueSellingOutOfStock: boolean;
   id: string;
   isActive: boolean;
+  lowStockAlert: number;
   price: string;
   productId: string;
   requiresExchangeEmpty: boolean;
@@ -828,6 +836,7 @@ export async function getMarketplaceCatalogPage({
             continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
             id: productVariants.id,
             isActive: productVariants.isActive,
+            lowStockAlert: productVariants.lowStockAlert,
             price: productVariants.price,
             productId: productVariants.productId,
             requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
@@ -930,6 +939,7 @@ export async function getMarketplaceCatalogPage({
     shortDescription: record.row.shortDescription,
     slug: record.row.slug,
     soldQuantity: record.soldQuantity,
+    stockStatus: getMarketplaceProductStockStatus(record.variants),
     title: record.row.title,
     variantCount: record.variants.length,
   }));
@@ -1476,6 +1486,7 @@ export async function getMarketplaceProductBySlug(
         exchangeConfirmationText: productVariants.exchangeConfirmationText,
         exchangeEmptyCylinderSize: productVariants.exchangeEmptyCylinderSize,
         id: productVariants.id,
+        lowStockAlert: productVariants.lowStockAlert,
         mediaId: productVariants.mediaId,
         notes: productVariants.notes,
         optionValues: productVariants.optionValues,
@@ -1646,6 +1657,7 @@ export async function getMarketplaceProductBySlug(
       ? (variantMediaById.get(variant.mediaId) ?? imageUrls[0] ?? null)
       : (imageUrls[0] ?? null),
     inStock: getVariantInStock(variant),
+    lowStockAlert: variant.lowStockAlert,
     notes: variant.notes,
     optionValues: variant.optionValues,
     price: variant.price,
@@ -1653,6 +1665,7 @@ export async function getMarketplaceProductBySlug(
     sku: variant.sku,
     soldQuantity: soldQuantityByVariantId.get(variant.id) ?? 0,
     stockOnHand: variant.stockOnHand,
+    stockStatus: getMarketplaceVariantStockStatus(variant),
     title: variant.title,
   }));
   const reviewRows = await db
@@ -1702,6 +1715,7 @@ export async function getMarketplaceProductBySlug(
     shortDescription: product.shortDescription,
     slug: product.slug,
     soldQuantity: totalSoldQuantity,
+    stockStatus: getMarketplaceProductStockStatus(activeVariantRows),
     title: product.title,
     totalSoldQuantity,
     updatedAt: product.updatedAt,
