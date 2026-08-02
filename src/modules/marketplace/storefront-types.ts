@@ -245,7 +245,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
     enabled: true,
     id: "hero-main",
     settings: {
-      accentText: "full|exchange|accessories",
+      accentText: "home|energy|online",
       actions: [
         {
           href: "#products",
@@ -264,9 +264,9 @@ export const defaultStorefrontSections: StorefrontSection[] = [
         },
       ],
       copy:
-        "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.",
+        "JurgensEnergy.com is a South African online store. Delivery is available to eligible addresses nationwide and usually arrives within 1–4 business days after payment confirmation.",
       heading:
-        "Shop home, energy, outdoor and everyday products online.",
+        "Shop home, energy and lifestyle products online.",
       headingSize: 52,
       headingTag: "h1",
       imageAlt: "Jurgens Energy online store products ready for delivery",
