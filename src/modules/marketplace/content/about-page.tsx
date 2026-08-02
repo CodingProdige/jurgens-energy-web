@@ -1,7 +1,7 @@
 import {
   FlameIcon,
   PackageCheckIcon,
-  RefreshCcwIcon,
+  ShieldCheckIcon,
   ShoppingBagIcon,
   TruckIcon,
 } from "lucide-react";
@@ -17,21 +17,21 @@ import {
 const storeCategories = [
   {
     description:
-      "Buy LPG cylinders online with clear product details, pricing and availability.",
+      "Shop practical products for home, energy, outdoor and everyday use.",
     icon: ShoppingBagIcon,
-    title: "LPG cylinders",
+    title: "Home and energy products",
   },
   {
     description:
-      "Choose an exchange-supported option and provide an eligible empty cylinder when your order is delivered.",
-    icon: RefreshCcwIcon,
-    title: "Cylinder exchanges",
+      "Select gas-related products and accessories with clear compatibility and safety notes where they apply.",
+    icon: ShieldCheckIcon,
+    title: "Product-specific guidance",
   },
   {
     description:
-      "Shop gas accessories and equipment for safe, practical everyday use.",
+      "Review product details, availability, delivery and support information before checkout.",
     icon: PackageCheckIcon,
-    title: "Gas accessories",
+    title: "Online ordering support",
   },
 ] as const;
 
@@ -46,7 +46,7 @@ export function AboutPage({
     <article>
       <ContentHero
         breadcrumbLabel="About us"
-        description="JurgensEnergy.com is a South African online store for LPG cylinders, cylinder exchange options and gas accessories. Customers can browse, order and pay online. Delivery is available to eligible addresses within South Africa, as confirmed at checkout."
+        description="JurgensEnergy.com is a South African online store. Customers can browse, order and pay online, with delivery available throughout South Africa and eligibility confirmed at checkout."
         eyebrow="About Jurgens Energy"
         icon={FlameIcon}
         title="JurgensEnergy.com is a South African online store."
@@ -55,9 +55,9 @@ export function AboutPage({
       <div className="mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-7 sm:py-12 lg:px-10 lg:py-16">
         <section>
           <ContentSectionHeading
-            description="Jurgens Energy brings the LPG products customers need into one straightforward online shopping experience. Product details explain what is included and whether an exchange requires an eligible empty cylinder at handover."
+            description="Jurgens Energy brings everyday retail and energy-related products into one straightforward online shopping experience. Product pages explain what is included, what is required, and whether any product-specific delivery or handover rules apply."
             eyebrow="What we sell"
-            title="Cylinders, exchanges and accessories—online."
+            title="Products, details and support—online."
           />
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -93,8 +93,8 @@ export function AboutPage({
               </h3>
               <p className="mt-1 text-[13px] leading-6 text-[#62625c] dark:text-[#bdbdb5]">
                 Jurgens Energy does not operate a customer-facing physical
-                store. Delivery is available to eligible addresses within South
-                Africa, as confirmed at checkout.{" "}
+                store. Delivery is available throughout South Africa, with
+                address eligibility confirmed at checkout.{" "}
                 {deliveryTimingDescription} Our order cut-off is 2:00 PM
                 SAST on business days.
               </p>
@@ -109,8 +109,8 @@ export function AboutPage({
         />
 
         <ContentActionPanel
-          actions={[{ href: "/products", label: "Shop LPG products" }]}
-          description="Browse LPG cylinders, exchange options and gas accessories available to order online."
+          actions={[{ href: "/products", label: "Shop products" }]}
+          description="Browse products available to order online and review delivery, payment and support information before checkout."
           eyebrow="Shop online"
           title="Find what you need."
         />

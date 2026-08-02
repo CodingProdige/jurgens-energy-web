@@ -18,7 +18,7 @@ function getContextDescription(data: MarketplaceCatalogPageData) {
     return `Browse all ${data.context.name} products available from Jurgens Energy.`;
   }
 
-  return "Browse LPG cylinders, exchange-supported options, and gas accessories.";
+  return "Browse products available from Jurgens Energy and review delivery eligibility at checkout.";
 }
 
 function getBaseHref(data: MarketplaceCatalogPageData) {

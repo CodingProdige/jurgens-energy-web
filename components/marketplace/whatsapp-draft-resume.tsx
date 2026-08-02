@@ -20,7 +20,7 @@ type ResumeStatus = "loading" | "ready" | "error";
 export function WhatsappDraftResume({ token }: { token: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<ResumeStatus>("loading");
-  const [message, setMessage] = useState("Preparing your gas order...");
+  const [message, setMessage] = useState("Preparing your order...");
 
   useEffect(() => {
     let cancelled = false;

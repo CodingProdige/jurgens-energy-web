@@ -15,10 +15,10 @@ export const metadata: Metadata = {
     template: "%s | Jurgens Energy",
   },
   description:
-    "Shop LPG cylinders, exchange-supported options and gas accessories from Jurgens Energy.",
+    "Shop home, energy, outdoor, appliance and lifestyle products online from Jurgens Energy.",
   openGraph: {
     description:
-      "Shop LPG cylinders, exchange-supported options and gas accessories from Jurgens Energy.",
+      "Shop home, energy, outdoor, appliance and lifestyle products online from Jurgens Energy.",
     siteName: "Jurgens Energy",
     title: "Jurgens Energy",
     type: "website",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     description:
-      "Shop LPG cylinders, exchange-supported options and gas accessories from Jurgens Energy.",
+      "Shop home, energy, outdoor, appliance and lifestyle products online from Jurgens Energy.",
     title: "Jurgens Energy",
   },
   appleWebApp: {

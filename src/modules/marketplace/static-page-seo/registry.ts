@@ -28,28 +28,28 @@ export type StaticSeoPageRegistryEntry = {
 export const STATIC_SEO_PAGE_REGISTRY = {
   home: {
     defaultDescription:
-      "Shop LPG cylinders, exchange options and gas accessories at JurgensEnergy.com. Delivery is available to eligible South African addresses confirmed at checkout.",
-    defaultTitle: "South African Online LPG Store",
+      "Shop home, energy, outdoor, appliance and lifestyle products at JurgensEnergy.com. Delivery is available throughout South Africa and confirmed at checkout.",
+    defaultTitle: "South African Online Store",
     key: "home",
     label: "Homepage",
     path: "/",
     scanFocus:
-      "The online LPG storefront, core product range, cylinder exchange options and checkout-confirmed delivery to eligible South African addresses.",
+      "The online storefront, live product range, checkout-confirmed delivery, payment methods, support access and business identity.",
   },
   products: {
     defaultDescription:
-      "Browse LPG gas cylinders, cylinder exchange options and gas accessories. Compare current prices, product choices, stock and available delivery methods online.",
-    defaultTitle: "Shop LPG Gas Cylinders & Gas Accessories",
+      "Browse products available from Jurgens Energy. Compare current prices, product choices, stock and available delivery methods online.",
+    defaultTitle: "Shop Online Products",
     key: "products",
     label: "All products",
     path: "/products",
     scanFocus:
-      "The live product catalogue, LPG cylinder choices, exchange-supported options, accessories and current shopping information.",
+      "The live product catalogue, current product choices, stock, prices, delivery labels and shopping information.",
   },
   brands: {
     defaultDescription:
-      "Explore LPG cylinder, gas appliance, regulator and accessory brands available from Jurgens Energy, then browse each brand's current product range online.",
-    defaultTitle: "LPG Cylinder & Gas Equipment Brands",
+      "Explore brands available from Jurgens Energy, then browse each brand's current product range, pricing and delivery details online.",
+    defaultTitle: "Brands Available Online",
     key: "brands",
     label: "Brands",
     path: "/brands",
@@ -58,28 +58,28 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   blog: {
     defaultDescription:
-      "Read practical Jurgens Energy articles about LPG safety, gas cylinders, exchange ordering, delivery and choosing gas products for your home or business.",
-    defaultTitle: "LPG Safety, Delivery & Product Advice",
+      "Read practical Jurgens Energy articles about online shopping, delivery, product guidance, safety, support and customer updates.",
+    defaultTitle: "Product Advice, Delivery & Safety Guides",
     key: "blog",
     label: "Blog",
     path: "/blog",
     scanFocus:
-      "Published LPG guides and articles, using only topics represented by live posts or the visible blog page.",
+      "Published guides and articles, using only topics represented by live posts or the visible blog page.",
   },
   about: {
     defaultDescription:
-      "JurgensEnergy.com is a South African online store for LPG cylinders and gas accessories. Delivery to eligible addresses is confirmed at checkout.",
-    defaultTitle: "About Our Online LPG Store",
+      "JurgensEnergy.com is a South African online store. Customers can shop and pay online, with delivery eligibility confirmed at checkout.",
+    defaultTitle: "About Jurgens Energy",
     key: "about",
     label: "About us",
     path: "/about",
     scanFocus:
-      "Verified business identity, the online-store model, LPG products, cylinder exchanges and checkout-confirmed delivery to eligible South African addresses.",
+      "Verified business identity, the online-store model, product range, payment information, support options and checkout-confirmed delivery.",
   },
   contact: {
     defaultDescription:
-      "Contact the Jurgens Energy online store for help with LPG products, cylinder exchanges, delivery, returns, refunds or an order by phone, email or WhatsApp.",
-    defaultTitle: "Contact Our Online LPG Store",
+      "Contact the Jurgens Energy online store for help with products, orders, delivery, payments, returns, refunds or support.",
+    defaultTitle: "Contact Jurgens Energy",
     key: "contact",
     label: "Contact",
     path: "/contact",
@@ -88,23 +88,23 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   faq: {
     defaultDescription:
-      "Find answers about ordering LPG cylinders, exchange handovers, product availability, delivery, payments, returns and support from Jurgens Energy.",
-    defaultTitle: "LPG Ordering, Exchange & Delivery FAQs",
+      "Find clear answers about ordering online, product availability, delivery, payments, returns, support and customer account help.",
+    defaultTitle: "Ordering, Delivery & Support FAQs",
     key: "faq",
     label: "FAQs",
     path: "/faq",
     scanFocus:
-      "The questions and answers that are visibly published, prioritising LPG ordering, exchange, payment and delivery topics.",
+      "The questions and answers that are visibly published, prioritising ordering, payment, delivery, returns and support topics.",
   },
   "lpg-delivery": {
     defaultDescription:
-      "Order LPG online for delivery to eligible South African addresses. Checkout confirms current delivery timing, availability, fees and exchange requirements.",
-    defaultTitle: "LPG Delivery in South Africa",
+      "Shop online for delivery to eligible South African addresses. Checkout confirms delivery timing, fees and product-specific requirements.",
+    defaultTitle: "Delivery in South Africa",
     key: "lpg-delivery",
     label: "LPG delivery",
     path: "/lpg-delivery",
     scanFocus:
-      "The online ordering flow, checkout-confirmed delivery to eligible South African addresses, published timing, shipping costs and cylinder-exchange handover requirements.",
+      "The online ordering flow, checkout-confirmed delivery to eligible South African addresses, published timing, shipping costs and product-specific handover requirements.",
   },
   "lpg-safety": {
     defaultDescription:

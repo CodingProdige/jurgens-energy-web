@@ -92,15 +92,15 @@ export async function LocalDeliveryPage() {
           ...(shippingStructuredData ? [shippingStructuredData] : []),
           createBreadcrumbStructuredData([
             { name: "Home", path: "/" },
-            { name: "LPG delivery", path: "/lpg-delivery" },
+            { name: "Delivery", path: "/lpg-delivery" },
           ]),
           createFaqStructuredData([...deliveryFaqItems]),
         ]}
       />
 
       <ContentHero
-        breadcrumbLabel="LPG delivery"
-        description={`Shop eligible LPG cylinders, exchange options and gas accessories online for delivery in South Africa. ${deliveryTimingDescription} ${deliveryFeeDescription}`}
+        breadcrumbLabel="Delivery"
+        description={`Shop online for delivery in South Africa. ${deliveryTimingDescription} ${deliveryFeeDescription}`}
         eyebrow="South Africa delivery"
         icon={TruckIcon}
         title="Nationwide delivery, clear timing."
@@ -116,8 +116,7 @@ export async function LocalDeliveryPage() {
 
           <div className="grid gap-7 sm:grid-cols-3">
             <NumberedStep number="01" title="Choose your product">
-              Select a full cylinder, an eligible exchange option or the gas
-              accessory you need.
+              Select the product or available option you need.
             </NumberedStep>
             <NumberedStep number="02" title="Review delivery">
               Enter your South African delivery address and review the delivery
@@ -177,7 +176,7 @@ export async function LocalDeliveryPage() {
           <ContentSectionHeading
             description="Stock, delivery eligibility and any exchange requirements are confirmed during checkout."
             eyebrow="Shop online"
-            title="LPG products for delivery."
+            title="Products for delivery."
           />
 
           {deliveryProducts.length > 0 ? (
@@ -241,7 +240,7 @@ export async function LocalDeliveryPage() {
                     variant: "secondary" as const,
                   },
             ]}
-            description="Choose the cylinder or gas product you need online, or ask the team for help before placing an order."
+            description="Choose the product you need online, or ask the team for help before placing an order."
             eyebrow="Ready to order?"
             title="Start with the product you need."
           />

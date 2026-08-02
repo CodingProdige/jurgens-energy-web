@@ -55,11 +55,11 @@ export const openAiReasoningEfforts = [
 export type OpenAiReasoningEffort = (typeof openAiReasoningEfforts)[number];
 export const defaultWhatsappFollowUpMessages = {
   default:
-    "Hi, just checking in. If you still need gas, send the cylinder size and quantity and we will help you finish the order.",
+    "Hi, just checking in. If you still need help choosing a product or finishing your order, reply here and we will help.",
   draft:
     "Hi, just checking in. Would you like to continue with this order? Reply YES to confirm, or tell us what to change.",
   support:
-    "Hi, just checking in. Did you still need help with delivery, a gas order, or anything else from Jurgens Energy?",
+    "Hi, just checking in. Did you still need help with delivery, an online order, or anything else from Jurgens Energy?",
 } as const;
 export const maxWhatsappEmailNotificationRecipients = 20;
 export const maxWhatsappOrderNotificationRecipients = 10;
@@ -638,7 +638,7 @@ const defaultSettings: MarketplaceSettings = {
   contactPhoneSecondary: "",
   facebookUrl: null,
   footerTagline:
-    "South African online store for LPG cylinders, exchanges and gas accessories.",
+    "South African online store for home, energy, outdoor, appliance and lifestyle products.",
   freeStorageQuotaMb: 512,
   googleAdsConversionId: null,
   googleAdsConversionLabel: null,

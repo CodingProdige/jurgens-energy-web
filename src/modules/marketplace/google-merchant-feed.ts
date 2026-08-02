@@ -24,6 +24,7 @@ import { getMediaPublicUrl } from "@/src/modules/media/paths";
 const publicProductStatuses = ["live", "active"] as const;
 const googleFeedCurrency = "ZAR";
 const googleFeedDescriptionLimit = 5_000;
+const googleFeedLabel = "ZA";
 const googleFeedTitleLimit = 150;
 
 type ProductOptionSchema = {
@@ -44,6 +45,7 @@ export type GoogleMerchantFeedItem = {
   customLabel0: GoogleMerchantShippingLabel;
   description: string;
   excludedDestinations: GoogleMerchantDestination[];
+  feedLabel: typeof googleFeedLabel;
   gtin: string | null;
   googleProductCategory: string | null;
   id: string;
@@ -274,6 +276,7 @@ export async function getGoogleMerchantFeedItems() {
         customLabel0,
         description: description.slice(0, googleFeedDescriptionLimit),
         excludedDestinations: destinations.excluded,
+        feedLabel: googleFeedLabel,
         gtin,
         googleProductCategory: getGoogleProductCategory(
           row.categoryPath,
@@ -315,7 +318,7 @@ export async function renderGoogleMerchantFeed() {
     "  <channel>",
     "    <title>Jurgens Energy Products</title>",
     `    <link>${escapeXml(storeUrl)}</link>`,
-    "    <description>Live Jurgens Energy product availability and pricing.</description>",
+    "    <description>Live Jurgens Energy online store product availability and pricing.</description>",
     ...items.flatMap(renderGoogleMerchantFeedItem),
     "  </channel>",
     "</rss>",
@@ -327,6 +330,7 @@ function renderGoogleMerchantFeedItem(item: GoogleMerchantFeedItem) {
   return [
     "    <item>",
     `      <g:id>${escapeXml(item.id)}</g:id>`,
+    `      <g:feed_label>${escapeXml(item.feedLabel)}</g:feed_label>`,
     `      <title>${escapeXml(item.title)}</title>`,
     `      <description>${escapeXml(item.description)}</description>`,
     `      <link>${escapeXml(item.link)}</link>`,

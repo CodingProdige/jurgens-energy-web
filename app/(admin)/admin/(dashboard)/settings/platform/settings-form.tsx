@@ -441,7 +441,7 @@ export function SocialLinksForm({
             id="footerTagline"
             name="footerTagline"
             defaultValue={footerTagline}
-            placeholder="South African online store for LPG products."
+            placeholder="South African online store for home, energy and everyday products."
           />
         </div>
 

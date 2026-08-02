@@ -51,12 +51,12 @@ export default async function BrandsPage() {
                     Shop by brand
                   </p>
                   <h1 className="mt-3 max-w-4xl text-[36px] font-black uppercase leading-[0.98] tracking-[-0.025em] sm:text-[52px] lg:text-[64px]">
-                    Brands you know. LPG products you can trust.
+                    Brands you know. Products you can shop online.
                   </h1>
                   <p className="mt-5 max-w-2xl text-[15px] font-medium leading-7 text-white/68 sm:text-[17px] sm:leading-8">
                     Browse brands with products currently available in our
-                    store, then explore their cylinders, appliances,
-                    regulators, and accessories.
+                    store, then explore each brand&apos;s current product
+                    range online.
                   </p>
                 </div>
 

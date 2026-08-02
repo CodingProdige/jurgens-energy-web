@@ -92,13 +92,12 @@ function ComingSoonVisual() {
             A South African{" "}
             <span className="text-primary">online</span>
             <br />
-            LPG store is coming.
+            store is coming.
           </h1>
           <p className="mt-5 max-w-[360px] text-[14px] font-medium leading-6 text-white/86">
-            JurgensEnergy.com is an online store for LPG cylinders, cylinder
-            exchanges and gas accessories. Delivery eligibility is confirmed
-            at checkout, and timing depends on the destination and delivery
-            service.
+            JurgensEnergy.com is an online store for home, energy, outdoor,
+            appliance and lifestyle products. Delivery eligibility is confirmed
+            at checkout.
           </p>
         </div>
       </div>
@@ -135,12 +134,12 @@ function ComingSoonPanel({
           A South African{" "}
           <span className="text-primary">online</span>
           <br />
-          LPG store is coming.
+          store is coming.
         </h2>
         <p className="mx-auto mt-4 max-w-[360px] text-[14px] leading-6 text-[#596176] dark:text-zinc-300 lg:mx-0">
-          JurgensEnergy.com is an online store for LPG cylinders, cylinder
-          exchanges and gas accessories. Delivery eligibility is confirmed at
-          checkout, and timing depends on the destination and delivery service.
+          JurgensEnergy.com is an online store for home, energy, outdoor,
+          appliance and lifestyle products. Delivery eligibility is confirmed at
+          checkout.
         </p>
       </div>
 

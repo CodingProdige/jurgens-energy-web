@@ -190,7 +190,7 @@ export async function interpretWhatsappMessageWithAi({
           workflowSummary,
         }),
         instructions: [
-          "You classify WhatsApp messages for a South African LPG gas support and ordering assistant.",
+          "You classify WhatsApp messages for a South African online store support and ordering assistant.",
           "Return only the structured JSON requested by the schema.",
           "Do not invent product availability, prices, stock, delivery promises, or payment claims.",
           "If the user asks a normal business, product, delivery, account, invoice, or order-status question, classify it instead of sending it to a human.",

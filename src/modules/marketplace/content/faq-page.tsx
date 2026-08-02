@@ -367,7 +367,7 @@ export function FaqPage({
     <article>
       <ContentHero
         breadcrumbLabel="FAQs"
-        description="Clear answers to common questions about LPG orders, delivery, cylinder exchanges, product safety, returns and support."
+        description="Clear answers to common questions about online orders, delivery, product-specific exchange requirements, product safety, returns and support."
         eyebrow="Frequently asked questions"
         icon={MessageCircleQuestionIcon}
         title="Start with an answer."

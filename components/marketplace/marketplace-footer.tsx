@@ -176,14 +176,14 @@ export async function MarketplaceFooter() {
               About Jurgens Energy
             </h2>
             <p className="mt-2 max-w-sm text-[15px] font-black leading-5 text-[#1a1a1a] dark:text-[#f7f7f2]">
-              JurgensEnergy.com is a South African online store for new LPG
-              cylinders, eligible cylinder exchanges and gas accessories.
+              JurgensEnergy.com is a South African online store for home,
+              energy, outdoor, appliance and lifestyle products.
             </p>
             <p className="mt-3 max-w-sm text-[12px] leading-5 text-[#696963] dark:text-[#a8a89f]">
-              Customers shop and pay online. We deliver to eligible addresses
-              within South Africa, with availability and shipping costs
-              confirmed at checkout. We do not operate a physical walk-in
-              store.
+              Customers shop and pay online. Delivery is available throughout
+              South Africa, with address eligibility, product-specific handling
+              and shipping costs confirmed at checkout. We do not operate a
+              physical walk-in store.
             </p>
             <Link
               className="mt-4 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-[0.08em] text-[#ff5a1f] transition hover:text-[#e44c15]"
@@ -217,7 +217,6 @@ export async function MarketplaceFooter() {
           <FooterColumn
             links={[
               ["All Products", "/products"],
-              ["Cylinder Exchange", "/products?exchange=1"],
               ...(accessoriesCategory
                 ? ([
                     [
@@ -229,6 +228,7 @@ export async function MarketplaceFooter() {
               ...(shopMenuData.hasCurrentDeals
                 ? ([["Deals", "/products?sale=1"]] as const)
                 : []),
+              ["Cylinder Exchange", "/products?exchange=1"],
               ["Brands", "/brands"],
             ]}
             title="Shop"
@@ -236,15 +236,20 @@ export async function MarketplaceFooter() {
           <FooterColumn
             links={[
               ["About Us", "/about"],
-              ["Safety", "/lpg-safety"],
-              ["Delivery", "/lpg-delivery"],
+              ["Delivery", "/delivery-information"],
+              ["Payments", "/payments"],
+              ["Product Safety", "/lpg-safety"],
               ["FAQs", "/faq"],
               ["Contact Us", "/contact"],
             ]}
             title="Company"
           />
           <FooterColumn
-            links={[["My Orders", "/account/orders"]]}
+            links={[
+              ["Support Centre", "/support"],
+              ["Payment Methods", "/payments"],
+              ["My Orders", "/account/orders"],
+            ]}
             title="Help"
           />
           <FooterColumn links={footerPolicyLinks} title="Policies" />

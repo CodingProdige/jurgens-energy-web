@@ -1,7 +1,7 @@
 import type { StorefrontSection } from "./storefront-types";
 
 const eligibleAddressHeroCopy =
-  "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Usually arrives within 1–4 business days after payment confirmation.";
+  "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.";
 const eligibleAddressFeatureTitle = "South Africa delivery";
 const eligibleAddressFeatureText =
   "Usually arrives within 1–4 business days after payment confirmation.";
@@ -17,11 +17,14 @@ const legacyHeroCopyReplacements: Readonly<Record<string, string>> = {
 
 const legacyFeatureGridTitleReplacements: Readonly<Record<string, string>> = {
   "LPG delivered with the speed, safety and service your day needs.":
-    "LPG ordering with clear product, payment and delivery updates.",
+    "Online ordering with clear product, payment and delivery updates.",
+  "LPG ordering with clear product, payment and delivery updates.":
+    "Online ordering with clear product, payment and delivery updates.",
 };
 
 const legacyFeatureGridEyebrowReplacements: Readonly<Record<string, string>> = {
-  "Modern energy, delivered": "South African online LPG store",
+  "Modern energy, delivered": "South African online store",
+  "South African online LPG store": "South African online store",
 };
 
 const legacyFeatureTitleReplacements: Readonly<Record<string, string>> = {

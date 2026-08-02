@@ -46,11 +46,11 @@ export async function MarketplaceHeader() {
   const navItems: readonly MarketplaceNavItem[] = [
     ["Home", "/"],
     ["Shop", "/products"],
-    ["Cylinder Exchange", "/products?exchange=1"],
-    ["Delivery", "/lpg-delivery"],
+    ["Brands", "/brands"],
+    ["Delivery", "/delivery-information"],
     ["Blog", "/blog"],
     ["About Us", "/about"],
-    ["Contact", "/contact"],
+    ["Support", "/support"],
   ];
   const accountUser: MarketplaceAccountSummary | null = session?.user
     ? {
@@ -72,7 +72,7 @@ export async function MarketplaceHeader() {
       <div className="border-b border-[#ecece6] bg-[#f7f7f2]/92 dark:border-white/10 dark:bg-[#101010]/92">
         <div className="mx-auto flex w-full items-center justify-end gap-2 overflow-hidden px-2 py-1.5 sm:w-[min(1500px,calc(100%-1rem))] sm:justify-between sm:px-6 sm:py-2 lg:px-10">
           <p className="hidden text-[11px] font-bold uppercase tracking-[0.16em] text-[#5c5c57] dark:text-[#c8c8c0] md:block">
-            South African online LPG store · Delivery eligibility confirmed at
+            South African online store · Delivery eligibility confirmed at
             checkout.
           </p>
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:ml-auto sm:flex-none sm:gap-2">
@@ -146,7 +146,7 @@ export async function MarketplaceHeader() {
             )}
             href="/products"
           >
-            Order Now
+            Shop Now
           </Link>
         </div>
       </div>

@@ -596,7 +596,7 @@ function buildModerationReply(state: WhatsappConversationState) {
     return "I am pausing automated replies for now. A Jurgens Energy team member can review this conversation if needed.";
   }
 
-  return "I can only help with Jurgens Energy gas orders, LPG exchanges, delivery, invoices, products, and account support.";
+  return "I can only help with Jurgens Energy products, online orders, delivery, invoices, returns, and account support.";
 }
 
 function createInterpretation(
@@ -3646,7 +3646,7 @@ async function getWhatsappKnowledgeFacts(
   ]);
   const publicName = support.businessName;
   const facts = [
-    `${publicName} is a South African online store for LPG cylinders, eligible cylinder exchanges, and gas-related products.`,
+    `${publicName} is a South African online store for home, energy, outdoor, appliance and lifestyle products. Some products, including gas-related items, may have product-specific safety, exchange or delivery requirements.`,
     ...southAfricaDeliveryFacts,
     ...getSouthAfricaDeliveryTimingFacts(settings),
     support.legalName && support.legalName !== publicName
@@ -3773,7 +3773,7 @@ async function answerSupportQuestion({
         return answer
           ? { grounded: true, media: [], reply: answer }
           : textReply([
-              "Jurgens Energy is a South African online store for LPG cylinders, eligible cylinder exchanges and gas-related products.",
+              "Jurgens Energy is a South African online store for home, energy, outdoor, appliance and lifestyle products.",
               "Delivery is available to eligible addresses within South Africa.",
               ...getSouthAfricaDeliveryTimingFacts(settings),
               getPublicDeliveryFeeDescription(settings),

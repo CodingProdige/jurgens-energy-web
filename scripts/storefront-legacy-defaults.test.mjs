@@ -76,7 +76,7 @@ test("historical default storefront claims are replaced exactly", () => {
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
+    "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.",
   );
   assert.equal(
     result[1].settings.steps[0].description,
@@ -86,8 +86,8 @@ test("historical default storefront claims are replaced exactly", () => {
     result[2].settings.features.map(({ text, title }) => ({ text, title })),
     [
       {
-        text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
-        title: "Delivery availability",
+        text: "Usually arrives within 1–4 business days after payment confirmation.",
+        title: "South Africa delivery",
       },
       {
         text: "Cylinder eligibility and handover checks apply where required.",
@@ -101,11 +101,11 @@ test("historical default storefront claims are replaced exactly", () => {
   );
   assert.equal(
     result[2].settings.eyebrow,
-    "South African online LPG store",
+    "South African online store",
   );
   assert.equal(
     result[2].settings.title,
-    "LPG ordering with clear product, payment and delivery updates.",
+    "Online ordering with clear product, payment and delivery updates.",
   );
   assert.equal(
     sections[0].settings.copy,
@@ -181,16 +181,16 @@ test("the previous neutral defaults are upgraded to the South Africa store copy"
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
+    "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.",
   );
   assert.deepEqual(result[1].settings.features[0], {
     icon: "delivery",
-    text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
-    title: "Delivery availability",
+    text: "Usually arrives within 1–4 business days after payment confirmation.",
+    title: "South Africa delivery",
   });
   assert.equal(
     result[1].settings.eyebrow,
-    "South African online LPG store",
+    "South African online store",
   );
 });
 
@@ -235,12 +235,12 @@ test("the previous South Africa defaults are upgraded to checkout-qualified deli
 
   assert.equal(
     result[0].settings.copy,
-    "JurgensEnergy.com is a South African online store for LPG cylinders, exchange options and gas accessories. Delivery is available to eligible addresses within South Africa, as confirmed at checkout.",
+    "JurgensEnergy.com is a South African online store for home, energy, outdoor, appliance and lifestyle products. Usually arrives within 1–4 business days after payment confirmation.",
   );
   assert.deepEqual(result[1].settings.features[0], {
     icon: "delivery",
-    text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
-    title: "Delivery availability",
+    text: "Usually arrives within 1–4 business days after payment confirmation.",
+    title: "South Africa delivery",
   });
 });
 
@@ -254,8 +254,8 @@ test("saved timing replaces only the recognized public storefront default", () =
         features: [
           {
             icon: "delivery",
-            text: "Eligible delivery normally takes 1–4 business days; checkout confirms address eligibility.",
-            title: "Delivery availability",
+            text: "Usually arrives within 1–4 business days after payment confirmation.",
+            title: "South Africa delivery",
           },
           {
             icon: "support",
@@ -278,7 +278,7 @@ test("saved timing replaces only the recognized public storefront default", () =
 
   assert.equal(
     result[0].settings.features[0].text,
-    "Delivery normally takes 3–7 business days after payment confirmation. Checkout confirms address eligibility.",
+    "Delivery normally takes 3–7 business days after payment confirmation.",
   );
   assert.equal(
     result[0].settings.features[1].text,

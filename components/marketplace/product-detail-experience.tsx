@@ -100,10 +100,34 @@ const previouslyViewedLimit = 16;
 const previouslyViewedStorageKey = "jurgens-energy:previously-viewed-products";
 const productReviewsHeadingId = "customer-reviews-heading";
 const productReviewsSectionId = "customer-reviews";
+type ProductPolicyLink = {
+  href: string;
+  icon: typeof TruckIcon;
+  kind: string;
+  label: string;
+};
+const deliveryPolicyLink = policyLinks.find((link) => link.kind === "delivery");
+const returnsPolicyLink = policyLinks.find((link) => link.kind === "returns");
 const productPolicyLinks = [
-  policyLinks.find((link) => link.kind === "delivery"),
-  policyLinks.find((link) => link.kind === "returns"),
-].filter((link): link is NonNullable<typeof link> => Boolean(link));
+  deliveryPolicyLink
+    ? { ...deliveryPolicyLink, icon: TruckIcon, label: "Shipping" }
+    : null,
+  returnsPolicyLink
+    ? { ...returnsPolicyLink, icon: RefreshCcwIcon, label: "Returns" }
+    : null,
+  {
+    href: "/payments",
+    icon: CreditCardIcon,
+    kind: "payments",
+    label: "Payments",
+  },
+  {
+    href: "/support",
+    icon: ShieldCheckIcon,
+    kind: "support",
+    label: "Support",
+  },
+].filter((link): link is ProductPolicyLink => Boolean(link));
 
 const exchangeSteps = [
   {
@@ -2451,7 +2475,7 @@ function ProductPolicyLinks({
 }) {
   return (
     <nav
-      aria-label="Product shipping and returns policies"
+      aria-label="Product help links"
       className={cn(
         "grid grid-cols-2 border-t border-[#ecece6] dark:border-white/10",
         compact ? "gap-1.5 pt-2" : "gap-2 pt-2.5",
@@ -2459,7 +2483,7 @@ function ProductPolicyLinks({
       )}
     >
       {productPolicyLinks.map((policy) => {
-        const Icon = policy.kind === "delivery" ? TruckIcon : RefreshCcwIcon;
+        const Icon = policy.icon;
 
         return (
           <Link

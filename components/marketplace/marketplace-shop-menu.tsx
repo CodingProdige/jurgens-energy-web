@@ -280,7 +280,7 @@ export function MarketplaceShopMenu({
           <div className="mx-auto grid w-[min(1500px,calc(100%-2rem))] grid-cols-[220px_minmax(220px,0.9fr)_minmax(240px,1.15fr)_220px] gap-5 px-4 py-7 2xl:grid-cols-[260px_minmax(240px,0.9fr)_minmax(280px,1.15fr)_260px] 2xl:gap-7 2xl:px-8">
             <section className="min-w-0 border-r border-white/15 pr-5 2xl:pr-7">
               <span className="inline-flex bg-[#ff5a1f] px-2 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-white">
-                Shop LPG
+                Shop online
               </span>
               <h2 className="mt-4 text-2xl font-black uppercase leading-[1.05] 2xl:text-[28px]">
                 Your one-stop <span className="text-[#ff5a1f]">LPG shop.</span>
@@ -429,7 +429,7 @@ export function MarketplaceShopMenu({
                 <ul className="mt-3 grid gap-3 text-[11px] font-semibold text-white/70">
                   <li className="flex gap-2.5">
                     <BadgeCheckIcon className="size-4 shrink-0 text-[#ff5a1f]" />
-                    LPG cylinders and exchanges
+                    Product-specific exchange options
                   </li>
                   <li className="flex gap-2.5">
                     <TruckIcon className="size-4 shrink-0 text-[#ff5a1f]" />

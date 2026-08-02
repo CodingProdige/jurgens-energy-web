@@ -9,7 +9,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getMarketplaceSettings();
 
   return getStaticPageMetadata("lpg-delivery", {
-    description: `Order LPG online for eligible South African addresses. ${getPublicDeliveryTimingDescription(settings)} Checkout confirms delivery availability and fees.`,
+    description: `Shop online for delivery to eligible South African addresses. ${getPublicDeliveryTimingDescription(settings)} Checkout confirms delivery availability and fees.`,
   });
 }
 

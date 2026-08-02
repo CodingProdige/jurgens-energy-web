@@ -243,7 +243,7 @@ export function LpgSafetyPage() {
         <div className="mt-12 sm:mt-16">
           <ContentActionPanel
             actions={[
-              { href: "/products", label: "Browse LPG products" },
+              { href: "/products", label: "Browse products" },
               {
                 href: "/contact",
                 label: "Ask before ordering",

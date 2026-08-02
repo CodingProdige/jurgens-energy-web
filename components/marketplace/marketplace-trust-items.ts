@@ -30,6 +30,6 @@ export const marketplaceTrustItems = [
   {
     description: "Options shown at checkout",
     icon: PackageCheckIcon,
-    title: "Cylinder Delivery",
+    title: "Product Delivery",
   },
 ] as const;
