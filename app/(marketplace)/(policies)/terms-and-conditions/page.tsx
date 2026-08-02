@@ -5,6 +5,7 @@ import { PolicyPage } from "@/src/modules/marketplace/policies/policy-page";
 import { createTermsAndConditionsDocument } from "@/src/modules/marketplace/policies/documents";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
+import { MarketplaceBusinessJsonLd } from "@/src/modules/marketplace/structured-data";
 
 export async function generateMetadata(): Promise<Metadata> {
   return getStaticPageMetadata("terms-and-conditions");
@@ -17,9 +18,12 @@ export default async function TermsAndConditionsPage() {
   ]);
 
   return (
-    <PolicyPage
-      businessIdentity={businessIdentity}
-      document={createTermsAndConditionsDocument(settings)}
-    />
+    <>
+      <MarketplaceBusinessJsonLd />
+      <PolicyPage
+        businessIdentity={businessIdentity}
+        document={createTermsAndConditionsDocument(settings)}
+      />
+    </>
   );
 }

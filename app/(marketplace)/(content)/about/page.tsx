@@ -5,6 +5,7 @@ import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { getPublicDeliveryTimingDescription } from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
+import { MarketplaceBusinessJsonLd } from "@/src/modules/marketplace/structured-data";
 
 export async function generateMetadata(): Promise<Metadata> {
   return getStaticPageMetadata("about");
@@ -17,9 +18,12 @@ export default async function AboutRoute() {
   ]);
 
   return (
-    <AboutPage
-      businessIdentity={businessIdentity}
-      deliveryTimingDescription={getPublicDeliveryTimingDescription(settings)}
-    />
+    <>
+      <MarketplaceBusinessJsonLd />
+      <AboutPage
+        businessIdentity={businessIdentity}
+        deliveryTimingDescription={getPublicDeliveryTimingDescription(settings)}
+      />
+    </>
   );
 }

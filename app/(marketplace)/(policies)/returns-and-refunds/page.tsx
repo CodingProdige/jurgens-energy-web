@@ -6,6 +6,7 @@ import { createReturnsAndRefundsPolicy } from "@/src/modules/marketplace/policie
 import { getPublicReturnsSummary } from "@/src/modules/marketplace/public-returns-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
+import { MarketplaceBusinessJsonLd } from "@/src/modules/marketplace/structured-data";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getMarketplaceSettings();
@@ -22,9 +23,12 @@ export default async function ReturnsAndRefundsPage() {
   ]);
 
   return (
-    <PolicyPage
-      businessIdentity={businessIdentity}
-      document={createReturnsAndRefundsPolicy(settings)}
-    />
+    <>
+      <MarketplaceBusinessJsonLd />
+      <PolicyPage
+        businessIdentity={businessIdentity}
+        document={createReturnsAndRefundsPolicy(settings)}
+      />
+    </>
   );
 }

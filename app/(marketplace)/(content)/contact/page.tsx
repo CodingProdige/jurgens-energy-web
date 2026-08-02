@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ContactPage } from "@/src/modules/marketplace/content/contact-page";
+import { MarketplaceBusinessJsonLd } from "@/src/modules/marketplace/structured-data";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 
 import { submitContactInquiry } from "./actions";
@@ -10,5 +11,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function ContactRoute() {
-  return <ContactPage action={submitContactInquiry} />;
+  return (
+    <>
+      <MarketplaceBusinessJsonLd />
+      <ContactPage action={submitContactInquiry} />
+    </>
+  );
 }

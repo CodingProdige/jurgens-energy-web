@@ -17,24 +17,36 @@ export default function robots(): MetadataRoute.Robots {
     "/sign-in",
     "/whatsapp/resume/",
   ];
+  const publicCheckoutVerificationPaths = [
+    "/cart",
+    "/cart/",
+    "/checkout",
+    "/checkout/",
+    "/api/cart/validate",
+    "/api/checkout/quotes",
+    "/api/checkout/orders",
+  ];
+  const googleVerificationBots = [
+    "StoreBot-Google",
+    "Googlebot",
+    "Googlebot-Image",
+    "Googlebot-Video",
+    "Google-InspectionTool",
+    "AdsBot-Google",
+    "AdsBot-Google-Mobile",
+  ];
 
   return {
     rules: [
-      {
-        userAgent: "StoreBot-Google",
-        allow: [
-          "/",
-          "/cart",
-          "/checkout",
-          "/api/cart/validate",
-          "/api/checkout/quotes",
-        ],
-        disallow: [...privatePaths, "/cart/", "/checkout/"],
-      },
+      ...googleVerificationBots.map((userAgent) => ({
+        userAgent,
+        allow: ["/", ...publicCheckoutVerificationPaths],
+        disallow: privatePaths,
+      })),
       {
         userAgent: "*",
         allow: "/",
-        disallow: [...privatePaths, "/cart", "/checkout"],
+        disallow: privatePaths,
       },
     ],
     sitemap: createMarketplaceCanonicalUrl("/sitemap.xml"),

@@ -13,6 +13,7 @@ import {
 
 import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
+import { PublicEmailAddress } from "@/components/marketplace/public-email-address";
 import {
   FacebookMark,
   InstagramMark,
@@ -118,7 +119,7 @@ export async function MarketplaceFooter() {
     })),
     support.email
       ? {
-          href: `mailto:${support.email}`,
+          href: null,
           icon: MailIcon,
           label: support.email,
         }
@@ -325,7 +326,14 @@ function ContactLine({
   const content = (
     <>
       <Icon className="size-4 shrink-0 text-[#1a1a1a] dark:text-[#f7f7f2]" />
-      <span className="min-w-0 break-words">{label}</span>
+      {label.includes("@") ? (
+        <PublicEmailAddress
+          className="min-w-0 break-words"
+          email={label}
+        />
+      ) : (
+        <span className="min-w-0 break-words">{label}</span>
+      )}
     </>
   );
 

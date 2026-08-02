@@ -45,7 +45,9 @@ export type GoogleMerchantFeedItem = {
   description: string;
   excludedDestinations: GoogleMerchantDestination[];
   gtin: string | null;
+  googleProductCategory: string | null;
   id: string;
+  identifierExists: "no" | null;
   imageLink: string;
   itemGroupId: string | null;
   itemGroupTitle: string | null;
@@ -273,7 +275,12 @@ export async function getGoogleMerchantFeedItems() {
         description: description.slice(0, googleFeedDescriptionLimit),
         excludedDestinations: destinations.excluded,
         gtin,
+        googleProductCategory: getGoogleProductCategory(
+          row.categoryPath,
+          title,
+        ),
         id: row.variantSku,
+        identifierExists: gtin || mpn ? null : "no",
         imageLink,
         itemGroupId: shouldGroupVariants ? row.productId : null,
         itemGroupTitle: shouldGroupVariants
@@ -338,6 +345,16 @@ function renderGoogleMerchantFeedItem(item: GoogleMerchantFeedItem) {
     `      <g:brand>${escapeXml(item.brand)}</g:brand>`,
     ...(item.mpn ? [`      <g:mpn>${escapeXml(item.mpn)}</g:mpn>`] : []),
     ...(item.gtin ? [`      <g:gtin>${item.gtin}</g:gtin>`] : []),
+    ...(item.identifierExists
+      ? [
+          `      <g:identifier_exists>${item.identifierExists}</g:identifier_exists>`,
+        ]
+      : []),
+    ...(item.googleProductCategory
+      ? [
+          `      <g:google_product_category>${escapeXml(item.googleProductCategory)}</g:google_product_category>`,
+        ]
+      : []),
     ...item.includedDestinations.map(
       (destination) =>
         `      <g:included_destination>${destination}</g:included_destination>`,
@@ -395,6 +412,47 @@ function getIsExchangeOffer(row: {
   variantTitle: string;
 }) {
   return row.requiresExchangeEmpty || /\bexchange\b/i.test(row.variantTitle);
+}
+
+function getGoogleProductCategory(
+  categoryPath: string | null,
+  title: string,
+) {
+  const haystack = `${categoryPath ?? ""} ${title}`.toLowerCase();
+
+  if (/\bdetector\b/.test(haystack)) {
+    return "Hardware > Tools > Measuring Tools & Sensors > Gas Detectors";
+  }
+
+  if (/\bhose|hoses\b/.test(haystack)) {
+    return "Hardware > Hardware Accessories > Gas Hoses";
+  }
+
+  if (/\bgeyser|water heater|water-heater\b/.test(haystack)) {
+    return "Home & Garden > Household Appliances > Water Heaters";
+  }
+
+  if (/\bcylinder|cylinders|gas bottle|gas-bottle|fuel container|tank\b/.test(haystack)) {
+    return "Hardware > Fuel Containers & Tanks";
+  }
+
+  if (/\bhob|cooktop|cooker top|cooker-top\b/.test(haystack)) {
+    return "Home & Garden > Kitchen & Dining > Kitchen Appliances > Cooktops";
+  }
+
+  if (/\bgrill|bbq|barbecue|braai|kamado\b/.test(haystack)) {
+    return "Home & Garden > Kitchen & Dining > Kitchen Appliances > Outdoor Grills";
+  }
+
+  if (/\bburner|stove|portable cooking\b/.test(haystack)) {
+    return "Home & Garden > Kitchen & Dining > Kitchen Appliances > Portable Cooking Stoves";
+  }
+
+  if (/\bregulator|valve|fitting|cap|adapter\b/.test(haystack)) {
+    return "Hardware > Hardware Accessories";
+  }
+
+  return "Home & Garden";
 }
 
 function formatGooglePrice(value: number) {

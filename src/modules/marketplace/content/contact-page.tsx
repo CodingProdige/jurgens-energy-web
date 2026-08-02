@@ -14,6 +14,7 @@ import {
   ContactForm,
   type ContactInquiryAction,
 } from "@/src/modules/marketplace/content/contact-form";
+import { PublicEmailAddress } from "@/components/marketplace/public-email-address";
 
 type ContactMethod = {
   external: boolean;
@@ -50,7 +51,7 @@ export async function ContactPage({ action }: { action: ContactInquiryAction }) 
     }),
     support.email
       ? {
-          href: `mailto:${support.email}`,
+          href: null,
           icon: MailIcon,
           label: "Email support",
           value: support.email,
@@ -120,9 +121,16 @@ export async function ContactPage({ action }: { action: ContactInquiryAction }) 
                       <span className="block text-[12px] font-bold text-[#666660] dark:text-[#aaa9a2]">
                         {method.label}
                       </span>
-                      <span className="mt-1 block break-words text-[15px] font-black text-[#080808] transition group-hover:text-[#ff5a1f] dark:text-[#f7f7f2]">
-                        {method.value}
-                      </span>
+                      {method.value.includes("@") ? (
+                        <PublicEmailAddress
+                          className="mt-1 block break-words text-[15px] font-black text-[#080808] transition group-hover:text-[#ff5a1f] dark:text-[#f7f7f2]"
+                          email={method.value}
+                        />
+                      ) : (
+                        <span className="mt-1 block break-words text-[15px] font-black text-[#080808] transition group-hover:text-[#ff5a1f] dark:text-[#f7f7f2]">
+                          {method.value}
+                        </span>
+                      )}
                     </span>
                   </>
                 );

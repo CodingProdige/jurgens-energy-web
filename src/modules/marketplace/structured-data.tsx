@@ -1,5 +1,7 @@
 import type { MarketplaceProductDetail } from "@/src/modules/marketplace/catalog";
 import type { CustomerSupportContactDetails } from "@/src/modules/customer-support/contact-details";
+import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
+import { getPublicBusinessIdentity } from "@/src/modules/business-information";
 import { createMarketplaceBusinessAddress } from "@/src/modules/marketplace/business-structured-address";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import { shouldPublishGoogleMerchantOffer } from "@/src/modules/marketplace/google-feed-utils";
@@ -8,6 +10,7 @@ import {
   getPublicDeliveryTimingDescription,
 } from "@/src/modules/marketplace/public-delivery-copy";
 import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import type { PublicBusinessIdentity } from "@/src/modules/business-information";
 
 export type StructuredDataValue = Record<string, unknown>;
@@ -23,6 +26,24 @@ export function MarketplaceJsonLd({
         __html: JSON.stringify(data).replace(/</g, "\\u003c"),
       }}
       type="application/ld+json"
+    />
+  );
+}
+
+export async function MarketplaceBusinessJsonLd() {
+  const [businessIdentity, settings, support] = await Promise.all([
+    getPublicBusinessIdentity(),
+    getMarketplaceSettings(),
+    getCustomerSupportContactDetails(),
+  ]);
+
+  return (
+    <MarketplaceJsonLd
+      data={createMarketplaceBusinessStructuredData({
+        businessIdentity,
+        settings,
+        support,
+      })}
     />
   );
 }
