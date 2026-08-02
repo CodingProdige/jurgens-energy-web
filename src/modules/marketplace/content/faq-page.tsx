@@ -26,6 +26,7 @@ type FaqGroup = {
 
 const deliveryFeeQuestion = "How is the delivery fee calculated?";
 const deliveryTimingQuestion = "How quickly will my order arrive?";
+const returnsQuestion = "How do returns and refunds work?";
 
 const faqGroups: FaqGroup[] = [
   {
@@ -219,26 +220,8 @@ const faqGroups: FaqGroup[] = [
         question: "What if the item is incorrect, damaged or defective?",
       },
       {
-        answer: (
-          <>
-            Eligible online purchases have applicable seven-day cooling-off
-            rights, and we also accept eligible new and unused voluntary returns
-            when you contact us within seven calendar days after receipt. You pay
-            the direct return courier cost for an eligible cooling-off or
-            voluntary change-of-mind return. Jurgens Energy covers qualifying
-            return transport for verified incorrect, damaged, unsafe or defective
-            goods where required by law. Read the{" "}
-            <Link
-              className="font-bold text-[#ff5a1f] hover:underline"
-              href="/returns-and-refunds"
-            >
-              Returns &amp; Refunds Policy
-            </Link>{" "}
-            and contact the team before returning anything. Never send LPG or a
-            filled cylinder through an ordinary parcel service.
-          </>
-        ),
-        question: "How do returns and refunds work?",
+        answer: null,
+        question: returnsQuestion,
       },
       {
         answer: (
@@ -290,15 +273,15 @@ const faqStructuredDataItems = [
       "Store product prices are VAT-inclusive unless a product clearly states otherwise. The standard delivery fee is also VAT-inclusive. Applicable delivery, deposit, exchange or other charges are displayed separately before the order is confirmed.",
   },
   {
-    question: "How do returns and refunds work?",
-    answer:
-      "Eligible online purchases have applicable seven-day cooling-off rights, and Jurgens Energy also accepts eligible new and unused voluntary returns when the customer contacts us within seven calendar days after receipt. The customer pays the direct return courier cost for an eligible cooling-off or voluntary change-of-mind return. Jurgens Energy covers qualifying incorrect, damaged, unsafe or defective return transport where required by law.",
+    question: returnsQuestion,
+    answer: "",
   },
 ] as const;
 
 export function createFaqStructuredDataItems(
   deliveryFeeDescription: string,
   deliveryTimingDescription: string,
+  returnsAnswer: string,
 ) {
   return faqStructuredDataItems.map((item) => {
     if (item.question === deliveryFeeQuestion) {
@@ -315,6 +298,13 @@ export function createFaqStructuredDataItems(
       };
     }
 
+    if (item.question === returnsQuestion) {
+      return {
+        ...item,
+        answer: returnsAnswer,
+      };
+    }
+
     return item;
   });
 }
@@ -322,9 +312,11 @@ export function createFaqStructuredDataItems(
 export function FaqPage({
   deliveryFeeDescription,
   deliveryTimingDescription,
+  returnsAnswer,
 }: {
   deliveryFeeDescription: string;
   deliveryTimingDescription: string;
+  returnsAnswer: string;
 }) {
   const resolvedFaqGroups = faqGroups.map((group) => ({
     ...group,
@@ -344,6 +336,24 @@ export function FaqPage({
               {deliveryTimingDescription} Our order cutoff is 2:00 PM SAST on
               business days, and an order placed after the cutoff begins
               processing on the next business day.
+            </>
+          ),
+        };
+      }
+
+      if (item.question === returnsQuestion) {
+        return {
+          ...item,
+          answer: (
+            <>
+              {returnsAnswer} Read the{" "}
+              <Link
+                className="font-bold text-[#ff5a1f] hover:underline"
+                href="/returns-and-refunds"
+              >
+                Returns &amp; Refunds Policy
+              </Link>{" "}
+              before returning anything.
             </>
           ),
         };

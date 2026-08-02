@@ -63,6 +63,39 @@ export const defaultWhatsappFollowUpMessages = {
 } as const;
 export const maxWhatsappEmailNotificationRecipients = 20;
 export const maxWhatsappOrderNotificationRecipients = 10;
+export const marketplaceReturnAcceptanceOptions = [
+  "defective_and_non_defective",
+  "defective_only",
+  "none",
+] as const;
+export const marketplaceReturnProductConditionOptions = [
+  "only_new",
+  "new_and_slightly_used",
+] as const;
+export const marketplaceReturnMethodOptions = [
+  "by_post",
+  "dropoff",
+  "in_store",
+] as const;
+export const marketplaceReturnLabelResponsibilityOptions = [
+  "customer",
+  "merchant",
+] as const;
+export const marketplaceReturnRestockingFeeOptions = [
+  "none",
+  "fixed",
+  "percentage",
+] as const;
+export type MarketplaceReturnAcceptance =
+  (typeof marketplaceReturnAcceptanceOptions)[number];
+export type MarketplaceReturnProductCondition =
+  (typeof marketplaceReturnProductConditionOptions)[number];
+export type MarketplaceReturnMethod =
+  (typeof marketplaceReturnMethodOptions)[number];
+export type MarketplaceReturnLabelResponsibility =
+  (typeof marketplaceReturnLabelResponsibilityOptions)[number];
+export type MarketplaceReturnRestockingFee =
+  (typeof marketplaceReturnRestockingFeeOptions)[number];
 
 function getWhatsappWebhookUrl() {
   return new URL("/api/webhooks/whatsapp", env.APP_URL).toString();
@@ -78,6 +111,123 @@ function normalizeOpenAiReasoningEffort(
   return openAiReasoningEfforts.includes(value as OpenAiReasoningEffort)
     ? (value as OpenAiReasoningEffort)
     : env.OPENAI_REASONING_EFFORT;
+}
+
+function normalizeReturnAcceptance(
+  value: string | null | undefined,
+): MarketplaceReturnAcceptance {
+  return marketplaceReturnAcceptanceOptions.includes(
+    value as MarketplaceReturnAcceptance,
+  )
+    ? (value as MarketplaceReturnAcceptance)
+    : "defective_and_non_defective";
+}
+
+function normalizeReturnProductCondition(
+  value: string | null | undefined,
+): MarketplaceReturnProductCondition {
+  return marketplaceReturnProductConditionOptions.includes(
+    value as MarketplaceReturnProductCondition,
+  )
+    ? (value as MarketplaceReturnProductCondition)
+    : "only_new";
+}
+
+function normalizeReturnLabelResponsibility(
+  value: string | null | undefined,
+): MarketplaceReturnLabelResponsibility {
+  return marketplaceReturnLabelResponsibilityOptions.includes(
+    value as MarketplaceReturnLabelResponsibility,
+  )
+    ? (value as MarketplaceReturnLabelResponsibility)
+    : "customer";
+}
+
+function normalizeReturnRestockingFeeType(
+  value: string | null | undefined,
+): MarketplaceReturnRestockingFee {
+  return marketplaceReturnRestockingFeeOptions.includes(
+    value as MarketplaceReturnRestockingFee,
+  )
+    ? (value as MarketplaceReturnRestockingFee)
+    : "none";
+}
+
+function normalizeReturnCountryCodes(value: unknown) {
+  const rawValues = Array.isArray(value)
+    ? value
+    : typeof value === "string" && value.trim().startsWith("[")
+      ? (() => {
+          try {
+            const parsed = JSON.parse(value) as unknown;
+
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        })()
+      : typeof value === "string"
+        ? value.split(/[\n,]+/g)
+        : [];
+
+  const countryCodes = Array.from(
+    new Set(
+      rawValues
+        .map((item) =>
+          typeof item === "string" ? item.trim().toUpperCase() : "",
+        )
+        .filter((item) => /^[A-Z]{2}$/.test(item)),
+    ),
+  ).slice(0, 20);
+
+  return countryCodes.length > 0 ? countryCodes : ["ZA"];
+}
+
+function normalizeReturnMethodCodes(value: unknown): MarketplaceReturnMethod[] {
+  const rawValues = Array.isArray(value)
+    ? value
+    : typeof value === "string" && value.trim().startsWith("[")
+      ? (() => {
+          try {
+            const parsed = JSON.parse(value) as unknown;
+
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        })()
+      : typeof value === "string"
+        ? value.split(/[\n,]+/g)
+        : [];
+
+  const methods = Array.from(
+    new Set(
+      rawValues.filter((item): item is MarketplaceReturnMethod =>
+        marketplaceReturnMethodOptions.includes(
+          item as MarketplaceReturnMethod,
+        ),
+      ),
+    ),
+  );
+
+  return methods.length > 0 ? methods : ["by_post"];
+}
+
+function normalizeReturnPolicyUrl(value: string | null | undefined) {
+  const trimmedValue = value?.trim();
+
+  if (trimmedValue?.startsWith("https://") && trimmedValue.length <= 500) {
+    return trimmedValue;
+  }
+
+  return new URL("/returns-and-refunds", env.APP_URL).toString();
+}
+
+function normalizeWholeNumber(
+  value: number | null | undefined,
+  fallback: number,
+) {
+  return typeof value === "number" && Number.isInteger(value) ? value : fallback;
 }
 
 export type MarketplacePaymentMethodBadge = {
@@ -374,6 +524,20 @@ export type MarketplaceSettings = {
   shippingMarginBps: number;
   shippingTransitMaxBusinessDays: number;
   shippingTransitMinBusinessDays: number;
+  returnsAcceptance: MarketplaceReturnAcceptance;
+  returnsCountryCodes: string[];
+  returnsCurrencyCode: string;
+  returnsExchangesEnabled: boolean;
+  returnsHazardousGoodsNoteEnabled: boolean;
+  returnsLabelResponsibility: MarketplaceReturnLabelResponsibility;
+  returnsMethodCodes: MarketplaceReturnMethod[];
+  returnsPolicyUrl: string;
+  returnsProductCondition: MarketplaceReturnProductCondition;
+  returnsRefundProcessingDays: number;
+  returnsRestockingFeeAmount: number | null;
+  returnsRestockingFeePercent: number | null;
+  returnsRestockingFeeType: MarketplaceReturnRestockingFee;
+  returnsWindowDays: number;
   payfastLiveMerchantId: string | null;
   payfastMode: "live" | "sandbox";
   payfastOnsiteEnabled: boolean;
@@ -522,6 +686,20 @@ const defaultSettings: MarketplaceSettings = {
   shippingMarginBps: 0,
   shippingTransitMaxBusinessDays: 3,
   shippingTransitMinBusinessDays: 1,
+  returnsAcceptance: "defective_and_non_defective",
+  returnsCountryCodes: ["ZA"],
+  returnsCurrencyCode: "ZAR",
+  returnsExchangesEnabled: true,
+  returnsHazardousGoodsNoteEnabled: true,
+  returnsLabelResponsibility: "customer",
+  returnsMethodCodes: ["by_post"],
+  returnsPolicyUrl: new URL("/returns-and-refunds", env.APP_URL).toString(),
+  returnsProductCondition: "only_new",
+  returnsRefundProcessingDays: 7,
+  returnsRestockingFeeAmount: null,
+  returnsRestockingFeePercent: null,
+  returnsRestockingFeeType: "none",
+  returnsWindowDays: 7,
   payfastLiveMerchantId: null,
   payfastMode: "sandbox",
   payfastOnsiteEnabled: false,
@@ -672,6 +850,26 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
         marketplaceSettings.shippingTransitMaxBusinessDays,
       shippingTransitMinBusinessDays:
         marketplaceSettings.shippingTransitMinBusinessDays,
+      returnsAcceptance: marketplaceSettings.returnsAcceptance,
+      returnsCountryCodes: marketplaceSettings.returnsCountryCodes,
+      returnsCurrencyCode: marketplaceSettings.returnsCurrencyCode,
+      returnsExchangesEnabled: marketplaceSettings.returnsExchangesEnabled,
+      returnsHazardousGoodsNoteEnabled:
+        marketplaceSettings.returnsHazardousGoodsNoteEnabled,
+      returnsLabelResponsibility:
+        marketplaceSettings.returnsLabelResponsibility,
+      returnsMethodCodes: marketplaceSettings.returnsMethodCodes,
+      returnsPolicyUrl: marketplaceSettings.returnsPolicyUrl,
+      returnsProductCondition: marketplaceSettings.returnsProductCondition,
+      returnsRefundProcessingDays:
+        marketplaceSettings.returnsRefundProcessingDays,
+      returnsRestockingFeeAmount:
+        marketplaceSettings.returnsRestockingFeeAmount,
+      returnsRestockingFeePercent:
+        marketplaceSettings.returnsRestockingFeePercent,
+      returnsRestockingFeeType:
+        marketplaceSettings.returnsRestockingFeeType,
+      returnsWindowDays: marketplaceSettings.returnsWindowDays,
       jurgensDeliveryCutoffTime: marketplaceSettings.jurgensDeliveryCutoffTime,
       payfastLiveMerchantId: marketplaceSettings.payfastLiveMerchantId,
       payfastLiveMerchantKeyEncrypted:
@@ -828,6 +1026,55 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       Number(settings.shippingFreeOverAmount) <= 0
         ? null
         : Number(settings.shippingFreeOverAmount),
+    returnsAcceptance: normalizeReturnAcceptance(settings.returnsAcceptance),
+    returnsCountryCodes: normalizeReturnCountryCodes(
+      settings.returnsCountryCodes,
+    ),
+    returnsCurrencyCode:
+      typeof settings.returnsCurrencyCode === "string" &&
+      /^[A-Z]{3}$/.test(settings.returnsCurrencyCode.trim().toUpperCase())
+        ? settings.returnsCurrencyCode.trim().toUpperCase()
+        : "ZAR",
+    returnsExchangesEnabled: settings.returnsExchangesEnabled ?? true,
+    returnsHazardousGoodsNoteEnabled:
+      settings.returnsHazardousGoodsNoteEnabled ?? true,
+    returnsLabelResponsibility: normalizeReturnLabelResponsibility(
+      settings.returnsLabelResponsibility,
+    ),
+    returnsMethodCodes: normalizeReturnMethodCodes(
+      settings.returnsMethodCodes,
+    ),
+    returnsPolicyUrl: normalizeReturnPolicyUrl(settings.returnsPolicyUrl),
+    returnsProductCondition: normalizeReturnProductCondition(
+      settings.returnsProductCondition,
+    ),
+    returnsRefundProcessingDays: Math.min(
+      60,
+      Math.max(
+        0,
+        normalizeWholeNumber(settings.returnsRefundProcessingDays, 7),
+      ),
+    ),
+    returnsRestockingFeeAmount:
+      settings.returnsRestockingFeeAmount === null ||
+      settings.returnsRestockingFeeAmount === undefined
+        ? null
+        : Math.max(0, Number(settings.returnsRestockingFeeAmount) || 0),
+    returnsRestockingFeePercent:
+      settings.returnsRestockingFeePercent === null ||
+      settings.returnsRestockingFeePercent === undefined
+        ? null
+        : Math.min(
+            100,
+            Math.max(0, Number(settings.returnsRestockingFeePercent) || 0),
+          ),
+    returnsRestockingFeeType: normalizeReturnRestockingFeeType(
+      settings.returnsRestockingFeeType,
+    ),
+    returnsWindowDays: Math.min(
+      365,
+      Math.max(1, normalizeWholeNumber(settings.returnsWindowDays, 7)),
+    ),
     hasOpenAiApiKey: Boolean(
       settings.openAiApiKeyEncrypted ?? env.OPENAI_API_KEY,
     ),
@@ -1648,6 +1895,149 @@ export async function updateMarketplaceShippingSettings({
     },
     ok: true,
     message: "Shipping settings saved.",
+  };
+}
+
+export async function updateMarketplaceReturnsSettings({
+  actorUserId,
+  returnsAcceptance,
+  returnsCountryCodes,
+  returnsCurrencyCode,
+  returnsExchangesEnabled,
+  returnsHazardousGoodsNoteEnabled,
+  returnsLabelResponsibility,
+  returnsMethodCodes,
+  returnsPolicyUrl,
+  returnsProductCondition,
+  returnsRefundProcessingDays,
+  returnsRestockingFeeAmount,
+  returnsRestockingFeePercent,
+  returnsRestockingFeeType,
+  returnsWindowDays,
+}: {
+  actorUserId: string;
+  returnsAcceptance: MarketplaceReturnAcceptance;
+  returnsCountryCodes: string[];
+  returnsCurrencyCode: string;
+  returnsExchangesEnabled: boolean;
+  returnsHazardousGoodsNoteEnabled: boolean;
+  returnsLabelResponsibility: MarketplaceReturnLabelResponsibility;
+  returnsMethodCodes: MarketplaceReturnMethod[];
+  returnsPolicyUrl: string;
+  returnsProductCondition: MarketplaceReturnProductCondition;
+  returnsRefundProcessingDays: number;
+  returnsRestockingFeeAmount: number | null;
+  returnsRestockingFeePercent: number | null;
+  returnsRestockingFeeType: MarketplaceReturnRestockingFee;
+  returnsWindowDays: number;
+}) {
+  const normalizedReturnsPolicyUrl = normalizeReturnPolicyUrl(returnsPolicyUrl);
+  const normalizedCountryCodes = normalizeReturnCountryCodes(
+    returnsCountryCodes,
+  );
+  const normalizedMethodCodes = normalizeReturnMethodCodes(returnsMethodCodes);
+  const normalizedCurrencyCode = returnsCurrencyCode.trim().toUpperCase();
+  const normalizedRestockingFeeAmount =
+    returnsRestockingFeeType === "fixed"
+      ? Math.max(0, Number(returnsRestockingFeeAmount) || 0)
+      : null;
+  const normalizedRestockingFeePercent =
+    returnsRestockingFeeType === "percentage"
+      ? Math.min(100, Math.max(0, Number(returnsRestockingFeePercent) || 0))
+      : null;
+
+  if (normalizedReturnsPolicyUrl !== returnsPolicyUrl.trim()) {
+    return {
+      ok: false as const,
+      message: "Use a full https:// URL for the return policy.",
+    };
+  }
+
+  if (!normalizedCountryCodes.includes("ZA")) {
+    return {
+      ok: false as const,
+      message:
+        "The marketplace return policy must include South Africa while the store ships to South Africa.",
+    };
+  }
+
+  if (!/^[A-Z]{3}$/.test(normalizedCurrencyCode)) {
+    return {
+      ok: false as const,
+      message: "Use a valid three-letter currency code, for example ZAR.",
+    };
+  }
+
+  if (
+    !Number.isInteger(returnsWindowDays) ||
+    returnsWindowDays < 1 ||
+    returnsWindowDays > 365
+  ) {
+    return {
+      ok: false as const,
+      message: "The return window must be between 1 and 365 days.",
+    };
+  }
+
+  if (
+    !Number.isInteger(returnsRefundProcessingDays) ||
+    returnsRefundProcessingDays < 0 ||
+    returnsRefundProcessingDays > 60
+  ) {
+    return {
+      ok: false as const,
+      message: "Refund processing time must be between 0 and 60 days.",
+    };
+  }
+
+  const values = {
+    returnsAcceptance,
+    returnsCountryCodes: normalizedCountryCodes,
+    returnsCurrencyCode: normalizedCurrencyCode,
+    returnsExchangesEnabled,
+    returnsHazardousGoodsNoteEnabled,
+    returnsLabelResponsibility,
+    returnsMethodCodes: normalizedMethodCodes,
+    returnsPolicyUrl: normalizedReturnsPolicyUrl,
+    returnsProductCondition,
+    returnsRefundProcessingDays,
+    returnsRestockingFeeAmount: normalizedRestockingFeeAmount,
+    returnsRestockingFeePercent: normalizedRestockingFeePercent,
+    returnsRestockingFeeType,
+    returnsWindowDays,
+    updatedAt: new Date(),
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({ id: 1, ...values })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: values,
+      });
+
+    await tx.insert(auditLogs).values({
+      action: "marketplace.returns_settings.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({
+        returnsAcceptance,
+        returnsCountryCodes: normalizedCountryCodes,
+        returnsExchangesEnabled,
+        returnsLabelResponsibility,
+        returnsMethodCodes: normalizedMethodCodes,
+        returnsProductCondition,
+        returnsRefundProcessingDays,
+        returnsRestockingFeeType,
+        returnsWindowDays,
+      }),
+    });
+  });
+
+  return {
+    ok: true as const,
+    message: "Returns policy settings saved.",
   };
 }
 

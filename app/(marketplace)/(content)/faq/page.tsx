@@ -8,6 +8,7 @@ import {
   getPublicDeliveryFeeDescription,
   getPublicDeliveryTimingDescription,
 } from "@/src/modules/marketplace/public-delivery-copy";
+import { getPublicReturnsFaqAnswer } from "@/src/modules/marketplace/public-returns-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 import {
@@ -25,6 +26,7 @@ export default async function FaqRoute() {
   const deliveryFeeDescription = getPublicDeliveryFeeDescription(settings);
   const deliveryTimingDescription =
     getPublicDeliveryTimingDescription(settings);
+  const returnsAnswer = getPublicReturnsFaqAnswer(settings);
 
   return (
     <>
@@ -34,6 +36,7 @@ export default async function FaqRoute() {
             createFaqStructuredDataItems(
               deliveryFeeDescription,
               deliveryTimingDescription,
+              returnsAnswer,
             ),
           ),
           createBreadcrumbStructuredData([
@@ -45,6 +48,7 @@ export default async function FaqRoute() {
       <FaqPage
         deliveryFeeDescription={deliveryFeeDescription}
         deliveryTimingDescription={deliveryTimingDescription}
+        returnsAnswer={returnsAnswer}
       />
     </>
   );

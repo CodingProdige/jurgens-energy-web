@@ -42,6 +42,7 @@ import {
   PencilIcon,
   PhoneIcon,
   PlusIcon,
+  RefreshCcwIcon,
   RotateCcwIcon,
   SaveIcon,
   SearchIcon,
@@ -80,6 +81,7 @@ import {
   saveJurgensDeliveryZoneSettings,
   updatePayFastPaymentSettings,
   updateCourierGuyCredentialSettings,
+  updateReturnsPolicySettings,
   updateShippingIntegrationSettings,
   updateWhatsappOrderingSettings,
   type AdminSettingsState,
@@ -91,6 +93,13 @@ import type {
   getAdminMediaLibrary,
 } from "@/src/modules/media/admin";
 import type { MarketplacePaymentMethodBadge } from "@/src/modules/marketplace/settings";
+import type {
+  MarketplaceReturnAcceptance,
+  MarketplaceReturnLabelResponsibility,
+  MarketplaceReturnMethod,
+  MarketplaceReturnProductCondition,
+  MarketplaceReturnRestockingFee,
+} from "@/src/modules/marketplace/settings";
 import type {
   AdminInAppNotificationTemplate,
   AdminNotificationDeliveryPolicy,
@@ -2818,6 +2827,552 @@ type NationwideShippingSettingsFormProps = {
   shippingTransitMaxBusinessDays: number;
   shippingTransitMinBusinessDays: number;
 };
+
+type ReturnsPolicySettingsFormProps = {
+  returnsAcceptance: MarketplaceReturnAcceptance;
+  returnsCountryCodes: string[];
+  returnsCurrencyCode: string;
+  returnsExchangesEnabled: boolean;
+  returnsHazardousGoodsNoteEnabled: boolean;
+  returnsLabelResponsibility: MarketplaceReturnLabelResponsibility;
+  returnsMethodCodes: MarketplaceReturnMethod[];
+  returnsPolicyUrl: string;
+  returnsProductCondition: MarketplaceReturnProductCondition;
+  returnsRefundProcessingDays: number;
+  returnsRestockingFeeAmount: number | null;
+  returnsRestockingFeePercent: number | null;
+  returnsRestockingFeeType: MarketplaceReturnRestockingFee;
+  returnsWindowDays: number;
+};
+
+const returnsAcceptanceLabels: Record<MarketplaceReturnAcceptance, string> = {
+  defective_and_non_defective:
+    "Yes, accept defective and non-defective products",
+  defective_only: "Accept returns for defective products only",
+  none: "No voluntary returns",
+};
+
+const returnsProductConditionLabels: Record<
+  MarketplaceReturnProductCondition,
+  string
+> = {
+  new_and_slightly_used: "New and slightly used products",
+  only_new: "Only new products",
+};
+
+const returnsMethodLabels: Record<MarketplaceReturnMethod, string> = {
+  by_post: "By post / approved courier",
+  dropoff: "At a drop-off location",
+  in_store: "In-store",
+};
+
+const returnsLabelResponsibilityLabels: Record<
+  MarketplaceReturnLabelResponsibility,
+  string
+> = {
+  customer: "Customer's responsibility",
+  merchant: "Jurgens Energy provides the label",
+};
+
+const returnsRestockingFeeLabels: Record<MarketplaceReturnRestockingFee, string> =
+  {
+    fixed: "Fixed cost",
+    none: "No cost",
+    percentage: "Percentage of product price",
+  };
+
+function getReturnDaysLabel(value: string) {
+  const days = Number(value);
+
+  if (!Number.isInteger(days) || days < 1) {
+    return "Enter valid days";
+  }
+
+  return `${days} calendar ${days === 1 ? "day" : "days"}`;
+}
+
+export function ReturnsPolicySettingsForm({
+  returnsAcceptance,
+  returnsCountryCodes,
+  returnsCurrencyCode,
+  returnsExchangesEnabled,
+  returnsHazardousGoodsNoteEnabled,
+  returnsLabelResponsibility,
+  returnsMethodCodes,
+  returnsPolicyUrl,
+  returnsProductCondition,
+  returnsRefundProcessingDays,
+  returnsRestockingFeeAmount,
+  returnsRestockingFeePercent,
+  returnsRestockingFeeType,
+  returnsWindowDays,
+}: ReturnsPolicySettingsFormProps) {
+  const [state, formAction, isPending] = useActionState(
+    updateReturnsPolicySettings,
+    initialState,
+  );
+  const [acceptance, setAcceptance] =
+    useState<MarketplaceReturnAcceptance>(returnsAcceptance);
+  const [condition, setCondition] =
+    useState<MarketplaceReturnProductCondition>(returnsProductCondition);
+  const [exchangesEnabled, setExchangesEnabled] = useState(
+    returnsExchangesEnabled,
+  );
+  const [hazardousNoteEnabled, setHazardousNoteEnabled] = useState(
+    returnsHazardousGoodsNoteEnabled,
+  );
+  const [methodCodes, setMethodCodes] = useState<MarketplaceReturnMethod[]>(
+    returnsMethodCodes.length > 0 ? returnsMethodCodes : ["by_post"],
+  );
+  const [labelResponsibility, setLabelResponsibility] =
+    useState<MarketplaceReturnLabelResponsibility>(
+      returnsLabelResponsibility,
+    );
+  const [restockingFeeType, setRestockingFeeType] =
+    useState<MarketplaceReturnRestockingFee>(returnsRestockingFeeType);
+  const [windowDaysValue, setWindowDaysValue] = useState(
+    String(returnsWindowDays),
+  );
+  const [refundProcessingDaysValue, setRefundProcessingDaysValue] = useState(
+    String(returnsRefundProcessingDays),
+  );
+  const [policyUrlValue, setPolicyUrlValue] = useState(returnsPolicyUrl);
+  const selectedCountries = returnsCountryCodes.includes("ZA")
+    ? returnsCountryCodes
+    : ["ZA", ...returnsCountryCodes];
+  const methodSummary = methodCodes
+    .map((method) => returnsMethodLabels[method])
+    .join(", ");
+
+  function toggleReturnMethod(
+    method: MarketplaceReturnMethod,
+    checked: boolean | "indeterminate",
+  ) {
+    setMethodCodes((current) => {
+      if (checked === true) {
+        return current.includes(method) ? current : [...current, method];
+      }
+
+      const next = current.filter((item) => item !== method);
+
+      return next.length > 0 ? next : current;
+    });
+  }
+
+  return (
+    <form action={formAction} className="grid gap-5">
+      <section className="grid gap-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+            <RefreshCcwIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Merchant Center return policy
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              These fields are the public source of truth for returns,
+              exchanges, fees, and refund timing. Keep Google Merchant Center
+              set to the same values.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)]">
+          <div className="grid gap-2">
+            <Label htmlFor="returnsPolicyUrl">Return policy URL</Label>
+            <Input
+              id="returnsPolicyUrl"
+              name="returnsPolicyUrl"
+              type="url"
+              value={policyUrlValue}
+              onChange={(event) => setPolicyUrlValue(event.target.value)}
+              placeholder="https://jurgensenergy.com/returns-and-refunds"
+              required
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Use this exact URL in Merchant Center so Google and the website
+              read the same policy.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label>Countries</Label>
+            <input name="returnsCountryCodes" type="hidden" value="ZA" />
+            <label className="flex min-h-8 items-center gap-2 rounded-lg border border-zinc-200 px-3 text-sm dark:border-white/10">
+              <Checkbox checked disabled />
+              <span>South Africa</span>
+            </label>
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Current marketplace delivery country: {selectedCountries.join(", ")}.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="returnsAcceptance">Returns</Label>
+            <Select
+              name="returnsAcceptance"
+              value={acceptance}
+              onValueChange={(value) => {
+                if (
+                  value === "defective_and_non_defective" ||
+                  value === "defective_only" ||
+                  value === "none"
+                ) {
+                  setAcceptance(value);
+                }
+              }}
+            >
+              <SelectTrigger className="w-full" id="returnsAcceptance">
+                <SelectValue>{returnsAcceptanceLabels[acceptance]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="defective_and_non_defective">
+                  {returnsAcceptanceLabels.defective_and_non_defective}
+                </SelectItem>
+                <SelectItem value="defective_only">
+                  {returnsAcceptanceLabels.defective_only}
+                </SelectItem>
+                <SelectItem value="none">
+                  {returnsAcceptanceLabels.none}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={exchangesEnabled}
+              name="returnsExchangesEnabled"
+              onCheckedChange={setExchangesEnabled}
+            />
+            <span>
+              <span className="block font-semibold text-zinc-950 dark:text-white">
+                Accept exchanges
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Mirrors Merchant Center&apos;s exchange preference. Exchange
+                orders still follow LPG safety and handover rules.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="returnsProductCondition">Product condition</Label>
+            <Select
+              name="returnsProductCondition"
+              value={condition}
+              onValueChange={(value) => {
+                if (
+                  value === "only_new" ||
+                  value === "new_and_slightly_used"
+                ) {
+                  setCondition(value);
+                }
+              }}
+            >
+              <SelectTrigger className="w-full" id="returnsProductCondition">
+                <SelectValue>
+                  {returnsProductConditionLabels[condition]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="only_new">
+                  {returnsProductConditionLabels.only_new}
+                </SelectItem>
+                <SelectItem value="new_and_slightly_used">
+                  {returnsProductConditionLabels.new_and_slightly_used}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="returnsWindowDays">Return window</Label>
+            <Input
+              id="returnsWindowDays"
+              max={365}
+              min={1}
+              name="returnsWindowDays"
+              onChange={(event) => setWindowDaysValue(event.target.value)}
+              required
+              step={1}
+              type="number"
+              value={windowDaysValue}
+            />
+            <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Public wording: within {getReturnDaysLabel(windowDaysValue)} after
+              delivery.
+            </p>
+          </div>
+        </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-sm dark:border-amber-400/30 dark:bg-amber-400/10">
+          <Checkbox
+            checked={hazardousNoteEnabled}
+            name="returnsHazardousGoodsNoteEnabled"
+            onCheckedChange={setHazardousNoteEnabled}
+          />
+          <span>
+            <span className="block font-semibold text-zinc-950 dark:text-white">
+              Show LPG safety return note
+            </span>
+            <span className="mt-1 block text-xs leading-5 text-slate-600 dark:text-zinc-300">
+              Keeps the public policy clear that LPG, filled cylinders, and
+              hazardous goods need pre-authorised safe collection and must not
+              be posted through ordinary parcel services.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section className="grid gap-5 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <fieldset className="grid gap-3">
+          <legend className="text-sm font-bold text-zinc-950 dark:text-white">
+            Return method
+          </legend>
+          <div className="grid gap-3 md:grid-cols-3">
+            {(["by_post", "dropoff", "in_store"] as const).map((method) => (
+              <label
+                className="flex min-h-10 items-center gap-2 rounded-lg border border-zinc-200 px-3 text-sm dark:border-white/10"
+                key={method}
+              >
+                <Checkbox
+                  checked={methodCodes.includes(method)}
+                  name="returnsMethodCodes"
+                  onCheckedChange={(checked) =>
+                    toggleReturnMethod(method, checked)
+                  }
+                  value={method}
+                />
+                <span className="font-medium">
+                  {returnsMethodLabels[method]}
+                </span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Recommended: use By post / approved courier only. Do not enable
+            in-store unless there is a real public returns counter.
+          </p>
+        </fieldset>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-2">
+            <Label htmlFor="returnsCurrencyCode">Currency</Label>
+            <Input
+              id="returnsCurrencyCode"
+              name="returnsCurrencyCode"
+              defaultValue={returnsCurrencyCode}
+              maxLength={3}
+              required
+            />
+          </div>
+          <div className="grid gap-2 md:col-span-2">
+            <Label htmlFor="returnsLabelResponsibility">Return label</Label>
+            <Select
+              name="returnsLabelResponsibility"
+              value={labelResponsibility}
+              onValueChange={(value) => {
+                if (value === "customer" || value === "merchant") {
+                  setLabelResponsibility(value);
+                }
+              }}
+            >
+              <SelectTrigger
+                className="w-full"
+                id="returnsLabelResponsibility"
+              >
+                <SelectValue>
+                  {returnsLabelResponsibilityLabels[labelResponsibility]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="customer">
+                  {returnsLabelResponsibilityLabels.customer}
+                </SelectItem>
+                <SelectItem value="merchant">
+                  {returnsLabelResponsibilityLabels.merchant}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-2">
+            <Label htmlFor="returnsRestockingFeeType">Restocking fee</Label>
+            <Select
+              name="returnsRestockingFeeType"
+              value={restockingFeeType}
+              onValueChange={(value) => {
+                if (
+                  value === "none" ||
+                  value === "fixed" ||
+                  value === "percentage"
+                ) {
+                  setRestockingFeeType(value);
+                }
+              }}
+            >
+              <SelectTrigger
+                className="w-full"
+                id="returnsRestockingFeeType"
+              >
+                <SelectValue>
+                  {returnsRestockingFeeLabels[restockingFeeType]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  {returnsRestockingFeeLabels.none}
+                </SelectItem>
+                <SelectItem value="fixed">
+                  {returnsRestockingFeeLabels.fixed}
+                </SelectItem>
+                <SelectItem value="percentage">
+                  {returnsRestockingFeeLabels.percentage}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="returnsRestockingFeeAmount">
+              Fixed fee amount
+            </Label>
+            <Input
+              disabled={restockingFeeType !== "fixed"}
+              id="returnsRestockingFeeAmount"
+              min={0}
+              name="returnsRestockingFeeAmount"
+              step="0.01"
+              type="number"
+              defaultValue={returnsRestockingFeeAmount ?? ""}
+              placeholder="Only for fixed cost"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="returnsRestockingFeePercent">
+              Percentage fee
+            </Label>
+            <Input
+              disabled={restockingFeeType !== "percentage"}
+              id="returnsRestockingFeePercent"
+              max={100}
+              min={0}
+              name="returnsRestockingFeePercent"
+              step="0.01"
+              type="number"
+              defaultValue={returnsRestockingFeePercent ?? ""}
+              placeholder="Only for percentage"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2 md:max-w-sm">
+          <Label htmlFor="returnsRefundProcessingDays">
+            Refund processing time
+          </Label>
+          <Input
+            id="returnsRefundProcessingDays"
+            max={60}
+            min={0}
+            name="returnsRefundProcessingDays"
+            onChange={(event) =>
+              setRefundProcessingDaysValue(event.target.value)
+            }
+            required
+            step={1}
+            type="number"
+            value={refundProcessingDaysValue}
+          />
+          <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Merchant Center asks for this in days. The public policy will say
+            approved refunds are processed within this period after approval or
+            inspection.
+          </p>
+        </div>
+      </section>
+
+      <section className="grid gap-4 rounded-xl border border-emerald-500/25 bg-emerald-50 p-4 text-sm dark:border-emerald-400/25 dark:bg-emerald-400/10">
+        <div className="flex items-start gap-3">
+          <CheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
+          <div className="min-w-0">
+            <h3 className="font-bold text-emerald-950 dark:text-emerald-100">
+              Merchant Center preview
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-emerald-800 dark:text-emerald-200">
+              Use these same values in Google Merchant Center after saving.
+            </p>
+          </div>
+        </div>
+        <dl className="grid gap-2 text-xs leading-5 text-emerald-900 dark:text-emerald-100 sm:grid-cols-2">
+          <div>
+            <dt className="font-bold">Return policy URL</dt>
+            <dd className="break-words">{policyUrlValue}</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Countries</dt>
+            <dd>South Africa</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Returns</dt>
+            <dd>{returnsAcceptanceLabels[acceptance]}</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Exchanges</dt>
+            <dd>{exchangesEnabled ? "Yes, accept exchanges" : "No exchanges"}</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Condition and window</dt>
+            <dd>
+              {returnsProductConditionLabels[condition]} ·{" "}
+              {getReturnDaysLabel(windowDaysValue)}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-bold">Method and fees</dt>
+            <dd>
+              {methodSummary} ·{" "}
+              {returnsLabelResponsibilityLabels[labelResponsibility]} ·{" "}
+              {returnsRestockingFeeLabels[restockingFeeType]}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-bold">Currency</dt>
+            <dd>{returnsCurrencyCode}</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Refund processing</dt>
+            <dd>{getReturnDaysLabel(refundProcessingDaysValue)}</dd>
+          </div>
+        </dl>
+      </section>
+
+      {state.message ? (
+        <p
+          className={
+            state.ok
+              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+          }
+        >
+          {state.message}
+        </p>
+      ) : null}
+
+      <Button type="submit" disabled={isPending} className="w-fit gap-2">
+        <SaveIcon className="size-4" />
+        {isPending ? "Saving..." : "Save returns policy settings"}
+      </Button>
+    </form>
+  );
+}
 
 function getDeliveryTimingPreview({
   handlingMaximum,

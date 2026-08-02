@@ -15,7 +15,7 @@ export const policyLinks = [
   },
   {
     description:
-      "Seven-day returns, return courier costs, defective goods, exchanges, and refunds.",
+      "Returns, exchanges, return costs, defective goods, and refunds.",
     href: "/returns-and-refunds",
     kind: "returns",
     label: "Returns & Refunds Policy",

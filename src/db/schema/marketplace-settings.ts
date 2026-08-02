@@ -131,6 +131,58 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   )
     .notNull()
     .default(3),
+  returnsPolicyUrl: text("returns_policy_url")
+    .notNull()
+    .default("https://jurgensenergy.com/returns-and-refunds"),
+  returnsCountryCodes: jsonb("returns_country_codes")
+    .$type<string[]>()
+    .notNull()
+    .default(["ZA"]),
+  returnsAcceptance: varchar("returns_acceptance", { length: 40 })
+    .notNull()
+    .default("defective_and_non_defective"),
+  returnsExchangesEnabled: boolean("returns_exchanges_enabled")
+    .notNull()
+    .default(true),
+  returnsProductCondition: varchar("returns_product_condition", { length: 40 })
+    .notNull()
+    .default("only_new"),
+  returnsWindowDays: integer("returns_window_days").notNull().default(7),
+  returnsMethodCodes: jsonb("returns_method_codes")
+    .$type<string[]>()
+    .notNull()
+    .default(["by_post"]),
+  returnsCurrencyCode: varchar("returns_currency_code", { length: 3 })
+    .notNull()
+    .default("ZAR"),
+  returnsLabelResponsibility: varchar("returns_label_responsibility", {
+    length: 40,
+  })
+    .notNull()
+    .default("customer"),
+  returnsRestockingFeeType: varchar("returns_restocking_fee_type", {
+    length: 40,
+  })
+    .notNull()
+    .default("none"),
+  returnsRestockingFeeAmount: numeric("returns_restocking_fee_amount", {
+    mode: "number",
+    precision: 12,
+    scale: 2,
+  }),
+  returnsRestockingFeePercent: numeric("returns_restocking_fee_percent", {
+    mode: "number",
+    precision: 5,
+    scale: 2,
+  }),
+  returnsRefundProcessingDays: integer("returns_refund_processing_days")
+    .notNull()
+    .default(7),
+  returnsHazardousGoodsNoteEnabled: boolean(
+    "returns_hazardous_goods_note_enabled",
+  )
+    .notNull()
+    .default(true),
   jurgensDeliveryCutoffTime: varchar("jurgens_delivery_cutoff_time", {
     length: 5,
   })
@@ -321,5 +373,25 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   shippingTransitBusinessDaysValid: check(
     "marketplace_settings_shipping_transit_days_valid",
     sql`${settings.shippingTransitMinBusinessDays} >= 0 AND ${settings.shippingTransitMaxBusinessDays} <= 60 AND ${settings.shippingTransitMinBusinessDays} <= ${settings.shippingTransitMaxBusinessDays}`,
+  ),
+  returnsPolicyUrlValid: check(
+    "marketplace_settings_returns_policy_url_valid",
+    sql`${settings.returnsPolicyUrl} ~ '^https://.+' AND length(${settings.returnsPolicyUrl}) <= 500`,
+  ),
+  returnsWindowDaysValid: check(
+    "marketplace_settings_returns_window_days_valid",
+    sql`${settings.returnsWindowDays} >= 1 AND ${settings.returnsWindowDays} <= 365`,
+  ),
+  returnsRefundProcessingDaysValid: check(
+    "marketplace_settings_returns_refund_processing_days_valid",
+    sql`${settings.returnsRefundProcessingDays} >= 0 AND ${settings.returnsRefundProcessingDays} <= 60`,
+  ),
+  returnsRestockingFeeAmountValid: check(
+    "marketplace_settings_returns_restocking_amount_valid",
+    sql`${settings.returnsRestockingFeeAmount} IS NULL OR ${settings.returnsRestockingFeeAmount} >= 0`,
+  ),
+  returnsRestockingFeePercentValid: check(
+    "marketplace_settings_returns_restocking_percent_valid",
+    sql`${settings.returnsRestockingFeePercent} IS NULL OR (${settings.returnsRestockingFeePercent} >= 0 AND ${settings.returnsRestockingFeePercent} <= 100)`,
   ),
 }));

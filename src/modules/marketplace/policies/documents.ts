@@ -14,6 +14,15 @@ import {
   getPublicDeliveryTiming,
   getPublicDeliveryTimingDescription,
 } from "@/src/modules/marketplace/public-delivery-copy";
+import {
+  getPublicRefundProcessingLabel,
+  getPublicRestockingFeeLabel,
+  getPublicReturnLabelResponsibilityLabel,
+  getPublicReturnMethodsLabel,
+  getPublicReturnsConditionLabel,
+  getPublicReturnsSummary,
+  getPublicReturnWindowLabel,
+} from "@/src/modules/marketplace/public-returns-copy";
 import type { MarketplaceSettings } from "@/src/modules/marketplace/settings";
 
 export { policyLinks };
@@ -357,7 +366,7 @@ export function createTermsAndConditionsDocument(
 
 export const returnsAndRefundsPolicy: PolicyDocument = {
   description:
-    "Eligible online orders have seven-day cooling-off rights, and eligible new and unused goods have a seven-day store-return option. This policy explains costs and refunds.",
+    "Eligible online orders have cooling-off rights, and eligible goods may qualify for the published store-return option. This policy explains return conditions, costs, exchanges, and refunds.",
   eyebrow: "Order resolutions",
   kind: "returns",
   shortTitle: "Returns & Refunds Policy",
@@ -381,18 +390,18 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
     },
     {
       id: "online-cooling-off",
-      title: "3. Seven-day cooling-off and store returns",
+      title: "3. Cooling-off and store returns",
       paragraphs: [
-        "Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within seven calendar days after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.",
-        "Separately, Jurgens Energy accepts eligible new and unused goods for a voluntary change-of-mind return when you contact us within seven calendar days after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.",
-        "Contact us within the seven-day period so that we can authorise the return courier or safe collection. For a voluntary change-of-mind return, you pay the direct return courier cost. We do not charge a restocking fee. Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.",
+        "Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within the applicable statutory period after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.",
+        "Separately, Jurgens Energy accepts eligible goods for a voluntary change-of-mind return when you contact us within the published return window after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.",
+        "Contact us within the return window so that we can authorise the return courier or safe collection. Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.",
       ],
     },
     {
       id: "unwanted-products",
-      title: "4. Requests outside the seven-day window",
+      title: "4. Requests outside the return window",
       paragraphs: [
-        "Outside the seven-day return window or another statutory return right, we may consider a request to return or exchange an unwanted product that is still new, unused, undamaged, complete, and in its original resaleable packaging. Any discretionary acceptance must be confirmed before the item is handed over.",
+        "Outside the published return window or another statutory return right, we may consider a request to return or exchange an unwanted product that is still new, unused, undamaged, complete, and in its original resaleable packaging. Any discretionary acceptance must be confirmed before the item is handed over.",
         "We ordinarily cannot accept a discretionary change-of-mind return for gas that has been used or released, an item that has been installed or altered, a product missing parts, or an item that cannot safely or lawfully be restocked. Your rights for an incorrect, unsafe, or defective product remain unaffected.",
       ],
     },
@@ -455,6 +464,112 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
     },
   ],
 };
+
+export function createReturnsAndRefundsPolicy(
+  settings: MarketplaceSettings,
+): PolicyDocument {
+  const returnWindowLabel = getPublicReturnWindowLabel(settings);
+  const conditionLabel = getPublicReturnsConditionLabel(
+    settings.returnsProductCondition,
+  );
+  const returnMethodsLabel = getPublicReturnMethodsLabel(settings);
+  const returnLabelResponsibility = getPublicReturnLabelResponsibilityLabel(
+    settings.returnsLabelResponsibility,
+  );
+  const restockingFeeLabel = getPublicRestockingFeeLabel(settings);
+  const refundProcessingLabel = getPublicRefundProcessingLabel(settings);
+  const acceptsChangeOfMind =
+    settings.returnsAcceptance === "defective_and_non_defective";
+  const acceptsDefectiveOnly =
+    settings.returnsAcceptance === "defective_only";
+  const exchangePolicy = settings.returnsExchangesEnabled
+    ? "Eligible exchanges are accepted when the product condition, safety rules, stock availability, and applicable law allow it. Any exchange must be authorised before the item is handed over."
+    : "Exchanges are not currently offered unless required by law or expressly authorised for the specific order.";
+  const hazardousReturnNote = settings.returnsHazardousGoodsNoteEnabled
+    ? "LPG, filled cylinders, and other hazardous items are accepted only through a pre-authorised collection that follows the applicable safety rules; they must never be sent through ordinary mail."
+    : "For an approved non-hazardous return, package the item securely and display the return reference we provide.";
+
+  return {
+    ...returnsAndRefundsPolicy,
+    description: getPublicReturnsSummary(settings),
+    sections: returnsAndRefundsPolicy.sections.map((section) => {
+      if (section.id === "online-cooling-off") {
+        return {
+          ...section,
+          title: "3. Cooling-off and store returns",
+          paragraphs: [
+            `Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within ${returnWindowLabel} after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.`,
+            acceptsChangeOfMind
+              ? `Separately, Jurgens Energy accepts eligible ${conditionLabel} for a voluntary change-of-mind return when you contact us within ${returnWindowLabel} after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.`
+              : acceptsDefectiveOnly
+                ? "Voluntary change-of-mind returns are not accepted unless required by law. Incorrect, damaged, unsafe, or defective products remain covered by applicable statutory remedies."
+                : "Voluntary returns are not accepted unless required by law. Incorrect, damaged, unsafe, or defective products remain covered by applicable statutory remedies.",
+            acceptsChangeOfMind
+              ? `Contact us within the return window so that we can authorise the return method. For a voluntary change-of-mind return, ${returnLabelResponsibility}. ${restockingFeeLabel} Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.`
+              : `Contact us promptly so that we can assess the request and confirm the lawful next step. ${restockingFeeLabel} Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.`,
+          ],
+        };
+      }
+
+      if (section.id === "unwanted-products") {
+        return {
+          ...section,
+          title: `4. Requests outside the ${returnWindowLabel} window`,
+          paragraphs: [
+            `Outside the ${returnWindowLabel} return window or another statutory return right, we may consider a request to return or exchange an unwanted product that is still ${conditionLabel}, undamaged, complete, and in its original resaleable packaging. Any discretionary acceptance must be confirmed before the item is handed over.`,
+            "We ordinarily cannot accept a discretionary change-of-mind return for gas that has been used or released, an item that has been installed or altered, a product missing parts, or an item that cannot safely or lawfully be restocked. Your rights for an incorrect, unsafe, or defective product remain unaffected.",
+          ],
+        };
+      }
+
+      if (section.id === "cylinder-exchanges") {
+        return {
+          ...section,
+          paragraphs: [
+            exchangePolicy,
+            ...section.paragraphs,
+          ],
+        };
+      }
+
+      if (section.id === "return-condition") {
+        return {
+          ...section,
+          title: "8. Approved return method",
+          paragraphs: [
+            "Jurgens Energy is an online-only store with no public walk-in shop, customer collection point, or returns counter. Do not travel to or send goods to a registered or administrative address. Wait for our written return authorisation and the approved courier or collection instructions.",
+            `Approved return method: ${returnMethodsLabel}. ${hazardousReturnNote}`,
+            "Return all parts, manuals, accessories, promotional items, and original packaging reasonably available. Do not remove serial labels or attempt repairs before assessment. We may inspect the product to confirm identity, condition, use, completeness, and the reported problem. An inspection does not remove a statutory right.",
+          ],
+        };
+      }
+
+      if (section.id === "costs") {
+        return {
+          ...section,
+          paragraphs: [
+            acceptsChangeOfMind
+              ? `For an eligible change-of-mind return, including an eligible ECTA cooling-off cancellation, ${returnLabelResponsibility}. ${restockingFeeLabel}`
+              : `${restockingFeeLabel} Return costs are assessed according to the approved reason and applicable law.`,
+            "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, unsafe, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
+          ],
+        };
+      }
+
+      if (section.id === "refunds") {
+        return {
+          ...section,
+          paragraphs: [
+            `For an eligible ECTA cooling-off cancellation, we refund the payments received within 30 days after cancellation. For another approved refund, we process it within ${refundProcessingLabel} after approval or inspection, using the original payment method where reasonably possible. Your bank or payment provider may take additional time to reflect an initiated refund. We may request verified bank details if the original method cannot receive it.`,
+            "The refunded amount includes product and delivery charges where required by law. For other approved returns, original delivery or completed service charges may be excluded where lawful and disclosed. We will provide a clear calculation if a deduction is permitted.",
+          ],
+        };
+      }
+
+      return section;
+    }),
+  };
+}
 
 export const deliveryInformation: PolicyDocument = {
   description:

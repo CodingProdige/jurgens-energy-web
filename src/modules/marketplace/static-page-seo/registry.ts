@@ -138,13 +138,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "returns-and-refunds": {
     defaultDescription:
-      "Read our Returns & Refunds Policy, including the seven-day return period, change-of-mind courier fees and help for incorrect, damaged or defective goods.",
+      "Read our Returns & Refunds Policy, including the current return period, change-of-mind courier fees and help for incorrect, damaged or defective goods.",
     defaultTitle: "Returns & Refunds Policy",
     key: "returns-and-refunds",
     label: "Returns & refunds policy",
     path: "/returns-and-refunds",
     scanFocus:
-      "A faithful summary of the live returns and refunds policy, including eligibility, the seven-day period, courier fees and statutory remedies.",
+      "A faithful summary of the live returns and refunds policy, including eligibility, the configured return period, courier fees and statutory remedies.",
   },
   "terms-and-conditions": {
     defaultDescription:

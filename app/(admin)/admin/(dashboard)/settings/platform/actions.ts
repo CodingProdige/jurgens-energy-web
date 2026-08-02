@@ -7,6 +7,11 @@ import { requireAdminCapability } from "@/src/modules/auth/permissions";
 import {
   maxWhatsappEmailNotificationRecipients,
   maxWhatsappOrderNotificationRecipients,
+  marketplaceReturnAcceptanceOptions,
+  marketplaceReturnLabelResponsibilityOptions,
+  marketplaceReturnMethodOptions,
+  marketplaceReturnProductConditionOptions,
+  marketplaceReturnRestockingFeeOptions,
   openAiReasoningEfforts,
   updateMarketplaceComingSoonSettings,
   updateMarketplaceFooterSettings,
@@ -16,6 +21,7 @@ import {
   updateMarketplaceOpenAiSettings,
   updateMarketplacePayFastSettings,
   updateMarketplaceCourierGuyCredentials,
+  updateMarketplaceReturnsSettings,
   updateMarketplaceShippingSettings,
   updateMarketplaceWhatsappSettings,
 } from "@/src/modules/marketplace/settings";
@@ -641,6 +647,96 @@ const courierGuyCredentialSettingsSchema = shippingSettingsBaseSchema.pick({
   courierGuyWebhookToken: true,
 });
 
+const returnsSettingsSchema = z
+  .object({
+    returnsAcceptance: z.enum(marketplaceReturnAcceptanceOptions),
+    returnsCountryCodes: z
+      .array(
+        z
+          .string()
+          .trim()
+          .transform((value) => value.toUpperCase())
+          .refine((value) => /^[A-Z]{2}$/.test(value), "Use valid countries."),
+      )
+      .min(1, "Select at least one country.")
+      .transform((values) => Array.from(new Set(values))),
+    returnsCurrencyCode: z
+      .string()
+      .trim()
+      .transform((value) => value.toUpperCase())
+      .refine(
+        (value) => /^[A-Z]{3}$/.test(value),
+        "Use a valid currency code.",
+      ),
+    returnsExchangesEnabled: z.coerce.boolean().default(false),
+    returnsHazardousGoodsNoteEnabled: z.coerce.boolean().default(false),
+    returnsLabelResponsibility: z.enum(
+      marketplaceReturnLabelResponsibilityOptions,
+    ),
+    returnsMethodCodes: z
+      .array(z.enum(marketplaceReturnMethodOptions))
+      .min(1, "Select at least one return method.")
+      .transform((values) => Array.from(new Set(values))),
+    returnsPolicyUrl: z
+      .string()
+      .trim()
+      .max(500, "The return policy URL is too long.")
+      .refine(
+        (value) => value.startsWith("https://"),
+        "Use a full https:// return policy URL.",
+      ),
+    returnsProductCondition: z.enum(
+      marketplaceReturnProductConditionOptions,
+    ),
+    returnsRefundProcessingDays: z.coerce.number().int().min(0).max(60),
+    returnsRestockingFeeAmount: z.preprocess(
+      (value) =>
+        value === "" || value === null || value === undefined ? null : value,
+      z.coerce.number().finite().min(0).max(1_000_000).nullable(),
+    ),
+    returnsRestockingFeePercent: z.preprocess(
+      (value) =>
+        value === "" || value === null || value === undefined ? null : value,
+      z.coerce.number().finite().min(0).max(100).nullable(),
+    ),
+    returnsRestockingFeeType: z.enum(marketplaceReturnRestockingFeeOptions),
+    returnsWindowDays: z.coerce.number().int().min(1).max(365),
+  })
+  .superRefine((settings, context) => {
+    if (!settings.returnsCountryCodes.includes("ZA")) {
+      context.addIssue({
+        code: "custom",
+        message: "South Africa must stay selected for this marketplace.",
+        path: ["returnsCountryCodes"],
+      });
+    }
+
+    if (
+      settings.returnsRestockingFeeType === "fixed" &&
+      (settings.returnsRestockingFeeAmount === null ||
+        settings.returnsRestockingFeeAmount <= 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Enter the fixed restocking fee, or choose no restocking fee.",
+        path: ["returnsRestockingFeeAmount"],
+      });
+    }
+
+    if (
+      settings.returnsRestockingFeeType === "percentage" &&
+      (settings.returnsRestockingFeePercent === null ||
+        settings.returnsRestockingFeePercent <= 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Enter the restocking percentage, or choose no restocking fee.",
+        path: ["returnsRestockingFeePercent"],
+      });
+    }
+  });
+
 const whatsappOptionalTimeSchema = z
   .string()
   .trim()
@@ -977,6 +1073,74 @@ export async function updateShippingIntegrationSettings(
   revalidatePath("/products");
   revalidatePath("/products/[slug]", "page");
   revalidatePath("/settings/platform");
+
+  return result;
+}
+
+export async function updateReturnsPolicySettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireSettingsManageAccess();
+
+  const parsed = returnsSettingsSchema.safeParse({
+    returnsAcceptance: String(
+      formData.get("returnsAcceptance") ?? "defective_and_non_defective",
+    ),
+    returnsCountryCodes: formData.getAll("returnsCountryCodes").map(String),
+    returnsCurrencyCode: String(
+      formData.get("returnsCurrencyCode") ?? "ZAR",
+    ),
+    returnsExchangesEnabled:
+      formData.get("returnsExchangesEnabled") === "on",
+    returnsHazardousGoodsNoteEnabled:
+      formData.get("returnsHazardousGoodsNoteEnabled") === "on",
+    returnsLabelResponsibility: String(
+      formData.get("returnsLabelResponsibility") ?? "customer",
+    ),
+    returnsMethodCodes: formData.getAll("returnsMethodCodes").map(String),
+    returnsPolicyUrl: String(formData.get("returnsPolicyUrl") ?? ""),
+    returnsProductCondition: String(
+      formData.get("returnsProductCondition") ?? "only_new",
+    ),
+    returnsRefundProcessingDays:
+      formData.get("returnsRefundProcessingDays") ?? "7",
+    returnsRestockingFeeAmount: formData.get("returnsRestockingFeeAmount"),
+    returnsRestockingFeePercent: formData.get("returnsRestockingFeePercent"),
+    returnsRestockingFeeType: String(
+      formData.get("returnsRestockingFeeType") ?? "none",
+    ),
+    returnsWindowDays: formData.get("returnsWindowDays") ?? "7",
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ??
+        "Check the returns policy settings.",
+    };
+  }
+
+  const result = await updateMarketplaceReturnsSettings({
+    ...parsed.data,
+    actorUserId: session.user.id,
+  });
+
+  if (!result.ok) {
+    return result;
+  }
+
+  revalidatePath("/");
+  revalidatePath("/cart");
+  revalidatePath("/checkout");
+  revalidatePath("/faq");
+  revalidatePath("/feeds/google-merchant.xml");
+  revalidatePath("/products");
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/returns-and-refunds");
+  revalidatePath("/settings/platform");
+  revalidatePath("/", "layout");
 
   return result;
 }

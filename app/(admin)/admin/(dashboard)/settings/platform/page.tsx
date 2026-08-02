@@ -13,6 +13,7 @@ import {
   MapPinIcon,
   MessageCircleIcon,
   Share2Icon,
+  RefreshCcwIcon,
   TruckIcon,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ import {
   NotificationSettingsForm,
   NationwideShippingSettingsForm,
   PayFastSettingsForm,
+  ReturnsPolicySettingsForm,
   SocialLinksForm,
   WhatsappOrderingSettingsForm,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/settings-form";
@@ -65,6 +67,13 @@ const settingSections = [
     description:
       "Manage nationwide pricing, Jurgens postcode eligibility, and Courier Guy fulfillment.",
     icon: TruckIcon,
+  },
+  {
+    key: "returns",
+    title: "Returns policy",
+    description:
+      "Manage the public returns, exchanges, fees, and refund timing promised to Merchant Center.",
+    icon: RefreshCcwIcon,
   },
   {
     key: "whatsapp-ordering",
@@ -379,6 +388,34 @@ function SettingsSection({
     );
   }
 
+  if (section === "returns") {
+    return (
+      <DashboardPanel
+        title="Returns policy"
+        description="Manage the public returns, exchanges, condition, method, fees, and refund timing that must match Google Merchant Center."
+      >
+        <ReturnsPolicySettingsForm
+          returnsAcceptance={settings.returnsAcceptance}
+          returnsCountryCodes={settings.returnsCountryCodes}
+          returnsCurrencyCode={settings.returnsCurrencyCode}
+          returnsExchangesEnabled={settings.returnsExchangesEnabled}
+          returnsHazardousGoodsNoteEnabled={
+            settings.returnsHazardousGoodsNoteEnabled
+          }
+          returnsLabelResponsibility={settings.returnsLabelResponsibility}
+          returnsMethodCodes={settings.returnsMethodCodes}
+          returnsPolicyUrl={settings.returnsPolicyUrl}
+          returnsProductCondition={settings.returnsProductCondition}
+          returnsRefundProcessingDays={settings.returnsRefundProcessingDays}
+          returnsRestockingFeeAmount={settings.returnsRestockingFeeAmount}
+          returnsRestockingFeePercent={settings.returnsRestockingFeePercent}
+          returnsRestockingFeeType={settings.returnsRestockingFeeType}
+          returnsWindowDays={settings.returnsWindowDays}
+        />
+      </DashboardPanel>
+    );
+  }
+
   if (section === "whatsapp-ordering") {
     return (
       <DashboardPanel
@@ -574,7 +611,7 @@ function SettingsSection({
           <LayersIcon className="size-5 text-admin-primary" />
           <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
             PayFast mode, Courier Guy credentials, WhatsApp ordering credentials,
-            Google tags, media limits, compression defaults, storage
+            returns policy values, Google tags, media limits, compression defaults, storage
             allocations, footer details, and social links are shared platform settings used
             wherever those systems appear.
           </p>

@@ -30,9 +30,9 @@ import {
 } from "@/src/modules/marketplace/settings";
 import {
   createDeliveryInformationDocument,
+  createReturnsAndRefundsPolicy,
   createTermsAndConditionsDocument,
   privacyPolicy,
-  returnsAndRefundsPolicy,
   type PolicyDocument,
 } from "@/src/modules/marketplace/policies/documents";
 import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
@@ -3710,7 +3710,7 @@ function getRelevantPolicyFacts(
   }
 
   if (/\b(?:return|refund|cancel|cancellation|damaged|defective)\b/.test(normalizedQuestion)) {
-    relevantDocuments.push(returnsAndRefundsPolicy);
+    relevantDocuments.push(createReturnsAndRefundsPolicy(settings));
   }
 
   if (/\b(?:privacy|personal information|data|popia)\b/.test(normalizedQuestion)) {
