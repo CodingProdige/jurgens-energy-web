@@ -271,7 +271,7 @@ export async function ensureInvoiceForPaidOrder(
       legalName: information.legalName.trim(),
       phone: information.invoicePhone.trim(),
       tradingName: information.tradingName.trim(),
-      vatRegistrationNumber: information.vatRegistrationNumber.trim(),
+      vatRegistrationNumber: nullableText(information.vatRegistrationNumber),
     };
     const customerSnapshot: InvoiceCustomerSnapshot = {
       ...billingAddress,
@@ -456,7 +456,7 @@ export async function getInvoiceDocumentData(
       phone: issuer.phone,
       registrationNumber: issuer.companyRegistrationNumber ?? undefined,
       tradingName: issuer.tradingName,
-      vatNumber: issuer.vatRegistrationNumber,
+      vatNumber: issuer.vatRegistrationNumber?.trim() || undefined,
       website: env.APP_URL,
     },
     lines: lines.map((line) => ({

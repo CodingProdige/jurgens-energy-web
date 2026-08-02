@@ -447,7 +447,9 @@ export function SocialLinksForm({
 
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <div className="grid gap-2">
-            <Label htmlFor="contactPhonePrimary">Primary phone</Label>
+            <Label htmlFor="contactPhonePrimary">
+              Primary phone <span className="text-red-600">*</span>
+            </Label>
             <div className="relative">
               <PhoneIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
               <Input
@@ -457,6 +459,7 @@ export function SocialLinksForm({
                 autoComplete="tel"
                 defaultValue={contactPhonePrimary}
                 placeholder="Enter the public support number"
+                required
                 className="pl-10"
               />
             </div>
@@ -479,7 +482,9 @@ export function SocialLinksForm({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="contactEmail">Contact email</Label>
+            <Label htmlFor="contactEmail">
+              Contact email <span className="text-red-600">*</span>
+            </Label>
             <div className="relative">
               <MailCheckIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
               <Input
@@ -489,6 +494,7 @@ export function SocialLinksForm({
                 autoComplete="email"
                 defaultValue={contactEmail}
                 placeholder="Enter the public support email"
+                required
                 className="pl-10"
               />
             </div>
@@ -499,9 +505,9 @@ export function SocialLinksForm({
               Registered business address
             </p>
             <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Managed once under Business Information and used automatically
-              on the contact page, in the footer, policies, and structured
-              business data.
+              Managed once under Business Information. Public display is
+              controlled by the storefront registration details toggle on the
+              Business Information settings page.
             </p>
             <Link
               className="w-fit text-xs font-semibold text-[#ff5a1f] hover:underline"

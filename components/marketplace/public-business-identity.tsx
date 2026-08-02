@@ -12,6 +12,10 @@ function getIdentityLines(
   identity: PublicBusinessIdentity,
   showRegisteredAddress: boolean,
 ) {
+  if (!identity.registrationDetailsVisible) {
+    return [];
+  }
+
   const registeredAddress = showRegisteredAddress
     ? formatRegisteredAddress(identity)
     : null;

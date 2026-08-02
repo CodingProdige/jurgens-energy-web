@@ -131,17 +131,16 @@ const socialLinksSchema = z.object({
   contactEmail: z
     .string()
     .trim()
+    .min(1, "Enter the public support email address.")
     .max(180, "Contact email is too long.")
-    .refine(
-      (value) => !value || z.string().email().safeParse(value).success,
-      "Enter a valid contact email address.",
-    ),
+    .email("Enter a valid contact email address."),
   contactPhonePrimary: z
     .string()
     .trim()
+    .min(1, "Enter the public support phone number.")
     .max(80, "Primary phone number is too long.")
     .refine(
-      (value) => !value || /^[+()\d\s-]+$/.test(value),
+      (value) => /^[+()\d\s-]+$/.test(value),
       "Primary phone number can only contain digits, spaces, +, -, and brackets.",
     ),
   contactPhoneSecondary: z

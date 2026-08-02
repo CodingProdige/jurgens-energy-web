@@ -158,8 +158,7 @@ export function BusinessInformationForm({
             defaultValue={information.vatRegistrationNumber}
             id="vatRegistrationNumber"
             label="VAT registration number"
-            placeholder="10-digit VAT number"
-            required
+            placeholder="Optional 10-digit VAT number"
           />
           <Field
             autoComplete="email"
@@ -183,6 +182,25 @@ export function BusinessInformationForm({
           public details. If those fields are blank, the invoice contacts above
           are used as the customer-support fallback.
         </p>
+
+        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <Checkbox
+            defaultChecked={information.publicRegistrationDetailsEnabled}
+            id="publicRegistrationDetailsEnabled"
+            name="publicRegistrationDetailsEnabled"
+          />
+          <div>
+            <Label htmlFor="publicRegistrationDetailsEnabled">
+              Show business registration details on the storefront
+            </Label>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
+              Controls the public legal name, company registration number, VAT
+              number, and registered address in the footer, contact/support
+              pages, policy pages, and structured data. Customer support email
+              and phone numbers stay public.
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-5 border-t border-slate-200 pt-7 dark:border-white/10">
@@ -191,9 +209,9 @@ export function BusinessInformationForm({
             Registered business address
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-            Used automatically on VAT invoices, the contact page, footer,
-            policy disclosures, and structured business data. It is not
-            presented as a walk-in shop or returns counter.
+            Used automatically on VAT invoices. Public display on the contact
+            page, footer, policy disclosures, and structured business data is
+            controlled by the storefront registration details toggle above.
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">

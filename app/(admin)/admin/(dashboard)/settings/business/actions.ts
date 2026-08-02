@@ -44,13 +44,17 @@ const businessInformationSchema = z
     legalName: z.string().trim().min(2).max(200),
     postalCode: z.string().trim().min(2).max(40),
     province: z.string().trim().min(2).max(120),
+    publicRegistrationDetailsEnabled: z.boolean(),
     suburb: optionalText(120),
     tradingName: z.string().trim().min(2).max(200),
     vatRegistrationNumber: z
       .string()
       .trim()
       .transform((value) => value.replace(/\s+/g, ""))
-      .refine((value) => /^\d{10}$/.test(value), "Enter a 10-digit VAT number."),
+      .refine(
+        (value) => value === "" || /^\d{10}$/.test(value),
+        "Enter a 10-digit VAT number, or leave VAT registration blank.",
+      ),
   })
   .superRefine((value, context) => {
     if (value.collectionAddressSameAsRegistered) {
@@ -137,6 +141,8 @@ export async function saveBusinessInformation(
     legalName: String(formData.get("legalName") ?? ""),
     postalCode: String(formData.get("postalCode") ?? ""),
     province: String(formData.get("province") ?? ""),
+    publicRegistrationDetailsEnabled:
+      formData.get("publicRegistrationDetailsEnabled") === "on",
     suburb: String(formData.get("suburb") ?? ""),
     tradingName: String(formData.get("tradingName") ?? ""),
     vatRegistrationNumber: String(
@@ -158,12 +164,17 @@ export async function saveBusinessInformation(
   revalidatePath("/settings/platform");
   revalidatePath("/checkout");
   revalidatePath("/about");
+  revalidatePath("/contact");
+  revalidatePath("/delivery-information");
+  revalidatePath("/privacy-policy");
+  revalidatePath("/returns-and-refunds");
+  revalidatePath("/support");
   revalidatePath("/terms-and-conditions");
   revalidatePath("/", "layout");
 
   return {
     message:
-      "Business, VAT, invoice, and courier collection information saved.",
+      "Business, invoice, public disclosure, VAT, and courier collection information saved.",
     ok: true,
   };
 }

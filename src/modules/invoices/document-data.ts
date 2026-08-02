@@ -71,7 +71,7 @@ export const invoiceDocumentDataSchema = z
       legalName: z.string().trim().min(1).max(200),
       tradingName: z.string().trim().min(1).max(200),
       registrationNumber: z.string().trim().min(1).max(120).optional(),
-      vatNumber: z.string().trim().min(1).max(120),
+      vatNumber: z.string().trim().min(1).max(120).optional(),
       address: postalAddressSchema,
       email: z.email().optional(),
       phone: z.string().trim().max(80).optional(),

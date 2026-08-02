@@ -32,7 +32,7 @@ export type InvoiceIssuerSnapshot = InvoiceAddressSnapshot & {
   legalName: string;
   phone: string;
   tradingName: string;
-  vatRegistrationNumber: string;
+  vatRegistrationNumber: string | null;
 };
 
 export type InvoiceCustomerSnapshot = InvoiceAddressSnapshot & {
@@ -67,6 +67,11 @@ export const businessInformation = pgTable("business_information", {
   companyRegistrationNumber: varchar("company_registration_number", {
     length: 80,
   }),
+  publicRegistrationDetailsEnabled: boolean(
+    "public_registration_details_enabled",
+  )
+    .notNull()
+    .default(true),
   vatRegistrationNumber: varchar("vat_registration_number", { length: 80 })
     .notNull()
     .default(""),

@@ -18,6 +18,7 @@ const business = {
   legalName: "Jurgens Energy (Pty) Ltd",
   postalCode: "8001",
   province: "Western Cape",
+  publicRegistrationDetailsEnabled: true,
   suburb: "Gardens",
   tradingName: "Jurgens Energy",
   vatRegistrationNumber: "4123456789",
@@ -71,6 +72,28 @@ test("falls back to Business Information when support settings are empty", () =>
 
   assert.equal(details.email, "accounts@example.com");
   assert.deepEqual(details.phoneNumbers, ["082 000 0000"]);
+});
+
+test("hides registration details without hiding support channels", () => {
+  const details = createCustomerSupportContactDetails({
+    business: {
+      ...business,
+      publicRegistrationDetailsEnabled: false,
+    },
+    settings: {
+      contactEmail: "help@example.com",
+      contactPhonePrimary: "+27 82 123 4567",
+      contactPhoneSecondary: "",
+      whatsappBusinessPhoneNumber: null,
+    },
+  });
+
+  assert.equal(details.businessAddress, null);
+  assert.equal(details.companyRegistrationNumber, null);
+  assert.equal(details.legalName, null);
+  assert.equal(details.vatRegistrationNumber, null);
+  assert.equal(details.email, "help@example.com");
+  assert.deepEqual(details.phoneNumbers, ["+27 82 123 4567"]);
 });
 
 test("does not repeat the same voice and WhatsApp phone in a contact sentence", () => {

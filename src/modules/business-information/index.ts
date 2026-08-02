@@ -22,6 +22,7 @@ export type PublicBusinessIdentity = {
   companyRegistrationNumber: string | null;
   legalName: string | null;
   registeredAddress: PublicRegisteredAddress | null;
+  registrationDetailsVisible: boolean;
   tradingName: string;
   tradingNameDisclosure: string | null;
   vatRegistrationNumber: string | null;
@@ -50,6 +51,7 @@ const defaultBusinessInformation: BusinessInformation = {
   legalName: "",
   postalCode: "",
   province: "",
+  publicRegistrationDetailsEnabled: true,
   suburb: null,
   tradingName: "Jurgens Energy",
   updatedAt: new Date(0),
@@ -82,6 +84,7 @@ export const getPublicBusinessIdentity = cache(
   async (): Promise<PublicBusinessIdentity> => {
     const row = await getBusinessInformation();
     const tradingName = row.tradingName.trim() || "Jurgens Energy";
+    const registrationDetailsVisible = row.publicRegistrationDetailsEnabled;
     const legalName = row.legalName.trim();
     const legalNameDiffers = Boolean(
       legalName &&
@@ -107,15 +110,19 @@ export const getPublicBusinessIdentity = cache(
         : null;
 
     return {
-      companyRegistrationNumber:
-        row.companyRegistrationNumber?.trim() || null,
-      legalName: legalName || null,
-      registeredAddress,
+      companyRegistrationNumber: registrationDetailsVisible
+        ? row.companyRegistrationNumber?.trim() || null
+        : null,
+      legalName: registrationDetailsVisible ? legalName || null : null,
+      registeredAddress: registrationDetailsVisible ? registeredAddress : null,
+      registrationDetailsVisible,
       tradingName,
-      tradingNameDisclosure: legalNameDiffers
+      tradingNameDisclosure: registrationDetailsVisible && legalNameDiffers
         ? `${tradingName} is a trading name of ${legalName}.`
         : null,
-      vatRegistrationNumber: row.vatRegistrationNumber.trim() || null,
+      vatRegistrationNumber: registrationDetailsVisible
+        ? row.vatRegistrationNumber.trim() || null
+        : null,
     };
   },
 );
@@ -159,6 +166,8 @@ export async function updateBusinessInformation(
           input.collectionAddressSameAsRegistered,
         invoiceEmail: input.invoiceEmail,
         legalName: input.legalName,
+        publicRegistrationDetailsEnabled:
+          input.publicRegistrationDetailsEnabled,
         tradingName: input.tradingName,
       }),
     });
@@ -173,7 +182,6 @@ export function isInvoiceBusinessInformationReady(
   return Boolean(
     information.legalName.trim() &&
       information.tradingName.trim() &&
-      information.vatRegistrationNumber.trim() &&
       information.invoiceEmail.trim() &&
       information.invoicePhone.trim() &&
       information.addressLine1.trim() &&

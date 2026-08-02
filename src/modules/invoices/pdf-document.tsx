@@ -391,7 +391,9 @@ function InvoiceDocument({ data }: { data: InvoiceDocumentData }) {
                 Registration: {data.issuer.registrationNumber}
               </Text>
             ) : null}
-            <Text style={styles.secondary}>VAT: {data.issuer.vatNumber}</Text>
+            {data.issuer.vatNumber ? (
+              <Text style={styles.secondary}>VAT: {data.issuer.vatNumber}</Text>
+            ) : null}
             <AddressBlock address={data.issuer.address} />
             {data.issuer.email ? (
               <Text style={styles.secondary}>{data.issuer.email}</Text>
@@ -555,7 +557,9 @@ function InvoiceDocument({ data }: { data: InvoiceDocumentData }) {
 
         <View style={styles.footer} fixed>
           <Text>
-            {data.issuer.tradingName} · VAT {data.issuer.vatNumber} · Invoice {data.invoiceNumber}
+            {data.issuer.tradingName}
+            {data.issuer.vatNumber ? ` · VAT ${data.issuer.vatNumber}` : ""} ·
+            Invoice {data.invoiceNumber}
           </Text>
           <Text
             render={({ pageNumber, totalPages }) =>

@@ -383,7 +383,9 @@ function CreditNoteDocument({ data }: { data: CreditNoteDocumentData }) {
                 Registration: {data.issuer.registrationNumber}
               </Text>
             ) : null}
-            <Text style={styles.secondary}>VAT: {data.issuer.vatNumber}</Text>
+            {data.issuer.vatNumber ? (
+              <Text style={styles.secondary}>VAT: {data.issuer.vatNumber}</Text>
+            ) : null}
             <AddressBlock address={data.issuer.address} />
             {data.issuer.email ? (
               <Text style={styles.secondary}>{data.issuer.email}</Text>
@@ -543,7 +545,9 @@ function CreditNoteDocument({ data }: { data: CreditNoteDocumentData }) {
 
         <View style={styles.footer} fixed>
           <Text>
-            {data.issuer.tradingName} · VAT {data.issuer.vatNumber} · Credit note {data.creditNoteNumber}
+            {data.issuer.tradingName}
+            {data.issuer.vatNumber ? ` · VAT ${data.issuer.vatNumber}` : ""} ·
+            Credit note {data.creditNoteNumber}
           </Text>
           <Text
             render={({ pageNumber, totalPages }) =>

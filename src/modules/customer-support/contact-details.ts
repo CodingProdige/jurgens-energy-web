@@ -15,6 +15,7 @@ type CustomerSupportBusinessInformation = Pick<
   | "legalName"
   | "postalCode"
   | "province"
+  | "publicRegistrationDetailsEnabled"
   | "suburb"
   | "tradingName"
   | "vatRegistrationNumber"
@@ -84,25 +85,33 @@ export function createCustomerSupportContactDetails({
   const configuredWhatsappPhone = cleanOptionalValue(
     settings.whatsappBusinessPhoneNumber,
   );
+  const registrationDetailsVisible =
+    business.publicRegistrationDetailsEnabled;
 
   return {
-    businessAddress: formatCustomerSupportBusinessAddress(business),
+    businessAddress: registrationDetailsVisible
+      ? formatCustomerSupportBusinessAddress(business)
+      : null,
     businessName:
       cleanOptionalValue(business.tradingName) ??
       cleanOptionalValue(business.legalName) ??
       "Jurgens Energy",
-    companyRegistrationNumber: cleanOptionalValue(
-      business.companyRegistrationNumber,
-    ),
+    companyRegistrationNumber: registrationDetailsVisible
+      ? cleanOptionalValue(business.companyRegistrationNumber)
+      : null,
     email:
       cleanOptionalValue(settings.contactEmail) ??
       cleanOptionalValue(business.invoiceEmail),
-    legalName: cleanOptionalValue(business.legalName),
+    legalName: registrationDetailsVisible
+      ? cleanOptionalValue(business.legalName)
+      : null,
     phoneNumbers:
       configuredPhoneNumbers.length > 0
         ? configuredPhoneNumbers
         : uniqueValues([business.invoicePhone]),
-    vatRegistrationNumber: cleanOptionalValue(business.vatRegistrationNumber),
+    vatRegistrationNumber: registrationDetailsVisible
+      ? cleanOptionalValue(business.vatRegistrationNumber)
+      : null,
     whatsappPhone: configuredWhatsappPhone
       ? normalizePhoneNumber(configuredWhatsappPhone, {
           defaultCountryCode: "ZA",

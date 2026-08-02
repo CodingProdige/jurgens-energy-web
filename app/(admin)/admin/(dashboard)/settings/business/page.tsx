@@ -11,7 +11,8 @@ import { BusinessInformationForm } from "@/app/(admin)/admin/(dashboard)/setting
 
 export const metadata: Metadata = {
   title: "Business Information",
-  description: "Manage the legal, VAT, invoice, and courier identity of Jurgens Energy.",
+  description:
+    "Manage the legal, invoice, public disclosure, optional VAT, and courier identity of Jurgens Energy.",
   robots: { follow: false, index: false },
 };
 
@@ -39,16 +40,17 @@ export default async function BusinessInformationPage() {
           Business information
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-zinc-300">
-          Control the registered business, VAT, invoice, and courier collection
-          information used throughout the storefront, checkout, shipping, and
-          customer documents.
+          Control the registered business, invoice, public disclosure,
+          optional VAT, and courier collection information used throughout the
+          storefront, checkout, shipping, and customer documents.
         </p>
       </div>
 
       {!invoiceReady ? (
         <div className="mb-5 rounded-xl border border-amber-400/35 bg-amber-400/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
-          Complete the legal name, VAT number, contact details, and registered
-          address before automatic VAT invoices can be issued.
+          Complete the legal name, invoice contact details, and registered
+          address before automatic invoices can be issued. VAT registration is
+          optional.
         </div>
       ) : null}
 
