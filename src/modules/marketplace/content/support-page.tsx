@@ -40,7 +40,7 @@ const supportTopics = [
   },
   {
     description:
-      "Review South Africa delivery timing, fees, address eligibility and order handover information.",
+      "Review South Africa delivery timing, fees, product handling and order handover information.",
     href: "/delivery-information",
     icon: TruckIcon,
     title: "Delivery",

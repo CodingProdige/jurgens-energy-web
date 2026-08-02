@@ -8,14 +8,14 @@ import {
 
 export const marketplaceTrustItems = [
   {
-    description: "Eligibility checks apply",
+    description: "Handled with care",
     icon: ShieldCheckIcon,
     title: "Safety-First Handling",
   },
   {
-    description: "Confirmed at checkout",
+    description: "Nationwide across South Africa",
     icon: TruckIcon,
-    title: "Delivery Availability",
+    title: "Nationwide Delivery",
   },
   {
     description: "Payment, invoice & delivery",
@@ -30,6 +30,6 @@ export const marketplaceTrustItems = [
   {
     description: "Options shown at checkout",
     icon: PackageCheckIcon,
-    title: "Product Delivery",
+    title: "Final Delivery Details",
   },
 ] as const;

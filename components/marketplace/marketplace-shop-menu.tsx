@@ -433,7 +433,7 @@ export function MarketplaceShopMenu({
                   </li>
                   <li className="flex gap-2.5">
                     <TruckIcon className="size-4 shrink-0 text-[#ff5a1f]" />
-                    Delivery eligibility confirmed at checkout
+                    Nationwide delivery across South Africa
                   </li>
                   <li className="flex gap-2.5">
                     <HeadphonesIcon className="size-4 shrink-0 text-[#ff5a1f]" />

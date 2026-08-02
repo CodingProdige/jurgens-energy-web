@@ -264,7 +264,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
         },
       ],
       copy:
-        "Jurgens Energy brings practical home, energy, appliance and lifestyle products into one simple online store, with clear pricing, secure checkout and delivery to eligible addresses across South Africa.",
+        "Jurgens Energy is a South African online store for practical home, energy, appliance and lifestyle products, with clear product details, secure checkout and straightforward customer support.",
       heading:
         "Shop home, energy and lifestyle products online.",
       headingSize: 52,
@@ -433,7 +433,7 @@ export const defaultStorefrontSections: StorefrontSection[] = [
         },
         {
           icon: "certified",
-          text: "Cylinder eligibility and handover checks apply where required.",
+          text: "Cylinder handover checks apply where required.",
           title: "Safety-first handling",
         },
         {

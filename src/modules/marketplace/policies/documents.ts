@@ -204,7 +204,7 @@ export const termsAndConditions: PolicyDocument = {
   sections: [
     {
       id: "agreement",
-      title: "1. Agreement and eligibility",
+      title: "1. Agreement and use of the store",
       paragraphs: [
         "These terms apply when you browse or use the Jurgens Energy online store, create an account, place an order, or order through a connected channel such as WhatsApp. By completing an order, you agree to these terms and the policies linked from this page.",
         "You must be at least 18 years old, have legal capacity to transact, and provide accurate information. If you order for a business or another person, you confirm that you are authorised to bind or act for them.",
@@ -247,13 +247,13 @@ export const termsAndConditions: PolicyDocument = {
       id: "delivery",
       title: "6. Shipping and delivery",
       paragraphs: [
-        "Courier-eligible products can be delivered nationwide to eligible addresses within South Africa. Products marked for Jurgens delivery are available only when the delivery postcode falls within an active Jurgens service area. Checkout cross-references the selected products and complete address before payment.",
-        "Checkout applies the published VAT-inclusive standard delivery fee to eligible orders. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
+        "Products set up for courier delivery can be delivered nationwide within South Africa. Products marked for Jurgens delivery use active Jurgens service-area postcodes. Checkout cross-references the selected products and complete address before payment.",
+        "Checkout applies the published VAT-inclusive standard delivery fee to each order. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
         "Our handling time is 0–1 business day after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched that day. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.",
-        "Eligible orders are normally delivered within 1–4 business days after payment confirmation. This published window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.",
+        "Orders are normally delivered within 1–4 business days after payment confirmation. This published window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.",
         "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
         "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
-        "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the eligible empty cylinder at the delivery handover.",
+        "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the matching empty cylinder at the delivery handover.",
       ],
     },
     {
@@ -262,7 +262,7 @@ export const termsAndConditions: PolicyDocument = {
       paragraphs: [
         "LPG is hazardous if stored, transported, installed, or used incorrectly. Follow the product instructions and applicable safety rules, keep cylinders upright in a well-ventilated place away from ignition sources, and use a suitably qualified registered gas installer where installation is required.",
         "For an exchange order, you must make the correct empty cylinder available at handover. The cylinder must meet the size, type and condition requirements shown with the product or confirmed before fulfilment, and it must be safe to handle.",
-        "We or a fulfilment partner may refuse to collect or exchange a cylinder that appears unsafe, damaged, modified, illegally filled, leaking, or otherwise ineligible. Never refill, tamper with, vent, or repair a cylinder yourself. If you smell gas or suspect a leak, move away from ignition sources, follow emergency safety guidance, and contact the appropriate emergency or qualified gas service rather than using ordinary customer-support messaging as an emergency service.",
+        "We or a fulfilment partner may refuse to collect or exchange a cylinder that appears unsafe, damaged, modified, illegally filled, leaking, or otherwise cannot be accepted. Never refill, tamper with, vent, or repair a cylinder yourself. If you smell gas or suspect a leak, move away from ignition sources, follow emergency safety guidance, and contact the appropriate emergency or qualified gas service rather than using ordinary customer-support messaging as an emergency service.",
       ],
     },
     {
@@ -350,13 +350,13 @@ export function createTermsAndConditionsDocument(
         ? {
             ...section,
             paragraphs: [
-              "Courier-eligible products can be delivered nationwide to eligible addresses within South Africa. Products marked for Jurgens delivery are available only when the delivery postcode falls within an active Jurgens service area. Checkout cross-references the selected products and complete address before payment.",
+              "Products set up for courier delivery can be delivered nationwide within South Africa. Products marked for Jurgens delivery use active Jurgens service-area postcodes. Checkout cross-references the selected products and complete address before payment.",
               deliveryFeeDescription,
               `Our handling time is ${handlingTimingLabel} after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched within that window. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.`,
               `${deliveryTimingDescription} This published window includes handling and transit time.`,
               "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and LPG safety requirements can affect timing. We will communicate a material delay and explain the available next step.",
               "You must provide a complete, accessible address and a working telephone number, and ensure that an authorised adult can receive the order. Products remain at our risk until accepted at the agreed delivery point, subject to applicable law. Additional delivery attempts or address changes may carry a disclosed reasonable charge where the failed delivery was caused by incorrect information or unavailable access.",
-              "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the eligible empty cylinder at the delivery handover.",
+              "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. A cylinder exchange still includes collection of the matching empty cylinder at the delivery handover.",
             ],
           }
         : section,
@@ -366,7 +366,7 @@ export function createTermsAndConditionsDocument(
 
 export const returnsAndRefundsPolicy: PolicyDocument = {
   description:
-    "Eligible online orders have cooling-off rights, and eligible goods may qualify for the published store-return option. This policy explains return conditions, costs, exchanges, and refunds.",
+    "Online orders have cooling-off rights where the law applies, and qualifying goods may use the published store-return option. This policy explains return conditions, costs, exchanges, and refunds.",
   eyebrow: "Order resolutions",
   kind: "returns",
   shortTitle: "Returns & Refunds Policy",
@@ -393,7 +393,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       title: "3. Cooling-off and store returns",
       paragraphs: [
         "Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within the applicable statutory period after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.",
-        "Separately, Jurgens Energy accepts eligible goods for a voluntary change-of-mind return when you contact us within the published return window after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.",
+        "Separately, Jurgens Energy accepts qualifying goods for a voluntary change-of-mind return when you contact us within the published return window after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.",
         "Contact us within the return window so that we can authorise the return courier or safe collection. Product-safety rules may affect the return method, but this policy does not limit rights relating to an incorrect, unsafe, or defective product or another right provided by law.",
       ],
     },
@@ -426,8 +426,8 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       id: "cylinder-exchanges",
       title: "7. Cylinder-exchange orders",
       paragraphs: [
-        "An exchange price assumes that an eligible empty cylinder is available for collection at the same handover. Cylinder size, type and condition may affect eligibility. A driver or fulfilment partner may refuse a leaking, modified, severely damaged, illegally filled, or otherwise unsafe cylinder.",
-        "If the requested exchange cannot be completed, we will explain the available options, which may include correcting the order, paying the disclosed difference for another eligible option, rescheduling, or cancelling the affected item. If the delivered cylinder appears unsafe or incorrect, do not use it and contact us promptly for an inspection and appropriate remedy.",
+        "An exchange price assumes that the matching empty cylinder is available for collection at the same handover. Cylinder size, type and condition may affect whether it can be accepted. A driver or fulfilment partner may refuse a leaking, modified, severely damaged, illegally filled, or otherwise unsafe cylinder.",
+        "If the requested exchange cannot be completed, we will explain the available options, which may include correcting the order, paying the disclosed difference for another accepted option, rescheduling, or cancelling the affected item. If the delivered cylinder appears unsafe or incorrect, do not use it and contact us promptly for an inspection and appropriate remedy.",
       ],
     },
     {
@@ -443,7 +443,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       id: "costs",
       title: "9. Return and collection costs",
       paragraphs: [
-        "For an eligible change-of-mind return, including an eligible ECTA cooling-off cancellation, the customer pays the direct return courier or approved collection cost. We do not charge a restocking fee for an approved return or exchange.",
+        "For a qualifying change-of-mind return, including an ECTA cooling-off cancellation where the law applies, the customer pays the direct return courier or approved collection cost. We do not charge a restocking fee for an approved return or exchange.",
         "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, unsafe, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
       ],
     },
@@ -451,7 +451,7 @@ export const returnsAndRefundsPolicy: PolicyDocument = {
       id: "refunds",
       title: "10. Refund timing and method",
       paragraphs: [
-        "For an eligible ECTA cooling-off cancellation, we refund the payments received within 30 days after cancellation. For another approved refund, we initiate payment promptly and within the deadline required by applicable law, using the original payment method where reasonably possible. Your bank or payment provider may take additional time to reflect an initiated refund. We may request verified bank details if the original method cannot receive it.",
+        "For an ECTA cooling-off cancellation where the law applies, we refund the payments received within 30 days after cancellation. For another approved refund, we initiate payment promptly and within the deadline required by applicable law, using the original payment method where reasonably possible. Your bank or payment provider may take additional time to reflect an initiated refund. We may request verified bank details if the original method cannot receive it.",
         "The refunded amount includes product and delivery charges where required by law. For other approved returns, original delivery or completed service charges may be excluded where lawful and disclosed. We will provide a clear calculation if a deduction is permitted.",
       ],
     },
@@ -483,7 +483,7 @@ export function createReturnsAndRefundsPolicy(
   const acceptsDefectiveOnly =
     settings.returnsAcceptance === "defective_only";
   const exchangePolicy = settings.returnsExchangesEnabled
-    ? "Eligible exchanges are accepted when the product condition, safety rules, stock availability, and applicable law allow it. Any exchange must be authorised before the item is handed over."
+    ? "Exchanges are accepted when the product condition, safety rules, stock availability, and applicable law allow it. Any exchange must be authorised before the item is handed over."
     : "Exchanges are not currently offered unless required by law or expressly authorised for the specific order.";
   const hazardousReturnNote = settings.returnsHazardousGoodsNoteEnabled
     ? "LPG, filled cylinders, and other hazardous items are accepted only through a pre-authorised collection that follows the applicable safety rules; they must never be sent through ordinary mail."
@@ -500,7 +500,7 @@ export function createReturnsAndRefundsPolicy(
           paragraphs: [
             `Where section 44 of the Electronic Communications and Transactions Act applies, you may cancel without giving a reason within ${returnWindowLabel} after receiving the goods, subject to the Act's statutory exclusions. We do not impose a cancellation penalty; you pay only the direct return cost permitted by law.`,
             acceptsChangeOfMind
-              ? `Separately, Jurgens Energy accepts eligible ${conditionLabel} for a voluntary change-of-mind return when you contact us within ${returnWindowLabel} after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.`
+              ? `Separately, Jurgens Energy accepts qualifying ${conditionLabel} for a voluntary change-of-mind return when you contact us within ${returnWindowLabel} after receiving them. Keep those goods unused, undamaged, complete, safely stored, and in their original resaleable packaging where reasonably applicable.`
               : acceptsDefectiveOnly
                 ? "Voluntary change-of-mind returns are not accepted unless required by law. Incorrect, damaged, unsafe, or defective products remain covered by applicable statutory remedies."
                 : "Voluntary returns are not accepted unless required by law. Incorrect, damaged, unsafe, or defective products remain covered by applicable statutory remedies.",
@@ -549,7 +549,7 @@ export function createReturnsAndRefundsPolicy(
           ...section,
           paragraphs: [
             acceptsChangeOfMind
-              ? `For an eligible change-of-mind return, including an eligible ECTA cooling-off cancellation, ${returnLabelResponsibility}. ${restockingFeeLabel}`
+              ? `For a qualifying change-of-mind return, including an ECTA cooling-off cancellation where the law applies, ${returnLabelResponsibility}. ${restockingFeeLabel}`
               : `${restockingFeeLabel} Return costs are assessed according to the approved reason and applicable law.`,
             "Jurgens Energy covers qualifying return transport for verified incorrect deliveries and qualifying damaged, unsafe, failed, or defective goods where applicable law requires the supplier to bear that risk and expense. We will disclose any customer-paid return cost before arranging the return and will not charge an amount prohibited by law.",
           ],
@@ -560,7 +560,7 @@ export function createReturnsAndRefundsPolicy(
         return {
           ...section,
           paragraphs: [
-            `For an eligible ECTA cooling-off cancellation, we refund the payments received within 30 days after cancellation. For another approved refund, we process it within ${refundProcessingLabel} after approval or inspection, using the original payment method where reasonably possible. Your bank or payment provider may take additional time to reflect an initiated refund. We may request verified bank details if the original method cannot receive it.`,
+            `For an ECTA cooling-off cancellation where the law applies, we refund the payments received within 30 days after cancellation. For another approved refund, we process it within ${refundProcessingLabel} after approval or inspection, using the original payment method where reasonably possible. Your bank or payment provider may take additional time to reflect an initiated refund. We may request verified bank details if the original method cannot receive it.`,
             "The refunded amount includes product and delivery charges where required by law. For other approved returns, original delivery or completed service charges may be excluded where lawful and disclosed. We will provide a clear calculation if a deduction is permitted.",
           ],
         };
@@ -573,7 +573,7 @@ export function createReturnsAndRefundsPolicy(
 
 export const deliveryInformation: PolicyDocument = {
   description:
-    "This policy explains delivery coverage, fees, timing, safe handover and support for eligible South African orders.",
+    "This policy explains delivery coverage, fees, timing, safe handover and support for South African orders.",
   eyebrow: "Getting your order",
   kind: "delivery",
   shortTitle: "Shipping & Delivery Policy",
@@ -583,18 +583,18 @@ export const deliveryInformation: PolicyDocument = {
       id: "coverage",
       title: "1. Where we deliver",
       paragraphs: [
-        "Courier-eligible products can be delivered nationwide to eligible addresses in South Africa. We do not offer international shipping.",
-        "Products marked for Jurgens delivery use active postcode service areas. Those areas confirm Jurgens delivery eligibility only; they do not change the customer delivery fee.",
-        "Enter a complete South African delivery address, postcode and working telephone number at checkout, or provide them during an assisted order. Checkout confirms delivery availability before payment.",
+        "Products set up for courier delivery can be delivered nationwide within South Africa. We do not offer international shipping.",
+        "Products marked for Jurgens delivery use active Jurgens service-area postcodes. Those service areas do not change the customer delivery fee.",
+        "Enter a complete South African delivery address, postcode and working telephone number at checkout, or provide them during an assisted order. Checkout shows the final delivery option before payment.",
         "If a legal, safety, stock, or transport constraint means we cannot complete the delivery, we will contact you about a practical alternative or cancellation and refund of the affected order.",
-        "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. Cylinder exchanges take place at the delivery handover when the eligible empty cylinder is collected.",
+        "Jurgens Energy is an online-only store. We do not operate a public walk-in shop, customer collection point, or returns counter. Cylinder exchanges take place at the delivery handover when the matching empty cylinder is collected.",
       ],
     },
     {
       id: "fees",
       title: "2. Delivery fee and free delivery",
       paragraphs: [
-        "Checkout applies the published VAT-inclusive standard delivery fee to eligible orders.",
+        "Checkout applies the published VAT-inclusive standard delivery fee to each order.",
         "If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
       ],
     },
@@ -619,7 +619,7 @@ export const deliveryInformation: PolicyDocument = {
         "An authorised adult must be available to receive and inspect the order.",
         "Secure pets and clear a safe path to the handover point.",
         "Tell us before dispatch about access controls, estates, stairs, restricted roads, loading rules, or other material access conditions.",
-        "For an exchange, disconnect the eligible empty cylinder safely and have it upright and ready in a ventilated place accessible to the delivery team.",
+        "For an exchange, disconnect the matching empty cylinder safely and have it upright and ready in a ventilated place accessible to the delivery team.",
         "Do not present a leaking, modified, illegally filled, or unsafe cylinder for exchange.",
       ],
     },
@@ -628,7 +628,7 @@ export const deliveryInformation: PolicyDocument = {
       title: "5. LPG and cylinder handover",
       paragraphs: [
         "LPG orders require safe handling. Cylinders must remain upright, secured, and away from ignition sources. A delivery representative may pause or refuse a handover where access, storage, the receiving environment, or an exchange cylinder creates a material safety risk.",
-        "A cylinder exchange is completed only when the correct eligible empty cylinder is handed over. Exchange rules may consider size, type and condition. If the empty cylinder is not eligible, we will explain the available correction, price difference, reschedule, or cancellation options.",
+        "A cylinder exchange is completed only when the correct matching empty cylinder is handed over. Exchange rules may consider size, type and condition. If the empty cylinder cannot be accepted, we will explain the available correction, price difference, reschedule, or cancellation options.",
         "Delivery does not include appliance installation or connection unless that service is expressly listed and confirmed. Work that legally requires a registered gas installer must be performed by a suitably qualified registered person.",
       ],
     },
@@ -644,7 +644,7 @@ export const deliveryInformation: PolicyDocument = {
       id: "missed-delivery",
       title: "7. Missed or unsuccessful delivery",
       paragraphs: [
-        "A delivery may be unsuccessful if nobody is available, the address or contact details are incorrect, access is unsafe or blocked, required authorisation is missing, or an exchange cylinder is unavailable or ineligible.",
+        "A delivery may be unsuccessful if nobody is available, the address or contact details are incorrect, access is unsafe or blocked, required authorisation is missing, or an exchange cylinder is unavailable or cannot be accepted.",
         "We will contact you about redelivery, order correction, or cancellation. A reasonable additional delivery-attempt charge may apply where the failure was caused by incorrect customer information or unavailable access, but it will be disclosed before the next attempt and applied only where lawful.",
       ],
     },
@@ -690,7 +690,7 @@ export function createDeliveryInformationDocument(
     ...deliveryInformation,
     description: deliveryTimingDescription.replace(
       /^Delivery/,
-      "Eligible South Africa delivery",
+      "South Africa delivery",
     ),
     sections: deliveryInformation.sections.map((section) => {
       if (section.id === "fees") {

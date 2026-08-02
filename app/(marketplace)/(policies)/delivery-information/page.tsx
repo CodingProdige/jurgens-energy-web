@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getMarketplaceSettings();
 
   return getStaticPageMetadata("delivery-information", {
-    description: `Read our South Africa Shipping & Delivery Policy. ${getPublicDeliveryTimingDescription(settings)} Review fees, address eligibility and handling.`,
+    description: `Read our South Africa Shipping & Delivery Policy. ${getPublicDeliveryTimingDescription(settings)} Review fees, product handling and delivery support.`,
   });
 }
 

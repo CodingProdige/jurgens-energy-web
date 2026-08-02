@@ -907,8 +907,8 @@ export function GoogleMarketingSettingsForm({
             </h3>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
               Merchant Center can fetch the primary online product feed below.
-              Delivery eligibility and pricing continue to be calculated from
-              the customer&apos;s checkout address.
+              Delivery availability and pricing continue to be calculated from
+              the customer&apos;s checkout details.
             </p>
           </div>
         </div>
@@ -1070,7 +1070,7 @@ export function GooglePlacesSettingsForm({
         </div>
         <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
           Address suggestions are limited to South Africa. The selected result
-          assists data entry; the normal checkout and delivery eligibility
+          assists data entry; the normal checkout and delivery availability
           validation remains the source of truth.
         </p>
       </div>

@@ -28,7 +28,7 @@ export type StaticSeoPageRegistryEntry = {
 export const STATIC_SEO_PAGE_REGISTRY = {
   home: {
     defaultDescription:
-      "Shop home, energy, outdoor, appliance and lifestyle products with Jurgens Energy. Delivery is available throughout South Africa and confirmed at checkout.",
+      "Shop home, energy, outdoor, appliance and lifestyle products with Jurgens Energy. Delivery is available throughout South Africa, with final delivery details shown before payment.",
     defaultTitle: "South African Online Store",
     key: "home",
     label: "Homepage",
@@ -68,7 +68,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   about: {
     defaultDescription:
-      "Jurgens Energy is a South African online store. Customers can shop and pay online, with delivery eligibility confirmed at checkout.",
+      "Jurgens Energy is a South African online store. Customers can shop and pay online, with delivery available throughout South Africa.",
     defaultTitle: "About Jurgens Energy",
     key: "about",
     label: "About us",
@@ -98,13 +98,13 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "lpg-delivery": {
     defaultDescription:
-      "Shop online for delivery to eligible South African addresses. Checkout confirms delivery timing, fees and product-specific requirements.",
+      "Shop online for nationwide delivery across South Africa. Checkout shows delivery timing, fees and product-specific requirements before payment.",
     defaultTitle: "Delivery in South Africa",
     key: "lpg-delivery",
     label: "LPG delivery",
     path: "/lpg-delivery",
     scanFocus:
-      "The online ordering flow, checkout-confirmed delivery to eligible South African addresses, published timing, shipping costs and product-specific handover requirements.",
+      "The online ordering flow, checkout-confirmed South African delivery, published timing, shipping costs and product-specific handover requirements.",
   },
   "lpg-safety": {
     defaultDescription:
@@ -118,7 +118,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
   },
   "delivery-information": {
     defaultDescription:
-      "Read our South Africa Shipping & Delivery Policy for current delivery timing, fees, address eligibility, order handling and delivery support.",
+      "Read our South Africa Shipping & Delivery Policy for current delivery timing, fees, order handling and delivery support.",
     defaultTitle: "Shipping & Delivery Policy",
     key: "delivery-information",
     label: "Shipping & delivery policy",
@@ -144,7 +144,7 @@ export const STATIC_SEO_PAGE_REGISTRY = {
     label: "Returns & refunds policy",
     path: "/returns-and-refunds",
     scanFocus:
-      "A faithful summary of the live returns and refunds policy, including eligibility, the configured return period, courier fees and statutory remedies.",
+      "A faithful summary of the live returns and refunds policy, including return conditions, the configured return period, courier fees and statutory remedies.",
   },
   "terms-and-conditions": {
     defaultDescription:

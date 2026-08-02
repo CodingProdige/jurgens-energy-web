@@ -121,7 +121,7 @@ export function getPublicReturnsSummary(settings: PublicReturnsSettings) {
     return `Defective, damaged, unsafe, or incorrect goods can be returned under applicable law. Change-of-mind returns are not accepted unless required by law. ${getPublicRestockingFeeLabel(settings)}`;
   }
 
-  return `Eligible ${conditionLabel} can be returned within ${windowLabel} after delivery. The customer pays the return courier for change-of-mind returns. ${getPublicRestockingFeeLabel(settings)}`;
+  return `Qualifying ${conditionLabel} can be returned within ${windowLabel} after delivery. The customer pays the return courier for change-of-mind returns. ${getPublicRestockingFeeLabel(settings)}`;
 }
 
 export function getPublicReturnsFaqAnswer(settings: PublicReturnsSettings) {

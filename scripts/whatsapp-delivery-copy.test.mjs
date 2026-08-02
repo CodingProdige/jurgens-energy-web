@@ -11,18 +11,18 @@ const publicDeliveryCopySource = readFileSync(
   "utf8",
 );
 
-test("WhatsApp delivery replies distinguish national and Jurgens eligibility", () => {
+test("WhatsApp delivery replies distinguish national and Jurgens service-area coverage", () => {
   assert.doesNotMatch(
     whatsappServiceSource,
     /deliver(?:s|ing)? eligible (?:online-store )?orders within South Africa/i,
   );
   assert.match(
     whatsappServiceSource,
-    /Courier-eligible products can be delivered nationwide within South Africa\./,
+    /Products set up for courier delivery can be delivered nationwide within South Africa\./,
   );
   assert.match(
     whatsappServiceSource,
-    /Products marked for Jurgens delivery require an eligible delivery postcode\./,
+    /Products marked for Jurgens delivery use active Jurgens service-area postcodes\./,
   );
 });
 

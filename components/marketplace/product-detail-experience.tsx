@@ -131,7 +131,7 @@ const productPolicyLinks = [
 
 const exchangeSteps = [
   {
-    description: "Eligible exchange orders can be delivered to your address.",
+    description: "Exchange orders can be delivered to your address.",
     icon: TruckIcon,
   },
   {
@@ -2878,7 +2878,7 @@ function MobileConfidenceRows({
           ? "Jurgens Energy direct delivery."
           : deliveryDetail,
       icon: TruckIcon,
-      title: "Delivery confirmed at checkout",
+      title: "Delivery details before payment",
     },
     {
       detail: "PayFast secure card payments.",
@@ -2893,7 +2893,7 @@ function MobileConfidenceRows({
     ...(isExchangeSelected
       ? [
           {
-            detail: "An eligible empty cylinder is required at delivery.",
+            detail: "A matching empty cylinder is required at delivery.",
             icon: RefreshCcwIcon,
             title: "Empty cylinder required",
           },

@@ -335,7 +335,7 @@ function SettingsSection({
     return (
       <DashboardPanel
         title="Shipping"
-        description="Manage nationwide customer pricing, Jurgens delivery eligibility, and encrypted Courier Guy credentials."
+        description="Manage nationwide customer pricing, Jurgens delivery service areas, and encrypted Courier Guy credentials."
       >
         <NationwideShippingSettingsForm
           courierGuyDefaultServiceCode={

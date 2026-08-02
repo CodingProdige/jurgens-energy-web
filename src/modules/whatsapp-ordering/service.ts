@@ -105,8 +105,8 @@ const draftTtlMs = 60 * 60 * 1000;
 const publicProductStatuses = new Set(["active", "live"]);
 const southAfricaDeliveryFacts = [
   "Jurgens Energy is an online store.",
-  "Courier-eligible products can be delivered nationwide within South Africa.",
-  "Products marked for Jurgens delivery require an eligible delivery postcode.",
+  "Products set up for courier delivery can be delivered nationwide within South Africa.",
+  "Products marked for Jurgens delivery use active Jurgens service-area postcodes.",
   "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
 ] as const;
 const checkoutLinkExpiryLabel = "1 hour";
@@ -2101,10 +2101,10 @@ async function answerDeliveryAreas() {
   const settings = await getMarketplaceSettings();
 
   return [
-    "Delivery is available to eligible addresses within South Africa.",
+    "Nationwide delivery is available within South Africa.",
     ...getSouthAfricaDeliveryTimingFacts(settings),
     getPublicDeliveryFeeDescription(settings),
-    "Checkout confirms product delivery eligibility from the complete delivery address.",
+    "Checkout shows the final delivery option for the selected products and complete delivery address before payment.",
   ].join("\n");
 }
 
@@ -2112,7 +2112,7 @@ async function answerShippingRates() {
   const settings = await getMarketplaceSettings();
 
   return [
-    "Delivery is available to eligible addresses within South Africa.",
+    "Nationwide delivery is available within South Africa.",
     ...getSouthAfricaDeliveryTimingFacts(settings),
     getPublicDeliveryFeeDescription(settings),
   ].join("\n");
@@ -2142,7 +2142,7 @@ async function answerLocation() {
   const support = await getCustomerSupportContactDetails();
 
   return [
-    `${support.businessName} is a South African online store. Delivery is available to eligible addresses within South Africa and confirmed at checkout.`,
+    `${support.businessName} is a South African online store. Nationwide delivery is available within South Africa. Checkout shows the final delivery details before payment.`,
     support.businessAddress
       ? `Registered business address: ${support.businessAddress}`
       : null,
@@ -2922,10 +2922,10 @@ async function checkJurgensDeliveryInquiry({
   if (!postalCode) {
     const settings = await getMarketplaceSettings();
     const reply = [
-      "Delivery is available to eligible addresses within South Africa.",
+      "Nationwide delivery is available within South Africa.",
       ...getSouthAfricaDeliveryTimingFacts(settings),
       getPublicDeliveryFeeDescription(settings),
-      `Checkout confirms delivery eligibility for ${itemLabel} from the complete delivery address.`,
+      `Checkout shows the final delivery option for ${itemLabel} from the complete delivery address.`,
       nextStep,
     ]
       .filter(Boolean)
@@ -2962,7 +2962,7 @@ async function checkJurgensDeliveryInquiry({
     const settings = await getMarketplaceSettings();
     const reply = [
       `Yes — delivery is available for ${itemLabel} to the address you supplied.`,
-      "Delivery is available to eligible addresses within South Africa.",
+      "Nationwide delivery is available within South Africa.",
       ...getSouthAfricaDeliveryTimingFacts(settings),
       getPublicDeliveryFeeDescription(settings),
       nextStep,
@@ -2980,7 +2980,7 @@ async function checkJurgensDeliveryInquiry({
   if (availability.unavailableCode === "postal_code_unavailable") {
     const reply = [
       `I could not confirm delivery for ${itemLabel} to the address you supplied.`,
-      "Delivery is available to eligible addresses within South Africa; exact product eligibility is confirmed from the complete address at checkout.",
+      "Nationwide delivery is available within South Africa; checkout confirms the final delivery option for the selected products and complete address.",
       getUnavailableDeliveryNextStep(),
     ].join("\n");
 
@@ -3105,14 +3105,14 @@ async function checkNationwideCourierDeliveryInquiry({
   });
   const priceMessage =
     price.rule === "free_shipping_over"
-      ? `Delivery would be ${formatZarAmount(0)} for this item and quantity if the checkout subtotal remains eligible.`
+      ? `Delivery would be ${formatZarAmount(0)} for this item and quantity if the checkout subtotal still qualifies.`
       : `Standard delivery would be ${formatZarAmount(price.amount)}, VAT included.`;
   const thresholdMessage =
     price.freeOverAmount === null
       ? null
       : `Free delivery over ${formatZarAmount(price.freeOverAmount)}.`;
   const reply = [
-    `Yes — ${itemLabel} is courier-eligible for nationwide delivery to the South African address you supplied.`,
+    `Yes — ${itemLabel} can be sent by courier for nationwide delivery to the South African address you supplied.`,
     ...getSouthAfricaDeliveryTimingFacts(settings),
     priceMessage,
     thresholdMessage,
@@ -3686,7 +3686,7 @@ async function getWhatsappKnowledgeFacts(
         row.continueSellingOutOfStock || row.stockOnHand > 0
           ? "currently available to order"
           : "currently out of stock";
-      return `${row.brandName ? `${row.brandName} ` : ""}${row.productTitle}${variantLabel}: ${formatMoney(row.price)}, ${stock}, South Africa delivery available where eligible${row.requiresExchangeEmpty ? ", exchange requires an eligible empty cylinder handover" : ""}${row.categoryPath ? `, category ${row.categoryPath}` : ""}. ${row.shortDescription?.slice(0, 220) ?? ""} Product page: ${createStoreUrl(`/products/${row.productSlug}`)}`;
+      return `${row.brandName ? `${row.brandName} ` : ""}${row.productTitle}${variantLabel}: ${formatMoney(row.price)}, ${stock}, South Africa delivery available${row.requiresExchangeEmpty ? ", exchange requires a matching empty cylinder handover" : ""}${row.categoryPath ? `, category ${row.categoryPath}` : ""}. ${row.shortDescription?.slice(0, 220) ?? ""} Product page: ${createStoreUrl(`/products/${row.productSlug}`)}`;
     }),
   ].filter((fact): fact is string => Boolean(fact));
 
@@ -3774,7 +3774,7 @@ async function answerSupportQuestion({
           ? { grounded: true, media: [], reply: answer }
           : textReply([
               "Jurgens Energy is a South African online store for home, energy, outdoor, appliance and lifestyle products.",
-              "Delivery is available to eligible addresses within South Africa.",
+              "Nationwide delivery is available within South Africa.",
               ...getSouthAfricaDeliveryTimingFacts(settings),
               getPublicDeliveryFeeDescription(settings),
             ].join(" "));
@@ -3947,7 +3947,7 @@ async function checkDeliveryAreaForAgent(
       ...southAfricaDeliveryFacts,
       ...getSouthAfricaDeliveryTimingFacts(settings),
       getPublicDeliveryFeeDescription(settings),
-      "Checkout confirms product delivery eligibility from the customer's complete South African delivery address.",
+      "Checkout shows the final delivery option from the customer's complete South African delivery address.",
     ],
     status: "checkout_confirmation_required",
   });
@@ -4360,7 +4360,7 @@ async function tryProcessWhatsappMessageWithAgent({
 
         return createWhatsappAgentAdapterResult({
           facts: [
-            "No recent eligible unpaid WhatsApp checkout draft was found, so no replacement payment link was created.",
+            "No recent usable unpaid WhatsApp checkout draft was found, so no replacement payment link was created.",
           ],
           status: "not_found",
         });

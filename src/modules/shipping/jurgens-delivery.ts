@@ -160,7 +160,7 @@ export async function upsertJurgensDeliveryZone(
 
     return {
       ok: true as const,
-      message: "Jurgens delivery eligibility zone saved.",
+      message: "Jurgens delivery service area saved.",
     };
   });
 }
@@ -253,7 +253,7 @@ async function evaluateJurgensDeliveryAvailability({
       postalCode,
       unavailableCode: "zone_configuration_conflict",
       unavailableReason:
-        "Jurgens Energy delivery eligibility needs confirmation for this address. Please contact support so we can confirm delivery without guessing.",
+        "Jurgens Energy delivery availability needs confirmation for this address. Please contact support so we can confirm delivery without guessing.",
       zone: null,
     };
   }

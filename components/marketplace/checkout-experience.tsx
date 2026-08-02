@@ -2149,7 +2149,7 @@ export function CheckoutExperience({
               <h2 className="text-sm font-black uppercase">Delivery</h2>
             </div>
             <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
-              One VAT-inclusive delivery fee applies per eligible order.
+              One VAT-inclusive delivery fee applies per order.
             </p>
             {isLoadingQuotes ? (
               <div
@@ -2157,7 +2157,7 @@ export function CheckoutExperience({
                 className="mt-4 flex min-h-24 items-center justify-center gap-2 rounded-md border border-[#e3e3dc] bg-[#f7f7f2] px-4 text-sm font-semibold text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]"
               >
                 <LoaderCircleIcon className="size-5 animate-spin text-[#ff5a1f]" />
-                Checking delivery eligibility…
+                Checking delivery details…
               </div>
             ) : quoteError ? (
               <div
@@ -2247,7 +2247,7 @@ export function CheckoutExperience({
             </div>
             ) : (
               <div className="mt-4 rounded-md border border-[#e3e3dc] bg-[#f7f7f2] px-4 py-4 text-sm text-[#666660] dark:border-white/10 dark:bg-white/[0.035] dark:text-[#aaa9a1]">
-                Delivery eligibility has not been checked yet.
+                Delivery details have not been checked yet.
               </div>
             )}
           </section>
@@ -2590,10 +2590,10 @@ export function CheckoutExperience({
                   <TruckIcon className="mt-0.5 size-3.5 shrink-0 text-[#ff5a1f]" />
                 )}
                 {checkoutStep === "address"
-                  ? "Enter your delivery address to check serviceability and apply the order delivery fee."
+                  ? "Enter your delivery address to show the final delivery option and apply the order delivery fee."
                   : shippingStepReady
                     ? "Review the single order delivery fee, then continue to payment."
-                    : "Delivery eligibility must be checked before you can continue to payment."}
+                    : "Delivery details must be checked before you can continue to payment."}
               </p>
               {checkoutStep === "address" ? (
                 <Button

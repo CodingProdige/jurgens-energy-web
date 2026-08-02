@@ -242,7 +242,7 @@ export function ProductCardQuickLook({
                 <div className="mt-4 flex min-w-0 flex-wrap gap-2 text-[11px] font-black uppercase leading-none">
                   <span className="inline-flex items-center gap-1 rounded-full border border-emerald-600 px-2.5 py-1.5 text-emerald-700 dark:border-emerald-300 dark:text-emerald-300">
                     <TruckIcon className="size-3.5" />
-                    Delivery confirmed at checkout
+                    Delivery details before payment
                   </span>
                   <span className="rounded-full border border-[#d8d8d2] px-2.5 py-1.5 text-[#080808] dark:border-white/15 dark:text-[#f7f7f2]">
                     Includes VAT

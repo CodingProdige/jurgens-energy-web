@@ -144,7 +144,7 @@ export function getPublicDeliveryFeeDescription(
       : roundMoney(Math.max(0, settings.shippingFreeOverAmount));
 
   if (flatRate === 0) {
-    return "Standard delivery is free for eligible orders.";
+    return "Standard delivery is free for qualifying orders.";
   }
 
   const flatRateCopy = formatZar(flatRate);

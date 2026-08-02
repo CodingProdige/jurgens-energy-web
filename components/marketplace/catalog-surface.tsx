@@ -18,7 +18,7 @@ function getContextDescription(data: MarketplaceCatalogPageData) {
     return `Browse all ${data.context.name} products available from Jurgens Energy.`;
   }
 
-  return "Browse products available from Jurgens Energy and review delivery eligibility at checkout.";
+  return "Browse products available from Jurgens Energy and review delivery details at checkout.";
 }
 
 function getBaseHref(data: MarketplaceCatalogPageData) {

@@ -46,7 +46,7 @@ export function AboutPage({
     <article>
       <ContentHero
         breadcrumbLabel="About us"
-        description="Jurgens Energy is a South African online store. Customers can browse, order and pay online, with delivery available throughout South Africa and eligibility confirmed at checkout."
+        description="Jurgens Energy is a South African online store. Customers can browse, order and pay online. Delivery is available throughout South Africa, and checkout shows the final delivery details before payment."
         eyebrow="About Jurgens Energy"
         icon={FlameIcon}
         title="Jurgens Energy is a South African online store."
@@ -89,14 +89,14 @@ export function AboutPage({
             </span>
             <div className="min-w-0">
               <h3 className="text-[15px] font-black uppercase leading-tight">
-                Delivery availability
+                Nationwide delivery
               </h3>
               <p className="mt-1 text-[13px] leading-6 text-[#62625c] dark:text-[#bdbdb5]">
                 Jurgens Energy does not operate a customer-facing physical
-                store. Delivery is available throughout South Africa, with
-                address eligibility confirmed at checkout.{" "}
-                {deliveryTimingDescription} Our order cut-off is 2:00 PM
-                SAST on business days.
+                store. Delivery is available throughout South Africa. Checkout
+                shows the final delivery details before payment.{" "}
+                {deliveryTimingDescription} Our order cut-off is 2:00 PM SAST on
+                business days.
               </p>
             </div>
           </div>

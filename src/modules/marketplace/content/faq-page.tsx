@@ -48,10 +48,10 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Courier-eligible products can be delivered nationwide within South
-            Africa. Jurgens-delivered products use eligible postcode areas.
-            Enter your complete delivery address at checkout to confirm
-            availability. Read the full{" "}
+            Jurgens Energy offers nationwide delivery within South Africa.
+            Some Jurgens-delivered products use active local service-area
+            postcodes. Enter your complete delivery address at checkout to
+            confirm availability. Read the full{" "}
             <Link
               className="font-bold text-[#ff5a1f] hover:underline"
               href="/delivery-information"
@@ -102,7 +102,7 @@ const faqGroups: FaqGroup[] = [
         answer: (
           <>
             An exchange-supported option assumes that you will hand over the
-            eligible empty cylinder described on the product or selected variant.
+            matching empty cylinder described on the product or selected variant.
             The full replacement cylinder is supplied as the empty cylinder is
             collected at the same handover.
           </>
@@ -113,8 +113,8 @@ const faqGroups: FaqGroup[] = [
         answer: (
           <>
             Check the exact exchange requirement shown on the product. Size, type
-            and condition may affect eligibility. Confirm the requirement before
-            checkout rather than assuming that any empty cylinder can be
+            and condition may affect whether we can accept the empty cylinder.
+            Confirm the requirement before checkout rather than assuming that any empty cylinder can be
             exchanged.
           </>
         ),
@@ -251,7 +251,7 @@ const faqStructuredDataItems = [
   {
     question: "Where do you deliver?",
     answer:
-      "Courier-eligible products can be delivered nationwide within South Africa. Jurgens-delivered products use eligible postcode areas. Checkout confirms availability from the complete delivery address.",
+      "Products set up for courier delivery can be delivered nationwide within South Africa. Jurgens-delivered products use active Jurgens service-area postcodes. Checkout confirms availability from the complete delivery address.",
   },
   {
     question: "How is the delivery fee calculated?",
@@ -265,7 +265,7 @@ const faqStructuredDataItems = [
   {
     question: "How does a cylinder exchange work?",
     answer:
-      "An exchange-supported option assumes that the eligible empty cylinder described on the product or selected variant will be handed over as the full replacement cylinder is delivered.",
+      "An exchange-supported option assumes that the matching empty cylinder described on the product or selected variant will be handed over as the full replacement cylinder is delivered.",
   },
   {
     question: "Do displayed prices include VAT?",

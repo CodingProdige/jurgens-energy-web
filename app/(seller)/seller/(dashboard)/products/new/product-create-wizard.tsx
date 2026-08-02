@@ -280,12 +280,12 @@ const googleFulfillmentChannelConfig: Record<
   },
   local_lpg: {
     description:
-      "Use for LPG and exchange offers delivered by Jurgens Energy to eligible South African addresses confirmed at checkout.",
+      "Use for LPG and exchange offers delivered by Jurgens Energy through active service-area postcodes.",
     label: "Jurgens Energy delivery",
   },
   national_courier: {
     description:
-      "Use when this exact variant is eligible for nationwide South African delivery through The Courier Guy.",
+      "Use when this exact variant is set up for nationwide South African delivery through The Courier Guy.",
     label: "South Africa courier",
   },
 };
@@ -1245,7 +1245,7 @@ function ExchangeRulesFields({
         />
         <span>
           <span className="block font-semibold text-zinc-950 dark:text-white">
-            Requires eligible empty-cylinder handover
+            Requires matching empty-cylinder handover
           </span>
           <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-zinc-400">
             Use this on exchange variants to show the required empty-cylinder

@@ -1,7 +1,7 @@
 import type { StorefrontSection } from "./storefront-types";
 
-const eligibleAddressFeatureTitle = "South Africa delivery";
-const eligibleAddressFeatureText =
+const southAfricaDeliveryFeatureTitle = "South Africa delivery";
+const southAfricaDeliveryFeatureText =
   "Usually arrives within 1–4 business days after payment confirmation.";
 
 const legacyFeatureGridTitleReplacements: Readonly<Record<string, string>> = {
@@ -19,20 +19,20 @@ const legacyFeatureGridEyebrowReplacements: Readonly<Record<string, string>> = {
 const legacyFeatureTitleReplacements: Readonly<Record<string, string>> = {
   "Certified cylinders": "Safety-first handling",
   "Ready to cook": "Clear product details",
-  "Same day delivery": eligibleAddressFeatureTitle,
-  "Local delivery": eligibleAddressFeatureTitle,
-  "Delivery in South Africa": eligibleAddressFeatureTitle,
+  "Same day delivery": southAfricaDeliveryFeatureTitle,
+  "Local delivery": southAfricaDeliveryFeatureTitle,
+  "Delivery in South Africa": southAfricaDeliveryFeatureTitle,
 };
 
 const legacyFeatureTextReplacements: Readonly<Record<string, string>> = {
   "Every cylinder is checked and handled with care.":
-    "Cylinder eligibility and handover checks apply where required.",
-  "Fast local delivery for homes and businesses.": eligibleAddressFeatureText,
+    "Cylinder handover checks apply where required.",
+  "Fast local delivery for homes and businesses.": southAfricaDeliveryFeatureText,
   "Local delivery options for eligible addresses.":
-    eligibleAddressFeatureText,
+    southAfricaDeliveryFeatureText,
   "Estimated delivery in 1–3 business days after payment confirmation.":
-    eligibleAddressFeatureText,
-  "Estimated delivery in 1–4 business days.": eligibleAddressFeatureText,
+    southAfricaDeliveryFeatureText,
+  "Estimated delivery in 1–4 business days.": southAfricaDeliveryFeatureText,
   "Full cylinders arrive ready for safe connection.":
     "Review the product details and connection requirements before use.",
 };
@@ -121,7 +121,7 @@ export function applyStorefrontDeliveryTiming(
         features: section.settings.features.map((feature) => ({
           ...feature,
           text:
-            feature.text === eligibleAddressFeatureText
+            feature.text === southAfricaDeliveryFeatureText
               ? deliveryTimingDescription
               : feature.text,
         })),

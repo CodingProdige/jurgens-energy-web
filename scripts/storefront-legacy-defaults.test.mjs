@@ -90,7 +90,7 @@ test("historical non-hero storefront claims are replaced exactly", () => {
         title: "South Africa delivery",
       },
       {
-        text: "Cylinder eligibility and handover checks apply where required.",
+        text: "Cylinder handover checks apply where required.",
         title: "Safety-first handling",
       },
       {

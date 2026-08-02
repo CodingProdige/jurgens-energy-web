@@ -189,8 +189,8 @@ export function LpgSafetyPage() {
             />
             <div className="grid gap-3">
               {[
-                "Read the exchange requirement shown on the product before ordering. Size, type and condition may affect eligibility.",
-                "Keep the eligible empty cylinder upright and ready in a ventilated place that the delivery team can access safely.",
+                "Read the exchange requirement shown on the product before ordering. Size, type and condition may affect whether we can accept the empty cylinder.",
+                "Keep the matching empty cylinder upright and ready in a ventilated place that the delivery team can access safely.",
                 "Do not present a leaking, modified, severely damaged or illegally filled cylinder for exchange.",
                 "If the empty cylinder may be unsafe or does not meet the stated requirement, contact the team before delivery so the available options can be confirmed.",
               ].map((point, index) => (

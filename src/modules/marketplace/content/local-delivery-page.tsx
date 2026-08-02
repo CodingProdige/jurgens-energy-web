@@ -40,7 +40,7 @@ function createDeliveryFaqItems(
     {
       question: "Where does Jurgens Energy deliver?",
       answer:
-        "Courier-eligible products can be delivered nationwide within South Africa. Products marked for Jurgens delivery require a postcode in an active Jurgens service area. Checkout confirms eligibility from the complete delivery address.",
+        "Jurgens Energy offers nationwide delivery within South Africa. Some Jurgens-delivered products use active local service-area postcodes. Checkout shows the final delivery option from the complete delivery address before payment.",
     },
     {
       question: "How long does delivery take?",
@@ -131,7 +131,7 @@ export async function LocalDeliveryPage() {
         <section className="mt-14 grid gap-4 border-y border-[#deded7] py-10 dark:border-white/10 sm:mt-20 sm:grid-cols-2 sm:py-14 lg:grid-cols-4">
           {[
             {
-              copy: "Courier-eligible goods can ship nationwide. Jurgens-delivered products use eligible postcode areas.",
+              copy: "Nationwide delivery is available across South Africa. Some Jurgens-delivered products use active local service-area postcodes.",
               icon: MapPinnedIcon,
               title: "South Africa coverage",
             },
@@ -174,7 +174,7 @@ export async function LocalDeliveryPage() {
 
         <section className="mt-14 sm:mt-20">
           <ContentSectionHeading
-            description="Stock, delivery eligibility and any exchange requirements are confirmed during checkout."
+            description="Stock, final delivery details and any exchange requirements are shown during checkout."
             eyebrow="Shop online"
             title="Products for delivery."
           />

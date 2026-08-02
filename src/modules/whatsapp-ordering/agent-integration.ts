@@ -101,7 +101,7 @@ const orderProposalParameters = {
         { type: "null" },
       ],
       description:
-        "exchange means the customer returns an eligible empty cylinder; standard means a full/new cylinder without a return.",
+        "exchange means the customer returns the matching empty cylinder; standard means a full/new cylinder without a return.",
     },
     quantity: { maximum: 12, minimum: 1, type: "integer" },
     repeat_last_order: { type: "boolean" },
@@ -172,7 +172,7 @@ export async function runJurgensWhatsappAgentTurn({
       AgentAuthorizationContext
     >({
       description:
-        "Retrieve the verified nationwide South African delivery policy, standard delivery fee, free-delivery threshold, and postcode eligibility for Jurgens-delivered products.",
+        "Retrieve the verified nationwide South African delivery policy, standard delivery fee, free-delivery threshold, and postcode service-area coverage for Jurgens-delivered products.",
       execute: ({ value }) =>
         execute(() => adapters.checkDeliveryArea(value)),
       name: "check_delivery_area",
@@ -284,7 +284,7 @@ export async function runJurgensWhatsappAgentTurn({
       AgentAuthorizationContext
     >({
       confirmationDescription:
-        "Generate a replacement secure checkout link for the customer's latest eligible unpaid WhatsApp draft.",
+        "Generate a replacement secure checkout link for the customer's latest usable unpaid WhatsApp draft.",
       description:
         "Renew an expired or requested payment link when the customer explicitly asks for a new link.",
       execute: () => execute(adapters.renewPaymentLink),
@@ -339,14 +339,14 @@ export async function runJurgensWhatsappAgentTurn({
     tools,
     trustedBusinessInstructions: [
       "Jurgens Energy is the sole seller in this store.",
-      "Courier-eligible products can be delivered nationwide within South Africa.",
-      "Products marked for Jurgens delivery require an eligible delivery postcode.",
+      "Products set up for courier delivery can be delivered nationwide within South Africa.",
+      "Products marked for Jurgens delivery use active Jurgens service-area postcodes.",
       "Use the current standard delivery fee and free-delivery threshold returned by the delivery policy tool. Keep delivery fee wording short and customer-facing.",
       "Carrier rates and carrier costs are private operational data. Never quote or expose them, and never imply they can change the amount charged after checkout.",
       "Jurgens Energy has no public walk-in shop, customer collection counter or returns desk.",
       "For a cylinder order, use propose_order rather than writing an offer from memory.",
       "Set repeat_last_order true only when the customer explicitly refers to the same, usual or previous order; refill, replace, replacement or top-up alone is an exchange request, not a repeat-order instruction.",
-      "An exchange requires an eligible empty cylinder handover; a full/new cylinder does not.",
+      "An exchange requires a matching empty cylinder handover; a full/new cylinder does not.",
       "Do not create a checkout link until the persisted offer is explicitly confirmed.",
       "Do not ask for an address in chat when secure checkout can collect it.",
       "Product media is sent separately by the application; never expose internal media paths.",

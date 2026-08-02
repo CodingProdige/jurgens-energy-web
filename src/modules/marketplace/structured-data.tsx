@@ -426,8 +426,8 @@ function createNationwideShippingServiceStructuredData(
   const feeDescription = hasFreeShippingThreshold
     ? `A VAT-inclusive delivery fee of ZAR ${flatRate.toFixed(2)} applies below a product subtotal of ZAR ${freeOverAmount.toFixed(2)}; qualifying orders at or above that subtotal ship free.`
     : flatRate === 0
-      ? "Eligible orders ship free."
-      : `A VAT-inclusive delivery fee of ZAR ${flatRate.toFixed(2)} applies per eligible order.`;
+      ? "Orders ship free."
+      : `A VAT-inclusive delivery fee of ZAR ${flatRate.toFixed(2)} applies per order.`;
 
   return {
     "@id": `${createMarketplaceCanonicalUrl("/")}#standard-shipping-service`,

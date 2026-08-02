@@ -155,7 +155,7 @@ export default async function SellerDashboardPage() {
         <DashboardPanel
           accent="green"
           title="Fulfillment readiness"
-          description="Prepare courier-eligible products for nationwide South African delivery through The Courier Guy."
+          description="Prepare courier-delivered products for nationwide South African delivery through The Courier Guy."
         >
           <div className="grid gap-3">
             {[

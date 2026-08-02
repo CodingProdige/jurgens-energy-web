@@ -30,18 +30,14 @@ import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { findShopMenuCategory } from "@/src/modules/marketplace/shop-menu-categories";
 
 function createFooterServices(deliveryTimingDescription: string) {
-  const eligibleDeliveryTimingDescription =
-    deliveryTimingDescription.replace(/^Delivery/, "Eligible delivery");
-
   return [
     {
-      description: eligibleDeliveryTimingDescription,
+      description: deliveryTimingDescription,
       icon: TruckIcon,
       title: "Nationwide Delivery",
     },
     {
-      description:
-        "Eligibility and cylinder handover checks apply where required.",
+      description: "Cylinder handover checks apply where required.",
       icon: ShieldCheckIcon,
       title: "Safety-First Handling",
     },
@@ -181,9 +177,8 @@ export async function MarketplaceFooter() {
             </p>
             <p className="mt-3 max-w-sm text-[12px] leading-5 text-[#696963] dark:text-[#a8a89f]">
               Customers shop and pay online. Delivery is available throughout
-              South Africa, with address eligibility, product-specific handling
-              and shipping costs confirmed at checkout. We do not operate a
-              physical walk-in store.
+              South Africa, with product-specific handling and shipping costs
+              shown before payment. We do not operate a physical walk-in store.
             </p>
             <Link
               className="mt-4 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-[0.08em] text-[#ff5a1f] transition hover:text-[#e44c15]"
