@@ -194,10 +194,10 @@ export function BusinessInformationForm({
               Show business registration details on the storefront
             </Label>
             <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-              Controls the public legal name, company registration number, VAT
-              number, and registered address in the footer, contact/support
-              pages, policy pages, and structured data. Customer support email
-              and phone numbers stay public.
+              Controls the public legal name, company registration number, and
+              VAT number in the footer, policy pages, and structured data.
+              Registered address, customer support email, and phone numbers
+              stay public.
             </p>
           </div>
         </div>
@@ -209,9 +209,10 @@ export function BusinessInformationForm({
             Registered business address
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-            Used automatically on VAT invoices. Public display on the contact
-            page, footer, policy disclosures, and structured business data is
-            controlled by the storefront registration details toggle above.
+            Used automatically on VAT invoices and public trust surfaces such
+            as the contact page, footer, policy disclosures, and structured
+            business data. It is not presented as a walk-in shop or returns
+            counter.
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">

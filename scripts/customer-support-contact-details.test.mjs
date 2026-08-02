@@ -88,7 +88,10 @@ test("hides registration details without hiding support channels", () => {
     },
   });
 
-  assert.equal(details.businessAddress, null);
+  assert.equal(
+    details.businessAddress,
+    "10 Example Road, Gardens, Cape Town, Western Cape, 8001, South Africa",
+  );
   assert.equal(details.companyRegistrationNumber, null);
   assert.equal(details.legalName, null);
   assert.equal(details.vatRegistrationNumber, null);

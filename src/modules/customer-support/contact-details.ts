@@ -89,9 +89,7 @@ export function createCustomerSupportContactDetails({
     business.publicRegistrationDetailsEnabled;
 
   return {
-    businessAddress: registrationDetailsVisible
-      ? formatCustomerSupportBusinessAddress(business)
-      : null,
+    businessAddress: formatCustomerSupportBusinessAddress(business),
     businessName:
       cleanOptionalValue(business.tradingName) ??
       cleanOptionalValue(business.legalName) ??

@@ -505,9 +505,9 @@ export function SocialLinksForm({
               Registered business address
             </p>
             <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Managed once under Business Information. Public display is
-              controlled by the storefront registration details toggle on the
-              Business Information settings page.
+              Managed once under Business Information and kept visible on the
+              storefront for customer trust and support. It is not presented as
+              a walk-in shop or returns counter.
             </p>
             <Link
               className="w-fit text-xs font-semibold text-[#ff5a1f] hover:underline"

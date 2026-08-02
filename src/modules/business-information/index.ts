@@ -114,7 +114,7 @@ export const getPublicBusinessIdentity = cache(
         ? row.companyRegistrationNumber?.trim() || null
         : null,
       legalName: registrationDetailsVisible ? legalName || null : null,
-      registeredAddress: registrationDetailsVisible ? registeredAddress : null,
+      registeredAddress,
       registrationDetailsVisible,
       tradingName,
       tradingNameDisclosure: registrationDetailsVisible && legalNameDiffers

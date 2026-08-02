@@ -12,21 +12,21 @@ function getIdentityLines(
   identity: PublicBusinessIdentity,
   showRegisteredAddress: boolean,
 ) {
-  if (!identity.registrationDetailsVisible) {
-    return [];
-  }
-
   const registeredAddress = showRegisteredAddress
     ? formatRegisteredAddress(identity)
     : null;
 
   return [
-    `Trading name: ${identity.tradingName}`,
-    identity.legalName ? `Legal name: ${identity.legalName}` : null,
-    identity.companyRegistrationNumber
+    identity.registrationDetailsVisible
+      ? `Trading name: ${identity.tradingName}`
+      : null,
+    identity.registrationDetailsVisible && identity.legalName
+      ? `Legal name: ${identity.legalName}`
+      : null,
+    identity.registrationDetailsVisible && identity.companyRegistrationNumber
       ? `Company registration: ${identity.companyRegistrationNumber}`
       : null,
-    identity.vatRegistrationNumber
+    identity.registrationDetailsVisible && identity.vatRegistrationNumber
       ? `VAT registration: ${identity.vatRegistrationNumber}`
       : null,
     registeredAddress
