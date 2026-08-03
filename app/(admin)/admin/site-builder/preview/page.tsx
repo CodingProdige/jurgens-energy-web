@@ -27,7 +27,9 @@ export default async function AdminSiteBuilderPreviewPage() {
     getPublishedBlogPosts(12),
     getMarketplaceCatalog({
       currencyContext,
-      limit: 48,
+      // Match the live homepage: builder product sections filter before they
+      // apply their own component-level display limit.
+      limit: null,
     }),
     getStorefrontPageForAdmin(),
   ]);

@@ -411,12 +411,12 @@ export async function getMarketplaceCatalog({
   brandSlug?: string;
   categorySlug?: string;
   currencyContext: CurrencyContext;
-  limit?: number;
+  limit?: number | null;
   query?: string;
 }) {
   const rows = await getPublicProductsBaseRows();
   const normalizedQuery = query?.trim().toLowerCase() ?? "";
-  const filteredRows = rows
+  const matchingRows = rows
     .filter((row) => !brandSlug || row.brandSlug === brandSlug)
     .filter((row) => !categorySlug || row.categorySlug === categorySlug)
     .filter((row) => {
@@ -432,8 +432,9 @@ export async function getMarketplaceCatalog({
       ]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(normalizedQuery));
-    })
-    .slice(0, limit);
+    });
+  const filteredRows =
+    typeof limit === "number" ? matchingRows.slice(0, limit) : matchingRows;
   const productIds = filteredRows.map((row) => row.id);
 
   if (productIds.length === 0) {

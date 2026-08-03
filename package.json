@@ -21,7 +21,7 @@
     "test:google-feeds": "node --experimental-strip-types --test scripts/google-feed-utils.test.mjs",
     "test:product-costs": "node --experimental-strip-types --test scripts/product-cost-price.test.mjs",
     "test:product-detail": "node --experimental-strip-types --test scripts/exchange-requirements.test.mjs scripts/product-description.test.mjs scripts/product-media-selection.test.mjs scripts/product-variant-presentation.test.mjs scripts/product-variant-reconciliation.test.mjs",
-    "test:marketplace-navigation": "node --experimental-strip-types --test scripts/catalog-sale.test.mjs scripts/marketplace-header-active-nav.test.mjs scripts/marketplace-stock-status.test.mjs scripts/product-card-media.test.mjs scripts/product-card-video-preview.test.mjs scripts/public-delivery-copy.test.mjs scripts/shop-menu-categories.test.mjs",
+    "test:marketplace-navigation": "node --experimental-strip-types --test scripts/catalog-sale.test.mjs scripts/marketplace-header-active-nav.test.mjs scripts/marketplace-stock-status.test.mjs scripts/product-card-media.test.mjs scripts/product-card-video-preview.test.mjs scripts/public-delivery-copy.test.mjs scripts/shop-menu-categories.test.mjs scripts/storefront-product-pool.test.mjs",
     "test:media": "node --experimental-strip-types --test scripts/image-renditions.test.mjs scripts/media-byte-range.test.mjs scripts/media-digital-source.test.mjs scripts/video-preview.test.mjs",
     "test:places": "node --experimental-strip-types --test scripts/google-places.test.mjs",
     "test:customer-support": "node --experimental-strip-types --test scripts/customer-support-contact-details.test.mjs scripts/business-structured-address.test.mjs",

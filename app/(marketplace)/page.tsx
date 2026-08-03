@@ -49,7 +49,9 @@ export default async function Home({
       getMarketplaceCatalog({
         brandSlug,
         currencyContext,
-        limit: 36,
+        // Storefront sections apply their own limits after category/brand/source
+        // filtering, so the home renderer needs the complete active product pool.
+        limit: null,
       }),
       getPublishedStorefrontPage(),
       getMarketplaceSettings(),
