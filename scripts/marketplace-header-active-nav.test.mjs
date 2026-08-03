@@ -15,6 +15,10 @@ test("marketplace header navigation highlights the current route", () => {
     "components/marketplace/marketplace-header.tsx",
     "utf8",
   );
+  const headerSearchSource = readFileSync(
+    "components/marketplace/marketplace-header-search.tsx",
+    "utf8",
+  );
 
   assert.match(desktopNavSource, /usePathname/);
   assert.match(desktopNavSource, /aria-current=\{active \? "page" : undefined\}/);
@@ -22,7 +26,12 @@ test("marketplace header navigation highlights the current route", () => {
   assert.match(desktopNavSource, /currentPath\.startsWith\("\/categories\/"\)/);
   assert.match(mobileNavSource, /usePathname/);
   assert.match(mobileNavSource, /aria-current=\{active \? "page" : undefined\}/);
+  assert.match(mobileNavSource, /MarketplaceHeaderSearch/);
   assert.match(headerSource, /MarketplaceDesktopNav/);
+  assert.match(headerSource, /MarketplaceHeaderSearch/);
+  assert.match(headerSearchSource, /action="\/products"/);
+  assert.match(headerSearchSource, /name="q"/);
+  assert.match(headerSearchSource, /type="search"/);
   assert.doesNotMatch(headerSource, /import \{ MarketplaceShopMenu \}/);
   assert.doesNotMatch(headerSource, /<MarketplaceShopMenu/);
 });

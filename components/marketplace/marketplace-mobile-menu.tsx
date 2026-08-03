@@ -25,6 +25,7 @@ import {
   type MarketplaceAccountSummary,
 } from "@/components/marketplace/marketplace-account-menu";
 import { marketplacePrimaryActionClass } from "@/components/marketplace/action-styles";
+import { MarketplaceHeaderSearch } from "@/components/marketplace/marketplace-header-search";
 import { MarketplaceWhatsAppIcon } from "@/components/marketplace/marketplace-whatsapp-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -313,36 +314,41 @@ export function MarketplaceMobileMenu({
               />
             ) : (
               <>
-            {accountUser ? (
-              <div className="rounded-lg border border-[#e8e8e2] bg-[#f7f7f2] p-3 dark:border-white/10 dark:bg-white/[0.06]">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ff5a1f] text-sm font-black uppercase text-white">
-                    {accountUser.image ? (
-                      <Image
-                        alt=""
-                        className="size-full object-cover"
-                        height={44}
-                        src={accountUser.image}
-                        unoptimized
-                        width={44}
-                      />
-                    ) : (
-                      getInitials(accountUser)
-                    )}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black">
-                      {accountUser.name || accountUser.email || "Account"}
-                    </p>
-                    {accountUser.email ? (
-                      <p className="truncate text-xs text-[#696963] dark:text-[#c8c8c0]">
-                        {accountUser.email}
-                      </p>
-                    ) : null}
+                <MarketplaceHeaderSearch
+                  className="w-full shadow-none"
+                  placeholder="Search the store"
+                />
+
+                {accountUser ? (
+                  <div className="rounded-lg border border-[#e8e8e2] bg-[#f7f7f2] p-3 dark:border-white/10 dark:bg-white/[0.06]">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ff5a1f] text-sm font-black uppercase text-white">
+                        {accountUser.image ? (
+                          <Image
+                            alt=""
+                            className="size-full object-cover"
+                            height={44}
+                            src={accountUser.image}
+                            unoptimized
+                            width={44}
+                          />
+                        ) : (
+                          getInitials(accountUser)
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black">
+                          {accountUser.name || accountUser.email || "Account"}
+                        </p>
+                        {accountUser.email ? (
+                          <p className="truncate text-xs text-[#696963] dark:text-[#c8c8c0]">
+                            {accountUser.email}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ) : null}
+                ) : null}
 
             <nav className="grid gap-1">
               {navItems.map(([label, href]) => {

@@ -10,6 +10,7 @@ import {
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
 import { MarketplaceCartLink } from "@/components/marketplace/marketplace-cart-link";
 import { MarketplaceDesktopNav } from "@/components/marketplace/marketplace-desktop-nav";
+import { MarketplaceHeaderSearch } from "@/components/marketplace/marketplace-header-search";
 import { MarketplaceHeaderShell } from "@/components/marketplace/marketplace-header-shell";
 import {
   MarketplaceMobileMenu,
@@ -122,11 +123,13 @@ export async function MarketplaceHeader() {
           whatsappHref={whatsappHref}
         />
 
+        <MarketplaceHeaderSearch className="hidden w-[min(22vw,21rem)] max-w-[21rem] shrink-0 xl:flex" />
+
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <MarketplaceCartLink />
           <Link
             className={cn(
-              "hidden sm:inline-flex sm:px-5",
+              "hidden 2xl:inline-flex 2xl:px-5",
               marketplacePrimaryActionBaseClass,
             )}
             href="/products"
