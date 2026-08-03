@@ -1563,6 +1563,12 @@ function ProductBuyBox({
   const topSoldVariantId = getTopSoldVariantId(product.variants);
   const soldLabel = getSoldQuantityLabel(product.totalSoldQuantity);
   const selectedStockStatus = selectedVariant?.stockStatus ?? product.stockStatus;
+  const selectedLowStockQuantity =
+    selectedStockStatus === "low_stock"
+      ? selectedVariant
+        ? Math.max(0, Math.floor(selectedVariant.stockOnHand))
+        : product.lowStockQuantity
+      : null;
 
   useEffect(() => {
     setAdded(false);
@@ -1653,6 +1659,7 @@ function ProductBuyBox({
         selectedPrice={selectedPrice}
         selectedVariant={selectedVariant}
         selectedVariantId={selectedVariantId}
+        lowStockQuantity={selectedLowStockQuantity}
         soldLabel={soldLabel}
         stockStatus={selectedStockStatus}
         topSoldVariantId={topSoldVariantId}
@@ -1681,7 +1688,10 @@ function ProductBuyBox({
             Includes VAT
           </p>
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-            <ProductStockStatusBadge status={selectedStockStatus} />
+            <ProductStockStatusBadge
+              lowStockQuantity={selectedLowStockQuantity}
+              status={selectedStockStatus}
+            />
           </div>
         </div>
 
@@ -1783,6 +1793,7 @@ function ProductBuyBox({
         selectedVariantId={selectedVariantId}
         setQuantity={setQuantity}
         setSelectedVariantId={setSelectedVariantId}
+        lowStockQuantity={selectedLowStockQuantity}
         soldLabel={soldLabel}
         stockStatus={selectedStockStatus}
         topSoldVariantId={topSoldVariantId}
@@ -1807,12 +1818,42 @@ function ProductBuyBox({
 function ProductStockStatusBadge({
   className,
   compact = false,
+  lowStockQuantity,
   status,
 }: {
   className?: string;
   compact?: boolean;
+  lowStockQuantity?: number | null;
   status: MarketplaceStockStatus;
 }) {
+  if (status === "low_stock") {
+    const stockLabel =
+      lowStockQuantity && lowStockQuantity > 0
+        ? lowStockQuantity === 1
+          ? "Only 1 left"
+          : `Only ${lowStockQuantity} left`
+        : getMarketplaceStockStatusLabel(status);
+
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 whitespace-nowrap font-black leading-none text-[#ff5a1f]",
+          compact ? "text-[10px]" : "text-xs sm:text-sm",
+          className,
+        )}
+      >
+        <FlameIcon
+          aria-hidden="true"
+          className={cn(
+            "shrink-0 fill-current",
+            compact ? "size-3" : "size-3.5 sm:size-4",
+          )}
+        />
+        {stockLabel}
+      </span>
+    );
+  }
+
   return (
     <Badge
       className={cn(
@@ -1820,8 +1861,6 @@ function ProductStockStatusBadge({
         compact
           ? "h-5 px-2 text-[10px]"
           : "px-2.5 py-1 text-[11px] sm:px-3 sm:text-xs",
-        status === "low_stock" &&
-          "bg-[#ffb000] text-[#080808] dark:bg-[#ffb000] dark:text-[#080808]",
         status === "in_stock" &&
           "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-300",
         status === "backorder" &&
@@ -1847,6 +1886,7 @@ function MobileProductPurchaseSummary({
   selectedPrice,
   selectedVariant,
   selectedVariantId,
+  lowStockQuantity,
   soldLabel,
   stockStatus,
   topSoldVariantId,
@@ -1863,6 +1903,7 @@ function MobileProductPurchaseSummary({
   selectedPrice: string;
   selectedVariant: MarketplaceVariant | null;
   selectedVariantId: string;
+  lowStockQuantity: number | null;
   soldLabel: string | null;
   stockStatus: MarketplaceStockStatus;
   topSoldVariantId: string | null;
@@ -1898,7 +1939,11 @@ function MobileProductPurchaseSummary({
             Includes VAT
           </p>
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <ProductStockStatusBadge compact status={stockStatus} />
+            <ProductStockStatusBadge
+              compact
+              lowStockQuantity={lowStockQuantity}
+              status={stockStatus}
+            />
           </div>
         </div>
 
@@ -2554,6 +2599,7 @@ function ProductOptionsDialog({
   selectedVariantId,
   setQuantity,
   setSelectedVariantId,
+  lowStockQuantity,
   soldLabel,
   stockStatus,
   topSoldVariantId,
@@ -2577,6 +2623,7 @@ function ProductOptionsDialog({
   selectedVariantId: string;
   setQuantity: (quantity: number) => void;
   setSelectedVariantId: (variantId: string) => void;
+  lowStockQuantity: number | null;
   soldLabel: string | null;
   stockStatus: MarketplaceStockStatus;
   topSoldVariantId: string | null;
@@ -2639,7 +2686,12 @@ function ProductOptionsDialog({
             <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
               <p>Includes VAT</p>
             </div>
-            <ProductStockStatusBadge className="mt-1" compact status={stockStatus} />
+            <ProductStockStatusBadge
+              className="mt-1"
+              compact
+              lowStockQuantity={lowStockQuantity}
+              status={stockStatus}
+            />
           </div>
           <DialogClose className="grid size-9 place-items-center rounded-full text-[#080808] transition hover:bg-[#f7f7f2] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/20 dark:text-[#f7f7f2] dark:hover:bg-white/10">
             <XIcon className="size-5" />
