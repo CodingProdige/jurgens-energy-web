@@ -2545,8 +2545,8 @@ function ProductPolicyLinks({
     <nav
       aria-label="Product help links"
       className={cn(
-        "grid grid-cols-2 border-t border-[#ecece6] dark:border-white/10",
-        compact ? "gap-1.5 pt-2" : "gap-2 pt-2.5",
+        "flex min-w-0 items-stretch overflow-x-auto border-t border-[#ecece6] [scrollbar-width:none] dark:border-white/10 [&::-webkit-scrollbar]:hidden",
+        compact ? "pt-2" : "pt-2.5",
         className,
       )}
     >
@@ -2556,10 +2556,10 @@ function ProductPolicyLinks({
         return (
           <Link
             className={cn(
-              "inline-flex min-w-0 items-center rounded-md font-black text-slate-700 transition hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/20 dark:text-zinc-200",
+              "inline-flex min-w-[4.75rem] flex-1 shrink-0 items-center justify-center whitespace-nowrap border-l border-[#ecece6] font-black text-slate-700 transition first:border-l-0 hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/20 dark:border-white/10 dark:text-zinc-200",
               compact
-                ? "min-h-7 gap-1 px-0.5 text-[9px] leading-none"
-                : "min-h-10 gap-1.5 px-1 text-[11px] leading-4",
+                ? "h-7 gap-1 px-2 text-[9px] leading-none"
+                : "h-9 gap-1.5 px-2 text-[11px] leading-none",
             )}
             href={policy.href}
             key={policy.kind}

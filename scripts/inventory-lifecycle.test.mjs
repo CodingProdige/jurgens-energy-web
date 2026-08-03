@@ -43,6 +43,10 @@ const workerSource = readFileSync(
   new URL("../src/modules/invoices/worker.ts", import.meta.url),
   "utf8",
 );
+const instrumentationSource = readFileSync(
+  new URL("../instrumentation.ts", import.meta.url),
+  "utf8",
+);
 const migrationSource = readFileSync(
   new URL(
     "../src/db/migrations/0080_inventory_reservations_and_refund_fulfillment.sql",
@@ -193,6 +197,8 @@ test("runs durable expiry and refund cancellation passes in the existing worker"
   assert.match(workerSource, /expirePendingCheckoutOrders\(\)/);
   assert.match(workerSource, /processRefundShipmentCancellationJobs\(\)/);
   assert.match(workerSource, /processNotificationDispatchRetries\(\)/);
+  assert.match(instrumentationSource, /startInvoiceWorker/);
+  assert.match(instrumentationSource, /process\.env\.NEXT_RUNTIME === "nodejs"/);
 });
 
 test("requires explicit refund fulfilment intent and idempotent adjustment records", () => {
