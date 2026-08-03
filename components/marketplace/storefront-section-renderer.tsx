@@ -17,6 +17,8 @@ import {
 } from "@/components/marketplace/action-styles";
 import { MarketplaceBlogCard } from "@/components/marketplace/blog-card";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
+import { StorefrontCarousel } from "@/components/marketplace/storefront-carousel";
+import { StorefrontLoadMoreGrid } from "@/components/marketplace/storefront-load-more-grid";
 import { cn } from "@/lib/utils";
 import type { PublicBlogPostSummary } from "@/src/modules/blog";
 import type {
@@ -26,10 +28,12 @@ import type {
 } from "@/src/modules/marketplace/catalog";
 import { filterStorefrontProducts } from "@/src/modules/marketplace/product-filters";
 import type {
+  StorefrontBannerLinkSection,
   StorefrontBrandCollectionSection,
   StorefrontButtonAction,
   StorefrontCategoryCollectionSection,
   StorefrontCategoryScope,
+  StorefrontCollectionLayout,
   StorefrontCylinderShowcaseSection,
   StorefrontFeatureGridSection,
   StorefrontHeroSection,
@@ -110,6 +114,10 @@ function renderStorefrontSection({
 
   if (section.type === "cylinder_showcase") {
     return <StorefrontCylinderShowcaseSectionView section={section} />;
+  }
+
+  if (section.type === "banner_link") {
+    return <StorefrontBannerLinkSectionView section={section} />;
   }
 
   if (section.type === "product_collection") {
@@ -288,6 +296,77 @@ function StorefrontProductCollectionSectionView({
         layout={settings.layout}
         products={selectedProducts}
       />
+    </section>
+  );
+}
+
+function StorefrontBannerLinkSectionView({
+  section,
+}: {
+  section: StorefrontBannerLinkSection;
+}) {
+  const { settings } = section;
+  const isRemoteImage =
+    settings.imageUrl.startsWith("http://") ||
+    settings.imageUrl.startsWith("https://");
+
+  return (
+    <section className="border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:px-10 sm:py-7 lg:px-16">
+      <StorefrontLink
+        className="group/banner relative block min-h-[220px] overflow-hidden rounded-xl border border-[#e8e8e2] bg-[#080808] text-white shadow-[0_14px_36px_rgba(8,8,8,0.12)] transition hover:border-[#ff5a1f]/70 dark:border-white/10 dark:bg-[#151515] sm:min-h-[260px]"
+        href={settings.href}
+      >
+        {settings.imageUrl ? (
+          isRemoteImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              alt={settings.imageAlt}
+              className="absolute inset-0 size-full object-cover opacity-60 transition duration-500 group-hover/banner:scale-[1.025]"
+              src={settings.imageUrl}
+            />
+          ) : (
+            <Image
+              alt={settings.imageAlt}
+              className="object-cover opacity-60 transition duration-500 group-hover/banner:scale-[1.025]"
+              fill
+              sizes="100vw"
+              src={settings.imageUrl}
+            />
+          )
+        ) : (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(255,90,31,0.46),transparent_34%),linear-gradient(135deg,#080808_0%,#1a1a1a_58%,#ff5a1f_160%)]"
+          />
+        )}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-r from-[#080808]/94 via-[#080808]/70 to-[#080808]/16"
+        />
+        <div className="relative z-10 grid min-h-[220px] max-w-3xl content-center p-5 sm:min-h-[260px] sm:p-8 lg:p-10">
+          {settings.eyebrow ? (
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#ffb000] sm:text-[12px]">
+              {settings.eyebrow}
+            </p>
+          ) : null}
+          <StorefrontTitle
+            as={settings.titleTag}
+            className="mt-2 max-w-2xl font-black uppercase leading-tight text-white"
+            size={settings.titleSize}
+          >
+            {settings.title}
+          </StorefrontTitle>
+          {settings.copy ? (
+            <p className="mt-3 max-w-xl text-[14px] font-semibold leading-6 text-white/82 sm:text-[16px] sm:leading-7">
+              {settings.copy}
+            </p>
+          ) : null}
+          <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-[#ff5a1f] px-5 py-3 text-[13px] font-black uppercase tracking-[0.05em] text-white transition group-hover/banner:bg-white group-hover/banner:text-[#080808]">
+            {settings.actionLabel}
+            <ArrowRightIcon className="size-4" />
+          </span>
+        </div>
+      </StorefrontLink>
     </section>
   );
 }
@@ -539,36 +618,54 @@ function ProductCollectionList({
   products,
 }: {
   emptyLabel: string;
-  layout: "carousel" | "grid";
+  layout: StorefrontCollectionLayout;
   products: MarketplaceProductCardData[];
 }) {
   const isCarousel = layout === "carousel";
+  const productCards = products.map((product) => (
+    <div
+      className={
+        isCarousel
+          ? "flex min-w-0 shrink-0 basis-[calc((100%_-_0.375rem)_/_2)] snap-start sm:basis-[calc((100%_-_3rem)_/_4)] xl:basis-[calc((100%_-_4rem)_/_5)]"
+          : undefined
+      }
+      key={product.id}
+    >
+      <MarketplaceProductCard product={product} />
+    </div>
+  ));
+
+  if (products.length === 0) {
+    return (
+      <div className="mt-2.5 grid px-1.5 sm:mt-5 sm:px-0">
+        <EmptyCollectionState label={emptyLabel} layout={layout} />
+      </div>
+    );
+  }
+
+  if (layout === "load_more") {
+    return (
+      <StorefrontLoadMoreGrid increment={8} initialCount={8}>
+        {productCards}
+      </StorefrontLoadMoreGrid>
+    );
+  }
+
+  if (isCarousel) {
+    return (
+      <StorefrontCarousel
+        className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
+        label="Product collection carousel"
+        trackClassName="-mx-1.5 flex snap-x snap-mandatory scroll-px-1.5 gap-1.5 overflow-x-auto px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:scroll-px-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:scroll-px-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
+      >
+        {productCards}
+      </StorefrontCarousel>
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        "mt-2.5 px-1.5 sm:mt-5 sm:px-0",
-        isCarousel
-          ? "-mx-1.5 flex snap-x snap-mandatory scroll-px-1.5 gap-1.5 overflow-x-auto px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:scroll-px-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:scroll-px-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
-          : "grid grid-cols-2 items-stretch gap-1.5 sm:gap-4 md:grid-cols-4",
-      )}
-    >
-      {products.length > 0 ? (
-        products.map((product) => (
-          <div
-            className={
-              isCarousel
-                ? "flex min-w-0 shrink-0 basis-[calc((100%_-_0.375rem)_/_2)] snap-start sm:basis-[calc((100%_-_3rem)_/_4)] xl:basis-[calc((100%_-_4rem)_/_5)]"
-                : undefined
-            }
-            key={product.id}
-          >
-            <MarketplaceProductCard product={product} />
-          </div>
-        ))
-      ) : (
-        <EmptyCollectionState label={emptyLabel} layout={layout} />
-      )}
+    <div className="mt-2.5 grid grid-cols-2 items-stretch gap-1.5 px-1.5 sm:mt-5 sm:gap-4 sm:px-0 md:grid-cols-4">
+      {productCards}
     </div>
   );
 }
@@ -584,51 +681,61 @@ function CategoryCollectionList({
   emptyLabel: string;
   imageOverrides: StorefrontCategoryCollectionSection["settings"]["categoryImages"];
   imageSource: StorefrontCategoryCollectionSection["settings"]["imageSource"];
-  layout: "carousel" | "grid";
+  layout: StorefrontCollectionLayout;
 }) {
   const imageOverrideByCategoryId = new Map(
     imageOverrides.map((image) => [image.categoryId, image]),
   );
   const isCarousel = layout === "carousel";
+  const categoryCards = categories.map((category) => {
+    const override = imageOverrideByCategoryId.get(category.id);
+    const imageUrl =
+      imageSource === "custom"
+        ? (override?.imageUrl ?? category.firstProductImageUrl)
+        : category.firstProductImageUrl;
+    const imageAlt =
+      imageSource === "custom"
+        ? (override?.imageAlt ?? `${category.name} category`)
+        : `${category.name} category`;
+
+    return (
+      <CategoryCard
+        category={category}
+        className={
+          isCarousel
+            ? "w-[46%] min-w-[8.5rem] max-w-[13rem] shrink-0 snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
+            : undefined
+        }
+        imageAlt={imageAlt}
+        imageUrl={imageUrl}
+        key={category.id}
+      />
+    );
+  });
+
+  if (categories.length === 0) {
+    return (
+      <div className="mt-2.5 grid px-1.5 sm:mt-5 sm:px-0">
+        <EmptyCollectionState label={emptyLabel} layout={layout} />
+      </div>
+    );
+  }
+
+  if (isCarousel) {
+    return (
+      <StorefrontCarousel
+        className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
+        label="Category collection carousel"
+        trackClassName="flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+      >
+        {categoryCards}
+      </StorefrontCarousel>
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        "mt-2.5 px-1.5 sm:mt-5 sm:px-0",
-        isCarousel
-          ? "flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
-          : "grid grid-cols-2 items-start gap-1.5 sm:gap-4 md:grid-cols-4",
-      )}
-    >
-      {categories.length > 0 ? (
-        categories.map((category) => {
-          const override = imageOverrideByCategoryId.get(category.id);
-          const imageUrl =
-            imageSource === "custom"
-              ? (override?.imageUrl ?? category.firstProductImageUrl)
-              : category.firstProductImageUrl;
-          const imageAlt =
-            imageSource === "custom"
-              ? (override?.imageAlt ?? `${category.name} category`)
-              : `${category.name} category`;
-
-          return (
-            <CategoryCard
-              category={category}
-              className={
-                isCarousel
-                  ? "w-[46%] min-w-[8.5rem] max-w-[13rem] snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
-                  : undefined
-              }
-              imageAlt={imageAlt}
-              imageUrl={imageUrl}
-              key={category.id}
-            />
-          );
-        })
-      ) : (
-        <EmptyCollectionState label={emptyLabel} layout={layout} />
-      )}
+    <div className="mt-2.5 grid grid-cols-2 items-start gap-1.5 px-1.5 sm:mt-5 sm:gap-4 sm:px-0 md:grid-cols-4">
+      {categoryCards}
     </div>
   );
 }
@@ -640,34 +747,44 @@ function BrandCollectionList({
 }: {
   brands: MarketplaceBrandSummary[];
   emptyLabel: string;
-  layout: "carousel" | "grid";
+  layout: StorefrontCollectionLayout;
 }) {
   const isCarousel = layout === "carousel";
+  const brandCards = brands.map((brand) => (
+    <MarketplaceBrandCard
+      brand={brand}
+      className={
+        isCarousel
+          ? "w-[46%] min-w-[8.5rem] max-w-[13rem] shrink-0 snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
+          : undefined
+      }
+      key={brand.id}
+    />
+  ));
+
+  if (brands.length === 0) {
+    return (
+      <div className="mt-2.5 grid px-1.5 sm:mt-5 sm:px-0">
+        <EmptyCollectionState label={emptyLabel} layout={layout} />
+      </div>
+    );
+  }
+
+  if (isCarousel) {
+    return (
+      <StorefrontCarousel
+        className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
+        label="Brand collection carousel"
+        trackClassName="flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+      >
+        {brandCards}
+      </StorefrontCarousel>
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        "mt-2.5 px-1.5 sm:mt-5 sm:px-0",
-        isCarousel
-          ? "flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
-          : "grid grid-cols-2 items-start gap-1.5 sm:gap-4 md:grid-cols-4",
-      )}
-    >
-      {brands.length > 0 ? (
-        brands.map((brand) => (
-          <MarketplaceBrandCard
-            brand={brand}
-            className={
-              isCarousel
-                ? "w-[46%] min-w-[8.5rem] max-w-[13rem] snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
-                : undefined
-            }
-            key={brand.id}
-          />
-        ))
-      ) : (
-        <EmptyCollectionState label={emptyLabel} layout={layout} />
-      )}
+    <div className="mt-2.5 grid grid-cols-2 items-start gap-1.5 px-1.5 sm:mt-5 sm:gap-4 sm:px-0 md:grid-cols-4">
+      {brandCards}
     </div>
   );
 }
@@ -678,35 +795,45 @@ function BlogCollectionList({
   posts,
 }: {
   emptyLabel: string;
-  layout: "carousel" | "grid";
+  layout: StorefrontCollectionLayout;
   posts: PublicBlogPostSummary[];
 }) {
   const isCarousel = layout === "carousel";
+  const blogCards = posts.map((post) => (
+    <MarketplaceBlogCard
+      className={
+        isCarousel
+          ? "w-[84%] min-w-[17rem] max-w-[22rem] shrink-0 snap-start sm:w-80 sm:min-w-80 sm:max-w-80"
+          : undefined
+      }
+      key={post.id}
+      post={post}
+    />
+  ));
+
+  if (posts.length === 0) {
+    return (
+      <div className="mt-2.5 grid px-1.5 sm:mt-5 sm:px-0">
+        <EmptyCollectionState label={emptyLabel} layout={layout} />
+      </div>
+    );
+  }
+
+  if (isCarousel) {
+    return (
+      <StorefrontCarousel
+        className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
+        label="Blog post carousel"
+        trackClassName="flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+      >
+        {blogCards}
+      </StorefrontCarousel>
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        "mt-2.5 px-1.5 sm:mt-5 sm:px-0",
-        isCarousel
-          ? "flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
-          : "grid grid-cols-1 items-start gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3",
-      )}
-    >
-      {posts.length > 0 ? (
-        posts.map((post) => (
-          <MarketplaceBlogCard
-            className={
-              isCarousel
-                ? "w-[84%] min-w-[17rem] max-w-[22rem] snap-start sm:w-80 sm:min-w-80 sm:max-w-80"
-                : undefined
-            }
-            key={post.id}
-            post={post}
-          />
-        ))
-      ) : (
-        <EmptyCollectionState label={emptyLabel} layout={layout} />
-      )}
+    <div className="mt-2.5 grid grid-cols-1 items-start gap-2 px-1.5 sm:mt-5 sm:grid-cols-2 sm:gap-4 sm:px-0 lg:grid-cols-3">
+      {blogCards}
     </div>
   );
 }
@@ -1143,7 +1270,7 @@ function EmptyCollectionState({
   layout,
 }: {
   label: string;
-  layout: "carousel" | "grid";
+  layout: StorefrontCollectionLayout;
 }) {
   return (
     <div

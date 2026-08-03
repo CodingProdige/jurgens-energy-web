@@ -106,9 +106,17 @@ const collectionLayoutOptions: Array<{
   label: string;
   value: StorefrontCollectionLayout;
 }> = storefrontCollectionLayouts.map((layout) => ({
-  label: layout === "carousel" ? "Carousel" : "Grid",
+  label:
+    layout === "carousel"
+      ? "Carousel"
+      : layout === "load_more"
+        ? "Load more"
+        : "Grid",
   value: layout,
 }));
+const simpleCollectionLayoutOptions = collectionLayoutOptions.filter(
+  (option) => option.value !== "load_more",
+);
 
 const categoryScopeOptions: Array<{
   label: string;
@@ -184,6 +192,11 @@ const sectionLibraryGroups: Array<{
         title: "Hero",
         type: "hero",
       },
+      {
+        description: "Full-width clickable campaign banner with optional media.",
+        title: "Banner link",
+        type: "banner_link",
+      },
     ],
     title: "Hero",
   },
@@ -191,7 +204,8 @@ const sectionLibraryGroups: Array<{
     description: "Product browsing sections that render catalog items.",
     items: [
       {
-        description: "Configurable product rail/grid filtered by product type.",
+        description:
+          "Configurable product rail, grid, or load-more section filtered by product type.",
         title: "Product collection",
         type: "product_collection",
       },
@@ -951,6 +965,13 @@ function SectionSettingsEditor({
           updateSettings={patch}
         />
       ) : null}
+      {section.type === "banner_link" ? (
+        <BannerLinkSettings
+          mediaLibrary={mediaLibrary}
+          section={section}
+          updateSettings={patch}
+        />
+      ) : null}
       {section.type === "quick_actions" ? (
         <QuickActionSettings section={section} updateSettings={patch} />
       ) : null}
@@ -1054,6 +1075,81 @@ function HeroSettings({
       />
       <TextField
         label="Hero image alt text"
+        onChange={(imageAlt) => updateSettings({ ...settings, imageAlt })}
+        value={settings.imageAlt}
+      />
+    </>
+  );
+}
+
+function BannerLinkSettings({
+  mediaLibrary,
+  section,
+  updateSettings,
+}: {
+  mediaLibrary: SiteBuilderMediaLibrary;
+  section: Extract<StorefrontSection, { type: "banner_link" }>;
+  updateSettings: (settings: StorefrontSection["settings"]) => void;
+}) {
+  const settings = section.settings;
+
+  return (
+    <>
+      <TextField
+        label="Eyebrow"
+        onChange={(eyebrow) => updateSettings({ ...settings, eyebrow })}
+        value={settings.eyebrow}
+      />
+      <TextareaField
+        label="Title"
+        onChange={(title) => updateSettings({ ...settings, title })}
+        value={settings.title}
+      />
+      <TitleStyleFields
+        label="Title"
+        max={56}
+        min={20}
+        onChange={({ size, tag }) =>
+          updateSettings({
+            ...settings,
+            titleSize: size,
+            titleTag: tag,
+          })
+        }
+        size={settings.titleSize}
+        tag={settings.titleTag}
+      />
+      <TextareaField
+        label="Supporting copy"
+        onChange={(copy) => updateSettings({ ...settings, copy })}
+        value={settings.copy}
+      />
+      <TextField
+        label="Action label"
+        onChange={(actionLabel) =>
+          updateSettings({ ...settings, actionLabel })
+        }
+        value={settings.actionLabel}
+      />
+      <LinkDestinationField
+        onChange={(href) => updateSettings({ ...settings, href })}
+        value={settings.href}
+      />
+      <MediaImageField
+        altValue={settings.imageAlt}
+        imageUrl={settings.imageUrl}
+        label="Banner image"
+        mediaLibrary={mediaLibrary}
+        onImageChange={(imageUrl, imageAlt) =>
+          updateSettings({
+            ...settings,
+            imageAlt: imageAlt ?? settings.imageAlt,
+            imageUrl,
+          })
+        }
+      />
+      <TextField
+        label="Banner image alt text"
         onChange={(imageAlt) => updateSettings({ ...settings, imageAlt })}
         value={settings.imageAlt}
       />
@@ -1763,7 +1859,7 @@ function CategoryCollectionSettings({
             layout: layout as StorefrontCollectionLayout,
           })
         }
-        options={collectionLayoutOptions}
+        options={simpleCollectionLayoutOptions}
         value={settings.layout}
       />
       <SelectField
@@ -1907,7 +2003,7 @@ function BrandCollectionSettings({
             layout: layout as StorefrontCollectionLayout,
           })
         }
-        options={collectionLayoutOptions}
+        options={simpleCollectionLayoutOptions}
         value={settings.layout}
       />
       <MultiSelectField
@@ -1982,7 +2078,7 @@ function LatestBlogPostsSettings({
             layout: layout as StorefrontCollectionLayout,
           })
         }
-        options={collectionLayoutOptions}
+        options={simpleCollectionLayoutOptions}
         value={settings.layout}
       />
       <NumberField

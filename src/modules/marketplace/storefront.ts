@@ -87,6 +87,10 @@ const storefrontMediaUrlSchema = boundedText(500)
     isAllowedStorefrontMediaUrl,
     "Use a relative image path or full http/https image URL.",
   );
+const optionalStorefrontMediaUrlSchema = boundedText(500).refine(
+  (value) => !value || isAllowedStorefrontMediaUrl(value),
+  "Use a relative image path or full http/https image URL.",
+);
 
 const actionSchema = z.object({
   href: storefrontHrefSchema,
@@ -216,6 +220,21 @@ const cylinderShowcaseSectionSchema = sectionBaseSchema.extend({
           : []),
     })),
   type: z.literal("cylinder_showcase"),
+});
+
+const bannerLinkSectionSchema = sectionBaseSchema.extend({
+  settings: z.object({
+    actionLabel: boundedText(80).min(1, "Banner action label is required."),
+    copy: boundedText(320),
+    eyebrow: boundedText(90),
+    href: storefrontHrefSchema,
+    imageAlt: boundedText(160),
+    imageUrl: optionalStorefrontMediaUrlSchema.default(""),
+    title: boundedText(160).min(1, "Banner title is required."),
+    titleSize: titleSizeSchema.default(34),
+    titleTag: titleTagSchema.default("h2"),
+  }),
+  type: z.literal("banner_link"),
 });
 
 const productCollectionSectionSchema = sectionBaseSchema.extend({
@@ -353,6 +372,7 @@ const storefrontSectionsSchema = z
       heroSectionSchema,
       quickActionsSectionSchema,
       cylinderShowcaseSectionSchema,
+      bannerLinkSectionSchema,
       productCollectionSectionSchema,
       categoryCollectionSectionSchema,
       brandCollectionSectionSchema,
@@ -427,6 +447,10 @@ const storefrontValidationFieldLabels: Record<string, string> = {
   categoryLimit: "Category limit",
   categoryScope: "Category scope",
   categoryVisibility: "Category visibility",
+  actionLabel: "Action label",
+  href: "Link destination",
+  imageUrl: "Image URL",
+  layout: "Layout",
   postLimit: "Post limit",
   productLimit: "Product limit",
   productSource: "Product source",

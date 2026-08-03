@@ -2,6 +2,7 @@ export const storefrontSectionTypes = [
   "hero",
   "quick_actions",
   "cylinder_showcase",
+  "banner_link",
   "product_collection",
   "category_collection",
   "brand_collection",
@@ -15,6 +16,7 @@ export const storefrontSectionCodePrefixes: Record<
   StorefrontSectionType,
   string
 > = {
+  banner_link: "BANNER-LINK",
   brand_collection: "BRAND-COLLECTION",
   category_collection: "CATEGORY-COLLECTION",
   cylinder_showcase: "CYLINDER-EXCHANGE",
@@ -33,7 +35,11 @@ export type StorefrontProductSource =
   | "exchange"
   | "full_cylinders";
 
-export const storefrontCollectionLayouts = ["grid", "carousel"] as const;
+export const storefrontCollectionLayouts = [
+  "grid",
+  "carousel",
+  "load_more",
+] as const;
 
 export type StorefrontCollectionLayout =
   (typeof storefrontCollectionLayouts)[number];
@@ -137,6 +143,21 @@ export type StorefrontCylinderShowcaseSection = StorefrontSectionBase<
   }
 >;
 
+export type StorefrontBannerLinkSection = StorefrontSectionBase<
+  "banner_link",
+  {
+    actionLabel: string;
+    copy: string;
+    eyebrow: string;
+    href: string;
+    imageAlt: string;
+    imageUrl: string;
+    title: string;
+    titleSize: number;
+    titleTag: StorefrontTitleTag;
+  }
+>;
+
 export type StorefrontProductCollectionSection = StorefrontSectionBase<
   "product_collection",
   {
@@ -219,6 +240,7 @@ export type StorefrontFeatureGridSection = StorefrontSectionBase<
 >;
 
 export type StorefrontSection =
+  | StorefrontBannerLinkSection
   | StorefrontBrandCollectionSection
   | StorefrontCategoryCollectionSection
   | StorefrontCylinderShowcaseSection
@@ -229,6 +251,7 @@ export type StorefrontSection =
   | StorefrontQuickActionsSection;
 
 export const storefrontSectionLabels: Record<StorefrontSectionType, string> = {
+  banner_link: "Banner link",
   brand_collection: "Brand collection",
   category_collection: "Category collection",
   cylinder_showcase: "Cylinder exchange",
@@ -336,6 +359,24 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       ],
     },
     type: "cylinder_showcase",
+  },
+  {
+    componentCode: "BANNER-LINK-01",
+    enabled: false,
+    id: "banner-link",
+    settings: {
+      actionLabel: "Shop now",
+      copy:
+        "Feature a promotion, category, brand, or important customer update with a full-width link.",
+      eyebrow: "Featured",
+      href: "/products",
+      imageAlt: "Jurgens Energy featured storefront banner",
+      imageUrl: "",
+      title: "Build a full-width banner link.",
+      titleSize: 34,
+      titleTag: "h2",
+    },
+    type: "banner_link",
   },
   {
     componentCode: "PRODUCT-COLLECTION-01",
@@ -472,6 +513,7 @@ export function createDefaultStorefrontSection(
     componentCode:
       componentCode ??
       `${storefrontSectionCodePrefixes[type]}-${Date.now().toString(36).toUpperCase()}`,
+    enabled: true,
     id: `${type}-${Date.now().toString(36)}`,
   } as StorefrontSection;
 }

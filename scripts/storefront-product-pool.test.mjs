@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { filterStorefrontProducts } from "../src/modules/marketplace/product-filters.ts";
+import {
+  createDefaultStorefrontSection,
+  storefrontCollectionLayouts,
+  storefrontSectionTypes,
+} from "../src/modules/marketplace/storefront-types.ts";
 
 function category({ id, path }) {
   return {
@@ -77,4 +82,15 @@ test("homepage and builder preview do not pre-truncate product sections before f
 
   assert.match(homepageSource, /getMarketplaceCatalog\(\{\s*brandSlug,[\s\S]*?limit:\s*null,/);
   assert.match(builderPreviewSource, /getMarketplaceCatalog\(\{\s*currencyContext,[\s\S]*?limit:\s*null,/);
+});
+
+test("storefront builder supports load-more products and banner link sections", () => {
+  assert.ok(storefrontCollectionLayouts.includes("load_more"));
+  assert.ok(storefrontSectionTypes.includes("banner_link"));
+
+  const bannerSection = createDefaultStorefrontSection("banner_link");
+
+  assert.equal(bannerSection.type, "banner_link");
+  assert.equal(bannerSection.enabled, true);
+  assert.equal(typeof bannerSection.settings.href, "string");
 });
