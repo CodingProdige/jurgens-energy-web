@@ -97,10 +97,12 @@ export function StorefrontCarousel({
     window.setTimeout(updateScrollState, 260);
   }
 
-  const showControls = scrollState.hasOverflow;
+  const showControls = true;
+  const canScrollPrevious = scrollState.hasOverflow && scrollState.previous;
+  const canScrollNext = scrollState.hasOverflow && scrollState.next;
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative min-w-0", className)}>
       <div
         aria-label={label}
         className={trackClassName}
@@ -114,25 +116,27 @@ export function StorefrontCarousel({
       <div
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-y-0 left-0 hidden w-12 bg-gradient-to-r from-white via-white/88 to-transparent dark:from-[#080808] dark:via-[#080808]/88 lg:block",
-          (!showControls || !scrollState.previous) && "opacity-0",
+          "pointer-events-none absolute inset-y-0 left-0 hidden w-14 bg-gradient-to-r from-white via-white/88 to-transparent transition dark:from-[#080808] dark:via-[#080808]/88 md:block",
+          !canScrollPrevious && "opacity-0",
         )}
       />
       <div
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-y-0 right-0 hidden w-12 bg-gradient-to-l from-white via-white/88 to-transparent dark:from-[#080808] dark:via-[#080808]/88 lg:block",
-          (!showControls || !scrollState.next) && "opacity-0",
+          "pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-white via-white/88 to-transparent transition dark:from-[#080808] dark:via-[#080808]/88 md:block",
+          !canScrollNext && "opacity-0",
         )}
       />
 
       <button
         aria-controls={trackId}
+        aria-disabled={!canScrollPrevious}
         aria-label="Previous items"
         className={cn(
-          "absolute left-1 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] lg:grid",
-          (!showControls || !scrollState.previous) &&
-            "pointer-events-none opacity-0",
+          "absolute left-2 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] md:grid",
+          !showControls && "hidden",
+          !canScrollPrevious &&
+            "pointer-events-none opacity-45 shadow-[0_6px_16px_rgba(8,8,8,0.08)]",
         )}
         onClick={() => scrollByPage(-1)}
         type="button"
@@ -141,11 +145,13 @@ export function StorefrontCarousel({
       </button>
       <button
         aria-controls={trackId}
+        aria-disabled={!canScrollNext}
         aria-label="Next items"
         className={cn(
-          "absolute right-1 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] lg:grid",
-          (!showControls || !scrollState.next) &&
-            "pointer-events-none opacity-0",
+          "absolute right-2 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] md:grid",
+          !showControls && "hidden",
+          !canScrollNext &&
+            "pointer-events-none opacity-45 shadow-[0_6px_16px_rgba(8,8,8,0.08)]",
         )}
         onClick={() => scrollByPage(1)}
         type="button"

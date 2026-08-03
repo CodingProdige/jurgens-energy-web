@@ -281,7 +281,7 @@ function StorefrontProductCollectionSectionView({
 
   return (
     <section
-      className="grid gap-3 border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
@@ -395,14 +395,24 @@ function StorefrontCategoryCollectionSectionView({
     )
     .slice(0, settings.categoryLimit);
   const sectionId = getCollectionSectionId(section.id, settings.actions);
+  const headerActions =
+    settings.actions.length > 0
+      ? settings.actions
+      : [
+          {
+            href: "/categories",
+            label: "View All Categories",
+            variant: "secondary" as const,
+          },
+        ];
 
   return (
     <section
-      className="grid gap-3 border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
-        actions={settings.actions}
+        actions={headerActions}
         eyebrow={settings.eyebrow}
         title={settings.title}
         titleSize={settings.titleSize}
@@ -435,7 +445,7 @@ function StorefrontBrandCollectionSectionView({
 
   return (
     <section
-      className="grid gap-3 border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
@@ -467,7 +477,7 @@ function StorefrontLatestBlogPostsSectionView({
 
   return (
     <section
-      className="grid gap-3 border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
@@ -567,8 +577,8 @@ function StorefrontCollectionHeader({
   titleTag: StorefrontTitleTag;
 }) {
   return (
-    <div className="grid gap-2 px-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:gap-x-4 sm:px-0">
-      <div className="min-w-0">
+    <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-2 overflow-hidden px-3 sm:flex-nowrap sm:items-end sm:px-0">
+      <div className="min-w-0 flex-1">
         {eyebrow ? (
           <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#ff5a1f] sm:text-[12px]">
             {eyebrow}
@@ -584,7 +594,7 @@ function StorefrontCollectionHeader({
       </div>
       <StorefrontTextActionList
         actions={actions}
-        className="sm:justify-end sm:pb-1"
+        className="w-full max-w-full sm:w-auto sm:max-w-[42%] sm:shrink-0 sm:justify-end sm:pb-1"
       />
     </div>
   );
@@ -1035,7 +1045,7 @@ function StorefrontTextActionList({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2",
+        "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 overflow-hidden",
         className,
       )}
     >
@@ -1056,7 +1066,7 @@ function StorefrontTextActionLink({
 }) {
   return (
     <StorefrontLink
-      className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-normal uppercase leading-none text-[#080808] transition hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:text-[#ff7a4b] sm:text-[13px]"
+      className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-[12px] font-normal uppercase leading-none text-[#080808] transition hover:text-[#ff5a1f] dark:text-[#f7f7f2] dark:hover:text-[#ff7a4b] sm:text-[13px]"
       href={action.href}
     >
       <span className="truncate">{action.label}</span>
