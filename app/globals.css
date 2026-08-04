@@ -818,6 +818,42 @@ h6:not([class]) {
   }
 }
 
+.marketplace-product-card,
+.marketplace-category-card,
+.marketplace-brand-card {
+  contain: none !important;
+  content-visibility: visible !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+.marketplace-product-card *,
+.marketplace-category-card *,
+.marketplace-brand-card * {
+  animation: none !important;
+  content-visibility: visible !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+.marketplace-product-card:hover,
+.marketplace-category-card:hover,
+.marketplace-brand-card:hover {
+  transform: none !important;
+}
+
+.marketplace-header-shell,
+.marketplace-header-shell *,
+.marketplace-header-search,
+.marketplace-header-search *,
+.marketplace-nav-link,
+.marketplace-shop-menu,
+.marketplace-shop-menu * {
+  animation: none !important;
+  content-visibility: visible !important;
+  transition: none !important;
+}
+
 @media (max-width: 63.999rem) {
   body:has([data-marketplace-mobile-dock])
     [data-marketplace-whatsapp-button] {

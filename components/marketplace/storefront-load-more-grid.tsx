@@ -32,7 +32,7 @@ export function StorefrontLoadMoreGrid({
       {remainingCount > 0 ? (
         <div className="mt-5 flex justify-center sm:mt-7">
           <button
-            className="group inline-flex min-h-11 items-center justify-center rounded-full bg-[#080808] px-7 text-[14px] font-black uppercase tracking-[0.04em] text-white shadow-[0_12px_28px_rgba(8,8,8,0.16)] transition hover:bg-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:bg-[#f7f7f2] dark:text-[#080808] dark:hover:bg-[#ff5a1f] dark:hover:text-white"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#080808] px-7 text-[14px] font-black uppercase tracking-[0.04em] text-white shadow-[0_12px_28px_rgba(8,8,8,0.16)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:bg-[#f7f7f2] dark:text-[#080808]"
             onClick={() =>
               setVisibleCount((currentCount) =>
                 Math.min(currentCount + increment, items.length),
@@ -41,7 +41,7 @@ export function StorefrontLoadMoreGrid({
             type="button"
           >
             Load more
-            <span className="ml-2 rounded-full bg-white/14 px-2 py-0.5 text-[11px] text-white/82 transition dark:bg-[#080808]/10 dark:text-[#080808]/70 dark:group-hover:bg-white/14 dark:group-hover:text-white">
+            <span className="ml-2 rounded-full bg-white/14 px-2 py-0.5 text-[11px] text-white/82 dark:bg-[#080808]/10 dark:text-[#080808]/70">
               {remainingCount}
             </span>
           </button>

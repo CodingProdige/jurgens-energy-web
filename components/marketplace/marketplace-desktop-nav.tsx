@@ -68,16 +68,17 @@ export function MarketplaceDesktopNav({
           <Link
             aria-current={active ? "page" : undefined}
             className={cn(
-              "group relative inline-flex h-[82px] items-center gap-1 transition hover:text-[#ff5a1f]",
+              "marketplace-nav-link relative inline-flex h-[82px] items-center gap-1 focus-visible:outline-none focus-visible:text-[#ff5a1f]",
               active && "text-[#ff5a1f]",
             )}
             href={href}
             key={label}
+            prefetch={false}
           >
             <span>{label}</span>
             <span
               className={cn(
-                "absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f] transition group-hover:scale-x-100",
+                "absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f]",
                 active ? "scale-x-100" : "scale-x-0",
               )}
             />

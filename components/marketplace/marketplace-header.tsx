@@ -112,6 +112,7 @@ export async function MarketplaceHeader() {
           aria-label="Jurgens Energy home"
           className="flex min-w-0 shrink items-center sm:shrink-0"
           href="/"
+          prefetch={false}
         >
           <JurgensEnergyLogo className="sm:hidden" compact />
           <JurgensEnergyLogo className="hidden sm:inline-flex" compact={false} />
@@ -133,6 +134,7 @@ export async function MarketplaceHeader() {
               marketplacePrimaryActionBaseClass,
             )}
             href="/products"
+            prefetch={false}
           >
             Shop Now
           </Link>

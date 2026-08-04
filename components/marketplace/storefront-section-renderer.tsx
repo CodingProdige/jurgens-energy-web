@@ -657,7 +657,7 @@ function ProductCollectionList({
     <div
       className={
         isCarousel
-          ? "flex w-[min(70vw,11rem)] min-w-[10.5rem] shrink-0 snap-start items-stretch sm:w-[12.5rem] sm:min-w-[12.5rem] md:w-[13rem] md:min-w-[13rem] lg:w-[13.5rem] lg:min-w-[13.5rem] xl:w-[14rem] xl:min-w-[14rem]"
+          ? "flex w-[min(70vw,11rem)] min-w-[10.5rem] shrink-0 items-stretch sm:w-[12.5rem] sm:min-w-[12.5rem] md:w-[13rem] md:min-w-[13rem] lg:w-[13.5rem] lg:min-w-[13.5rem] xl:w-[14rem] xl:min-w-[14rem]"
           : undefined
       }
       key={product.id}
@@ -687,7 +687,7 @@ function ProductCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Product collection carousel"
-        trackClassName="-mx-1.5 flex snap-x snap-mandatory items-stretch gap-1.5 overflow-x-auto overflow-y-visible scroll-px-1.5 px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:scroll-px-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:scroll-px-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="-mx-1.5 flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
       >
         {productCards}
       </StorefrontCarousel>
@@ -734,7 +734,7 @@ function CategoryCollectionList({
         category={category}
         className={
           isCarousel
-            ? "w-[46%] min-w-[8.5rem] max-w-[13rem] shrink-0 snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
+            ? "w-[46%] min-w-[8.5rem] max-w-[13rem] shrink-0 sm:w-56 sm:min-w-56 sm:max-w-56"
             : undefined
         }
         imageAlt={imageAlt}
@@ -757,7 +757,7 @@ function CategoryCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Category collection carousel"
-        trackClassName="flex snap-x items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {categoryCards}
       </StorefrontCarousel>
@@ -786,7 +786,7 @@ function BrandCollectionList({
       brand={brand}
       className={
         isCarousel
-          ? "w-[46%] min-w-[8.5rem] max-w-[13rem] shrink-0 snap-start sm:w-56 sm:min-w-56 sm:max-w-56"
+          ? "w-[46%] min-w-[8.5rem] max-w-[13rem] shrink-0 sm:w-56 sm:min-w-56 sm:max-w-56"
           : undefined
       }
       key={brand.id}
@@ -806,7 +806,7 @@ function BrandCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Brand collection carousel"
-        trackClassName="flex snap-x items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {brandCards}
       </StorefrontCarousel>
@@ -834,7 +834,7 @@ function BlogCollectionList({
     <MarketplaceBlogCard
       className={
         isCarousel
-          ? "w-[84%] min-w-[17rem] max-w-[22rem] shrink-0 snap-start sm:w-80 sm:min-w-80 sm:max-w-80"
+          ? "w-[84%] min-w-[17rem] max-w-[22rem] shrink-0 sm:w-80 sm:min-w-80 sm:max-w-80"
           : undefined
       }
       key={post.id}
@@ -855,7 +855,7 @@ function BlogCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Blog post carousel"
-        trackClassName="flex snap-x items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {blogCards}
       </StorefrontCarousel>
@@ -883,7 +883,7 @@ function CategoryCard({
   return (
     <StorefrontLink
       className={cn(
-        "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition-colors hover:border-[#ff5a1f]/55 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
+        "marketplace-category-card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
         className,
       )}
       href={`/categories/${category.path}`}
@@ -921,7 +921,7 @@ export function MarketplaceBrandCard({
   return (
     <StorefrontLink
       className={cn(
-        "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition-colors hover:border-[#ff5a1f]/55 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
+        "marketplace-brand-card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
         className,
       )}
       href={`/brands/${brand.slug}`}
@@ -977,12 +977,12 @@ function StorefrontCollectionImage({
   if (isRemoteImage) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img alt={alt} className={imageClass} src={src} />
+      <img alt={alt} className={imageClass} loading="eager" src={src} />
     );
   }
 
   return (
-    <Image alt={alt} className={imageClass} fill sizes={sizes} src={src} />
+    <Image alt={alt} className={imageClass} fill loading="eager" sizes={sizes} src={src} />
   );
 }
 
@@ -1143,7 +1143,7 @@ function StorefrontLink({
   }
 
   return (
-    <Link className={className} href={href}>
+    <Link className={className} href={href} prefetch={false}>
       {children}
     </Link>
   );

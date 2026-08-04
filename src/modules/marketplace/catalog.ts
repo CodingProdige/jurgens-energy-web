@@ -179,6 +179,17 @@ export type MarketplaceProductDetail = MarketplaceProductCard & {
   variants: MarketplaceVariant[];
 };
 
+export type MarketplaceSearchSuggestion = {
+  brandName: string | null;
+  id: string;
+  imageUrl: string | null;
+  priceLabel: string;
+  productCode: string | null;
+  slug: string;
+  soldQuantity: number;
+  title: string;
+};
+
 export type MarketplaceSitemapEntries = {
   brands: Array<{ slug: string; updatedAt: Date }>;
   categories: Array<{ path: string; updatedAt: Date }>;
@@ -575,16 +586,20 @@ export type MarketplaceCatalogPageData = {
 };
 
 type MarketplaceCatalogFilterVariant = {
+  barcode: string | null;
   compareAtPrice: string | null;
   continueSellingOutOfStock: boolean;
   id: string;
   isActive: boolean;
   lowStockAlert: number;
+  optionValues: string[];
   price: string;
   productId: string;
   requiresExchangeEmpty: boolean;
+  sku: string;
   status: string;
   stockOnHand: number;
+  title: string;
 };
 
 type MarketplaceCatalogFilterRecord = {
@@ -656,7 +671,15 @@ function matchesCatalogRecord({
       record.row.title,
       record.row.shortDescription,
       record.row.brandName,
+      record.row.barcode,
+      record.row.categoryName,
       record.row.categoryPath,
+      ...record.variants.flatMap((variant) => [
+        variant.barcode,
+        variant.sku,
+        variant.title,
+        ...variant.optionValues,
+      ]),
     ]
       .filter(Boolean)
       .some((value) => value!.toLowerCase().includes(normalizedQuery))
@@ -764,6 +787,231 @@ function sortCatalogRecords(
   });
 }
 
+function normalizeCatalogSearchValue(value: string | null | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function getVariantSearchValues(variant: MarketplaceCatalogFilterVariant) {
+  return [
+    variant.sku,
+    variant.barcode,
+    variant.title,
+    ...variant.optionValues,
+  ].filter((value): value is string => Boolean(value));
+}
+
+function variantMatchesQuery(
+  variant: MarketplaceCatalogFilterVariant,
+  normalizedQuery: string,
+) {
+  if (!normalizedQuery) {
+    return false;
+  }
+
+  return getVariantSearchValues(variant).some((value) =>
+    value.toLowerCase().includes(normalizedQuery),
+  );
+}
+
+function variantExactCodeMatchesQuery(
+  variant: MarketplaceCatalogFilterVariant,
+  normalizedQuery: string,
+) {
+  if (!normalizedQuery) {
+    return false;
+  }
+
+  return [variant.sku, variant.barcode]
+    .filter(Boolean)
+    .some((value) => value!.toLowerCase() === normalizedQuery);
+}
+
+export async function getMarketplaceSearchSuggestions({
+  currencyContext,
+  limit = 6,
+  query = "",
+}: {
+  currencyContext: CurrencyContext;
+  limit?: number;
+  query?: string;
+}): Promise<{
+  popular: MarketplaceSearchSuggestion[];
+  suggestions: MarketplaceSearchSuggestion[];
+}> {
+  const normalizedQuery = normalizeCatalogSearchValue(query);
+  const rows = await getPublicProductsBaseRows();
+  const productIds = rows.map((row) => row.id);
+
+  if (productIds.length === 0) {
+    return { popular: [], suggestions: [] };
+  }
+
+  const [variantRows, soldQuantityByProductId, productMediaByProductId] =
+    await Promise.all([
+      db
+        .select({
+          barcode: productVariants.barcode,
+          compareAtPrice: productVariants.compareAtPrice,
+          continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
+          id: productVariants.id,
+          isActive: productVariants.isActive,
+          lowStockAlert: productVariants.lowStockAlert,
+          optionValues: productVariants.optionValues,
+          price: productVariants.price,
+          productId: productVariants.productId,
+          requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
+          sku: productVariants.sku,
+          status: productVariants.status,
+          stockOnHand: productVariants.stockOnHand,
+          title: productVariants.title,
+        })
+        .from(productVariants)
+        .where(inArray(productVariants.productId, productIds))
+        .orderBy(asc(productVariants.title)),
+      getSoldQuantityByProductId(productIds),
+      getProductCardMediaByProductId(productIds),
+    ]);
+  const variantsByProductId = new Map<string, MarketplaceCatalogFilterVariant[]>();
+
+  for (const variant of variantRows) {
+    if (variant.status !== "active" || !variant.isActive) {
+      continue;
+    }
+
+    const variants = variantsByProductId.get(variant.productId) ?? [];
+    variants.push(variant);
+    variantsByProductId.set(variant.productId, variants);
+  }
+
+  const records = rows
+    .map((row): MarketplaceCatalogFilterRecord => {
+      const variants = variantsByProductId.get(row.id) ?? [];
+      const prices = variants
+        .map((variant) => Number(variant.price))
+        .filter(Number.isFinite);
+
+      return {
+        maximumPrice: prices.length > 0 ? Math.max(...prices) : null,
+        minimumPrice: prices.length > 0 ? Math.min(...prices) : null,
+        ratingSummary: getEmptyProductRatingSummary(),
+        row,
+        soldQuantity: soldQuantityByProductId.get(row.id) ?? 0,
+        variants,
+      };
+    })
+    .filter((record) => record.variants.length > 0);
+
+  function toSuggestion(record: MarketplaceCatalogFilterRecord) {
+    const exactVariant = record.variants.find((variant) =>
+      variantExactCodeMatchesQuery(variant, normalizedQuery),
+    );
+    const matchingVariant = exactVariant ??
+      record.variants.find((variant) =>
+        variantMatchesQuery(variant, normalizedQuery),
+      ) ??
+      record.variants[0] ??
+      null;
+
+    return {
+      brandName: record.row.brandName,
+      id: record.row.id,
+      imageUrl:
+        productMediaByProductId.get(record.row.id)?.coverImageUrl ?? null,
+      priceLabel: getPriceLabel(record.variants, currencyContext),
+      productCode: matchingVariant?.sku ?? null,
+      slug: record.row.slug,
+      soldQuantity: record.soldQuantity,
+      title: record.row.title,
+    };
+  }
+
+  function getMatchRank(record: MarketplaceCatalogFilterRecord) {
+    if (!normalizedQuery) {
+      return 100;
+    }
+
+    const productValues = [
+      record.row.title,
+      record.row.shortDescription,
+      record.row.brandName,
+      record.row.barcode,
+      record.row.categoryName,
+      record.row.categoryPath,
+    ].filter((value): value is string => Boolean(value));
+
+    if (
+      record.variants.some((variant) =>
+        variantExactCodeMatchesQuery(variant, normalizedQuery),
+      )
+    ) {
+      return 0;
+    }
+
+    if (
+      productValues.some((value) =>
+        value.toLowerCase().startsWith(normalizedQuery),
+      )
+    ) {
+      return 1;
+    }
+
+    if (
+      record.variants.some((variant) =>
+        getVariantSearchValues(variant).some((value) =>
+          value.toLowerCase().startsWith(normalizedQuery),
+        ),
+      )
+    ) {
+      return 2;
+    }
+
+    if (
+      productValues.some((value) =>
+        value.toLowerCase().includes(normalizedQuery),
+      )
+    ) {
+      return 3;
+    }
+
+    if (
+      record.variants.some((variant) =>
+        variantMatchesQuery(variant, normalizedQuery),
+      )
+    ) {
+      return 4;
+    }
+
+    return 100;
+  }
+
+  const popularRecords = [...records]
+    .sort(
+      (first, second) =>
+        second.soldQuantity - first.soldQuantity ||
+        second.row.updatedAt.getTime() - first.row.updatedAt.getTime(),
+    )
+    .slice(0, Math.max(1, Math.min(limit, 8)));
+  const matchedRecords = normalizedQuery
+    ? records
+        .map((record) => ({ rank: getMatchRank(record), record }))
+        .filter(({ rank }) => rank < 100)
+        .sort(
+          (first, second) =>
+            first.rank - second.rank ||
+            second.record.soldQuantity - first.record.soldQuantity ||
+            second.record.row.updatedAt.getTime() -
+              first.record.row.updatedAt.getTime(),
+        )
+        .slice(0, Math.max(1, Math.min(limit, 10)))
+        .map(({ record }) => record)
+    : popularRecords;
+
+  return {
+    popular: popularRecords.map(toSuggestion),
+    suggestions: matchedRecords.map(toSuggestion),
+  };
+}
+
 export async function getMarketplaceCatalogPage({
   accumulate = false,
   brandSlug,
@@ -836,16 +1084,20 @@ export async function getMarketplaceCatalogPage({
     productIds.length > 0
       ? await db
           .select({
+            barcode: productVariants.barcode,
             compareAtPrice: productVariants.compareAtPrice,
             continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
             id: productVariants.id,
             isActive: productVariants.isActive,
             lowStockAlert: productVariants.lowStockAlert,
+            optionValues: productVariants.optionValues,
             price: productVariants.price,
             productId: productVariants.productId,
             requiresExchangeEmpty: productVariants.requiresExchangeEmpty,
+            sku: productVariants.sku,
             status: productVariants.status,
             stockOnHand: productVariants.stockOnHand,
+            title: productVariants.title,
           })
           .from(productVariants)
           .where(inArray(productVariants.productId, productIds))

@@ -1672,6 +1672,7 @@ function ProductBuyBox({
             averageRating={product.averageRating}
             available={deliveryAvailable}
             benefit={deliveryBenefit}
+            productCode={selectedVariant?.sku ?? null}
             productTitle={product.title}
             reviewCount={product.reviewCount}
             sellerName={sellerName}
@@ -1923,6 +1924,7 @@ function MobileProductPurchaseSummary({
             available={deliveryAvailable}
             benefit={deliveryBenefit}
             compact
+            productCode={selectedVariant?.sku ?? null}
             productTitle={product.title}
             reviewCount={product.reviewCount}
             sellerName={sellerName}
@@ -2114,6 +2116,7 @@ function ProductConversionHeader({
   available,
   benefit,
   compact = false,
+  productCode,
   productTitle,
   reviewCount,
   sellerName,
@@ -2123,6 +2126,7 @@ function ProductConversionHeader({
   available: boolean;
   benefit: string;
   compact?: boolean;
+  productCode: string | null;
   productTitle: string;
   reviewCount: number;
   sellerName: string;
@@ -2150,6 +2154,16 @@ function ProductConversionHeader({
           >
             {productTitle}
           </h1>
+          {productCode ? (
+            <p
+              className={cn(
+                "min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-zinc-400",
+                compact ? "leading-3" : "sm:text-[11px]",
+              )}
+            >
+              Product code: {productCode}
+            </p>
+          ) : null}
         </div>
         <ProductShareButton compact={compact} productTitle={productTitle} />
       </div>

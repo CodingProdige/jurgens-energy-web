@@ -72,8 +72,9 @@ export default async function CategoriesPage() {
               </div>
 
               <Link
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#ff5a1f] px-5 text-[12px] font-black uppercase tracking-[0.05em] text-white transition hover:bg-[#e94d15]"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#ff5a1f] px-5 text-[12px] font-black uppercase tracking-[0.05em] text-white"
                 href="/products"
+                prefetch={false}
               >
                 Shop all products
                 <ArrowRightIcon className="size-4" />
@@ -113,9 +114,10 @@ export default async function CategoriesPage() {
               <div className="mt-5 grid gap-2 sm:mt-7 sm:grid-cols-2 lg:grid-cols-3">
                 {subcategories.map((category) => (
                   <Link
-                    className="group flex min-w-0 items-center justify-between gap-3 rounded-md border border-[#e8e8e2] bg-white px-4 py-3 transition hover:border-[#ff5a1f]/60 hover:text-[#ff5a1f] dark:border-white/10 dark:bg-white/[0.04]"
+                    className="marketplace-category-card flex min-w-0 items-center justify-between gap-3 rounded-md border border-[#e8e8e2] bg-white px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]"
                     href={`/categories/${category.path}`}
                     key={category.id}
+                    prefetch={false}
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-[14px] font-black">
@@ -125,7 +127,7 @@ export default async function CategoriesPage() {
                         {category.productCount} products
                       </span>
                     </span>
-                    <ArrowRightIcon className="size-4 shrink-0 transition group-hover:translate-x-0.5" />
+                    <ArrowRightIcon className="size-4 shrink-0" />
                   </Link>
                 ))}
               </div>
@@ -149,8 +151,9 @@ function CategoryDirectoryCard({
 
   return (
     <Link
-      className="group block min-w-0 overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none"
+      className="marketplace-category-card block min-w-0 overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none"
       href={`/categories/${category.path}`}
+      prefetch={false}
     >
       <div className="relative aspect-square bg-[#f7f7f2] dark:bg-[#1a1a1a]">
         {category.firstProductImageUrl ? (
@@ -158,14 +161,16 @@ function CategoryDirectoryCard({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt={`${category.name} category`}
-              className="size-full object-cover transition duration-300 group-hover:scale-[1.04]"
+              className="size-full object-cover"
+              loading="eager"
               src={category.firstProductImageUrl}
             />
           ) : (
             <Image
               alt={`${category.name} category`}
-              className="object-cover transition duration-300 group-hover:scale-[1.04]"
+              className="object-cover"
               fill
+              loading="eager"
               sizes="(min-width: 1280px) 20vw, (min-width: 768px) 33vw, 50vw"
               src={category.firstProductImageUrl}
             />
@@ -204,8 +209,9 @@ function EmptyCategoriesState() {
           assigned to them.
         </p>
         <Link
-          className="mt-5 inline-flex h-9 items-center justify-center rounded-md border border-[#d8d8d1] px-3 text-sm font-semibold transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] dark:border-white/15"
+          className="mt-5 inline-flex h-9 items-center justify-center rounded-md border border-[#d8d8d1] px-3 text-sm font-semibold dark:border-white/15"
           href="/products"
+          prefetch={false}
         >
           Browse products
         </Link>

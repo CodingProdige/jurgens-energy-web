@@ -15,7 +15,7 @@ type ProductCardQuickAddButtonProps = {
 };
 
 const quickAddPillClass =
-  "marketplace-card-quick-add inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-full border border-[#080808]/80 bg-white px-2 text-[#080808] shadow-[0_4px_12px_rgba(8,8,8,0.10)] transition-colors hover:border-[#ff5a1f] hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-[#f7f7f2]/80 dark:bg-[#f7f7f2] dark:text-[#080808] sm:h-8 sm:min-w-11";
+  "marketplace-card-quick-add inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-full border border-[#080808]/80 bg-white px-2 text-[#080808] shadow-[0_4px_12px_rgba(8,8,8,0.10)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-[#f7f7f2]/80 dark:bg-[#f7f7f2] dark:text-[#080808] sm:h-8 sm:min-w-11";
 
 export function ProductCardQuickAddButton({
   className,
@@ -86,6 +86,7 @@ export function ProductCardQuickAddButton({
         data-analytics-item-id={product.id}
         data-analytics-item-name={product.title}
         href={productHref}
+        prefetch={false}
         title="Choose options"
       >
         <QuickAddGlyph />
@@ -99,7 +100,7 @@ export function ProductCardQuickAddButton({
       className={cn(
         quickAddPillClass,
         added &&
-          "marketplace-card-quick-add-added border-emerald-600 bg-emerald-600 text-white hover:border-emerald-600 hover:bg-emerald-600 hover:text-white dark:border-emerald-600 dark:bg-emerald-600 dark:text-white",
+          "marketplace-card-quick-add-added border-emerald-600 bg-emerald-600 text-white dark:border-emerald-600 dark:bg-emerald-600 dark:text-white",
         className,
       )}
       onClick={handleQuickAdd}

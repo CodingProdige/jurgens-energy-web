@@ -74,9 +74,10 @@ function ExchangeableProductCard({
 }) {
   return (
     <Link
-      className="group/product flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 transition hover:border-[#ff5a1f]/70 hover:bg-[#ff5a1f]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+      className="marketplace-product-card flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
       href={`/products/${product.slug}`}
       onClick={onNavigate}
+      prefetch={false}
     >
       <span
         className="relative grid aspect-[1/1] size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.08]"
@@ -96,14 +97,14 @@ function ExchangeableProductCard({
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[11px] font-black uppercase text-white transition group-hover/product:text-[#ff5a1f]">
+        <span className="block truncate text-[11px] font-black uppercase text-white">
           {product.title}
         </span>
         <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#ff5a1f]">
           Exchange supported
         </span>
       </span>
-      <ChevronRightIcon className="size-4 shrink-0 text-[#ff5a1f] transition group-hover/product:translate-x-0.5" />
+      <ChevronRightIcon className="size-4 shrink-0 text-[#ff5a1f]" />
     </Link>
   );
 }
@@ -121,19 +122,11 @@ export function MarketplaceShopMenu({
   const [panelTop, setPanelTop] = useState(112);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lpgCategory = findLpgCategory(data.categories);
   const topLevelCategories = data.categories.filter(
     (category) => category.id !== lpgCategory?.id,
   );
-
-  const clearOpenTimer = useCallback(() => {
-    if (openTimerRef.current) {
-      clearTimeout(openTimerRef.current);
-      openTimerRef.current = null;
-    }
-  }, []);
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current) {
@@ -151,29 +144,20 @@ export function MarketplaceShopMenu({
   }, []);
 
   const openMenu = useCallback(() => {
-    clearOpenTimer();
     clearCloseTimer();
     updatePanelPosition();
     setOpen(true);
-  }, [clearCloseTimer, clearOpenTimer, updatePanelPosition]);
+  }, [clearCloseTimer, updatePanelPosition]);
 
   const closeMenu = useCallback(() => {
-    clearOpenTimer();
     clearCloseTimer();
     setOpen(false);
-  }, [clearCloseTimer, clearOpenTimer]);
-
-  const scheduleOpen = useCallback(() => {
-    clearCloseTimer();
-    clearOpenTimer();
-    openTimerRef.current = setTimeout(openMenu, 180);
-  }, [clearCloseTimer, clearOpenTimer, openMenu]);
+  }, [clearCloseTimer]);
 
   const scheduleClose = useCallback(() => {
-    clearOpenTimer();
     clearCloseTimer();
     closeTimerRef.current = setTimeout(() => setOpen(false), 140);
-  }, [clearCloseTimer, clearOpenTimer]);
+  }, [clearCloseTimer]);
 
   useEffect(() => {
     if (!open) {
@@ -209,27 +193,16 @@ export function MarketplaceShopMenu({
 
   useEffect(
     () => () => {
-      clearOpenTimer();
       clearCloseTimer();
     },
-    [clearCloseTimer, clearOpenTimer],
+    [clearCloseTimer],
   );
 
   return (
     <div
-      className="relative flex h-[82px] items-center"
+      className="marketplace-shop-menu relative flex h-[82px] items-center"
       onBlur={(event) => {
         if (!rootRef.current?.contains(event.relatedTarget as Node | null)) {
-          scheduleClose();
-        }
-      }}
-      onPointerEnter={(event) => {
-        if (event.pointerType === "mouse") {
-          scheduleOpen();
-        }
-      }}
-      onPointerLeave={(event) => {
-        if (event.pointerType === "mouse") {
           scheduleClose();
         }
       }}
@@ -240,7 +213,7 @@ export function MarketplaceShopMenu({
         aria-expanded={open}
         aria-haspopup="true"
         className={cn(
-          "group relative inline-flex h-[82px] items-center gap-1 text-[12px] font-black uppercase leading-none transition hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:text-[#ff5a1f]",
+          "marketplace-nav-link relative inline-flex h-[82px] items-center gap-1 text-[12px] font-black uppercase leading-none focus-visible:outline-none focus-visible:text-[#ff5a1f]",
           active || open
             ? "text-[#ff5a1f]"
             : "text-[#080808] dark:text-[#f7f7f2]",
@@ -263,11 +236,11 @@ export function MarketplaceShopMenu({
       >
         <span>Shop</span>
         <ChevronDownIcon
-          className={`size-3 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`size-3 ${open ? "rotate-180" : ""}`}
         />
         <span
-          className={`absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f] transition ${
-            active || open ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+          className={`absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f] ${
+            active || open ? "scale-x-100" : "scale-x-0"
           }`}
         />
       </button>
@@ -277,8 +250,6 @@ export function MarketplaceShopMenu({
           aria-label="Shop navigation"
           className="fixed inset-x-0 z-[75] overflow-y-auto overscroll-contain border-y border-white/10 bg-[#101010] text-left text-white shadow-[0_24px_60px_rgba(0,0,0,0.34)] [scrollbar-color:#ff5a1f_#1a1a1a]"
           id="marketplace-shop-mega-menu"
-          onPointerEnter={clearCloseTimer}
-          onPointerLeave={scheduleClose}
           role="navigation"
           style={{
             maxHeight: `min(calc(100dvh - ${panelTop}px - 1rem), 640px)`,
@@ -291,34 +262,38 @@ export function MarketplaceShopMenu({
                 Shop online
               </span>
               <h2 className="mt-4 text-2xl font-black uppercase leading-[1.05] 2xl:text-[28px]">
-                Your one-stop <span className="text-[#ff5a1f]">LPG shop.</span>
+                Your one-stop{" "}
+                <span className="text-[#ff5a1f]">online shop.</span>
               </h2>
               <p className="mt-3 text-xs font-medium leading-5 text-white/60">
-                Browse {data.totalProductCount} products across cylinders,
-                exchange options, and accessories.
+                Browse {data.totalProductCount} products across home, energy,
+                appliance and lifestyle categories.
               </p>
               <div className="mt-5 grid gap-2">
                 <Link
-                  className="flex h-10 items-center justify-between rounded-md bg-[#ff5a1f] px-3 text-[11px] font-black uppercase text-white transition hover:bg-[#e64b15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="flex h-10 items-center justify-between rounded-md bg-[#ff5a1f] px-3 text-[11px] font-black uppercase text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   href="/products"
                   onClick={closeMenu}
+                  prefetch={false}
                 >
                   Shop all products
                   <ChevronRightIcon className="size-4" />
                 </Link>
                 <Link
-                  className="flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-[11px] font-bold uppercase text-white/80 transition hover:border-[#ff5a1f] hover:text-white"
+                  className="flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-[11px] font-bold uppercase text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
                   href="/products?exchange=1"
                   onClick={closeMenu}
+                  prefetch={false}
                 >
                   <RefreshCcwIcon className="size-3.5 text-[#ff5a1f]" />
                   Cylinder exchange
                 </Link>
                 {data.hasCurrentDeals ? (
                   <Link
-                    className="flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-[11px] font-bold uppercase text-white/80 transition hover:border-[#ff5a1f] hover:text-white"
+                    className="flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-[11px] font-bold uppercase text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
                     href="/products?sale=1"
                     onClick={closeMenu}
+                    prefetch={false}
                   >
                     <TagsIcon className="size-3.5 text-[#ff5a1f]" />
                     Shop current deals
@@ -336,9 +311,10 @@ export function MarketplaceShopMenu({
                   <h2 className="mt-1 text-base font-black uppercase">Exchangeable cylinders</h2>
                 </div>
                 <Link
-                  className="shrink-0 text-[10px] font-black uppercase text-white/55 hover:text-[#ff5a1f]"
+                  className="shrink-0 text-[10px] font-black uppercase text-white/55 focus-visible:outline-none focus-visible:text-[#ff5a1f]"
                   href="/products?exchange=1"
                   onClick={closeMenu}
+                  prefetch={false}
                 >
                   View all
                 </Link>
@@ -371,9 +347,10 @@ export function MarketplaceShopMenu({
                   <h2 className="mt-1 text-base font-black uppercase">Categories</h2>
                 </div>
                 <Link
-                  className="shrink-0 text-[10px] font-black uppercase text-white/55 hover:text-[#ff5a1f]"
-                  href="/products"
+                  className="shrink-0 text-[10px] font-black uppercase text-white/55 focus-visible:outline-none focus-visible:text-[#ff5a1f]"
+                  href="/categories"
                   onClick={closeMenu}
+                  prefetch={false}
                 >
                   View all
                 </Link>
@@ -383,19 +360,20 @@ export function MarketplaceShopMenu({
                   <div className="grid gap-2">
                     {topLevelCategories.map((category) => (
                       <article
-                        className="min-w-0 rounded-lg border border-white/10 bg-white/[0.035] p-3 transition hover:border-[#ff5a1f]/60 hover:bg-white/[0.06]"
+                        className="marketplace-category-card min-w-0 rounded-lg border border-white/10 bg-white/[0.035] p-3"
                         key={category.id}
                       >
                         <Link
-                          className="group/category flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+                          className="flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
                           href={categoryHref(category)}
                           onClick={closeMenu}
+                          prefetch={false}
                         >
                           <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.07]">
                             <CategoryIcon category={category} />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[12px] font-black uppercase text-white transition group-hover/category:text-[#ff5a1f]">
+                            <span className="block truncate text-[12px] font-black uppercase text-white">
                               {category.name}
                             </span>
                             <span className="mt-0.5 block text-[10px] font-semibold text-white/45">
@@ -404,16 +382,17 @@ export function MarketplaceShopMenu({
                                 : `${category.productCount} product${category.productCount === 1 ? "" : "s"}`}
                             </span>
                           </span>
-                          <ChevronRightIcon className="size-4 shrink-0 text-[#ff5a1f] transition group-hover/category:translate-x-0.5" />
+                          <ChevronRightIcon className="size-4 shrink-0 text-[#ff5a1f]" />
                         </Link>
                         {category.brands.length > 0 ? (
                           <div className="mt-2 flex flex-wrap gap-1 border-t border-white/10 pt-2">
                             {category.brands.slice(0, 4).map((brand) => (
                               <Link
-                                className="rounded-full bg-white/[0.07] px-2 py-1 text-[9px] font-bold text-white/65 transition hover:bg-[#ff5a1f] hover:text-white"
+                                className="rounded-full bg-white/[0.07] px-2 py-1 text-[9px] font-bold text-white/65"
                                 href={`/brands/${brand.slug}`}
                                 key={brand.id}
                                 onClick={closeMenu}
+                                prefetch={false}
                               >
                                 {brand.name}
                               </Link>
@@ -451,7 +430,7 @@ export function MarketplaceShopMenu({
                 {whatsappHref ? (
                   <Link
                     aria-label="Start a WhatsApp chat"
-                    className="mt-5 flex h-10 items-center justify-between rounded-md bg-[#080808] px-3 text-[10px] font-black uppercase text-white shadow-[0_8px_18px_rgba(8,8,8,0.2)] ring-1 ring-[#25d366]/20 transition hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/50"
+                    className="mt-5 flex h-10 items-center justify-between rounded-md bg-[#080808] px-3 text-[10px] font-black uppercase text-white shadow-[0_8px_18px_rgba(8,8,8,0.2)] ring-1 ring-[#25d366]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25d366]/50"
                     href={whatsappHref}
                     onClick={closeMenu}
                     rel="noreferrer"

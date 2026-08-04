@@ -287,7 +287,7 @@ export function ProductCardVideoPreview({
             onStalled={handlePlaybackInterruption}
             onWaiting={handlePlaybackInterruption}
             playsInline
-            preload="metadata"
+            preload="none"
             ref={videoRef}
             tabIndex={-1}
           />
@@ -295,7 +295,7 @@ export function ProductCardVideoPreview({
           <button
             aria-label={`${isPlaybackRequested ? "Pause" : "Play"} video preview for ${analytics.productName}`}
             aria-pressed={isPlaybackRequested}
-            className="pointer-events-auto absolute bottom-1.5 left-1.5 z-[3] grid size-6 place-items-center rounded-full bg-[#080808]/78 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-[#080808] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] focus-visible:ring-offset-2 sm:bottom-2 sm:left-2 sm:size-7"
+            className="pointer-events-auto absolute bottom-1.5 left-1.5 z-[3] grid size-6 place-items-center rounded-full bg-[#080808]/78 text-white shadow-md backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] focus-visible:ring-offset-2 sm:bottom-2 sm:left-2 sm:size-7"
             onClick={handleControlClick}
             title={`${isPlaybackRequested ? "Pause" : "Play"} video preview`}
             type="button"
