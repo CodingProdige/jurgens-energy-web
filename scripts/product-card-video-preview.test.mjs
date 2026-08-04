@@ -2,93 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import {
-  PRODUCT_CARD_VIDEO_ANALYTICS_DELAY_MS,
-  PRODUCT_CARD_VIDEO_HOVER_DELAY_MS,
-  canAutoplayProductCardVideo,
-  isPointerInsideProductCardVideo,
-} from "../src/modules/marketplace/product-card-video-preview.ts";
-
-test("product-card video hover waits for deliberate intent", () => {
-  assert.equal(PRODUCT_CARD_VIDEO_HOVER_DELAY_MS, 200);
-});
+import { PRODUCT_CARD_VIDEO_ANALYTICS_DELAY_MS } from "../src/modules/marketplace/product-card-video-preview.ts";
 
 test("preview analytics require sustained playback", () => {
   assert.equal(PRODUCT_CARD_VIDEO_ANALYTICS_DELAY_MS, 1_000);
 });
 
-test("hover autoplay requires a suitable pointer, motion setting and connection", () => {
-  const eligibleConditions = {
-    effectiveConnectionType: "4g",
-    prefersReducedMotion: false,
-    saveData: false,
-    supportsFineHover: true,
-  };
-
-  assert.equal(canAutoplayProductCardVideo(eligibleConditions), true);
-  assert.equal(
-    canAutoplayProductCardVideo({
-      ...eligibleConditions,
-      supportsFineHover: false,
-    }),
-    false,
-  );
-  assert.equal(
-    canAutoplayProductCardVideo({
-      ...eligibleConditions,
-      prefersReducedMotion: true,
-    }),
-    false,
-  );
-  assert.equal(
-    canAutoplayProductCardVideo({
-      ...eligibleConditions,
-      saveData: true,
-    }),
-    false,
-  );
-  assert.equal(
-    canAutoplayProductCardVideo({
-      ...eligibleConditions,
-      effectiveConnectionType: "2g",
-    }),
-    false,
-  );
-  assert.equal(
-    canAutoplayProductCardVideo({
-      ...eligibleConditions,
-      effectiveConnectionType: "slow-2g",
-    }),
-    false,
-  );
-  assert.equal(
-    canAutoplayProductCardVideo({
-      ...eligibleConditions,
-      effectiveConnectionType: "3g",
-    }),
-    true,
-  );
-});
-
-test("only hovering the square media region starts a card preview", () => {
-  const bounds = {
-    bottom: 300,
-    left: 100,
-    right: 300,
-    top: 100,
-  };
-
-  assert.equal(
-    isPointerInsideProductCardVideo({ clientX: 200, clientY: 200 }, bounds),
-    true,
-  );
-  assert.equal(
-    isPointerInsideProductCardVideo({ clientX: 200, clientY: 340 }, bounds),
-    false,
-  );
-});
-
-test("the client island preserves full-length native looping and lazy loading", async () => {
+test("the client island keeps video playback manual and stable", async () => {
   const source = await readFile(
     new URL(
       "../components/marketplace/product-card-video-preview.tsx",
@@ -97,13 +17,18 @@ test("the client island preserves full-length native looping and lazy loading", 
     "utf8",
   );
 
-  assert.match(source, /preload="none"/);
+  assert.match(source, /preload="metadata"/);
   assert.match(source, /\n\s+loop\n/);
   assert.match(source, /\n\s+muted\n/);
   assert.match(source, /\n\s+playsInline\n/);
+  assert.match(source, /type PlaybackIntent = "manual"/);
   assert.match(source, /video\.src = preview\.url/);
-  assert.match(source, /video\.removeAttribute\("src"\)/);
-  assert.match(source, /new IntersectionObserver/);
+  assert.doesNotMatch(source, /video\.removeAttribute\("src"\)/);
+  assert.doesNotMatch(source, /new IntersectionObserver/);
+  assert.doesNotMatch(source, /pointerenter|pointermove|pointerleave/);
+  assert.doesNotMatch(source, /PRODUCT_CARD_VIDEO_HOVER_DELAY_MS/);
+  assert.doesNotMatch(source, /canAutoplayProductCardVideo/);
+  assert.doesNotMatch(source, /isPointerInsideProductCardVideo/);
   assert.match(source, /document\.hidden/);
   assert.match(source, /onWaiting=\{handlePlaybackInterruption\}/);
   assert.match(source, /video\.readyState < HTMLMediaElement\.HAVE_FUTURE_DATA/);

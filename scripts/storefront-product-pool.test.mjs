@@ -100,9 +100,32 @@ test("storefront collection cards stay stable on hover and category CTA opens th
     "components/marketplace/storefront-section-renderer.tsx",
     "utf8",
   );
+  const quickLookSource = readFileSync(
+    "components/marketplace/product-card-quick-look.tsx",
+    "utf8",
+  );
+  const productCardSource = readFileSync(
+    "components/marketplace/product-card.tsx",
+    "utf8",
+  );
+  const quickAddSource = readFileSync(
+    "components/marketplace/product-card-quick-add-button.tsx",
+    "utf8",
+  );
 
   assert.match(rendererSource, /function getCategoryCollectionHeaderActions/);
   assert.match(rendererSource, /href:\s*"\/categories"/);
+  assert.match(rendererSource, /w-\[min\(70vw,11rem\)\]/);
+  assert.match(rendererSource, /items-stretch gap-1\.5 overflow-x-auto overflow-y-visible/);
+  assert.match(rendererSource, /overflow-x-clip border-b/);
+  assert.match(productCardSource, /flex min-h-full min-w-0 w-full flex-col/);
+  assert.match(productCardSource, /relative z-20 flex flex-1 flex-col/);
+  assert.doesNotMatch(productCardSource, /loading="eager"/);
+  assert.doesNotMatch(quickAddSource, /hover:shadow/);
+  assert.doesNotMatch(quickAddSource, /active:scale/);
   assert.doesNotMatch(rendererSource, /hover:-translate-y/);
   assert.doesNotMatch(rendererSource, /group-hover\/card:scale/);
+  assert.doesNotMatch(quickLookSource, /group-hover:/);
+  assert.doesNotMatch(quickLookSource, /sm:opacity-0/);
+  assert.doesNotMatch(quickLookSource, /sm:translate-y-1/);
 });

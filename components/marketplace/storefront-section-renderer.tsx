@@ -281,7 +281,7 @@ function StorefrontProductCollectionSectionView({
 
   return (
     <section
-      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-x-clip border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
@@ -399,7 +399,7 @@ function StorefrontCategoryCollectionSectionView({
 
   return (
     <section
-      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-x-clip border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
@@ -436,7 +436,7 @@ function StorefrontBrandCollectionSectionView({
 
   return (
     <section
-      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-x-clip border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
@@ -468,7 +468,7 @@ function StorefrontLatestBlogPostsSectionView({
 
   return (
     <section
-      className="grid min-w-0 gap-3 overflow-hidden border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
+      className="grid min-w-0 gap-3 overflow-x-clip border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:gap-4 sm:px-10 sm:py-7 lg:px-16"
       id={sectionId}
     >
       <StorefrontCollectionHeader
@@ -657,7 +657,7 @@ function ProductCollectionList({
     <div
       className={
         isCarousel
-          ? "flex min-w-0 shrink-0 basis-[calc((100%_-_0.375rem)_/_2)] snap-start sm:basis-[calc((100%_-_3rem)_/_4)] xl:basis-[calc((100%_-_4rem)_/_5)]"
+          ? "flex w-[min(70vw,11rem)] min-w-[10.5rem] shrink-0 snap-start items-stretch sm:w-[12.5rem] sm:min-w-[12.5rem] md:w-[13rem] md:min-w-[13rem] lg:w-[13.5rem] lg:min-w-[13.5rem] xl:w-[14rem] xl:min-w-[14rem]"
           : undefined
       }
       key={product.id}
@@ -687,7 +687,7 @@ function ProductCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Product collection carousel"
-        trackClassName="-mx-1.5 flex snap-x snap-mandatory scroll-px-1.5 gap-1.5 overflow-x-auto px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:scroll-px-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:scroll-px-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="-mx-1.5 flex snap-x snap-mandatory items-stretch gap-1.5 overflow-x-auto overflow-y-visible scroll-px-1.5 px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:scroll-px-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:scroll-px-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
       >
         {productCards}
       </StorefrontCarousel>
@@ -757,7 +757,7 @@ function CategoryCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Category collection carousel"
-        trackClassName="flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex snap-x items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {categoryCards}
       </StorefrontCarousel>
@@ -806,7 +806,7 @@ function BrandCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Brand collection carousel"
-        trackClassName="flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex snap-x items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {brandCards}
       </StorefrontCarousel>
@@ -855,7 +855,7 @@ function BlogCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Blog post carousel"
-        trackClassName="flex snap-x gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex snap-x items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {blogCards}
       </StorefrontCarousel>

@@ -15,7 +15,7 @@ type ProductCardQuickAddButtonProps = {
 };
 
 const quickAddPillClass =
-  "marketplace-card-quick-add inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-full border border-[#080808]/80 bg-white px-2 text-[#080808] shadow-[0_4px_12px_rgba(8,8,8,0.10)] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] hover:shadow-[0_8px_18px_rgba(255,90,31,0.18)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 active:scale-95 dark:border-[#f7f7f2]/80 dark:bg-[#f7f7f2] dark:text-[#080808] sm:h-8 sm:min-w-11";
+  "marketplace-card-quick-add inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-full border border-[#080808]/80 bg-white px-2 text-[#080808] shadow-[0_4px_12px_rgba(8,8,8,0.10)] transition-colors hover:border-[#ff5a1f] hover:text-[#ff5a1f] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-[#f7f7f2]/80 dark:bg-[#f7f7f2] dark:text-[#080808] sm:h-8 sm:min-w-11";
 
 export function ProductCardQuickAddButton({
   className,

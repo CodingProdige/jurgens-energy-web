@@ -43,7 +43,6 @@ export function MarketplaceProductCard({
       className="marketplace-product-card-media object-cover"
       fill
       quality={90}
-      loading="eager"
       sizes="(min-width: 1280px) 220px, (min-width: 768px) 25vw, 50vw"
       src={displayImageUrl}
     />
@@ -54,7 +53,7 @@ export function MarketplaceProductCard({
   );
 
   return (
-    <article className="marketplace-product-card group relative flex h-full min-w-0 w-full flex-col overflow-hidden rounded-[5px] border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-md">
+    <article className="marketplace-product-card group relative flex min-h-full min-w-0 w-full flex-col overflow-hidden rounded-[5px] border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition-colors dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-md">
       <Link
         aria-label={`View ${product.title}`}
         className="absolute inset-0 z-10"
@@ -66,7 +65,7 @@ export function MarketplaceProductCard({
         href={productHref}
       />
 
-      <div className="pointer-events-none relative z-20 flex h-full min-h-0 flex-col">
+      <div className="pointer-events-none relative z-20 flex flex-1 flex-col">
         <div
           className="relative aspect-[1/1] h-auto min-w-0 w-full shrink-0 overflow-hidden bg-[#f7f7f2] dark:bg-[#1a1a1a]"
           data-product-card-media-container=""
