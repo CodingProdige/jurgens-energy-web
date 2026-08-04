@@ -3544,7 +3544,7 @@ export function NationwideShippingSettingsForm({
                 Nationwide customer delivery price
               </h3>
               <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                Checkout charges one VAT-inclusive fee per eligible South
+                Checkout charges one customer-facing delivery fee per South
                 African order. Courier Guy rates remain private; Jurgens Energy
                 absorbs any difference.
               </p>
@@ -3573,7 +3573,7 @@ export function NationwideShippingSettingsForm({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="shippingFlatRate">
-                Standard delivery fee (VAT included)
+                Standard delivery fee
               </Label>
               <Input
                 id="shippingFlatRate"

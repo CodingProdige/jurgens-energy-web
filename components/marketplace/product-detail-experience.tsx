@@ -1686,7 +1686,7 @@ function ProductBuyBox({
             price={selectedPrice}
           />
           <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400 sm:text-[11px]">
-            Includes VAT
+            Final price
           </p>
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
             <ProductStockStatusBadge
@@ -1938,7 +1938,7 @@ function MobileProductPurchaseSummary({
             price={selectedPrice}
           />
           <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400">
-            Includes VAT
+            Final price
           </p>
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <ProductStockStatusBadge
@@ -2698,7 +2698,7 @@ function ProductOptionsDialog({
               price={selectedPrice}
             />
             <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
-              <p>Includes VAT</p>
+              <p>Final price</p>
             </div>
             <ProductStockStatusBadge
               className="mt-1"
@@ -2929,7 +2929,7 @@ function MobileTrustTicker() {
   const items = [
     { icon: ShieldCheckIcon, label: "Careful handling" },
     { icon: CreditCardIcon, label: "Secure payments" },
-    { icon: FileTextIcon, label: "Includes VAT" },
+    { icon: FileTextIcon, label: "Final price" },
   ] as const;
 
   return (

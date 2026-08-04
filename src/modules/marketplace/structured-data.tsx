@@ -424,10 +424,10 @@ function createNationwideShippingServiceStructuredData(
         },
       ];
   const feeDescription = hasFreeShippingThreshold
-    ? `A VAT-inclusive delivery fee of ZAR ${flatRate.toFixed(2)} applies below a product subtotal of ZAR ${freeOverAmount.toFixed(2)}; qualifying orders at or above that subtotal ship free.`
+    ? `A delivery fee of ZAR ${flatRate.toFixed(2)} applies below a product subtotal of ZAR ${freeOverAmount.toFixed(2)}; qualifying orders at or above that subtotal ship free.`
     : flatRate === 0
       ? "Orders ship free."
-      : `A VAT-inclusive delivery fee of ZAR ${flatRate.toFixed(2)} applies per order.`;
+      : `A delivery fee of ZAR ${flatRate.toFixed(2)} applies per order.`;
 
   return {
     "@id": `${createMarketplaceCanonicalUrl("/")}#standard-shipping-service`,
@@ -437,7 +437,7 @@ function createNationwideShippingServiceStructuredData(
     handlingTime,
     name: "Standard nationwide South Africa delivery",
     shippingConditions,
-    url: createMarketplaceCanonicalUrl("/lpg-delivery"),
+    url: createMarketplaceCanonicalUrl("/delivery-information"),
   };
 }
 

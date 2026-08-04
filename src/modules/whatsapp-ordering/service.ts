@@ -3106,7 +3106,7 @@ async function checkNationwideCourierDeliveryInquiry({
   const priceMessage =
     price.rule === "free_shipping_over"
       ? `Delivery would be ${formatZarAmount(0)} for this item and quantity if the checkout subtotal still qualifies.`
-      : `Standard delivery would be ${formatZarAmount(price.amount)}, VAT included.`;
+      : `Standard delivery would be ${formatZarAmount(price.amount)}.`;
   const thresholdMessage =
     price.freeOverAmount === null
       ? null

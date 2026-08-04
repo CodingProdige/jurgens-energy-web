@@ -11,7 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "My Invoices",
-  description: "Review and download your Jurgens Energy VAT invoices.",
+  description: "Review and download your Jurgens Energy invoices.",
   robots: { follow: false, index: false },
 };
 
@@ -25,7 +25,7 @@ export default async function AccountInvoicesPage() {
   return (
     <AccountPageShell
       active="invoices"
-      description="Download your immutable VAT invoices and any tax credit notes issued after a completed refund."
+      description="Download your immutable invoices and any credit notes issued after a completed refund."
       title="My invoices"
     >
       <div className="grid gap-5">

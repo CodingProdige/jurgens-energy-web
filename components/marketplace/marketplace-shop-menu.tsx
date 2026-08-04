@@ -310,7 +310,7 @@ export function MarketplaceShopMenu({
               <div className="flex items-end justify-between gap-3 border-b border-white/15 pb-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#ff5a1f]">
-                    LPG first
+                    Cylinder options
                   </p>
                   <h2 className="mt-1 text-base font-black uppercase">Exchangeable cylinders</h2>
                 </div>
@@ -337,7 +337,7 @@ export function MarketplaceShopMenu({
                 </div>
               ) : (
                 <div className="mt-4 rounded-lg border border-white/10 p-5 text-sm text-white/60">
-                  No exchangeable LPG cylinders are available right now.
+                  No exchangeable cylinder products are available right now.
                 </div>
               )}
             </section>

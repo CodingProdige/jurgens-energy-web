@@ -160,9 +160,10 @@ export function PolicyPage({
           {businessIdentity ? (
             <PublicBusinessIdentityDisclosure
               className="mt-7"
+              forceRegistrationDetails
               identity={businessIdentity}
               showRegisteredAddress
-              title="The operator of this store"
+              title="Jurgens Energy registered details"
             />
           ) : null}
 

@@ -11,22 +11,25 @@ export function formatRegisteredAddress(identity: PublicBusinessIdentity) {
 function getIdentityLines(
   identity: PublicBusinessIdentity,
   showRegisteredAddress: boolean,
+  forceRegistrationDetails: boolean,
 ) {
   const registeredAddress = showRegisteredAddress
     ? formatRegisteredAddress(identity)
     : null;
+  const showRegistrationDetails =
+    forceRegistrationDetails || identity.registrationDetailsVisible;
 
   return [
-    identity.registrationDetailsVisible
+    showRegistrationDetails
       ? `Trading name: ${identity.tradingName}`
       : null,
-    identity.registrationDetailsVisible && identity.legalName
+    showRegistrationDetails && identity.legalName
       ? `Legal name: ${identity.legalName}`
       : null,
-    identity.registrationDetailsVisible && identity.companyRegistrationNumber
+    showRegistrationDetails && identity.companyRegistrationNumber
       ? `Company registration: ${identity.companyRegistrationNumber}`
       : null,
-    identity.registrationDetailsVisible && identity.vatRegistrationNumber
+    showRegistrationDetails && identity.vatRegistrationNumber
       ? `VAT registration: ${identity.vatRegistrationNumber}`
       : null,
     registeredAddress
@@ -38,17 +41,23 @@ function getIdentityLines(
 export function PublicBusinessIdentityDisclosure({
   appearance = "panel",
   className,
+  forceRegistrationDetails = false,
   identity,
   showRegisteredAddress = false,
   title = "Registered business",
 }: {
   appearance?: "footer" | "panel";
   className?: string;
+  forceRegistrationDetails?: boolean;
   identity: PublicBusinessIdentity;
   showRegisteredAddress?: boolean;
   title?: string;
 }) {
-  const lines = getIdentityLines(identity, showRegisteredAddress);
+  const lines = getIdentityLines(
+    identity,
+    showRegisteredAddress,
+    forceRegistrationDetails,
+  );
 
   if (lines.length === 0) {
     return null;
@@ -85,7 +94,7 @@ export function PublicBusinessIdentityDisclosure({
       </span>
       <div className="min-w-0">
         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#ff5a1f]">
-          Legal identity
+          Registered details
         </p>
         <h2 className="mt-1.5 text-[18px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2] sm:text-[21px]">
           {title}

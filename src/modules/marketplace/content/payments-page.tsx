@@ -24,7 +24,7 @@ const paymentHighlights = [
   },
   {
     description:
-      "Product prices, delivery fees and order totals are shown VAT-inclusive in South African rand.",
+      "Product prices, delivery fees and order totals are shown clearly in South African rand.",
     icon: WalletCardsIcon,
     title: "Clear ZAR totals",
   },
@@ -36,9 +36,9 @@ const paymentHighlights = [
   },
   {
     description:
-      "VAT invoices are generated after payment and are emailed when ready. They are also available from your account.",
+      "Invoices are generated after payment and are emailed when ready. They are also available from your account.",
     icon: FileTextIcon,
-    title: "VAT invoice support",
+    title: "Invoice support",
   },
 ] as const;
 
@@ -165,8 +165,8 @@ export async function PaymentsPage() {
               },
               {
                 answer:
-                  "Your VAT invoice may take a moment to prepare. You do not need to wait on the confirmation page; it will be emailed when ready and available from your account.",
-                question: "Where do I get my VAT invoice?",
+                  "Your invoice may take a moment to prepare. You do not need to wait on the confirmation page; it will be emailed when ready and available from your account.",
+                question: "Where do I get my invoice?",
               },
               {
                 answer:

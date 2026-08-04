@@ -295,7 +295,7 @@ function ProductCardPrice({
     <div className="min-w-0 flex-1 leading-none">
       {priceRow}
       <span className="mt-0.5 block text-[7px] font-medium leading-none text-[#6a6a63] dark:text-zinc-400 sm:text-[8px]">
-        Includes VAT
+        Final price
       </span>
     </div>
   );

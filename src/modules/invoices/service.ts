@@ -20,7 +20,10 @@ import type {
   InvoiceCustomerSnapshot,
   InvoiceIssuerSnapshot,
 } from "@/src/db/schema/invoices";
-import { isInvoiceBusinessInformationReady } from "@/src/modules/business-information";
+import {
+  isBusinessVatRegistered,
+  isInvoiceBusinessInformationReady,
+} from "@/src/modules/business-information";
 import {
   parseInvoiceDocumentData,
   type InvoiceDocumentData,
@@ -114,9 +117,11 @@ async function allocateInvoiceNumber(
 }
 
 function createInvoiceLines({
+  issuerVatRegistered,
   itemRows,
   shippingTotalCents,
 }: {
+  issuerVatRegistered: boolean;
   itemRows: Array<{
     id: string;
     quantity: number;
@@ -130,7 +135,8 @@ function createInvoiceLines({
   const lines: InvoiceLineDraft[] = itemRows.map((item, index) => {
     const unitGrossCents = moneyToCents(item.unitPrice);
     const grossCents = unitGrossCents * item.quantity;
-    const amounts = calculateVatInclusiveAmounts(grossCents, item.taxRateBps);
+    const taxRateBps = issuerVatRegistered ? item.taxRateBps : 0;
+    const amounts = calculateVatInclusiveAmounts(grossCents, taxRateBps);
 
     return {
       description: item.title,
@@ -142,15 +148,18 @@ function createInvoiceLines({
       quantity: item.quantity,
       sku: nullableText(item.skuSnapshot),
       taxCents: amounts.taxCents,
-      taxRateBps: item.taxRateBps,
+      taxRateBps,
       unitGrossCents,
     };
   });
 
   if (shippingTotalCents > 0) {
+    const shippingTaxRateBps = issuerVatRegistered
+      ? SOUTH_AFRICAN_STANDARD_VAT_RATE_BPS
+      : 0;
     const amounts = calculateVatInclusiveAmounts(
       shippingTotalCents,
-      SOUTH_AFRICAN_STANDARD_VAT_RATE_BPS,
+      shippingTaxRateBps,
     );
 
     lines.push({
@@ -163,7 +172,7 @@ function createInvoiceLines({
       quantity: 1,
       sku: null,
       taxCents: amounts.taxCents,
-      taxRateBps: SOUTH_AFRICAN_STANDARD_VAT_RATE_BPS,
+      taxRateBps: shippingTaxRateBps,
       unitGrossCents: shippingTotalCents,
     });
   }
@@ -229,6 +238,7 @@ export async function ensureInvoiceForPaidOrder(
     if (!information || !isInvoiceBusinessInformationReady(information)) {
       return { status: "business_information_incomplete" };
     }
+    const issuerVatRegistered = isBusinessVatRegistered(information);
 
     const itemRows = await transaction
       .select({
@@ -247,6 +257,7 @@ export async function ensureInvoiceForPaidOrder(
     }
 
     const lines = createInvoiceLines({
+      issuerVatRegistered,
       itemRows,
       shippingTotalCents: moneyToCents(order.shippingTotal),
     });
@@ -471,7 +482,9 @@ export async function getInvoiceDocumentData(
       vatRateBasisPoints: line.taxRateBps,
       netAmountCents: moneyToCents(line.lineTotalExcludingTax),
     })),
-    notes: ["All prices are VAT inclusive."],
+    notes: invoice.issuerSnapshot.vatRegistrationNumber?.trim()
+      ? ["All prices are VAT inclusive."]
+      : ["No VAT has been charged on this invoice."],
     orderNumber: invoice.orderNumber,
     payment: {
       amountPaidCents: moneyToCents(invoice.amountPaid),

@@ -684,7 +684,7 @@ async function reserveRefund(
     if (!invoice) {
       throw new PayFastRefundServiceError(
         "invoice_not_found",
-        "A tax invoice must exist before a paid order can be refunded.",
+        "An invoice must exist before a paid order can be refunded.",
       );
     }
 

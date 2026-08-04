@@ -5,7 +5,7 @@ import { MarketplaceBusinessJsonLd } from "@/src/modules/marketplace/structured-
 
 export const metadata: Metadata = {
   description:
-    "Learn how secure online payments work at Jurgens Energy, including PayFast hosted checkout, VAT-inclusive totals and VAT invoices.",
+    "Learn how secure online payments work at Jurgens Energy, including PayFast hosted checkout, clear totals and invoices.",
   title: "Payments",
 };
 

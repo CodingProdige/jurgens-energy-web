@@ -337,6 +337,9 @@ function AddressBlock({
 }
 
 function InvoiceDocument({ data }: { data: InvoiceDocumentData }) {
+  const isVatRegistered = Boolean(data.issuer.vatNumber);
+  const documentLabel = isVatRegistered ? "Tax Invoice" : "Invoice";
+  const documentHeading = isVatRegistered ? "TAX INVOICE" : "INVOICE";
   const logoPath = path.join(
     /* turbopackIgnore: true */ process.cwd(),
     "public",
@@ -350,12 +353,12 @@ function InvoiceDocument({ data }: { data: InvoiceDocumentData }) {
       author={data.issuer.legalName}
       creationDate={new Date(data.issuedAt)}
       creator="Jurgens Energy invoicing"
-      keywords={`tax invoice, ${data.invoiceNumber}, ${data.orderNumber}`}
+      keywords={`${documentLabel.toLowerCase()}, ${data.invoiceNumber}, ${data.orderNumber}`}
       language="en-ZA"
       modificationDate={new Date(data.issuedAt)}
       pageLayout="singlePage"
-      subject={`VAT invoice for order ${data.orderNumber}`}
-      title={`Tax Invoice ${data.invoiceNumber}`}
+      subject={`${documentLabel} for order ${data.orderNumber}`}
+      title={`${documentLabel} ${data.invoiceNumber}`}
     >
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.topRule} fixed />
@@ -371,7 +374,7 @@ function InvoiceDocument({ data }: { data: InvoiceDocumentData }) {
             </View>
           </View>
           <View style={styles.documentTitleWrap}>
-            <Text style={styles.documentTitle}>TAX INVOICE</Text>
+            <Text style={styles.documentTitle}>{documentHeading}</Text>
             <Text style={styles.invoiceNumber}>{data.invoiceNumber}</Text>
             <Text style={styles.paidBadge}>PAID</Text>
           </View>
@@ -456,10 +459,18 @@ function InvoiceDocument({ data }: { data: InvoiceDocumentData }) {
           <View style={styles.tableHeader}>
             <Text style={styles.descriptionColumn}>Description</Text>
             <Text style={styles.quantityColumn}>Qty</Text>
-            <Text style={styles.unitColumn}>Unit incl.</Text>
-            <Text style={styles.rateColumn}>VAT</Text>
-            <Text style={styles.amountColumn}>Excl.</Text>
-            <Text style={styles.amountColumn}>Incl.</Text>
+            <Text style={styles.unitColumn}>
+              {isVatRegistered ? "Unit incl." : "Unit price"}
+            </Text>
+            <Text style={styles.rateColumn}>
+              {isVatRegistered ? "VAT" : "Tax"}
+            </Text>
+            <Text style={styles.amountColumn}>
+              {isVatRegistered ? "Excl." : "Subtotal"}
+            </Text>
+            <Text style={styles.amountColumn}>
+              {isVatRegistered ? "Incl." : "Total"}
+            </Text>
           </View>
           {data.lines.map((line, index) => (
             <View
@@ -519,18 +530,33 @@ function InvoiceDocument({ data }: { data: InvoiceDocumentData }) {
           </View>
 
           <View style={styles.summary}>
-            <View style={styles.summaryRow}>
-              <Text>Subtotal excl. VAT</Text>
-              <Text>{formatMoney(data.totals.netAmountCents)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text>VAT</Text>
-              <Text>{formatMoney(data.totals.vatAmountCents)}</Text>
-            </View>
-            <View style={[styles.summaryRow, styles.summaryTotal]}>
-              <Text>Total incl. VAT</Text>
-              <Text>{formatMoney(data.totals.grossAmountCents)}</Text>
-            </View>
+            {isVatRegistered ? (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text>Subtotal excl. VAT</Text>
+                  <Text>{formatMoney(data.totals.netAmountCents)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text>VAT</Text>
+                  <Text>{formatMoney(data.totals.vatAmountCents)}</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.summaryTotal]}>
+                  <Text>Total incl. VAT</Text>
+                  <Text>{formatMoney(data.totals.grossAmountCents)}</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text>Subtotal</Text>
+                  <Text>{formatMoney(data.totals.grossAmountCents)}</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.summaryTotal]}>
+                  <Text>Total</Text>
+                  <Text>{formatMoney(data.totals.grossAmountCents)}</Text>
+                </View>
+              </>
+            )}
             <View style={styles.summaryRow}>
               <Text>Amount paid</Text>
               <Text style={styles.amountPaid}>

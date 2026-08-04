@@ -92,7 +92,7 @@ export async function LocalDeliveryPage() {
           ...(shippingStructuredData ? [shippingStructuredData] : []),
           createBreadcrumbStructuredData([
             { name: "Home", path: "/" },
-            { name: "Delivery", path: "/lpg-delivery" },
+            { name: "Delivery", path: "/delivery-information" },
           ]),
           createFaqStructuredData([...deliveryFaqItems]),
         ]}

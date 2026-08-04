@@ -579,8 +579,7 @@ export function CartExperience() {
               <span className="text-xl font-black tabular-nums">{subtotalLabel}</span>
             </div>
             <p className="mt-1 text-[11px] leading-4 text-[#777770] dark:text-[#aaa9a1]">
-              Delivery details and the VAT-inclusive order fee are shown before
-              payment.
+              Delivery details and the order fee are shown before payment.
             </p>
           </div>
           <Link

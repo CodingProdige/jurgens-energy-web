@@ -110,19 +110,15 @@ export const getPublicBusinessIdentity = cache(
         : null;
 
     return {
-      companyRegistrationNumber: registrationDetailsVisible
-        ? row.companyRegistrationNumber?.trim() || null
-        : null,
-      legalName: registrationDetailsVisible ? legalName || null : null,
+      companyRegistrationNumber: row.companyRegistrationNumber?.trim() || null,
+      legalName: legalName || null,
       registeredAddress,
       registrationDetailsVisible,
       tradingName,
-      tradingNameDisclosure: registrationDetailsVisible && legalNameDiffers
+      tradingNameDisclosure: legalNameDiffers
         ? `${tradingName} is a trading name of ${legalName}.`
         : null,
-      vatRegistrationNumber: registrationDetailsVisible
-        ? row.vatRegistrationNumber.trim() || null
-        : null,
+      vatRegistrationNumber: row.vatRegistrationNumber.trim() || null,
     };
   },
 );
@@ -191,6 +187,22 @@ export function isInvoiceBusinessInformationReady(
       information.countryCode.trim(),
   );
 }
+
+export function isBusinessVatRegistered(
+  information: Pick<BusinessInformation, "vatRegistrationNumber">,
+) {
+  return Boolean(information.vatRegistrationNumber.trim());
+}
+
+export const getBusinessVatStatus = cache(async () => {
+  const information = await getBusinessInformation();
+  const vatRegistrationNumber = information.vatRegistrationNumber.trim();
+
+  return {
+    isVatRegistered: Boolean(vatRegistrationNumber),
+    vatRegistrationNumber: vatRegistrationNumber || null,
+  };
+});
 
 export async function getBusinessDispatchContact() {
   const information = await getBusinessInformation();

@@ -125,16 +125,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     sitemapEntry({
       changeFrequency: "monthly",
       lastModified: staticPageLastModified(
-        "lpg-delivery",
-        contentPageLastModified,
-        staticSeoUpdatedAt,
-      ),
-      path: "/lpg-delivery",
-      priority: 0.8,
-    }),
-    sitemapEntry({
-      changeFrequency: "monthly",
-      lastModified: staticPageLastModified(
         "about",
         contentPageLastModified,
         staticSeoUpdatedAt,

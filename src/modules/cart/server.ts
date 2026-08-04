@@ -15,6 +15,7 @@ import {
   type CartValidationResponse,
   type ValidatedCartItem,
 } from "@/src/modules/cart/contracts";
+import { getBusinessVatStatus } from "@/src/modules/business-information";
 import {
   getExchangeRequirementText,
   resolveCartLineExchangePolicy,
@@ -62,8 +63,8 @@ export async function validateCartLines(
     };
   }
 
-  const rows = await db
-    .select({
+  const [rows, vatStatus] = await Promise.all([
+    db.select({
       brandName: brands.name,
       compareAtPrice: productVariants.compareAtPrice,
       continueSellingOutOfStock: productVariants.continueSellingOutOfStock,
@@ -100,8 +101,10 @@ export async function validateCartLines(
     .innerJoin(products, eq(products.id, productVariants.productId))
     .leftJoin(brands, eq(brands.id, products.brandId))
     .leftJoin(sellers, eq(sellers.id, products.sellerId))
-    .leftJoin(media, eq(media.id, productVariants.mediaId))
-    .where(inArray(productVariants.id, variantIds));
+      .leftJoin(media, eq(media.id, productVariants.mediaId))
+      .where(inArray(productVariants.id, variantIds)),
+    getBusinessVatStatus(),
+  ]);
 
   const productIdsWithoutVariantMedia = rows
     .filter((row) => !row.mediaRelativePath)
@@ -161,6 +164,7 @@ export async function validateCartLines(
     const quantity = Math.min(requested.quantity, Math.max(1, maxQuantity || 1));
     const unitPriceZar = roundMoney(Number(row.price));
     const lineTotalZar = roundMoney(unitPriceZar * quantity);
+    const taxRateBps = vatStatus.isVatRegistered ? row.taxRateBps : 0;
     const displayUnitPrice = roundMoney(
       convertFromZar(unitPriceZar, currencyContext),
     );
@@ -219,7 +223,7 @@ export async function validateCartLines(
         sellerName: row.sellerName,
         shipsAlone: row.shipsAlone,
         sku: row.sku,
-        taxRateBps: row.taxRateBps,
+        taxRateBps,
         unitPriceLabel: formatFromZar(unitPriceZar, currencyContext),
         unitPriceZar,
         variantId: row.variantId,

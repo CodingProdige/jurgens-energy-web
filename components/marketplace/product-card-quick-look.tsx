@@ -245,7 +245,7 @@ export function ProductCardQuickLook({
                     Delivery details before payment
                   </span>
                   <span className="rounded-full border border-[#d8d8d2] px-2.5 py-1.5 text-[#080808] dark:border-white/15 dark:text-[#f7f7f2]">
-                    Includes VAT
+                    Final price
                   </span>
                 </div>
 
@@ -371,7 +371,7 @@ function ProductQuickLookPrice({
         ) : null}
       </div>
       <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
-        Includes VAT
+        Final price
       </p>
     </div>
   );

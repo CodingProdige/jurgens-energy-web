@@ -43,7 +43,7 @@ export function createMarketplaceWhatsAppHref(phoneNumber: string | null) {
   }
 
   const phoneDigits = normalizedPhone.replace(/\D/g, "");
-  const text = encodeURIComponent("Hi Jurgens Energy, I need a gas topup.");
+  const text = encodeURIComponent("Hi Jurgens Energy, I need help with an order.");
 
   return phoneDigits ? `https://wa.me/${phoneDigits}?text=${text}` : null;
 }
@@ -67,7 +67,7 @@ export function MarketplaceWhatsAppButton({
 
   return (
     <Link
-      aria-label="Order LPG gas on WhatsApp"
+      aria-label="Contact Jurgens Energy on WhatsApp"
       className="group fixed bottom-5 right-5 z-[45] inline-flex h-14 items-center gap-2.5 overflow-hidden rounded-full bg-[#080808] px-5 text-sm font-normal uppercase text-white shadow-[0_14px_30px_rgba(8,8,8,0.24),0_0_16px_rgba(37,211,102,0.12)] ring-1 ring-[#25d366]/10 transition hover:bg-[#1a1a1a] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#25d366]/25 dark:ring-[#25d366]/15 max-[520px]:bottom-4 max-[520px]:right-4 max-[520px]:size-14 max-[520px]:justify-center max-[520px]:px-0"
       data-marketplace-whatsapp-button
       href={whatsappHref}
@@ -77,7 +77,7 @@ export function MarketplaceWhatsAppButton({
       <span className="marketplace-whatsapp-shimmer pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-white/35 to-transparent" />
       <MarketplaceWhatsAppIcon className="relative z-10 size-6 text-[#25d366]" />
       <span className="relative z-10 text-white max-[520px]:sr-only">
-        Need gas?
+        Need help?
       </span>
     </Link>
   );

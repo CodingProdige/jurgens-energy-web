@@ -43,7 +43,7 @@ const invoiceLineSchema = z
       context.addIssue({
         code: "custom",
         message:
-          "Line gross amount must equal quantity multiplied by the VAT-inclusive unit price, less the discount.",
+          "Line gross amount must equal quantity multiplied by the unit price, less the discount.",
         path: ["grossAmountCents"],
       });
     }

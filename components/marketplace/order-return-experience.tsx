@@ -347,10 +347,10 @@ export function OrderReturnExperience({
           <div className="min-w-0 flex-1">
             <p className="text-xs font-black">
               {invoiceReady && order.invoice
-                ? `VAT invoice ${order.invoice.invoiceNumber}`
+                ? `Invoice ${order.invoice.invoiceNumber}`
                 : invoiceDelayed
-                  ? "VAT invoice is on its way"
-                  : "Preparing your VAT invoice"}
+                  ? "Invoice is on its way"
+                  : "Preparing your invoice"}
             </p>
             <p className="mt-1 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
               {invoiceReady

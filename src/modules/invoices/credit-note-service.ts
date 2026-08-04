@@ -136,6 +136,9 @@ export async function getCreditNoteDocumentData(
           transactionReference: record.refundId,
         }
       : undefined;
+  const issuerVatRegistered = Boolean(
+    record.issuerSnapshot.vatRegistrationNumber?.trim(),
+  );
 
   return parseCreditNoteDocumentData({
     creditNoteNumber: record.creditNoteNumber,
@@ -153,10 +156,15 @@ export async function getCreditNoteDocumentData(
       vatAmountCents: moneyToCents(line.taxAmount),
       vatRateBasisPoints: line.taxRateBps,
     })),
-    notes: [
-      "All credited amounts are VAT inclusive.",
-      "This document adjusts the original tax invoice; it does not replace it.",
-    ],
+    notes: issuerVatRegistered
+      ? [
+          "All credited amounts are VAT inclusive.",
+          "This document adjusts the original tax invoice; it does not replace it.",
+        ]
+      : [
+          "No VAT was charged on the original invoice.",
+          "This document adjusts the original invoice; it does not replace it.",
+        ],
     orderNumber: record.orderNumber,
     originalInvoice: {
       grossAmountCents: moneyToCents(record.invoiceTotal),

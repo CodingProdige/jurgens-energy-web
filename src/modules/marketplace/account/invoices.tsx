@@ -126,7 +126,7 @@ export function CustomerInvoiceHistory({
           </span>
           <h2 className="mt-4 text-xl font-black">No invoices yet</h2>
           <p className="mt-2 text-sm leading-6 text-[#666660] dark:text-[#aaa9a1]">
-            A VAT invoice will appear here after a successful payment has been
+            An invoice will appear here after a successful payment has been
             verified and its PDF has been prepared.
           </p>
           <Link
@@ -144,7 +144,7 @@ export function CustomerInvoiceHistory({
   return (
     <section className="overflow-hidden rounded-md border border-[#deded7] bg-white shadow-[0_10px_30px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-[#101010]">
       <div className="border-b border-[#e8e8e2] px-4 py-4 dark:border-white/10 sm:px-5">
-        <h2 className="font-black">VAT invoices</h2>
+        <h2 className="font-black">Invoices</h2>
         <p className="mt-1 text-xs text-[#777770] dark:text-[#aaa9a1]">
           {invoices.length} invoice{invoices.length === 1 ? "" : "s"} available
           for this account.

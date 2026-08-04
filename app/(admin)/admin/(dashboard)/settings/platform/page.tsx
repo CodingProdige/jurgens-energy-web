@@ -79,7 +79,7 @@ const settingSections = [
     key: "whatsapp-ordering",
     title: "WhatsApp ordering",
     description:
-      "Manage 360dialog credentials, webhook URL, and the quick gas topup assistant.",
+      "Manage 360dialog credentials, webhook URL, and the quick WhatsApp support assistant.",
     icon: MessageCircleIcon,
   },
   {

@@ -209,8 +209,8 @@ export function BusinessInformationForm({
             Registered business address
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-zinc-300">
-            Used automatically on VAT invoices and public trust surfaces such
-            as the contact page, footer, policy disclosures, and structured
+            Used automatically on invoices and public trust surfaces such as
+            the contact page, footer, policy disclosures, and structured
             business data. It is not presented as a walk-in shop or returns
             counter.
           </p>

@@ -66,8 +66,9 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Standard delivery is VAT-inclusive. If the order qualifies for free
-            delivery, checkout reduces the delivery fee to zero before payment.
+            Standard delivery is shown before payment. If the order qualifies
+            for free delivery, checkout reduces the delivery fee to zero before
+            payment.
           </>
         ),
         question: "How is the delivery fee calculated?",
@@ -195,8 +196,9 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Store product prices are VAT-inclusive unless a product clearly states
-            otherwise. The standard delivery fee is also VAT-inclusive.
+            Store product prices are shown before payment unless a product
+            clearly states otherwise. The standard delivery fee is also shown
+            before payment.
             Delivery, deposit, exchange or other applicable charges are
             displayed separately before the order is confirmed where they apply.
           </>
@@ -251,7 +253,7 @@ const faqStructuredDataItems = [
   {
     question: "How is the delivery fee calculated?",
     answer:
-      "Standard delivery is VAT-inclusive. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
+      "Standard delivery is shown before payment. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
   },
   {
     question: deliveryTimingQuestion,
@@ -265,7 +267,7 @@ const faqStructuredDataItems = [
   {
     question: "Do displayed prices include VAT?",
     answer:
-      "Store product prices are VAT-inclusive unless a product clearly states otherwise. The standard delivery fee is also VAT-inclusive. Applicable delivery, deposit, exchange or other charges are displayed separately before the order is confirmed.",
+      "Store product prices are shown before payment unless a product clearly states otherwise. The standard delivery fee is also shown before payment. Applicable delivery, deposit, exchange or other charges are displayed separately before the order is confirmed.",
   },
   {
     question: returnsQuestion,

@@ -1068,7 +1068,6 @@ export async function updateShippingIntegrationSettings(
   revalidatePath("/delivery-information");
   revalidatePath("/faq");
   revalidatePath("/feeds/google-merchant.xml");
-  revalidatePath("/lpg-delivery");
   revalidatePath("/products");
   revalidatePath("/products/[slug]", "page");
   revalidatePath("/settings/platform");

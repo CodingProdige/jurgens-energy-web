@@ -1899,7 +1899,7 @@ export function CheckoutExperience({
                     <p className="font-bold text-[#080808] dark:text-white">
                       {customer.name}
                     </p>
-                    <p>VAT invoice using the delivery address.</p>
+                    <p>Invoice using the delivery address.</p>
                   </>
                 )}
               </div>
@@ -1916,16 +1916,16 @@ export function CheckoutExperience({
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-black uppercase">
-                    Billing &amp; VAT invoice
+                    Billing &amp; invoice
                   </span>
                   <span className="rounded-full border border-[#ff5a1f]/30 bg-[#ff5a1f]/8 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-[#d9430e] dark:text-[#ff8a60]">
                     Optional details
                   </span>
                 </span>
                 <span className="mt-1 block text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
-                  A paid VAT invoice is sent automatically. Open this section
-                  only if it should include a business name, VAT number, or a
-                  different billing address.
+                  A paid invoice is sent automatically. Open this section only if
+                  it should include a business name, tax number, or a different
+                  billing address.
                 </span>
               </span>
               <ChevronDownIcon className="mt-2 size-4 shrink-0 text-[#777770] transition-transform group-open:rotate-180" />
@@ -2149,7 +2149,7 @@ export function CheckoutExperience({
               <h2 className="text-sm font-black uppercase">Delivery</h2>
             </div>
             <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
-              One VAT-inclusive delivery fee applies per order.
+              One delivery fee applies per order.
             </p>
             {isLoadingQuotes ? (
               <div
@@ -2478,7 +2478,7 @@ export function CheckoutExperience({
           )}
           <div className="mt-1 border-t border-[#e8e8e2] pt-3 dark:border-white/10">
             <div className="flex justify-between gap-4 text-[10px] leading-4 text-[#888881] dark:text-[#92928b]">
-              <span>Includes VAT</span>
+              <span>Included tax</span>
               <span className="tabular-nums">{formatZar(includedVat)}</span>
             </div>
             <div className="mt-1 flex items-end justify-between gap-4">

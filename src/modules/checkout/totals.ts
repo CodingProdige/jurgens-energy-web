@@ -37,8 +37,9 @@ export function calculateCheckoutIncludedVatCents({
     );
   }, 0);
   const shippingGrossCents = zarToCents(shippingTotalZar);
+  const hasTaxableItems = items.some((item) => item.taxRateBps > 0);
   const shippingVatCents =
-    shippingGrossCents === 0
+    shippingGrossCents === 0 || !hasTaxableItems
       ? 0
       : calculateVatInclusiveAmounts(
           shippingGrossCents,

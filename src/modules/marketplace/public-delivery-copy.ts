@@ -150,10 +150,10 @@ export function getPublicDeliveryFeeDescription(
   const flatRateCopy = formatZar(flatRate);
 
   if (freeOverAmount !== null && freeOverAmount > 0) {
-    return `Standard delivery is ${flatRateCopy}, VAT included. Free delivery over ${formatZar(freeOverAmount)}.`;
+    return `Standard delivery is ${flatRateCopy}. Free delivery over ${formatZar(freeOverAmount)}.`;
   }
 
-  return `Standard delivery is ${flatRateCopy}, VAT included.`;
+  return `Standard delivery is ${flatRateCopy}.`;
 }
 
 function formatZar(value: number) {

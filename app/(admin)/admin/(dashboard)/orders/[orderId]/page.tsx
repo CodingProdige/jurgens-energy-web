@@ -830,7 +830,7 @@ export default async function AdminOrderDetailPage({
                 detail={invoiceAutomation.detail}
                 icon={<ReceiptTextIcon className="size-4" />}
                 status={invoiceAutomation.status}
-                title="VAT invoice"
+                title="Invoice"
               />
               <AutomationRow
                 detail={fulfilmentAutomation.detail}

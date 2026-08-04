@@ -161,7 +161,7 @@ export const privacyPolicy: PolicyDocument = {
       id: "children-and-changes",
       title: "11. Children and policy changes",
       paragraphs: [
-        "The store is intended for adults who can lawfully place orders and handle LPG-related purchases. We do not knowingly invite children to create customer accounts or place orders without an authorised adult.",
+        "The store is intended for adults who can lawfully place orders. We do not knowingly invite children to create customer accounts or place orders without an authorised adult.",
         "We may update this policy when our services, providers, or legal duties change. The effective date at the top identifies the current version. Material changes will be communicated through the website or another appropriate channel.",
       ],
     },
@@ -214,15 +214,15 @@ export const termsAndConditions: PolicyDocument = {
       id: "products",
       title: "2. Product information and availability",
       paragraphs: [
-        "We aim to describe products, sizes, brands, exchange options, compatibility, images, and stock accurately. Screen colours and product packaging may vary, and a manufacturer may make non-material changes. Please check dimensions, connections, appliance requirements, and intended use before ordering an accessory or LPG product.",
+        "We aim to describe products, sizes, brands, exchange options, compatibility, images, and stock accurately. Screen colours and product packaging may vary, and a manufacturer may make non-material changes. Please check dimensions, connections, appliance requirements, and intended use before ordering a product or accessory.",
         "Stock indicators are not a reservation. Products, exchange options, delivery services, and quantities remain subject to availability and any lawful product-specific supply restrictions. We will contact you if an ordered item cannot be supplied as described.",
       ],
     },
     {
       id: "pricing",
-      title: "3. Prices, VAT, and promotions",
+      title: "3. Prices, tax, and promotions",
       paragraphs: [
-        "Product prices displayed by the store are VAT-inclusive unless a product clearly states otherwise. The standard delivery fee is also VAT-inclusive. Delivery, deposit, exchange, or other applicable charges are shown separately before you confirm the order where they apply.",
+        "Product prices and delivery fees are shown in South African rand unless a product clearly states otherwise. Delivery, deposit, exchange, or other applicable charges are shown separately before you confirm the order where they apply.",
         "A non-ZAR currency selection is a display convenience based on an exchange rate available to the store. The checkout total and payment-provider confirmation govern the amount charged. Promotions apply only for their stated period and conditions and may not be combined unless expressly allowed.",
         "If a price, description, discount, or calculation contains an obvious error, we may correct it before accepting the order. We will ask whether you want to proceed at the corrected amount or cancel, and will refund any amount already paid for an order we cannot accept.",
       ],
@@ -248,7 +248,7 @@ export const termsAndConditions: PolicyDocument = {
       title: "6. Shipping and delivery",
       paragraphs: [
         "Products set up for courier delivery can be delivered nationwide within South Africa. Products marked for Jurgens delivery use active Jurgens service-area postcodes. Checkout cross-references the selected products and complete address before payment.",
-        "Checkout applies the published VAT-inclusive standard delivery fee to each order. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
+        "Checkout applies the published standard delivery fee to each order. If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
         "Our handling time is 0–1 business day after payment confirmation. An order placed and paid by the 2:00 PM South African Standard Time (SAST) cutoff on a business day may be handled and dispatched that day. An order placed after the cutoff begins processing on the next business day, and handling does not begin before payment is confirmed.",
         "Orders are normally delivered within 1–4 business days after payment confirmation. This published window includes handling and transit time. Delivery dates and time windows remain estimates unless we expressly confirm a fixed appointment.",
         "Stock, order preparation, courier or vehicle capacity, weather, traffic, access, public holidays, and product-specific handling requirements can affect timing. We will communicate a material delay and explain the available next step.",
@@ -257,7 +257,7 @@ export const termsAndConditions: PolicyDocument = {
       ],
     },
     {
-      id: "lpg-and-exchanges",
+      id: "product-handling-and-exchanges",
       title: "7. Product handling and cylinder exchanges",
       paragraphs: [
         "Follow the product instructions, handover requirements and any installation rules that apply to the item. Use a suitably qualified registered installer where installation is required.",
@@ -594,7 +594,7 @@ export const deliveryInformation: PolicyDocument = {
       id: "fees",
       title: "2. Delivery fee and free delivery",
       paragraphs: [
-        "Checkout applies the published VAT-inclusive standard delivery fee to each order.",
+        "Checkout applies the published standard delivery fee to each order.",
         "If the order qualifies for free delivery, checkout reduces the delivery fee to zero before payment.",
       ],
     },
@@ -624,7 +624,7 @@ export const deliveryInformation: PolicyDocument = {
       ],
     },
     {
-      id: "lpg-delivery",
+      id: "product-handover",
       title: "5. Product and cylinder handover",
       paragraphs: [
         "Some orders have product-specific handling requirements. Cylinders must remain upright and secured. A delivery representative may pause or refuse a handover where access, storage, the receiving environment, or an exchange cylinder does not meet the fulfilment requirements.",

@@ -6,7 +6,6 @@ export const STATIC_SEO_PAGE_KEYS = [
   "about",
   "contact",
   "faq",
-  "lpg-delivery",
   "delivery-information",
   "privacy-policy",
   "returns-and-refunds",
@@ -94,16 +93,6 @@ export const STATIC_SEO_PAGE_REGISTRY = {
     path: "/faq",
     scanFocus:
       "The questions and answers that are visibly published, prioritising ordering, payment, delivery, returns and support topics.",
-  },
-  "lpg-delivery": {
-    defaultDescription:
-      "Shop online for nationwide delivery across South Africa. Checkout shows delivery timing, fees and product-specific requirements before payment.",
-    defaultTitle: "Delivery in South Africa",
-    key: "lpg-delivery",
-    label: "LPG delivery",
-    path: "/lpg-delivery",
-    scanFocus:
-      "The online ordering flow, checkout-confirmed South African delivery, published timing, shipping costs and product-specific handover requirements.",
   },
   "delivery-information": {
     defaultDescription:
