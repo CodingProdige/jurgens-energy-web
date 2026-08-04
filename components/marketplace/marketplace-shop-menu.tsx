@@ -206,6 +206,8 @@ export function MarketplaceShopMenu({
           scheduleClose();
         }
       }}
+      onPointerEnter={openMenu}
+      onPointerLeave={scheduleClose}
       ref={rootRef}
     >
       <button
@@ -213,7 +215,7 @@ export function MarketplaceShopMenu({
         aria-expanded={open}
         aria-haspopup="true"
         className={cn(
-          "marketplace-nav-link relative inline-flex h-[82px] items-center gap-1 text-[12px] font-black uppercase leading-none focus-visible:outline-none focus-visible:text-[#ff5a1f]",
+          "marketplace-nav-link group relative inline-flex h-[82px] items-center gap-1 text-[12px] font-black uppercase leading-none focus-visible:outline-none focus-visible:text-[#ff5a1f]",
           active || open
             ? "text-[#ff5a1f]"
             : "text-[#080808] dark:text-[#f7f7f2]",
@@ -239,8 +241,8 @@ export function MarketplaceShopMenu({
           className={`size-3 ${open ? "rotate-180" : ""}`}
         />
         <span
-          className={`absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f] ${
-            active || open ? "scale-x-100" : "scale-x-0"
+          className={`marketplace-nav-underline absolute inset-x-0 bottom-5 h-0.5 rounded-full bg-[#ff5a1f] ${
+            active || open ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
           }`}
         />
       </button>
@@ -250,6 +252,8 @@ export function MarketplaceShopMenu({
           aria-label="Shop navigation"
           className="fixed inset-x-0 z-[75] overflow-y-auto overscroll-contain border-y border-white/10 bg-[#101010] text-left text-white shadow-[0_24px_60px_rgba(0,0,0,0.34)] [scrollbar-color:#ff5a1f_#1a1a1a]"
           id="marketplace-shop-mega-menu"
+          onPointerEnter={clearCloseTimer}
+          onPointerLeave={scheduleClose}
           role="navigation"
           style={{
             maxHeight: `min(calc(100dvh - ${panelTop}px - 1rem), 640px)`,

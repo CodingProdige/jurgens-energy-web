@@ -127,14 +127,14 @@ export function ProductCardQuickLook({
       <button
         aria-label={`Quick look at ${product.title}`}
         className={cn(
-          "pointer-events-auto absolute bottom-1.5 left-1.5 z-30 inline-flex h-6 max-w-[calc(100%-3.25rem)] items-center gap-1 rounded-full bg-white/92 px-1.5 text-[9px] font-black leading-none text-[#080808] shadow-[0_4px_14px_rgba(8,8,8,0.16)] ring-1 ring-[#080808]/10 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:bg-[#f7f7f2]/92 dark:text-[#080808] sm:bottom-2 sm:left-2 sm:h-6",
+          "pointer-events-auto absolute bottom-1.5 left-1.5 z-30 grid size-7 place-items-center rounded-full bg-white/94 text-[#080808] shadow-[0_4px_14px_rgba(8,8,8,0.16)] ring-1 ring-[#080808]/10 backdrop-blur-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:bg-[#f7f7f2]/94 dark:text-[#080808] sm:bottom-2 sm:left-2 sm:size-8",
           className,
         )}
         onClick={openQuickLook}
+        title="Quick look"
         type="button"
       >
-        <EyeIcon aria-hidden="true" className="size-3 shrink-0" />
-        <span className="truncate">Quick look</span>
+        <EyeIcon aria-hidden="true" className="size-3.5 shrink-0 sm:size-4" />
       </button>
 
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>

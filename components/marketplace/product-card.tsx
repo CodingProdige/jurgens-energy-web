@@ -54,7 +54,7 @@ export function MarketplaceProductCard({
   );
 
   return (
-    <article className="marketplace-product-card relative flex min-h-full min-w-0 w-full flex-col overflow-hidden rounded-[5px] border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-md">
+    <article className="marketplace-product-card relative flex min-h-full min-w-0 w-full flex-col overflow-hidden rounded-lg border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-xl">
       <Link
         aria-label={`View ${product.title}`}
         className="absolute inset-0 z-10"
@@ -114,9 +114,7 @@ export function MarketplaceProductCard({
               Sale
             </Badge>
           ) : null}
-          {!product.previewVideo ? (
-            <ProductCardQuickLook product={product} />
-          ) : null}
+          <ProductCardQuickLook product={product} />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-px px-1.5 pb-1.5 pt-1 sm:px-2 sm:pb-2 sm:pt-1.5">

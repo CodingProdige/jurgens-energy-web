@@ -64,7 +64,9 @@ export function ProgressiveProductGrid({
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const loadNextPageRef = useRef<() => Promise<void>>(async () => {});
   const loadingRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const trackedProductIdsRef = useRef(new Set<string>());
   const hasMore = loadedPage < totalPages;
 
@@ -181,6 +183,39 @@ export function ProgressiveProductGrid({
     }
   }, [context, filters, loadedPage, totalPages, updateBrowserPage]);
 
+  useEffect(() => {
+    loadNextPageRef.current = loadNextPage;
+  }, [loadNextPage]);
+
+  useEffect(() => {
+    if (!hasMore) {
+      return;
+    }
+
+    const sentinel = sentinelRef.current;
+
+    if (!sentinel || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadNextPageRef.current();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "80% 0px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, [hasMore, products.length]);
+
   useEffect(
     () => () => {
       abortCatalogRequest(abortControllerRef.current);
@@ -195,6 +230,13 @@ export function ProgressiveProductGrid({
           <MarketplaceProductCard key={product.id} product={product} />
         ))}
       </section>
+      {hasMore ? (
+        <div
+          aria-hidden="true"
+          className="h-px w-full"
+          ref={sentinelRef}
+        />
+      ) : null}
 
       <div aria-live="polite" className="mt-5 grid min-h-10 place-items-center px-3">
         {hasMore ? (

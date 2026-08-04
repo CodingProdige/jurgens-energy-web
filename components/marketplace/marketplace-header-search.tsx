@@ -191,10 +191,11 @@ export function MarketplaceHeaderSearch({
 
   useEffect(() => {
     if (!focused) {
+      setLoading(false);
       return;
     }
 
-    const controller = new AbortController();
+    let cancelled = false;
     const timeout = window.setTimeout(() => {
       setLoading(true);
 
@@ -204,7 +205,6 @@ export function MarketplaceHeaderSearch({
         )}&limit=6`,
         {
           cache: "no-store",
-          signal: controller.signal,
         },
       )
         .then((response) => {
@@ -215,25 +215,31 @@ export function MarketplaceHeaderSearch({
           return response.json() as Promise<SearchSuggestionsResponse>;
         })
         .then((data) => {
+          if (cancelled) {
+            return;
+          }
+
           setPopularProducts(data.popular ?? []);
           setSuggestions(data.suggestions ?? []);
         })
-        .catch((error) => {
-          if (!(error instanceof DOMException && error.name === "AbortError")) {
-            setPopularProducts([]);
-            setSuggestions([]);
+        .catch(() => {
+          if (cancelled) {
+            return;
           }
+
+          setPopularProducts([]);
+          setSuggestions([]);
         })
         .finally(() => {
-          if (!controller.signal.aborted) {
+          if (!cancelled) {
             setLoading(false);
           }
         });
     }, 140);
 
     return () => {
+      cancelled = true;
       window.clearTimeout(timeout);
-      controller.abort();
     };
   }, [focused, normalizedQuery]);
 
