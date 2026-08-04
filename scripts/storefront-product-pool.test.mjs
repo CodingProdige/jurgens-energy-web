@@ -94,3 +94,15 @@ test("storefront builder supports load-more products and banner link sections", 
   assert.equal(bannerSection.enabled, true);
   assert.equal(typeof bannerSection.settings.href, "string");
 });
+
+test("storefront collection cards stay stable on hover and category CTA opens the categories page", () => {
+  const rendererSource = readFileSync(
+    "components/marketplace/storefront-section-renderer.tsx",
+    "utf8",
+  );
+
+  assert.match(rendererSource, /function getCategoryCollectionHeaderActions/);
+  assert.match(rendererSource, /href:\s*"\/categories"/);
+  assert.doesNotMatch(rendererSource, /hover:-translate-y/);
+  assert.doesNotMatch(rendererSource, /group-hover\/card:scale/);
+});

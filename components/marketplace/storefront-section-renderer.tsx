@@ -395,16 +395,7 @@ function StorefrontCategoryCollectionSectionView({
     )
     .slice(0, settings.categoryLimit);
   const sectionId = getCollectionSectionId(section.id, settings.actions);
-  const headerActions =
-    settings.actions.length > 0
-      ? settings.actions
-      : [
-          {
-            href: "/categories",
-            label: "View All Categories",
-            variant: "secondary" as const,
-          },
-        ];
+  const headerActions = getCategoryCollectionHeaderActions(settings.actions);
 
   return (
     <section
@@ -609,6 +600,36 @@ function filterCategoriesByScope(
   }
 
   return categories.filter((category) => !category.path.includes("/"));
+}
+
+function getCategoryCollectionHeaderActions(actions: StorefrontButtonAction[]) {
+  const normalizedActions = actions.map((action) =>
+    isViewAllCategoriesAction(action)
+      ? {
+          ...action,
+          href: "/categories",
+        }
+      : action,
+  );
+
+  return normalizedActions.length > 0
+    ? normalizedActions
+    : [
+        {
+          href: "/categories",
+          label: "View All Categories",
+          variant: "secondary" as const,
+        },
+      ];
+}
+
+function isViewAllCategoriesAction(action: StorefrontButtonAction) {
+  const normalizedLabel = action.label.toLowerCase();
+
+  return (
+    normalizedLabel.includes("categor") &&
+    (normalizedLabel.includes("view") || normalizedLabel.includes("all"))
+  );
 }
 
 function getCollectionSectionId(
@@ -862,7 +883,7 @@ function CategoryCard({
   return (
     <StorefrontLink
       className={cn(
-        "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:-translate-y-0.5 hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
+        "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition-colors hover:border-[#ff5a1f]/55 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
         className,
       )}
       href={`/categories/${category.path}`}
@@ -900,7 +921,7 @@ export function MarketplaceBrandCard({
   return (
     <StorefrontLink
       className={cn(
-        "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:-translate-y-0.5 hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
+        "group/card block overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition-colors hover:border-[#ff5a1f]/55 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none",
         className,
       )}
       href={`/brands/${brand.slug}`}
@@ -939,7 +960,7 @@ function StorefrontCollectionImage({
   src: string | null;
 }) {
   const imageClass = cn(
-    "size-full transition duration-300 group-hover/card:scale-[1.04]",
+    "size-full",
     fit === "cover" ? "object-cover" : "object-contain p-3 sm:p-4",
   );
   const isRemoteImage =
