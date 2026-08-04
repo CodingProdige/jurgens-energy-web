@@ -54,7 +54,7 @@ export function MarketplaceProductCard({
   );
 
   return (
-    <article className="marketplace-product-card relative flex min-h-full min-w-0 w-full flex-col overflow-hidden rounded-lg border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-xl">
+    <article className="marketplace-product-card relative flex min-w-0 w-full flex-col overflow-hidden rounded-lg border border-[#e8e8e2] bg-white text-left shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none sm:rounded-xl">
       <Link
         aria-label={`View ${product.title}`}
         className="absolute inset-0 z-10"
@@ -67,7 +67,7 @@ export function MarketplaceProductCard({
         prefetch={false}
       />
 
-      <div className="pointer-events-none relative z-20 flex flex-1 flex-col">
+      <div className="pointer-events-none relative z-20 flex flex-col">
         <div
           className="relative aspect-[1/1] h-auto min-w-0 w-full shrink-0 overflow-hidden bg-[#f7f7f2] dark:bg-[#1a1a1a]"
           data-product-card-media-container=""
@@ -117,7 +117,7 @@ export function MarketplaceProductCard({
           <ProductCardQuickLook product={product} />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-px px-1.5 pb-1.5 pt-1 sm:px-2 sm:pb-2 sm:pt-1.5">
+        <div className="flex min-w-0 flex-col gap-px px-1.5 pb-1.5 pt-1 sm:px-2 sm:pb-2 sm:pt-1.5">
           <h3 className="truncate text-[11px] font-bold leading-[1.12] text-[#080808] dark:text-[#f7f7f2] sm:text-[12px] sm:leading-[1.15]">
             {product.title}
           </h3>
@@ -215,7 +215,7 @@ function ProductCardPerformanceMarquee({
   }
 
   return (
-    <div className="mt-auto min-w-0 pt-px">
+    <div className="min-w-0 pt-px">
       <span
         className={
           badge.tone === "best-seller"

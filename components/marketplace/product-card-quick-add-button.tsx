@@ -100,7 +100,7 @@ export function ProductCardQuickAddButton({
       className={cn(
         quickAddPillClass,
         added &&
-          "marketplace-card-quick-add-added border-emerald-600 bg-emerald-600 text-white dark:border-emerald-600 dark:bg-emerald-600 dark:text-white",
+          "border-emerald-600 bg-emerald-600 text-white dark:border-emerald-600 dark:bg-emerald-600 dark:text-white",
         className,
       )}
       onClick={handleQuickAdd}

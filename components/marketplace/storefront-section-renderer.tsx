@@ -313,7 +313,7 @@ function StorefrontBannerLinkSectionView({
   return (
     <section className="border-b border-[#ecece6] px-0 py-4 dark:border-white/10 sm:px-10 sm:py-7 lg:px-16">
       <StorefrontLink
-        className="group/banner relative block min-h-[220px] overflow-hidden rounded-xl border border-[#e8e8e2] bg-[#080808] text-white shadow-[0_14px_36px_rgba(8,8,8,0.12)] transition hover:border-[#ff5a1f]/70 dark:border-white/10 dark:bg-[#151515] sm:min-h-[260px]"
+        className="relative block min-h-[220px] overflow-hidden rounded-xl border border-[#e8e8e2] bg-[#080808] text-white shadow-[0_14px_36px_rgba(8,8,8,0.12)] dark:border-white/10 dark:bg-[#151515] sm:min-h-[260px]"
         href={settings.href}
       >
         {settings.imageUrl ? (
@@ -321,13 +321,13 @@ function StorefrontBannerLinkSectionView({
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt={settings.imageAlt}
-              className="absolute inset-0 size-full object-cover opacity-60 transition duration-500 group-hover/banner:scale-[1.025]"
+              className="absolute inset-0 size-full object-cover opacity-60"
               src={settings.imageUrl}
             />
           ) : (
             <Image
               alt={settings.imageAlt}
-              className="object-cover opacity-60 transition duration-500 group-hover/banner:scale-[1.025]"
+              className="object-cover opacity-60"
               fill
               sizes="100vw"
               src={settings.imageUrl}
@@ -361,7 +361,7 @@ function StorefrontBannerLinkSectionView({
               {settings.copy}
             </p>
           ) : null}
-          <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-[#ff5a1f] px-5 py-3 text-[13px] font-black uppercase tracking-[0.05em] text-white transition group-hover/banner:bg-white group-hover/banner:text-[#080808]">
+          <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-[#ff5a1f] px-5 py-3 text-[13px] font-black uppercase tracking-[0.05em] text-white">
             {settings.actionLabel}
             <ArrowRightIcon className="size-4" />
           </span>
@@ -657,7 +657,7 @@ function ProductCollectionList({
     <div
       className={
         isCarousel
-          ? "flex w-[min(70vw,11rem)] min-w-[10.5rem] shrink-0 items-stretch sm:w-[12.5rem] sm:min-w-[12.5rem] md:w-[13rem] md:min-w-[13rem] lg:w-[13.5rem] lg:min-w-[13.5rem] xl:w-[14rem] xl:min-w-[14rem]"
+          ? "flex w-[min(70vw,11rem)] min-w-[10.5rem] shrink-0 items-start sm:w-[12.5rem] sm:min-w-[12.5rem] md:w-[13rem] md:min-w-[13rem] lg:w-[13.5rem] lg:min-w-[13.5rem] xl:w-[14rem] xl:min-w-[14rem]"
           : undefined
       }
       key={product.id}
@@ -687,7 +687,7 @@ function ProductCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Product collection carousel"
-        trackClassName="-mx-1.5 flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible px-1.5 pb-2 [scrollbar-width:none] sm:-mx-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="-mx-1.5 flex items-start gap-1.5 overflow-x-auto px-1.5 py-1 [scrollbar-width:none] sm:-mx-3 sm:gap-4 sm:px-3 lg:-mx-4 lg:px-4 [&::-webkit-scrollbar]:hidden"
       >
         {productCards}
       </StorefrontCarousel>
@@ -695,7 +695,7 @@ function ProductCollectionList({
   }
 
   return (
-    <div className="mt-2.5 grid grid-cols-2 items-stretch gap-1.5 px-1.5 sm:mt-5 sm:gap-4 sm:px-0 md:grid-cols-4">
+    <div className="mt-2.5 grid grid-cols-2 items-start gap-1.5 px-1.5 sm:mt-5 sm:gap-4 sm:px-0 md:grid-cols-4">
       {productCards}
     </div>
   );
@@ -757,7 +757,7 @@ function CategoryCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Category collection carousel"
-        trackClassName="flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex items-start gap-1.5 overflow-x-auto py-1 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {categoryCards}
       </StorefrontCarousel>
@@ -806,7 +806,7 @@ function BrandCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Brand collection carousel"
-        trackClassName="flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex items-start gap-1.5 overflow-x-auto py-1 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {brandCards}
       </StorefrontCarousel>
@@ -855,7 +855,7 @@ function BlogCollectionList({
       <StorefrontCarousel
         className="mt-2.5 px-1.5 sm:mt-5 sm:px-0"
         label="Blog post carousel"
-        trackClassName="flex items-stretch gap-1.5 overflow-x-auto overflow-y-visible pb-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
+        trackClassName="flex items-start gap-1.5 overflow-x-auto py-1 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {blogCards}
       </StorefrontCarousel>

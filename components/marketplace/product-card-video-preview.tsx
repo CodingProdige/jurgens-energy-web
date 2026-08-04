@@ -271,8 +271,8 @@ export function ProductCardVideoPreview({
           <video
             aria-hidden="true"
             className={cn(
-              "marketplace-product-card-media absolute inset-0 size-full bg-[#f7f7f2] object-cover opacity-0 dark:bg-[#1a1a1a]",
-              playbackStatus === "playing" && "opacity-100",
+              "marketplace-product-card-media absolute inset-0 size-full bg-[#f7f7f2] object-cover dark:bg-[#1a1a1a]",
+              playbackStatus === "playing" ? "block" : "hidden",
             )}
             disablePictureInPicture
             disableRemotePlayback
@@ -295,7 +295,7 @@ export function ProductCardVideoPreview({
           <button
             aria-label={`${isPlaybackRequested ? "Pause" : "Play"} video preview for ${analytics.productName}`}
             aria-pressed={isPlaybackRequested}
-            className="pointer-events-auto absolute bottom-1.5 left-10 z-[31] grid size-7 place-items-center rounded-full bg-[#080808]/78 text-white shadow-md backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] focus-visible:ring-offset-2 sm:bottom-2 sm:left-12 sm:size-8"
+            className="pointer-events-auto absolute bottom-1.5 left-10 z-[31] grid size-7 place-items-center rounded-full bg-[#080808] text-white shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] focus-visible:ring-offset-2 sm:bottom-2 sm:left-12 sm:size-8"
             onClick={handleControlClick}
             title={`${isPlaybackRequested ? "Pause" : "Play"} video preview`}
             type="button"

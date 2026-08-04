@@ -26,7 +26,7 @@ export function StorefrontLoadMoreGrid({
 
   return (
     <div className={cn("mt-2.5 px-1.5 sm:mt-5 sm:px-0", className)}>
-      <div className="grid grid-cols-2 items-stretch gap-1.5 sm:gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 items-start gap-1.5 sm:gap-4 md:grid-cols-4">
         {visibleItems}
       </div>
       {remainingCount > 0 ? (

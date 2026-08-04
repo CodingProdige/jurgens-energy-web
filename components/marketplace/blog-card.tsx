@@ -15,16 +15,16 @@ export function MarketplaceBlogCard({
   return (
     <article
       className={cn(
-        "group overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_4px_14px_rgba(8,8,8,0.04)] transition hover:-translate-y-0.5 hover:border-[#ff5a1f]/55 hover:shadow-[0_12px_28px_rgba(8,8,8,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f7f7f2] dark:shadow-none",
+        "overflow-hidden rounded-md border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_4px_14px_rgba(8,8,8,0.04)] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#f7f7f2] dark:shadow-none",
         className,
       )}
     >
-      <Link className="block" href={`/blog/${post.slug}`}>
+      <Link className="block" href={`/blog/${post.slug}`} prefetch={false}>
         <div className="relative aspect-[4/3] bg-[#f7f7f2] dark:bg-[#1a1a1a]">
           {post.coverImageUrl ? (
             <Image
               alt={post.title}
-              className="object-cover transition duration-300 group-hover:scale-[1.03]"
+              className="object-cover"
               fill
               sizes="(min-width: 1024px) 360px, 90vw"
               src={post.coverImageUrl}
@@ -47,7 +47,7 @@ export function MarketplaceBlogCard({
               {post.excerpt}
             </p>
           ) : null}
-          <span className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-normal uppercase text-[#080808] transition group-hover:text-[#ff5a1f] dark:text-[#f7f7f2]">
+          <span className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-normal uppercase text-[#080808] dark:text-[#f7f7f2]">
             Read more
             <ArrowRightIcon className="size-3.5" />
           </span>

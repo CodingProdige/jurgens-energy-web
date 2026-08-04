@@ -1,14 +1,7 @@
 "use client";
 
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useId, useRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -19,18 +12,6 @@ type StorefrontCarouselProps = {
   trackClassName: string;
 };
 
-type ScrollState = {
-  hasOverflow: boolean;
-  next: boolean;
-  previous: boolean;
-};
-
-const initialScrollState: ScrollState = {
-  hasOverflow: false,
-  next: false,
-  previous: false,
-};
-
 export function StorefrontCarousel({
   children,
   className,
@@ -39,48 +20,6 @@ export function StorefrontCarousel({
 }: StorefrontCarouselProps) {
   const trackId = useId();
   const trackRef = useRef<HTMLDivElement>(null);
-  const [scrollState, setScrollState] = useState(initialScrollState);
-
-  const updateScrollState = useCallback(() => {
-    const track = trackRef.current;
-
-    if (!track) {
-      return;
-    }
-
-    const maxScrollLeft = track.scrollWidth - track.clientWidth;
-
-    setScrollState({
-      hasOverflow: maxScrollLeft > 4,
-      next: track.scrollLeft < maxScrollLeft - 4,
-      previous: track.scrollLeft > 4,
-    });
-  }, []);
-
-  useEffect(() => {
-    updateScrollState();
-
-    const track = trackRef.current;
-
-    if (!track) {
-      return;
-    }
-
-    const resizeObserver =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(updateScrollState);
-
-    resizeObserver?.observe(track);
-    track.addEventListener("scroll", updateScrollState, { passive: true });
-    window.addEventListener("resize", updateScrollState);
-
-    return () => {
-      resizeObserver?.disconnect();
-      track.removeEventListener("scroll", updateScrollState);
-      window.removeEventListener("resize", updateScrollState);
-    };
-  }, [children, updateScrollState]);
 
   function scrollByPage(direction: -1 | 1) {
     const track = trackRef.current;
@@ -93,13 +32,7 @@ export function StorefrontCarousel({
       behavior: "smooth",
       left: direction * Math.max(track.clientWidth * 0.82, 260),
     });
-
-    window.setTimeout(updateScrollState, 260);
   }
-
-  const showControls = true;
-  const canScrollPrevious = scrollState.hasOverflow && scrollState.previous;
-  const canScrollNext = scrollState.hasOverflow && scrollState.next;
 
   return (
     <div className={cn("relative min-w-0", className)}>
@@ -115,14 +48,8 @@ export function StorefrontCarousel({
 
       <button
         aria-controls={trackId}
-        aria-disabled={!canScrollPrevious}
         aria-label="Previous items"
-        className={cn(
-          "absolute left-2 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] md:grid",
-          !showControls && "hidden",
-          !canScrollPrevious &&
-            "pointer-events-none opacity-45 shadow-[0_6px_16px_rgba(8,8,8,0.08)]",
-        )}
+        className="absolute left-2 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] md:grid"
         onClick={() => scrollByPage(-1)}
         type="button"
       >
@@ -130,14 +57,8 @@ export function StorefrontCarousel({
       </button>
       <button
         aria-controls={trackId}
-        aria-disabled={!canScrollNext}
         aria-label="Next items"
-        className={cn(
-          "absolute right-2 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] md:grid",
-          !showControls && "hidden",
-          !canScrollNext &&
-            "pointer-events-none opacity-45 shadow-[0_6px_16px_rgba(8,8,8,0.08)]",
-        )}
+        className="absolute right-2 top-1/2 z-10 hidden size-10 -translate-y-1/2 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] shadow-[0_10px_28px_rgba(8,8,8,0.16)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/25 dark:border-white/15 dark:bg-[#151515] dark:text-[#f7f7f2] md:grid"
         onClick={() => scrollByPage(1)}
         type="button"
       >
