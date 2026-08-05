@@ -196,14 +196,12 @@ const faqGroups: FaqGroup[] = [
       {
         answer: (
           <>
-            Store product prices are shown before payment unless a product
-            clearly states otherwise. The standard delivery fee is also shown
-            before payment.
-            Delivery, deposit, exchange or other applicable charges are
-            displayed separately before the order is confirmed where they apply.
+            Yes. Product prices are shown clearly on each product, and delivery
+            is shown separately before payment. VAT wording appears
+            automatically when Jurgens Energy is VAT registered.
           </>
         ),
-        question: "Do displayed prices include VAT?",
+        question: "Are displayed prices final?",
       },
       {
         answer: (
@@ -265,9 +263,9 @@ const faqStructuredDataItems = [
       "An exchange-supported option assumes that the matching empty cylinder described on the product or selected variant will be handed over as the full replacement cylinder is delivered.",
   },
   {
-    question: "Do displayed prices include VAT?",
+    question: "Are displayed prices final?",
     answer:
-      "Store product prices are shown before payment unless a product clearly states otherwise. The standard delivery fee is also shown before payment. Applicable delivery, deposit, exchange or other charges are displayed separately before the order is confirmed.",
+      "Yes. Product prices are shown clearly on each product, and delivery is shown separately before payment. VAT wording appears automatically when Jurgens Energy is VAT registered.",
   },
   {
     question: returnsQuestion,

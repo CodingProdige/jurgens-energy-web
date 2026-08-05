@@ -50,6 +50,7 @@ export function ProgressiveProductGrid({
   initialPage,
   initialProducts,
   initialTotalPages,
+  priceTaxDisclosure = "Final price",
 }: {
   context: MarketplaceCatalogPageContext;
   filters: MarketplaceCatalogFilters;
@@ -57,6 +58,7 @@ export function ProgressiveProductGrid({
   initialProducts: MarketplaceProductCardData[];
   initialTotalCount: number;
   initialTotalPages: number;
+  priceTaxDisclosure?: string;
 }) {
   const [products, setProducts] = useState(initialProducts);
   const [loadedPage, setLoadedPage] = useState(initialPage);
@@ -192,7 +194,11 @@ export function ProgressiveProductGrid({
     <div className="min-w-0">
       <section className="grid w-full min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-1.5 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
         {products.map((product) => (
-          <MarketplaceProductCard key={product.id} product={product} />
+          <MarketplaceProductCard
+            key={product.id}
+            priceTaxDisclosure={priceTaxDisclosure}
+            product={product}
+          />
         ))}
       </section>
 

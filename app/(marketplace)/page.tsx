@@ -18,6 +18,7 @@ import {
 } from "@/src/modules/marketplace/structured-data";
 import { getStaticPageMetadata } from "@/src/modules/marketplace/static-page-seo";
 import { getPublicBusinessIdentity } from "@/src/modules/business-information";
+import { getPriceTaxDisclosure } from "@/src/modules/tax/vat-display";
 
 export async function generateMetadata(): Promise<Metadata> {
   return getStaticPageMetadata("home");
@@ -74,6 +75,7 @@ export default async function Home({
             brands={catalog.brands}
             blogPosts={blogPosts}
             categories={catalog.categories}
+            priceTaxDisclosure={getPriceTaxDisclosure(businessIdentity)}
             products={catalog.products}
             sections={applyStorefrontDeliveryTiming(
               storefrontPage.sections,

@@ -30,6 +30,7 @@ import {
   createProductStructuredData,
   MarketplaceJsonLd,
 } from "@/src/modules/marketplace/structured-data";
+import { getPriceTaxDisclosure } from "@/src/modules/tax/vat-display";
 
 const productSearchParamsSchema = z.object({
   variant: z.string().uuid().optional(),
@@ -178,6 +179,7 @@ export default async function ProductPage({
           deliveryCopy={deliveryCopy}
           initialVariantId={initialVariantId}
           jurgensDeliveryCutoffTime={settings.jurgensDeliveryCutoffTime}
+          priceTaxDisclosure={getPriceTaxDisclosure(businessIdentity)}
           product={productView}
           relatedProducts={moreInCategoryProducts}
           sellerName={businessIdentity.tradingName}

@@ -336,18 +336,32 @@ function CreditNoteDocument({ data }: { data: CreditNoteDocumentData }) {
     "logo",
     "jurgens-icon.png",
   );
+  const isVatRegistered = Boolean(data.issuer.vatNumber?.trim());
+  const creditNoteTitle = isVatRegistered ? "TAX CREDIT NOTE" : "CREDIT NOTE";
+  const documentKeywords = isVatRegistered
+    ? `tax credit note, ${data.creditNoteNumber}, ${data.originalInvoice.invoiceNumber}`
+    : `credit note, ${data.creditNoteNumber}, ${data.originalInvoice.invoiceNumber}`;
+  const documentSubject = isVatRegistered
+    ? `VAT credit against invoice ${data.originalInvoice.invoiceNumber}`
+    : `Credit against invoice ${data.originalInvoice.invoiceNumber}`;
+  const documentTitle = isVatRegistered
+    ? `Tax Credit Note ${data.creditNoteNumber}`
+    : `Credit Note ${data.creditNoteNumber}`;
+  const creditExplanation = isVatRegistered
+    ? `This tax credit note reduces the amount and VAT recorded on tax invoice ${data.originalInvoice.invoiceNumber}.`
+    : `This credit note reduces the amount recorded on invoice ${data.originalInvoice.invoiceNumber}.`;
 
   return (
     <Document
       author={data.issuer.legalName}
       creationDate={new Date(data.issuedAt)}
       creator="Jurgens Energy invoicing"
-      keywords={`tax credit note, ${data.creditNoteNumber}, ${data.originalInvoice.invoiceNumber}`}
+      keywords={documentKeywords}
       language="en-ZA"
       modificationDate={new Date(data.issuedAt)}
       pageLayout="singlePage"
-      subject={`VAT credit against invoice ${data.originalInvoice.invoiceNumber}`}
-      title={`Tax Credit Note ${data.creditNoteNumber}`}
+      subject={documentSubject}
+      title={documentTitle}
     >
       <Page size="A4" style={styles.page} wrap>
         <View style={styles.topRule} fixed />
@@ -363,7 +377,7 @@ function CreditNoteDocument({ data }: { data: CreditNoteDocumentData }) {
             </View>
           </View>
           <View style={styles.documentTitleWrap}>
-            <Text style={styles.documentTitle}>TAX CREDIT NOTE</Text>
+            <Text style={styles.documentTitle}>{creditNoteTitle}</Text>
             <Text style={styles.documentNumber}>{data.creditNoteNumber}</Text>
             <Text style={styles.creditBadge}>CREDIT ISSUED</Text>
           </View>
@@ -448,10 +462,18 @@ function CreditNoteDocument({ data }: { data: CreditNoteDocumentData }) {
           <View style={styles.tableHeader}>
             <Text style={styles.descriptionColumn}>Description</Text>
             <Text style={styles.quantityColumn}>Qty</Text>
-            <Text style={styles.unitColumn}>Unit incl.</Text>
-            <Text style={styles.rateColumn}>VAT</Text>
-            <Text style={styles.amountColumn}>Credit excl.</Text>
-            <Text style={styles.amountColumn}>Credit incl.</Text>
+            <Text style={styles.unitColumn}>
+              {isVatRegistered ? "Unit incl." : "Unit price"}
+            </Text>
+            <Text style={styles.rateColumn}>
+              {isVatRegistered ? "VAT" : "Tax"}
+            </Text>
+            <Text style={styles.amountColumn}>
+              {isVatRegistered ? "Credit excl." : "Credit subtotal"}
+            </Text>
+            <Text style={styles.amountColumn}>
+              {isVatRegistered ? "Credit incl." : "Credit total"}
+            </Text>
           </View>
           {data.lines.map((line, index) => (
             <View
@@ -493,10 +515,7 @@ function CreditNoteDocument({ data }: { data: CreditNoteDocumentData }) {
         <View style={styles.summaryArea} wrap={false}>
           <View style={styles.explanationCard}>
             <Text style={styles.eyebrow}>Credit details</Text>
-            <Text>
-              This tax credit note reduces the amount and VAT recorded on tax
-              invoice {data.originalInvoice.invoiceNumber}.
-            </Text>
+            <Text>{creditExplanation}</Text>
             {data.refund ? (
               <View style={{ marginTop: 7 }}>
                 <Text>
@@ -511,24 +530,44 @@ function CreditNoteDocument({ data }: { data: CreditNoteDocumentData }) {
               </View>
             ) : (
               <Text style={[styles.secondary, { marginTop: 7 }]}>
-                Refund settlement is recorded separately from this tax document.
+                Refund settlement is recorded separately from this{" "}
+                {isVatRegistered ? "tax document" : "credit note"}.
               </Text>
             )}
           </View>
 
           <View style={styles.summary}>
-            <View style={styles.summaryRow}>
-              <Text>Credit excl. VAT</Text>
-              <Text>{formatCredit(data.totals.netAmountCents)}</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text>VAT credit</Text>
-              <Text>{formatCredit(data.totals.vatAmountCents)}</Text>
-            </View>
-            <View style={[styles.summaryRow, styles.summaryTotal]}>
-              <Text>Total credit incl. VAT</Text>
-              <Text>{formatCredit(data.totals.grossAmountCents)}</Text>
-            </View>
+            {isVatRegistered ? (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text>Credit excl. VAT</Text>
+                  <Text>{formatCredit(data.totals.netAmountCents)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text>VAT credit</Text>
+                  <Text>{formatCredit(data.totals.vatAmountCents)}</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.summaryTotal]}>
+                  <Text>Total credit incl. VAT</Text>
+                  <Text>{formatCredit(data.totals.grossAmountCents)}</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text>Credit subtotal</Text>
+                  <Text>{formatCredit(data.totals.grossAmountCents)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text>No VAT charged</Text>
+                  <Text>{formatMoney(0)}</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.summaryTotal]}>
+                  <Text>Total credit</Text>
+                  <Text>{formatCredit(data.totals.grossAmountCents)}</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 

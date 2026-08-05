@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { MarketplaceCatalogSurface } from "@/components/marketplace/catalog-surface";
+import { getBusinessVatStatus } from "@/src/modules/business-information";
 import { getCurrencyContext } from "@/src/modules/currency/server";
 import {
   getMarketplaceCatalogPage,
@@ -13,6 +14,7 @@ import {
   type MarketplaceCatalogSearchParams,
 } from "@/src/modules/marketplace/catalog-filters";
 import { createMarketplaceDynamicPageMetadata } from "@/src/modules/marketplace/dynamic-page-metadata";
+import { getPriceTaxDisclosure } from "@/src/modules/tax/vat-display";
 
 type CategoryRouteParams = { path: string[] };
 
@@ -115,16 +117,25 @@ export default async function CategoryPage({
     ...parseMarketplaceCatalogFilters(resolvedSearchParams),
     categoryPaths: [],
   };
-  const data = await getMarketplaceCatalogPage({
-    accumulate: true,
-    categoryPath: category.path,
-    currencyContext,
-    filters,
-  });
+  const [data, vatStatus] = await Promise.all([
+    getMarketplaceCatalogPage({
+      accumulate: true,
+      categoryPath: category.path,
+      currencyContext,
+      filters,
+    }),
+    getBusinessVatStatus(),
+  ]);
 
   if (!data.context) {
     notFound();
   }
 
-  return <MarketplaceCatalogSurface data={data} filters={filters} />;
+  return (
+    <MarketplaceCatalogSurface
+      data={data}
+      filters={filters}
+      priceTaxDisclosure={getPriceTaxDisclosure(vatStatus)}
+    />
+  );
 }

@@ -16,8 +16,10 @@ import {
 } from "@/src/modules/marketplace/stock-status";
 
 export function MarketplaceProductCard({
+  priceTaxDisclosure = "Final price",
   product,
 }: {
+  priceTaxDisclosure?: string;
   product: MarketplaceProductCardData;
 }) {
   const productHref = `/products/${product.slug}`;
@@ -114,7 +116,10 @@ export function MarketplaceProductCard({
               Sale
             </Badge>
           ) : null}
-          <ProductCardQuickLook product={product} />
+          <ProductCardQuickLook
+            priceTaxDisclosure={priceTaxDisclosure}
+            product={product}
+          />
         </div>
 
         <div className="flex min-w-0 flex-col gap-px px-1.5 pb-1.5 pt-1 sm:px-2 sm:pb-2 sm:pt-1.5">
@@ -149,6 +154,7 @@ export function MarketplaceProductCard({
               compareAtLabel={product.compareAtPriceLabel}
               discountLabel={product.discountLabel}
               label={product.priceLabel}
+              priceTaxDisclosure={priceTaxDisclosure}
             />
             <ProductCardQuickAddButton
               className="pointer-events-auto relative z-30 ml-auto"
@@ -264,10 +270,12 @@ function ProductCardPrice({
   compareAtLabel,
   discountLabel,
   label,
+  priceTaxDisclosure,
 }: {
   compareAtLabel: string | null;
   discountLabel: string | null;
   label: string;
+  priceTaxDisclosure: string;
 }) {
   const fromPrefix = "From ";
   const currentLabel = label.startsWith(fromPrefix)
@@ -295,7 +303,7 @@ function ProductCardPrice({
     <div className="min-w-0 flex-1 leading-none">
       {priceRow}
       <span className="mt-0.5 block text-[7px] font-medium leading-none text-[#6a6a63] dark:text-zinc-400 sm:text-[8px]">
-        Final price
+        {priceTaxDisclosure}
       </span>
     </div>
   );

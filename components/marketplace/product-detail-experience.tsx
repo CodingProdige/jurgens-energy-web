@@ -90,6 +90,7 @@ type ProductDetailExperienceProps = {
   };
   initialVariantId?: string;
   jurgensDeliveryCutoffTime: string;
+  priceTaxDisclosure?: string;
   product: MarketplaceProductDetailView;
   relatedProducts: MarketplaceProductCardData[];
   sellerName: string;
@@ -191,6 +192,7 @@ export function ProductDetailExperience({
   currencyContext,
   deliveryCopy,
   initialVariantId,
+  priceTaxDisclosure = "Final price",
   product,
   relatedProducts,
   sellerName,
@@ -400,6 +402,7 @@ export function ProductDetailExperience({
           deliveryAvailable={deliveryAvailable}
           deliveryBenefit={deliveryBenefit}
           deliveryDetail={deliveryDetail}
+          priceTaxDisclosure={priceTaxDisclosure}
           product={product}
           quantity={quantity}
           sellerName={sellerName}
@@ -423,6 +426,7 @@ export function ProductDetailExperience({
             href={
               product.category ? `/categories/${product.category.path}` : "/products"
             }
+            priceTaxDisclosure={priceTaxDisclosure}
             products={relatedProducts}
             title="More in this category"
             viewAllLabel="View category"
@@ -432,6 +436,7 @@ export function ProductDetailExperience({
         {previouslyViewedProducts.length > 0 ? (
           <ProductRail
             href="/products"
+            priceTaxDisclosure={priceTaxDisclosure}
             products={previouslyViewedProducts}
             title="Previously viewed"
             viewAllLabel="Continue shopping"
@@ -1513,6 +1518,7 @@ function ProductBuyBox({
   deliveryAvailable,
   deliveryBenefit,
   deliveryDetail,
+  priceTaxDisclosure,
   product,
   quantity,
   sellerName,
@@ -1526,6 +1532,7 @@ function ProductBuyBox({
   deliveryAvailable: boolean;
   deliveryBenefit: string;
   deliveryDetail: string;
+  priceTaxDisclosure: string;
   product: MarketplaceProductDetailView;
   quantity: number;
   sellerName: string;
@@ -1660,6 +1667,7 @@ function ProductBuyBox({
         selectedVariant={selectedVariant}
         selectedVariantId={selectedVariantId}
         lowStockQuantity={selectedLowStockQuantity}
+        priceTaxDisclosure={priceTaxDisclosure}
         soldLabel={soldLabel}
         stockStatus={selectedStockStatus}
         topSoldVariantId={topSoldVariantId}
@@ -1686,7 +1694,7 @@ function ProductBuyBox({
             price={selectedPrice}
           />
           <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400 sm:text-[11px]">
-            Final price
+            {priceTaxDisclosure}
           </p>
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
             <ProductStockStatusBadge
@@ -1795,6 +1803,7 @@ function ProductBuyBox({
         setQuantity={setQuantity}
         setSelectedVariantId={setSelectedVariantId}
         lowStockQuantity={selectedLowStockQuantity}
+        priceTaxDisclosure={priceTaxDisclosure}
         soldLabel={soldLabel}
         stockStatus={selectedStockStatus}
         topSoldVariantId={topSoldVariantId}
@@ -1888,6 +1897,7 @@ function MobileProductPurchaseSummary({
   selectedVariant,
   selectedVariantId,
   lowStockQuantity,
+  priceTaxDisclosure,
   soldLabel,
   stockStatus,
   topSoldVariantId,
@@ -1905,6 +1915,7 @@ function MobileProductPurchaseSummary({
   selectedVariant: MarketplaceVariant | null;
   selectedVariantId: string;
   lowStockQuantity: number | null;
+  priceTaxDisclosure: string;
   soldLabel: string | null;
   stockStatus: MarketplaceStockStatus;
   topSoldVariantId: string | null;
@@ -1915,7 +1926,7 @@ function MobileProductPurchaseSummary({
 
   return (
     <div className="grid min-w-0 gap-0 lg:hidden">
-      <MobileTrustTicker />
+      <MobileTrustTicker priceTaxDisclosure={priceTaxDisclosure} />
 
       <section className="grid w-full min-w-0 max-w-[100vw] gap-2.5 overflow-x-hidden border-b border-[#e8e8e2] bg-white px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04] sm:rounded-lg sm:border sm:p-3 sm:shadow-sm">
         <div className="grid min-w-0 gap-1.5">
@@ -1938,7 +1949,7 @@ function MobileProductPurchaseSummary({
             price={selectedPrice}
           />
           <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400">
-            Final price
+            {priceTaxDisclosure}
           </p>
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <ProductStockStatusBadge
@@ -2614,6 +2625,7 @@ function ProductOptionsDialog({
   setQuantity,
   setSelectedVariantId,
   lowStockQuantity,
+  priceTaxDisclosure,
   soldLabel,
   stockStatus,
   topSoldVariantId,
@@ -2638,6 +2650,7 @@ function ProductOptionsDialog({
   setQuantity: (quantity: number) => void;
   setSelectedVariantId: (variantId: string) => void;
   lowStockQuantity: number | null;
+  priceTaxDisclosure: string;
   soldLabel: string | null;
   stockStatus: MarketplaceStockStatus;
   topSoldVariantId: string | null;
@@ -2698,7 +2711,7 @@ function ProductOptionsDialog({
               price={selectedPrice}
             />
             <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
-              <p>Final price</p>
+              <p>{priceTaxDisclosure}</p>
             </div>
             <ProductStockStatusBadge
               className="mt-1"
@@ -2925,11 +2938,15 @@ function VariantOptionCard({
   );
 }
 
-function MobileTrustTicker() {
+function MobileTrustTicker({
+  priceTaxDisclosure,
+}: {
+  priceTaxDisclosure: string;
+}) {
   const items = [
     { icon: ShieldCheckIcon, label: "Careful handling" },
     { icon: CreditCardIcon, label: "Secure payments" },
-    { icon: FileTextIcon, label: "Final price" },
+    { icon: FileTextIcon, label: priceTaxDisclosure },
   ] as const;
 
   return (
@@ -3294,11 +3311,13 @@ function TopVariantBadge({ className }: { className?: string }) {
 
 function ProductRail({
   href,
+  priceTaxDisclosure,
   products,
   title,
   viewAllLabel,
 }: {
   href: string;
+  priceTaxDisclosure: string;
   products: MarketplaceProductCardData[];
   title: string;
   viewAllLabel: string;
@@ -3363,7 +3382,10 @@ function ProductRail({
             className="flex w-[10.75rem] shrink-0 snap-start sm:w-[12rem] lg:w-[13rem]"
             key={item.id}
           >
-            <MarketplaceProductCard product={item} />
+            <MarketplaceProductCard
+              priceTaxDisclosure={priceTaxDisclosure}
+              product={item}
+            />
           </div>
         ))}
       </div>

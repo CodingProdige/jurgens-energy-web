@@ -330,11 +330,17 @@ export function CheckoutExperience({
   initialCustomer,
   initialFallbackAddress,
   isSignedIn,
+  isVatRegistered = false,
+  taxHelpText = "No VAT is charged on this order.",
+  taxSummaryLabel = "No VAT charged",
 }: {
   initialAddresses: CheckoutSavedAddress[];
   initialCustomer: { email: string; name: string; phone: string };
   initialFallbackAddress: CheckoutAddressPrefill | null;
   isSignedIn: boolean;
+  isVatRegistered?: boolean;
+  taxHelpText?: string;
+  taxSummaryLabel?: string;
 }) {
   const initialSavedAddress =
     initialAddresses.find((candidate) => candidate.isDefault) ??
@@ -611,11 +617,12 @@ export function CheckoutExperience({
     : 0;
   const subtotal = cart?.subtotalZar ?? 0;
   const grandTotal = subtotal + shippingTotal;
-  const includedVat =
-    calculateCheckoutIncludedVatCents({
-      items: cart?.items ?? [],
-      shippingTotalZar: shippingTotal,
-    }) / 100;
+  const includedTax = isVatRegistered
+    ? calculateCheckoutIncludedVatCents({
+        items: cart?.items ?? [],
+        shippingTotalZar: shippingTotal,
+      }) / 100
+    : 0;
   const selectedProductCount =
     cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
   const checkoutStepIndex = CHECKOUT_STEPS.indexOf(checkoutStep);
@@ -2478,8 +2485,8 @@ export function CheckoutExperience({
           )}
           <div className="mt-1 border-t border-[#e8e8e2] pt-3 dark:border-white/10">
             <div className="flex justify-between gap-4 text-[10px] leading-4 text-[#888881] dark:text-[#92928b]">
-              <span>Included tax</span>
-              <span className="tabular-nums">{formatZar(includedVat)}</span>
+              <span>{taxSummaryLabel}</span>
+              <span className="tabular-nums">{formatZar(includedTax)}</span>
             </div>
             <div className="mt-1 flex items-end justify-between gap-4">
               <span className="font-bold">
@@ -2573,7 +2580,7 @@ export function CheckoutExperience({
               <div className="mt-1 grid gap-2 text-[10px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
                 <p className="flex items-center gap-2">
                   <CheckCircle2Icon className="size-3.5 text-emerald-600" />
-                  Product and delivery prices include VAT.
+                  {taxHelpText}
                 </p>
                 <p className="flex items-center gap-2">
                   <LockKeyholeIcon className="size-3.5 text-[#ff5a1f]" />

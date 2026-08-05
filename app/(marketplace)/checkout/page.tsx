@@ -16,6 +16,12 @@ import { getLatestOwnedCheckoutAddress } from "@/src/modules/checkout/orders";
 import { hasCourierGuySandboxCheckoutAccess } from "@/src/modules/checkout/sandbox-access";
 import { getCheckoutAddressBook } from "@/src/modules/marketplace/account/addresses";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
+import { getBusinessVatStatus } from "@/src/modules/business-information";
+import {
+  getCheckoutTaxHelpText,
+  getCheckoutTaxSummaryLabel,
+  hasVatRegistrationForDisplay,
+} from "@/src/modules/tax/vat-display";
 import {
   getPrimaryWhatsappCustomerLinkForUser,
 } from "@/src/modules/whatsapp-ordering/customer-links";
@@ -27,9 +33,10 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
-  const [session, marketplaceSettings] = await Promise.all([
+  const [session, marketplaceSettings, vatStatus] = await Promise.all([
     auth(),
     getMarketplaceSettings(),
+    getBusinessVatStatus(),
   ]);
   const userId = session?.user?.id ?? null;
   const isCourierGuySandboxPreview =
@@ -114,6 +121,9 @@ export default async function CheckoutPage() {
               }}
               initialFallbackAddress={initialFallbackAddress}
               isSignedIn={Boolean(userId)}
+              isVatRegistered={hasVatRegistrationForDisplay(vatStatus)}
+              taxHelpText={getCheckoutTaxHelpText(vatStatus)}
+              taxSummaryLabel={getCheckoutTaxSummaryLabel(vatStatus)}
             />
           </div>
         </main>
