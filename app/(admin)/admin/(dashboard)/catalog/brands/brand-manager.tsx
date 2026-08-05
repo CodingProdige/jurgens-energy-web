@@ -89,6 +89,7 @@ type BrandManagerProps = {
     assets: AdminMediaAsset[];
     folders: AdminMediaFolder[];
     storage: MediaStorageSettings;
+    totalAssetCount: number;
     usedStorageBytes: number;
   };
   totalBrandCount: number;
@@ -486,6 +487,7 @@ function BrandForm({
         selectedAssetId={selectedLogo?.id}
         storage={mediaLibrary.storage}
         surface="admin"
+        totalAssetCount={mediaLibrary.totalAssetCount}
         usedStorageBytes={mediaLibrary.usedStorageBytes}
       />
     </form>

@@ -6405,6 +6405,7 @@ export function ProductCreateWizard({
         storage={data.mediaLibrary.storage}
         surface="admin"
         title="Product media"
+        totalAssetCount={data.mediaLibrary.totalAssetCount}
         usedStorageBytes={data.mediaLibrary.usedStorageBytes}
       />
     </div>

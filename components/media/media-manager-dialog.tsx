@@ -44,6 +44,7 @@ import {
   createAdminMediaFolder,
   deleteAdminMediaAsset,
   deleteAdminMediaFolder,
+  loadAdminMediaAssetsPage,
   renameAdminMediaFolder,
   setAdminMediaAssetFolders,
   updateAdminMediaMetadata,
@@ -102,6 +103,7 @@ type MediaManagerDialogProps = {
   storage: MediaStorageSettings;
   surface?: MediaManagerSurface;
   title?: string;
+  totalAssetCount?: number;
   usedStorageBytes: number;
 };
 
@@ -164,6 +166,7 @@ type MediaLibraryFolder = {
 };
 
 const MEDIA_FOLDER_NAME_MAX_LENGTH = 25;
+const MEDIA_MANAGER_VISIBLE_PAGE_SIZE = 48;
 
 const systemMediaFolders = [
   { filter: "brand", label: "Brand assets" },
@@ -235,12 +238,25 @@ export function MediaManagerDialog({
   storage,
   surface = "marketplace",
   title = "Media Manager",
+  totalAssetCount,
   usedStorageBytes,
 }: MediaManagerDialogProps) {
   const accent = mediaManagerAccentClasses[surface];
   const deleteMediaAsset =
     surface === "seller" ? deleteOwnerMediaAsset : deleteAdminMediaAsset;
+  const initialTotalAssetCount = totalAssetCount ?? assets.length;
   const [libraryAssets, setLibraryAssets] = useState(assets);
+  const [visibleAssetCount, setVisibleAssetCount] = useState(
+    MEDIA_MANAGER_VISIBLE_PAGE_SIZE,
+  );
+  const [loadedAssetTotal, setLoadedAssetTotal] = useState(
+    initialTotalAssetCount,
+  );
+  const [nextAssetOffset, setNextAssetOffset] = useState<number | null>(
+    assets.length < initialTotalAssetCount ? assets.length : null,
+  );
+  const [isLoadingMoreAssets, setIsLoadingMoreAssets] = useState(false);
+  const [loadMoreMessage, setLoadMoreMessage] = useState<string | null>(null);
   const [localUsedStorageBytes, setLocalUsedStorageBytes] =
     useState(usedStorageBytes);
   const [persistedFolders, setPersistedFolders] =
@@ -446,9 +462,30 @@ export function MediaManagerDialog({
     systemFolderIds,
   ]);
 
-  useEffect(() => setLibraryAssets(assets), [assets]);
+  const visibleFilteredAssets = filteredAssets.slice(0, visibleAssetCount);
+  const hasHiddenFilteredAssets = visibleAssetCount < filteredAssets.length;
+  const hiddenLoadedAssetCount = Math.max(
+    0,
+    filteredAssets.length - visibleFilteredAssets.length,
+  );
+  const hasMoreRemoteAssets = surface !== "seller" && nextAssetOffset !== null;
+  const canLoadMoreAssets = hasHiddenFilteredAssets || hasMoreRemoteAssets;
+
+  useEffect(() => {
+    const nextTotal = totalAssetCount ?? assets.length;
+
+    setLibraryAssets(assets);
+    setLoadedAssetTotal(nextTotal);
+    setNextAssetOffset(assets.length < nextTotal ? assets.length : null);
+    setVisibleAssetCount(MEDIA_MANAGER_VISIBLE_PAGE_SIZE);
+    setLoadMoreMessage(null);
+  }, [assets, totalAssetCount]);
   useEffect(() => setLocalUsedStorageBytes(usedStorageBytes), [usedStorageBytes]);
   useEffect(() => setPersistedFolders(initialFolders), [initialFolders]);
+
+  useEffect(() => {
+    setVisibleAssetCount(MEDIA_MANAGER_VISIBLE_PAGE_SIZE);
+  }, [dateFilter, folderFilter, libraryFilter, mediaTypeFilter, query, sortOrder]);
 
   useEffect(
     () => () => {
@@ -505,6 +542,8 @@ export function MediaManagerDialog({
           )
         : [asset, ...current],
     );
+    setLoadedAssetTotal((current) => current + 1);
+    setNextAssetOffset((current) => (current === null ? null : current + 1));
     setLocalUsedStorageBytes((current) => current + asset.byteSize);
     setSelectedAssetIds((current) =>
       allowMultipleSelection
@@ -599,6 +638,10 @@ export function MediaManagerDialog({
     setLibraryAssets((current) =>
       current.filter((currentAsset) => currentAsset.id !== asset.id),
     );
+    setLoadedAssetTotal((current) => Math.max(0, current - 1));
+    setNextAssetOffset((current) =>
+      current === null ? null : Math.max(0, current - 1),
+    );
     setLocalUsedStorageBytes((current) =>
       Math.max(0, current - asset.byteSize),
     );
@@ -661,6 +704,12 @@ export function MediaManagerDialog({
     setLibraryAssets((current) =>
       current.filter((asset) => !idsToDelete.has(asset.id)),
     );
+    setLoadedAssetTotal((current) =>
+      Math.max(0, current - assetsToDelete.length),
+    );
+    setNextAssetOffset((current) =>
+      current === null ? null : Math.max(0, current - assetsToDelete.length),
+    );
     setLocalUsedStorageBytes((current) =>
       Math.max(
         0,
@@ -669,6 +718,60 @@ export function MediaManagerDialog({
       ),
     );
     setSelectedAssetIds([]);
+  }
+
+  async function handleLoadMoreAssets() {
+    setLoadMoreMessage(null);
+
+    if (hasHiddenFilteredAssets) {
+      setVisibleAssetCount((current) =>
+        Math.min(
+          current + MEDIA_MANAGER_VISIBLE_PAGE_SIZE,
+          filteredAssets.length,
+        ),
+      );
+      return;
+    }
+
+    if (nextAssetOffset === null || isLoadingMoreAssets || surface === "seller") {
+      return;
+    }
+
+    setIsLoadingMoreAssets(true);
+
+    try {
+      const result = await loadAdminMediaAssetsPage({
+        limit: MEDIA_MANAGER_VISIBLE_PAGE_SIZE,
+        offset: nextAssetOffset,
+        surface: surface === "admin" ? "admin" : "marketplace",
+      });
+
+      if (!result.ok) {
+        setLoadMoreMessage(result.message ?? "Could not load more media.");
+        return;
+      }
+
+      const newAssets = result.assets ?? [];
+
+      setLibraryAssets((current) => {
+        const existingIds = new Set(current.map((asset) => asset.id));
+        const merged = [...current];
+
+        newAssets.forEach((asset) => {
+          if (!existingIds.has(asset.id)) {
+            merged.push(asset);
+          }
+        });
+
+        return merged;
+      });
+      setNextAssetOffset(result.nextOffset ?? null);
+      setVisibleAssetCount((current) => current + MEDIA_MANAGER_VISIBLE_PAGE_SIZE);
+    } catch {
+      setLoadMoreMessage("Could not load more media.");
+    } finally {
+      setIsLoadingMoreAssets(false);
+    }
   }
 
   function useSelectedAsset() {
@@ -709,7 +812,7 @@ export function MediaManagerDialog({
       <Dialog open={open} onOpenChange={handleMediaManagerOpenChange}>
         <DialogContent
           showCloseButton={false}
-          className="z-[80] h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[min(88rem,calc(100vw-1rem))] max-w-none overflow-hidden border border-slate-200 bg-white p-0 text-zinc-950 shadow-2xl shadow-black/20 sm:h-[min(54rem,calc(100dvh-1.5rem))] sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(88rem,calc(100vw-1.5rem))] sm:max-w-none dark:border-white/10 dark:bg-[#0d1218] dark:text-white dark:shadow-black/50"
+          className="z-[80] flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[min(88rem,calc(100vw-1rem))] max-w-none flex-col overflow-hidden border border-slate-200 bg-white p-0 text-zinc-950 shadow-2xl shadow-black/20 sm:h-[min(54rem,calc(100dvh-1.5rem))] sm:max-h-[calc(100dvh-1.5rem)] sm:w-[min(88rem,calc(100vw-1.5rem))] sm:max-w-none dark:border-white/10 dark:bg-[#0d1218] dark:text-white dark:shadow-black/50"
           overlayClassName="z-[70] bg-black/72 backdrop-blur-sm"
         >
           <DialogHeader className="border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur md:px-6 dark:border-white/10 dark:bg-[#111820]/95">
@@ -820,7 +923,7 @@ export function MediaManagerDialog({
             </div>
           </DialogHeader>
 
-          <DialogBody className="overflow-hidden p-0">
+          <DialogBody className="min-h-0 flex-1 overflow-hidden p-0">
             <Tabs
               value={activeTab}
               onValueChange={setActiveTab}
@@ -847,7 +950,7 @@ export function MediaManagerDialog({
                     folderAssetCounts={folderAssetCounts}
                     imageCount={imageCount}
                     initialFolders={persistedFolders}
-                    libraryAssetsCount={libraryAssets.length}
+                    libraryAssetsCount={loadedAssetTotal}
                     libraryFilter={libraryFilter}
                     productImageCount={productImageCount}
                     setActiveTab={setActiveTab}
@@ -998,7 +1101,7 @@ export function MediaManagerDialog({
                         folderAssetCounts={folderAssetCounts}
                         imageCount={imageCount}
                         initialFolders={persistedFolders}
-                        libraryAssetsCount={libraryAssets.length}
+                        libraryAssetsCount={loadedAssetTotal}
                         libraryFilter={libraryFilter}
                         productImageCount={productImageCount}
                         setActiveTab={setActiveTab}
@@ -1030,10 +1133,10 @@ export function MediaManagerDialog({
 
                   <div
                     className={cn(
-                      "contents",
+                      "flex min-h-0 flex-1 flex-col",
                       mobilePanel !== "library" &&
                         activeTab !== "upload" &&
-                        "hidden lg:contents",
+                        "hidden lg:flex",
                     )}
                   >
                     {activeTab === "library" ? (
@@ -1053,7 +1156,7 @@ export function MediaManagerDialog({
                     ) : null}
                     <TabsContent
                       value="library"
-                      className="min-h-0 overflow-y-auto p-4 [scrollbar-width:none] lg:p-5 [&::-webkit-scrollbar]:hidden"
+                      className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6 [scrollbar-width:thin] lg:p-5 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/20"
                     >
                       <div className="mb-5 hidden items-center justify-between lg:flex">
                         <p className="text-sm font-bold">
@@ -1095,7 +1198,7 @@ export function MediaManagerDialog({
                             upload={upload}
                           />
                         ))}
-                        {filteredAssets.map((asset) => (
+                        {visibleFilteredAssets.map((asset) => (
                           <MediaAssetCard
                             acceptedMediaTypes={acceptedMediaTypes}
                             accent={accent}
@@ -1121,11 +1224,42 @@ export function MediaManagerDialog({
                           />
                         ))}
                       </div>
+                      {canLoadMoreAssets ? (
+                        <div className="mt-5 flex flex-col items-center gap-2">
+                          <Button
+                            className="h-10 rounded-full px-5 font-bold"
+                            disabled={isLoadingMoreAssets}
+                            onClick={() => void handleLoadMoreAssets()}
+                            type="button"
+                            variant="outline"
+                          >
+                            {isLoadingMoreAssets ? (
+                              <RefreshCwIcon className="size-4 animate-spin" />
+                            ) : null}
+                            {hasHiddenFilteredAssets
+                              ? `Load more (${hiddenLoadedAssetCount.toLocaleString()} more)`
+                              : "Load more media"}
+                          </Button>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Showing{" "}
+                            {visibleFilteredAssets.length.toLocaleString()} of{" "}
+                            {filteredAssets.length.toLocaleString()} matching files
+                            {loadedAssetTotal > libraryAssets.length
+                              ? ` · ${libraryAssets.length.toLocaleString()} of ${loadedAssetTotal.toLocaleString()} loaded`
+                              : ""}
+                          </p>
+                        </div>
+                      ) : null}
+                      {loadMoreMessage ? (
+                        <p className="mt-3 text-center text-sm font-semibold text-red-600 dark:text-red-300">
+                          {loadMoreMessage}
+                        </p>
+                      ) : null}
                     </TabsContent>
 
                     <TabsContent
                       value="upload"
-                      className="min-h-0 overflow-y-auto p-4 lg:p-6"
+                      className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-6"
                     >
                       <MediaUploadForm
                         accent={accent}

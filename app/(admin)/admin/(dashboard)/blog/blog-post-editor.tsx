@@ -36,6 +36,7 @@ export type BlogEditorMediaLibrary = {
   assets: AdminMediaAsset[];
   folders: AdminMediaFolder[];
   storage: MediaStorageSettings;
+  totalAssetCount: number;
   usedStorageBytes: number;
 };
 
@@ -323,6 +324,7 @@ export function BlogPostEditor({
         storage={mediaLibrary.storage}
         surface="admin"
         title="Select blog cover image"
+        totalAssetCount={mediaLibrary.totalAssetCount}
         usedStorageBytes={mediaLibrary.usedStorageBytes}
       />
     </div>

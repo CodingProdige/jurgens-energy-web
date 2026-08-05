@@ -87,6 +87,7 @@ type UserManagerProps = AdminUsersData & {
     assets: AdminMediaAsset[];
     folders: AdminMediaFolder[];
     storage: MediaStorageSettings;
+    totalAssetCount: number;
     usedStorageBytes: number;
   };
   page: UserPageKind;
@@ -771,6 +772,7 @@ function UserProfileForm({
         storage={mediaLibrary.storage}
         surface="admin"
         title="Select profile picture"
+        totalAssetCount={mediaLibrary.totalAssetCount}
         usedStorageBytes={mediaLibrary.usedStorageBytes}
       />
     </form>

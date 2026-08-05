@@ -47,6 +47,7 @@ type MediaLibrary = {
   assets: AdminMediaAsset[];
   folders: AdminMediaFolder[];
   storage: MediaStorageSettings;
+  totalAssetCount: number;
   usedStorageBytes: number;
 };
 
@@ -556,6 +557,7 @@ export function AdminWhatsappConversationExperience({
         storage={mediaLibrary.storage}
         surface="admin"
         title="Attach media or document"
+        totalAssetCount={mediaLibrary.totalAssetCount}
         usedStorageBytes={mediaLibrary.usedStorageBytes}
       />
     </div>

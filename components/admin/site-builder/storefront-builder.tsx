@@ -2637,6 +2637,7 @@ function MediaImageField({
         storage={mediaLibrary.storage}
         surface="admin"
         title={`Select ${label.toLowerCase()}`}
+        totalAssetCount={mediaLibrary.totalAssetCount}
         usedStorageBytes={mediaLibrary.usedStorageBytes}
       />
     </Field>

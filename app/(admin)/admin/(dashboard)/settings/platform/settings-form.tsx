@@ -755,6 +755,7 @@ export function SocialLinksForm({
           storage={mediaLibrary.storage}
           surface="admin"
           title={`Select ${activePaymentMethod?.label || "payment method"} icon`}
+          totalAssetCount={mediaLibrary.totalAssetCount}
           usedStorageBytes={mediaLibrary.usedStorageBytes}
         />
       ) : null}
@@ -6037,6 +6038,7 @@ function NotificationTemplateEditor({
           open={isMediaManagerOpen}
           storage={mediaLibrary.storage}
           surface="admin"
+          totalAssetCount={mediaLibrary.totalAssetCount}
           usedStorageBytes={mediaLibrary.usedStorageBytes}
         />
       ) : null}

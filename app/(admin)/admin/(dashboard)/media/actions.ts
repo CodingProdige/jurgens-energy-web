@@ -12,6 +12,7 @@ import { db } from "@/src/db";
 import { media, mediaFolderAssignments, mediaFolders } from "@/src/db/schema";
 import { requireAdminAccess } from "@/src/modules/auth/permissions";
 import {
+  getScopedMediaAssetsPage,
   getMediaUsageCount,
   processAndStoreMediaUpload,
   updateStoredMediaMetadata,
@@ -57,6 +58,13 @@ export type MediaMoveState = {
   ok?: boolean;
 };
 
+export type MediaLoadPageState = {
+  assets?: AdminMediaAsset[];
+  message?: string;
+  nextOffset?: number | null;
+  ok?: boolean;
+};
+
 const uploadSchema = z.object({
   altText: z.string().trim().max(240).optional(),
   acceptedMediaTypes: z
@@ -91,6 +99,12 @@ const folderSchema = z.object({
 const folderAssignmentsSchema = z.object({
   folderIds: z.array(z.string().uuid()).max(20),
   id: z.string().uuid(),
+});
+
+const loadAssetsPageSchema = z.object({
+  limit: z.number().int().min(1).max(120).default(48),
+  offset: z.number().int().min(0),
+  surface: z.enum(["admin", "marketplace"]).default("admin"),
 });
 
 async function requireAdminMediaManageAccess() {
@@ -490,6 +504,36 @@ export async function setAdminMediaAssetFolders(input: {
     id: asset.id,
     ok: true,
     message: "Media folders updated.",
+  };
+}
+
+export async function loadAdminMediaAssetsPage(input: {
+  limit?: number;
+  offset: number;
+  surface?: "admin" | "marketplace";
+}): Promise<MediaLoadPageState> {
+  const session = await requireAdminMediaManageAccess();
+  const parsed = loadAssetsPageSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { ok: false, message: "Could not load more media." };
+  }
+
+  const page = await getScopedMediaAssetsPage(
+    {
+      ownerUserId: session.user.id,
+      surface: parsed.data.surface,
+    },
+    {
+      limit: parsed.data.limit,
+      offset: parsed.data.offset,
+    },
+  );
+
+  return {
+    assets: page.assets,
+    nextOffset: page.nextOffset,
+    ok: true,
   };
 }
 

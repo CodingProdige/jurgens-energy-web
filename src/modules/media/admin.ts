@@ -103,6 +103,11 @@ export type MediaStorageQuotaDetails = {
   usedBytes: number;
 };
 
+type MediaAssetPageOptions = {
+  limit?: number;
+  offset?: number;
+};
+
 export class MediaStorageQuotaError extends Error {
   code = "storage_full" as const;
   details: MediaStorageQuotaDetails;
@@ -141,14 +146,18 @@ export async function getMediaStorageSettings(): Promise<MediaStorageSettings> {
   };
 }
 
-export async function getScopedMediaLibrary(scope: MediaLibraryScope) {
-  const mediaScope =
-    scope.surface === "admin"
-      ? "admin-media"
-      : scope.surface === "seller"
-        ? "seller-media"
-        : "marketplace-media";
-  const whereClause = scope.sellerId
+function getMediaLibraryRelativeScope(scope: MediaLibraryScope) {
+  return scope.surface === "admin"
+    ? "admin-media"
+    : scope.surface === "seller"
+      ? "seller-media"
+      : "marketplace-media";
+}
+
+function getScopedMediaWhereClause(scope: MediaLibraryScope) {
+  const mediaScope = getMediaLibraryRelativeScope(scope);
+
+  return scope.sellerId
     ? and(
         eq(media.ownerUserId, scope.ownerUserId),
         eq(media.sellerId, scope.sellerId),
@@ -158,6 +167,16 @@ export async function getScopedMediaLibrary(scope: MediaLibraryScope) {
         eq(media.ownerUserId, scope.ownerUserId),
         like(media.relativePath, `${mediaScope}/%`),
       );
+}
+
+export async function getScopedMediaAssetsPage(
+  scope: MediaLibraryScope,
+  options: MediaAssetPageOptions = {},
+) {
+  const safeLimit = Math.min(120, Math.max(1, options.limit ?? 48));
+  const safeOffset = Math.max(0, options.offset ?? 0);
+  const whereClause = getScopedMediaWhereClause(scope);
+
   const rows = await db
     .select({
       altText: media.altText,
@@ -179,29 +198,46 @@ export async function getScopedMediaLibrary(scope: MediaLibraryScope) {
     .from(media)
     .where(whereClause)
     .orderBy(desc(media.createdAt))
-    .limit(120);
+    .limit(safeLimit + 1)
+    .offset(safeOffset);
 
-  const [{ totalByteSize }] = await db
-    .select({
-      totalByteSize: sql<number>`coalesce(sum(${media.byteSize} + coalesce(${media.previewByteSize}, 0)), 0)`,
-    })
-    .from(media)
-    .where(whereClause);
-
-  const assetIds = rows.map((row) => row.id);
+  const pageRows = rows.slice(0, safeLimit);
+  const assetIds = pageRows.map((row) => row.id);
   const folderIdsByAssetId = await getFolderIdsByAssetId(assetIds);
   const usageCountByAssetId = await getMediaUsageCounts(assetIds);
 
   return {
-    assets: rows.map((row) =>
+    assets: pageRows.map((row) =>
       toAdminMediaAsset({
         ...row,
         folderIds: folderIdsByAssetId.get(row.id) ?? legacyFolderIds(row.folderId),
         usageCount: usageCountByAssetId.get(row.id) ?? 0,
       }),
     ),
+    nextOffset: rows.length > safeLimit ? safeOffset + pageRows.length : null,
+  };
+}
+
+export async function getScopedMediaLibrary(scope: MediaLibraryScope) {
+  const whereClause = getScopedMediaWhereClause(scope);
+  const assetPage = await getScopedMediaAssetsPage(scope, {
+    limit: 120,
+    offset: 0,
+  });
+
+  const [{ totalAssetCount, totalByteSize }] = await db
+    .select({
+      totalAssetCount: sql<number>`count(*)::int`,
+      totalByteSize: sql<number>`coalesce(sum(${media.byteSize} + coalesce(${media.previewByteSize}, 0)), 0)`,
+    })
+    .from(media)
+    .where(whereClause);
+
+  return {
+    assets: assetPage.assets,
     folders: await getScopedMediaFolders(scope),
     storage: await getMediaStorageSettings(),
+    totalAssetCount: Number(totalAssetCount ?? assetPage.assets.length),
     usedStorageBytes: Number(totalByteSize ?? 0),
   };
 }
