@@ -471,6 +471,7 @@ export async function updateSellerProductShipping(
   });
 
   revalidatePath("/seller/products");
+  revalidatePath("/feeds/google-merchant.xml");
 
   return { success: "Product shipping details saved." };
 }
@@ -515,6 +516,7 @@ export async function cancelSellerProductReview(input: unknown) {
 
   revalidatePath("/seller/products");
   revalidatePath(`/seller/products/${product.id}/edit`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return productActionResult(true, "Review cancelled. Product returned to draft.");
 }
@@ -622,6 +624,7 @@ export async function submitSavedSellerProductForReview(input: unknown) {
 
   revalidatePath("/seller/products");
   revalidatePath(`/seller/products/${product.id}/edit`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   await notifyAdminsProductSubmitted({
     productId: product.id,
@@ -750,6 +753,7 @@ export async function updateSellerProductOperationalFields(input: unknown) {
 
   revalidatePath("/seller/products");
   revalidatePath(`/seller/products/${product.id}/edit`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return productActionResult(true, "Operational product fields saved.");
 }
@@ -794,6 +798,7 @@ export async function pauseSellerProduct(input: unknown) {
 
   revalidatePath("/seller/products");
   revalidatePath(`/seller/products/${product.id}/edit`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return productActionResult(true, "Product paused.");
 }
@@ -848,6 +853,7 @@ export async function activateSellerProduct(input: unknown) {
 
   revalidatePath("/seller/products");
   revalidatePath(`/seller/products/${product.id}/edit`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return productActionResult(true, "Product activated.");
 }
@@ -887,6 +893,7 @@ export async function deleteOrArchiveSellerProduct(input: unknown) {
     await db.delete(products).where(eq(products.id, product.id));
 
     revalidatePath("/seller/products");
+    revalidatePath("/feeds/google-merchant.xml");
 
     return productActionResult(true, "Product deleted.");
   }
@@ -910,6 +917,7 @@ export async function deleteOrArchiveSellerProduct(input: unknown) {
 
   revalidatePath("/seller/products");
   revalidatePath(`/seller/products/${product.id}/edit`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return productActionResult(true, "Product has sales history, so it was archived.");
 }
@@ -1156,6 +1164,7 @@ export async function importSellerProductCsvDrafts(input: unknown) {
   }
 
   revalidatePath("/seller/products");
+  revalidatePath("/feeds/google-merchant.xml");
 
   return {
     failures,
@@ -1224,6 +1233,7 @@ export async function importSellerProductLinkDraft(input: unknown) {
   }
 
   revalidatePath("/seller/products");
+  revalidatePath("/feeds/google-merchant.xml");
 
   return {
     ...result,

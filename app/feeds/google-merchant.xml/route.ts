@@ -7,7 +7,7 @@ export async function GET() {
 
   return new Response(feed, {
     headers: {
-      "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=300",
+      "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
       "Content-Disposition": 'inline; filename="google-merchant.xml"',
       "Content-Type": "application/xml; charset=utf-8",
       "X-Content-Type-Options": "nosniff",

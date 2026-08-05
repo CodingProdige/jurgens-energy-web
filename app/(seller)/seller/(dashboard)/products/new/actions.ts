@@ -1320,6 +1320,7 @@ export async function saveProductDraft(input: ProductDraftInput) {
   revalidatePath("/products/all");
   revalidatePath("/products/new");
   revalidatePath(`/products/${productSlug}`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return {
     ok: true,

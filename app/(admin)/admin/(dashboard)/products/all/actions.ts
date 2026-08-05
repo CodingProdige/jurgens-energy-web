@@ -122,6 +122,7 @@ export async function updateAdminProductStatus(
   revalidatePath("/products");
   revalidatePath("/products/all");
   revalidatePath(`/products/${product.slug}`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return {
     ok: true,
@@ -201,6 +202,9 @@ export async function deleteOrArchiveAdminProduct(
     revalidatePath("/admin/products");
     revalidatePath("/admin/products/all");
     revalidatePath("/products");
+    revalidatePath("/products/all");
+    revalidatePath(`/products/${product.slug}`);
+    revalidatePath("/feeds/google-merchant.xml");
 
     return {
       ok: true,
@@ -247,6 +251,9 @@ export async function deleteOrArchiveAdminProduct(
   revalidatePath("/admin/products/all");
   revalidatePath(`/admin/products/${product.id}/edit`);
   revalidatePath("/products");
+  revalidatePath("/products/all");
+  revalidatePath(`/products/${product.slug}`);
+  revalidatePath("/feeds/google-merchant.xml");
 
   return {
     ok: true,
