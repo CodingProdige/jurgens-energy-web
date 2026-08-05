@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
   ArchiveIcon,
+  BadgePercentIcon,
   CheckCircleIcon,
   CircleHelpIcon,
   DownloadIcon,
@@ -996,6 +997,10 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
             />
           </div>
           <div className="grid min-w-0 grid-cols-2 gap-2 md:flex md:shrink-0 md:items-center">
+            <DashboardButton nativeButton={false} render={<Link href="/products/sales" />}>
+              <BadgePercentIcon className="size-3.5" />
+              Sales
+            </DashboardButton>
             <DashboardButton nativeButton={false} render={<Link href="/products/new" />}>
               <PlusIcon className="size-3.5" />
               New product

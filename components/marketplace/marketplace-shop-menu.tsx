@@ -295,7 +295,7 @@ export function MarketplaceShopMenu({
                 {data.hasCurrentDeals ? (
                   <Link
                     className="flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-[11px] font-bold uppercase text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-                    href="/products?sale=1"
+                    href="/sale"
                     onClick={closeMenu}
                     prefetch={false}
                   >

@@ -680,6 +680,20 @@
       "when": 1787738400000,
       "tag": "0096_business_public_registration_toggle",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1787824800000,
+      "tag": "0097_dynamic_invoice_notification_copy",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1787911200000,
+      "tag": "0098_sale_campaigns",
+      "breakpoints": true
     }
   ]
 }

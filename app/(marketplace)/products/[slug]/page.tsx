@@ -220,6 +220,7 @@ function toProductDetailView(
     ratingSummary: product.ratingSummary,
     reviewCount: product.reviewCount,
     reviews: product.reviews,
+    saleBadgeText: product.saleBadgeText,
     shortDescription: product.shortDescription,
     slug: product.slug,
     soldQuantity: product.soldQuantity,

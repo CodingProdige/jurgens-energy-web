@@ -112,8 +112,8 @@ export function MarketplaceProductCard({
             </Badge>
           </div>
           {product.isOnSale ? (
-            <Badge className="marketplace-card-sale-badge absolute right-0 top-0 z-20 h-[15px] rounded-l-[3px] rounded-r-none bg-[#ff5a1f] px-1 text-[6.5px] font-black uppercase leading-none text-white shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]">
-              Sale
+            <Badge className="marketplace-card-sale-badge absolute right-0 top-0 z-20 inline-flex h-[15px] max-w-[88px] items-center rounded-l-[3px] rounded-r-none bg-[#ff5a1f] px-1 text-[6.5px] font-black uppercase leading-none text-white shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:max-w-[104px] sm:text-[8px]">
+              <span className="truncate">{product.saleBadgeText ?? "Sale"}</span>
             </Badge>
           ) : null}
           <ProductCardQuickLook

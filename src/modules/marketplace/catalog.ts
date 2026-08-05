@@ -12,6 +12,8 @@ import {
   productVariants,
   products,
   reviews,
+  saleCampaigns,
+  saleCampaignVariants,
 } from "@/src/db/schema";
 import {
   convertFromZar,
@@ -108,6 +110,7 @@ export type MarketplaceProductCard = {
   id: string;
   inStock: boolean;
   isOnSale: boolean;
+  saleBadgeText: string | null;
   lowStockQuantity: number | null;
   priceLabel: string;
   previewVideo: MarketplaceProductPreviewVideo | null;
@@ -252,6 +255,47 @@ function getProductCardSaleData(
     discountLabel: `${discountPercent}% off`,
     isOnSale: true,
   };
+}
+
+async function getActiveSaleBadgeTextByProductId(productIds: string[]) {
+  const uniqueProductIds = Array.from(new Set(productIds));
+
+  if (uniqueProductIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const rows = await db
+    .select({
+      badgeText: saleCampaigns.badgeText,
+      productId: productVariants.productId,
+    })
+    .from(saleCampaignVariants)
+    .innerJoin(
+      saleCampaigns,
+      eq(saleCampaigns.id, saleCampaignVariants.campaignId),
+    )
+    .innerJoin(
+      productVariants,
+      eq(productVariants.id, saleCampaignVariants.variantId),
+    )
+    .where(
+      and(
+        inArray(productVariants.productId, uniqueProductIds),
+        eq(saleCampaigns.status, "active"),
+        eq(saleCampaignVariants.status, "active"),
+      ),
+    )
+    .orderBy(desc(saleCampaigns.createdAt));
+
+  const badgeTextByProductId = new Map<string, string>();
+
+  for (const row of rows) {
+    if (!badgeTextByProductId.has(row.productId)) {
+      badgeTextByProductId.set(row.productId, row.badgeText);
+    }
+  }
+
+  return badgeTextByProductId;
 }
 
 function getQuickAddVariantId(
@@ -466,6 +510,7 @@ export async function getMarketplaceCatalog({
     productMediaByProductId,
     ratingSummariesByProductId,
     soldQuantityByProductId,
+    saleBadgeTextByProductId,
     categoriesList,
     brandsList,
   ] =
@@ -488,6 +533,7 @@ export async function getMarketplaceCatalog({
       getProductCardMediaByProductId(productIds),
       getProductRatingSummariesByProductId(productIds),
       getSoldQuantityByProductId(productIds),
+      getActiveSaleBadgeTextByProductId(productIds),
       getMarketplaceCategories(),
       getMarketplaceBrands(),
     ]);
@@ -537,6 +583,7 @@ export async function getMarketplaceCatalog({
       previewVideo:
         productMediaByProductId.get(row.id)?.previewVideo ?? null,
       ...getProductCardSaleData(variants, currencyContext),
+      saleBadgeText: saleBadgeTextByProductId.get(row.id) ?? null,
       quickAddVariantId: getQuickAddVariantId(variants),
       reviewCount: ratingSummary.reviewCount,
       shortDescription: row.shortDescription,
@@ -1172,8 +1219,10 @@ export async function getMarketplaceCatalogPage({
     page * pageSize,
   );
   const pageProductIds = paginatedRecords.map((record) => record.row.id);
-  const productMediaByProductId =
-    await getProductCardMediaByProductId(pageProductIds);
+  const [productMediaByProductId, saleBadgeTextByProductId] = await Promise.all([
+    getProductCardMediaByProductId(pageProductIds),
+    getActiveSaleBadgeTextByProductId(pageProductIds),
+  ]);
   const productsList = paginatedRecords.map((record): MarketplaceProductCard => ({
     averageRating: record.ratingSummary.averageRating,
     brandId: record.row.brandId,
@@ -1191,6 +1240,7 @@ export async function getMarketplaceCatalogPage({
     previewVideo:
       productMediaByProductId.get(record.row.id)?.previewVideo ?? null,
     ...getProductCardSaleData(record.variants, currencyContext),
+    saleBadgeText: saleBadgeTextByProductId.get(record.row.id) ?? null,
     quickAddVariantId: getQuickAddVariantId(record.variants),
     reviewCount: record.ratingSummary.reviewCount,
     shortDescription: record.row.shortDescription,
@@ -1944,6 +1994,9 @@ export async function getMarketplaceProductBySlug(
     )
     .orderBy(desc(reviews.approvedAt), desc(reviews.createdAt))
     .limit(12);
+  const saleBadgeTextByProductId = await getActiveSaleBadgeTextByProductId([
+    product.id,
+  ]);
 
   return {
     averageRating: ratingSummary.averageRating,
@@ -1966,6 +2019,7 @@ export async function getMarketplaceProductBySlug(
     priceLabel: getPriceLabel(variants, currencyContext),
     previewVideo,
     ...getProductCardSaleData(variants, currencyContext),
+    saleBadgeText: saleBadgeTextByProductId.get(product.id) ?? null,
     quickAddVariantId: getQuickAddVariantId(activeVariantRows),
     ratingSummary,
     reviewCount: ratingSummary.reviewCount,

@@ -86,6 +86,11 @@ const navItems: DashboardSurfaceNavItem<AdminCapability>[] = [
         capability: "admin.catalog.view",
       },
       {
+        label: "Sales",
+        href: "/products/sales",
+        capability: "admin.catalog.manage",
+      },
+      {
         label: "New product",
         href: "/products/new",
         capability: "admin.catalog.manage",

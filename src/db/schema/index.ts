@@ -9,6 +9,7 @@ export * from "@/src/db/schema/sellers";
 export * from "@/src/db/schema/catalog";
 export * from "@/src/db/schema/media";
 export * from "@/src/db/schema/products";
+export * from "@/src/db/schema/sales";
 export * from "@/src/db/schema/cart";
 export * from "@/src/db/schema/customer-addresses";
 export * from "@/src/db/schema/orders";
