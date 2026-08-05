@@ -11,8 +11,10 @@ import {
 } from "@/src/db/schema";
 import {
   cartValidationRequestSchema,
+  type CartAvailabilityIssueReason,
   type CartValidationRequest,
   type CartValidationResponse,
+  type InvalidCartItem,
   type ValidatedCartItem,
 } from "@/src/modules/cart/contracts";
 import { getBusinessVatStatus } from "@/src/modules/business-information";
@@ -42,6 +44,42 @@ function roundMoney(value: number) {
   return Number(value.toFixed(2));
 }
 
+function getAvailabilityIssue({
+  activeVariant,
+  inStock,
+  publicProduct,
+}: {
+  activeVariant: boolean;
+  inStock: boolean;
+  publicProduct: boolean;
+}): {
+  label: string;
+  reason: CartAvailabilityIssueReason;
+} | null {
+  if (!publicProduct) {
+    return {
+      label: "This product is not currently listed for sale.",
+      reason: "product_not_live",
+    };
+  }
+
+  if (!activeVariant) {
+    return {
+      label: "This selected option is not currently sold.",
+      reason: "variant_not_active",
+    };
+  }
+
+  if (!inStock) {
+    return {
+      label: "This selected option is out of stock.",
+      reason: "out_of_stock",
+    };
+  }
+
+  return null;
+}
+
 export async function validateCartLines(
   input: CartValidationRequest,
   currencyContext: CurrencyContext,
@@ -56,6 +94,7 @@ export async function validateCartLines(
     return {
       currencyCode: currencyContext.currency,
       currencyLocale: currencyContext.locale,
+      invalidItems: [],
       invalidVariantIds: [],
       items: [],
       subtotalDisplay: 0,
@@ -143,9 +182,6 @@ export async function validateCartLines(
     }
   }
 
-  const requestByVariantId = new Map(
-    requestedLines.map((item) => [item.variantId, item]),
-  );
   const rowByVariantId = new Map(rows.map((row) => [row.variantId, row]));
   const validatedItems = requestedLines.flatMap((requested): ValidatedCartItem[] => {
     const row = rowByVariantId.get(requested.variantId);
@@ -158,6 +194,11 @@ export async function validateCartLines(
     const activeVariant = row.variantIsActive && row.variantStatus === "active";
     const inStock = row.continueSellingOutOfStock || row.stockOnHand > 0;
     const available = publicProduct && activeVariant && inStock;
+    const availabilityIssue = getAvailabilityIssue({
+      activeVariant,
+      inStock,
+      publicProduct,
+    });
     const maxQuantity = row.continueSellingOutOfStock
       ? 99
       : Math.max(0, Math.min(99, row.stockOnHand));
@@ -188,6 +229,8 @@ export async function validateCartLines(
     return [
       {
         available,
+        availabilityIssueLabel: availabilityIssue?.label ?? null,
+        availabilityIssueReason: availabilityIssue?.reason ?? null,
         brandId: row.productBrandId,
         brandName: row.brandName,
         categoryId: row.productCategoryId,
@@ -233,6 +276,16 @@ export async function validateCartLines(
       },
     ];
   });
+  const invalidItems: InvalidCartItem[] = requestedLines
+    .filter((requested) => !rowByVariantId.has(requested.variantId))
+    .map((requested) => ({
+      purchaseType: requested.purchaseType,
+      quantity: requested.quantity,
+      reason: "not_found",
+      reasonLabel:
+        "This product or selected option has been removed from the catalogue.",
+      variantId: requested.variantId,
+    }));
   const subtotalZar = roundMoney(
     validatedItems.reduce((total, item) => total + item.lineTotalZar, 0),
   );
@@ -243,9 +296,8 @@ export async function validateCartLines(
   return {
     currencyCode: currencyContext.currency,
     currencyLocale: currencyContext.locale,
-    invalidVariantIds: variantIds.filter(
-      (variantId) => !requestByVariantId.has(variantId) || !rowByVariantId.has(variantId),
-    ),
+    invalidItems,
+    invalidVariantIds: invalidItems.map((item) => item.variantId),
     items: validatedItems,
     subtotalDisplay,
     subtotalZar,

@@ -14,8 +14,24 @@ export const cartValidationRequestSchema = z.object({
 export type CartLineInput = z.infer<typeof cartLineInputSchema>;
 export type CartValidationRequest = z.infer<typeof cartValidationRequestSchema>;
 
+export type CartAvailabilityIssueReason =
+  | "not_found"
+  | "out_of_stock"
+  | "product_not_live"
+  | "variant_not_active";
+
+export type InvalidCartItem = {
+  purchaseType: "standard" | "exchange";
+  quantity: number;
+  reason: CartAvailabilityIssueReason;
+  reasonLabel: string;
+  variantId: string;
+};
+
 export type ValidatedCartItem = {
   available: boolean;
+  availabilityIssueLabel: string | null;
+  availabilityIssueReason: CartAvailabilityIssueReason | null;
   brandId: string | null;
   brandName: string | null;
   categoryId: string | null;
@@ -58,6 +74,7 @@ export type ValidatedCartItem = {
 export type CartValidationResponse = {
   currencyCode: string;
   currencyLocale: string;
+  invalidItems: InvalidCartItem[];
   invalidVariantIds: string[];
   items: ValidatedCartItem[];
   subtotalDisplay: number;

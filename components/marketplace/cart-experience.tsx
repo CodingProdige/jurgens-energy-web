@@ -43,6 +43,10 @@ function toValidationItems(items: LocalCartItem[]) {
   }));
 }
 
+function getCartValidationKey(items: LocalCartItem[]) {
+  return JSON.stringify(toValidationItems(items));
+}
+
 function formatMoney(amount: number, currencyCode: string, locale: string) {
   return new Intl.NumberFormat(locale, {
     currency: currencyCode,
@@ -220,7 +224,7 @@ function CartLine({
         {!item.available ? (
           <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 dark:text-red-300">
             <AlertCircleIcon className="size-3.5" />
-            Currently unavailable
+            {item.availabilityIssueLabel ?? "Currently unavailable"}
           </p>
         ) : null}
 
@@ -253,7 +257,7 @@ function CartLine({
   );
 }
 
-function MissingCartLine({
+function PendingCartLine({
   item,
   onRemove,
 }: {
@@ -261,16 +265,79 @@ function MissingCartLine({
   onRemove: () => void;
 }) {
   return (
-    <article className="grid grid-cols-[1.25rem_5.25rem_minmax(0,1fr)] gap-2.5 border-b border-[#e8e8e2] bg-[#fafaf7] px-3 py-3 opacity-70 last:border-b-0 dark:border-white/10 dark:bg-white/[0.02] sm:grid-cols-[1.25rem_7rem_minmax(0,1fr)_auto] sm:gap-4 sm:px-4 sm:py-4">
-      <Checkbox aria-label={`${item.title} is unavailable`} disabled />
+    <article className="grid grid-cols-[1.25rem_5.25rem_minmax(0,1fr)] gap-2.5 border-b border-[#e8e8e2] bg-[#fafaf7] px-3 py-3 last:border-b-0 dark:border-white/10 dark:bg-white/[0.02] sm:grid-cols-[1.25rem_7rem_minmax(0,1fr)_auto] sm:gap-4 sm:px-4 sm:py-4">
+      <Checkbox aria-label={`${item.title} is being checked`} disabled />
       <div className="relative aspect-square overflow-hidden rounded-[5px] border border-[#e4e4de] bg-[#f4f4f0] dark:border-white/10 dark:bg-white/[0.04]">
         {item.imageUrl ? (
-          <Image alt={item.title} className="object-contain" fill sizes="112px" src={item.imageUrl} />
+          <Image
+            alt={item.title}
+            className="object-contain"
+            fill
+            sizes="112px"
+            src={item.imageUrl}
+          />
         ) : null}
       </div>
       <div className="min-w-0">
         <div className="flex min-w-0 items-start justify-between gap-2">
-          <p className="line-clamp-2 text-[13px] font-bold sm:text-[15px]">{item.title}</p>
+          <p className="line-clamp-2 text-[13px] font-bold sm:text-[15px]">
+            {item.title}
+          </p>
+          <button
+            aria-label={`Remove ${item.title} from cart`}
+            className="grid size-7 shrink-0 place-items-center rounded-md text-[#777770] transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-300 sm:hidden"
+            onClick={onRemove}
+            type="button"
+          >
+            <Trash2Icon className="size-3.5" />
+          </button>
+        </div>
+        <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#666660] dark:text-[#aaa9a1]">
+          <LoaderCircleIcon className="size-3.5 animate-spin text-[#ff5a1f]" />
+          Checking availability…
+        </p>
+      </div>
+      <button
+        aria-label={`Remove ${item.title} from cart`}
+        className="hidden h-8 items-center gap-1.5 px-1.5 text-xs text-[#666660] hover:text-red-600 dark:text-[#aaa9a1] sm:inline-flex"
+        onClick={onRemove}
+        type="button"
+      >
+        <Trash2Icon className="size-3.5" />
+        Remove
+      </button>
+    </article>
+  );
+}
+
+function MissingCartLine({
+  item,
+  onRemove,
+  reasonLabel,
+}: {
+  item: LocalCartItem;
+  onRemove: () => void;
+  reasonLabel?: string;
+}) {
+  return (
+    <article className="grid grid-cols-[1.25rem_5.25rem_minmax(0,1fr)] gap-2.5 border-b border-[#e8e8e2] bg-[#fafaf7] px-3 py-3 opacity-70 last:border-b-0 dark:border-white/10 dark:bg-white/[0.02] sm:grid-cols-[1.25rem_7rem_minmax(0,1fr)_auto] sm:gap-4 sm:px-4 sm:py-4">
+      <Checkbox aria-label={`${item.title} is unavailable`} disabled />
+      <div className="relative aspect-square overflow-hidden rounded-[5px] border border-[#e4e4de] bg-[#f4f4f0] dark:border-white/10 dark:bg-white/[0.04]">
+        {item.imageUrl ? (
+          <Image
+            alt={item.title}
+            className="object-contain"
+            fill
+            sizes="112px"
+            src={item.imageUrl}
+          />
+        ) : null}
+      </div>
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <p className="line-clamp-2 text-[13px] font-bold sm:text-[15px]">
+            {item.title}
+          </p>
           <button
             aria-label={`Remove ${item.title} from cart`}
             className="grid size-7 shrink-0 place-items-center rounded-md text-[#777770] transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-300 sm:hidden"
@@ -282,7 +349,8 @@ function MissingCartLine({
         </div>
         <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 dark:text-red-300">
           <AlertCircleIcon className="size-3.5" />
-          This product is no longer available.
+          {reasonLabel ??
+            "This product or selected option is no longer listed for sale."}
         </p>
       </div>
       <button
@@ -302,6 +370,7 @@ export function CartExperience() {
   const [localItems, setLocalItems] = useState<LocalCartItem[]>([]);
   const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
   const [validation, setValidation] = useState<CartValidationResponse | null>(null);
+  const [validatedCartKey, setValidatedCartKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -312,11 +381,13 @@ export function CartExperience() {
 
     if (items.length === 0) {
       setValidation(null);
+      setValidatedCartKey(null);
       setIsLoading(false);
       setError(null);
       return;
     }
 
+    const validationKey = getCartValidationKey(items);
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     setIsLoading(true);
@@ -346,6 +417,7 @@ export function CartExperience() {
       );
 
       setValidation(result);
+      setValidatedCartKey(validationKey);
 
       for (const item of result.items) {
         if (requestedQuantityByVariantId.get(item.variantId) !== item.quantity) {
@@ -368,6 +440,7 @@ export function CartExperience() {
       }
 
       setError("We could not refresh the cart. Please try again.");
+      setValidatedCartKey(null);
     } finally {
       if (!abortController.signal.aborted) {
         setIsLoading(false);
@@ -399,10 +472,23 @@ export function CartExperience() {
     () => new Map(validation?.items.map((item) => [item.variantId, item]) ?? []),
     [validation],
   );
+  const invalidByVariantId = useMemo(
+    () =>
+      new Map(
+        validation?.invalidItems?.map((item) => [item.variantId, item]) ?? [],
+      ),
+    [validation],
+  );
   const selectedVariantIdSet = useMemo(
     () => new Set(selectedVariantIds),
     [selectedVariantIds],
   );
+  const currentCartValidationKey = useMemo(
+    () => getCartValidationKey(localItems),
+    [localItems],
+  );
+  const hasCurrentValidation =
+    validation !== null && validatedCartKey === currentCartValidationKey;
   const selectedItems =
     validation?.items.filter(
       (item) => selectedVariantIdSet.has(item.variantId) && item.checkoutEligible,
@@ -540,22 +626,39 @@ export function CartExperience() {
           {localItems.map((localItem) => {
             const item = validatedByVariantId.get(localItem.variantId);
 
-            return item ? (
-              <CartLine
-                checked={selectedVariantIdSet.has(item.variantId)}
-                item={item}
-                key={item.variantId}
-                onCheckedChange={(checked) => toggleVariant(item.variantId, checked)}
-                onQuantityChange={(quantity) =>
-                  updateLocalCartItemQuantity(item.variantId, quantity)
-                }
-                onRemove={() => removeValidatedItem(item)}
-              />
-            ) : (
+            if (item) {
+              return (
+                <CartLine
+                  checked={selectedVariantIdSet.has(item.variantId)}
+                  item={item}
+                  key={item.variantId}
+                  onCheckedChange={(checked) => toggleVariant(item.variantId, checked)}
+                  onQuantityChange={(quantity) =>
+                    updateLocalCartItemQuantity(item.variantId, quantity)
+                  }
+                  onRemove={() => removeValidatedItem(item)}
+                />
+              );
+            }
+
+            if (!hasCurrentValidation) {
+              return (
+                <PendingCartLine
+                  item={localItem}
+                  key={localItem.variantId}
+                  onRemove={() => removeLocalCartItem(localItem.variantId)}
+                />
+              );
+            }
+
+            return (
               <MissingCartLine
                 item={localItem}
                 key={localItem.variantId}
                 onRemove={() => removeLocalCartItem(localItem.variantId)}
+                reasonLabel={
+                  invalidByVariantId.get(localItem.variantId)?.reasonLabel
+                }
               />
             );
           })}
