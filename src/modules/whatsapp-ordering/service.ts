@@ -26,6 +26,7 @@ import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import {
   getMarketplaceSettings,
   getOpenAiIntegrationConfig,
+  getWhatsappAutomationState,
   type MarketplaceSettings,
 } from "@/src/modules/marketplace/settings";
 import {
@@ -159,6 +160,7 @@ export type WhatsappAcceptedInboundMessage = {
 };
 
 export type ProcessWhatsappInboundMessageOptions = {
+  automatedResponsesEnabled: boolean;
   onInboundAccepted?: (message: WhatsappAcceptedInboundMessage) => void;
 };
 
@@ -170,6 +172,7 @@ export type WhatsappAssistantResult = {
   skipReply?: boolean;
   status:
     | "ask_for_size"
+    | "automation_disabled"
     | "automation_paused"
     | "draft_confirmation"
     | "draft_created"
@@ -1839,6 +1842,26 @@ async function respond({
   reply: string;
   status: WhatsappAssistantResult["status"];
 }) {
+  const automationState = await getWhatsappAutomationState();
+
+  if (!automationState.enabled) {
+    if (conversationId) {
+      await updateConversationAfterMessage({
+        conversationId,
+        direction: "inbound",
+        intent: "automation_disabled",
+      });
+    }
+
+    return {
+      conversationId,
+      draftUrl: null,
+      reply: "",
+      skipReply: true,
+      status: "automation_disabled" as const,
+    };
+  }
+
   let finalReply = reply.trim();
 
   if (conversationId) {
@@ -4543,11 +4566,21 @@ async function tryProcessWhatsappMessageWithAgent({
 
 export async function processWhatsappInboundMessage(
   input: WhatsappInboundMessage,
-  options: ProcessWhatsappInboundMessageOptions = {},
+  options: ProcessWhatsappInboundMessageOptions,
 ): Promise<WhatsappAssistantResult> {
   const phone = normalizeWhatsappPhone(input.from);
 
   if (!phone) {
+    if (!options.automatedResponsesEnabled) {
+      return {
+        conversationId: null,
+        draftUrl: null,
+        reply: "",
+        skipReply: true,
+        status: "automation_disabled",
+      };
+    }
+
     return {
       conversationId: null,
       draftUrl: null,
@@ -4618,6 +4651,22 @@ export async function processWhatsappInboundMessage(
       providerProfileName,
     };
     await updateConversationState(conversation.id, baseConversationState);
+  }
+
+  if (!options.automatedResponsesEnabled) {
+    await updateConversationAfterMessage({
+      conversationId: conversation.id,
+      direction: "inbound",
+      intent: "automation_disabled",
+    });
+
+    return {
+      conversationId: conversation.id,
+      draftUrl: null,
+      reply: "",
+      skipReply: true,
+      status: "automation_disabled",
+    };
   }
 
   let conversationState = updateRepeatedMessageState(

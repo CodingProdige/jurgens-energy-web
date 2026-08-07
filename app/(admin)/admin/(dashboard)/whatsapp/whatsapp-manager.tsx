@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
   BarChart3Icon,
+  BotIcon,
   EyeIcon,
   Loader2Icon,
   RefreshCwIcon,
@@ -18,6 +19,7 @@ import {
   pauseWhatsappAutomation,
   resumeWhatsappAutomation,
   sendWhatsappFollowUp,
+  setWhatsappAutomatedResponsesEnabled,
 } from "@/app/(admin)/admin/(dashboard)/whatsapp/actions";
 import { WhatsappCustomerDetails } from "@/app/(admin)/admin/(dashboard)/whatsapp/whatsapp-customer-details";
 import {
@@ -58,6 +60,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type {
   AdminWhatsappConversation,
@@ -128,10 +131,20 @@ function ActivityBadge({
 }
 
 function AutomationBadge({
+  automatedResponsesEnabled,
   conversation,
 }: {
+  automatedResponsesEnabled: boolean;
   conversation: AdminWhatsappConversation;
 }) {
+  if (!automatedResponsesEnabled) {
+    return (
+      <Badge className="rounded-md border-0 bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-zinc-300">
+        Global off
+      </Badge>
+    );
+  }
+
   if (conversation.isAutomationPaused) {
     return (
       <Badge className="rounded-md border-0 bg-amber-500/14 text-amber-700 dark:text-amber-300">
@@ -156,6 +169,7 @@ function AutomationBadge({
 }
 
 function ConversationQuickActions({
+  automatedResponsesEnabled,
   canManage,
   conversation,
   onSendFollowUp,
@@ -163,6 +177,7 @@ function ConversationQuickActions({
   onViewCustomerDetails,
   pendingAction,
 }: {
+  automatedResponsesEnabled: boolean;
   canManage: boolean;
   conversation: AdminWhatsappConversation;
   onSendFollowUp: (conversation: AdminWhatsappConversation) => void;
@@ -214,8 +229,15 @@ function ConversationQuickActions({
                 rowActionMenuItemClass,
                 "disabled:cursor-wait disabled:opacity-60",
               )}
-              disabled={Boolean(pendingAction)}
+              disabled={
+                Boolean(pendingAction) || !automatedResponsesEnabled
+              }
               onClick={() => onToggleAutomation(conversation)}
+              title={
+                automatedResponsesEnabled
+                  ? undefined
+                  : "Global automated responses are disabled."
+              }
               type="button"
             >
               {isAutomationPending ? (
@@ -278,9 +300,11 @@ function ConversationQuickActions({
 
 export function AdminWhatsappManager({
   canManage,
+  canManageAutomatedResponses,
   data,
 }: {
   canManage: boolean;
+  canManageAutomatedResponses: boolean;
   data: AdminWhatsappConversationsData;
 }) {
   const router = useRouter();
@@ -290,9 +314,16 @@ export function AdminWhatsappManager({
     useState<AdminWhatsappConversation | null>(null);
   const [actionFeedback, setActionFeedback] =
     useState<ConversationActionFeedback | null>(null);
+  const [automatedResponsesEnabled, setAutomatedResponsesEnabled] = useState(
+    data.automatedResponsesEnabled,
+  );
   const [pendingAction, setPendingAction] =
     useState<PendingConversationAction | null>(null);
+  const [isAutomationSettingPending, startAutomationSettingTransition] =
+    useTransition();
   const [, startActionTransition] = useTransition();
+  const automatedResponsesActive =
+    data.whatsappOrderingEnabled && automatedResponsesEnabled;
   const metrics = useMemo<DashboardMetricDefinition[]>(
     () => [
       {
@@ -304,11 +335,12 @@ export function AdminWhatsappManager({
       },
       {
         color: "emerald",
-        description:
-          "Open conversations with automation active and recent or available customer activity.",
+        description: automatedResponsesActive
+          ? "Open conversations with automation active and recent or available customer activity."
+          : "No conversations are automated while the global response switch is off.",
         id: "active",
         label: "Active",
-        value: data.metrics.active,
+        value: automatedResponsesActive ? data.metrics.active : 0,
       },
       {
         color: "#ff5a1f",
@@ -350,7 +382,7 @@ export function AdminWhatsappManager({
         value: data.metrics.flagged,
       },
     ],
-    [data.metrics],
+    [automatedResponsesActive, data.metrics],
   );
   const activePage = Math.min(
     currentPage,
@@ -360,6 +392,40 @@ export function AdminWhatsappManager({
     (activePage - 1) * pageSize,
     activePage * pageSize,
   );
+
+  function updateAutomatedResponses(enabled: boolean) {
+    if (isAutomationSettingPending) {
+      return;
+    }
+
+    const previousValue = automatedResponsesEnabled;
+    setActionFeedback(null);
+    setAutomatedResponsesEnabled(enabled);
+
+    startAutomationSettingTransition(async () => {
+      try {
+        const result = await setWhatsappAutomatedResponsesEnabled({ enabled });
+
+        setActionFeedback({
+          message: result.message,
+          tone: result.ok ? "success" : "error",
+        });
+
+        if (result.ok) {
+          router.refresh();
+          return;
+        }
+
+        setAutomatedResponsesEnabled(previousValue);
+      } catch {
+        setAutomatedResponsesEnabled(previousValue);
+        setActionFeedback({
+          message: "The global automated response setting could not be updated.",
+          tone: "error",
+        });
+      }
+    });
+  }
 
   function runConversationAction(
     conversation: AdminWhatsappConversation,
@@ -406,21 +472,81 @@ export function AdminWhatsappManager({
 
   return (
     <>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <DashboardPageHeader
-          breadcrumbs={["Orders", "WhatsApp"]}
-          className="mb-0"
-          title="WhatsApp Conversations"
-        />
-        <Link
-          href="/settings/platform?section=whatsapp-ordering#whatsapp-email-alerts"
-          className="inline-flex h-9 shrink-0 items-center justify-center self-start rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-zinc-900 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] focus-visible:ring-offset-2 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
-        >
-          Configure email alerts
-        </Link>
-      </div>
+      <DashboardPageHeader
+        breadcrumbs={["Orders", "WhatsApp"]}
+        title="WhatsApp Conversations"
+      />
 
       <div className="grid gap-4">
+        <section
+          className={cn(
+            dashboardPanelClass,
+            "flex min-w-0 flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between",
+          )}
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className={cn(
+                "inline-flex size-9 shrink-0 items-center justify-center rounded-lg",
+                automatedResponsesActive
+                  ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+                  : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-zinc-300",
+              )}
+            >
+              <BotIcon className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-bold text-zinc-950 dark:text-white">
+                  Automated WhatsApp responses
+                </h2>
+                <Badge
+                  className={cn(
+                    "rounded-md border-0",
+                    automatedResponsesActive
+                      ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+                      : "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-zinc-300",
+                  )}
+                >
+                  {automatedResponsesActive
+                    ? "On"
+                    : data.whatsappOrderingEnabled
+                      ? "Off"
+                      : "Ordering off"}
+                </Badge>
+              </div>
+              <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                {data.whatsappOrderingEnabled
+                  ? "When off, incoming messages stay in this inbox for manual replies. The assistant and scheduled automatic follow-ups will not send; transactional order updates continue normally."
+                  : "WhatsApp ordering is disabled in Platform Settings, so automated responses are inactive. Incoming messages remain available for manual handling."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-3 sm:justify-end">
+            <Link
+              href="/settings/platform?section=whatsapp-ordering#whatsapp-email-alerts"
+              className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-zinc-900 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f] focus-visible:ring-offset-2 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
+            >
+              Configure WhatsApp
+            </Link>
+            <Switch
+              aria-label="Toggle automated WhatsApp responses globally"
+              checked={automatedResponsesEnabled}
+              disabled={
+                !canManageAutomatedResponses || isAutomationSettingPending
+              }
+              onCheckedChange={updateAutomatedResponses}
+            />
+            {isAutomationSettingPending ? (
+              <Loader2Icon
+                aria-label="Updating automated responses"
+                className="size-4 animate-spin text-slate-500"
+              />
+            ) : null}
+          </div>
+        </section>
+
         <DashboardCompactMetrics
           metrics={metrics}
           storageKey="jurgens:admin:whatsapp-conversation-metrics"
@@ -513,7 +639,12 @@ export function AdminWhatsappManager({
                         <div className="min-w-0 space-y-2 overflow-hidden">
                           <div className="flex flex-wrap gap-1.5">
                             <ActivityBadge conversation={conversation} />
-                            <AutomationBadge conversation={conversation} />
+                            <AutomationBadge
+                              automatedResponsesEnabled={
+                                automatedResponsesActive
+                              }
+                              conversation={conversation}
+                            />
                           </div>
                           <p className="line-clamp-2 text-xs leading-5 text-slate-500 dark:text-zinc-400">
                             {conversation.activity.description}
@@ -563,6 +694,7 @@ export function AdminWhatsappManager({
                       </TableCell>
                       <TableCell className={whatsappTableActionCellClass}>
                         <ConversationQuickActions
+                          automatedResponsesEnabled={automatedResponsesActive}
                           canManage={canManage}
                           conversation={conversation}
                           onSendFollowUp={(selectedConversation) =>

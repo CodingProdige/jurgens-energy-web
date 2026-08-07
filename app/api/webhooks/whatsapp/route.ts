@@ -5,11 +5,15 @@ import {
   send360DialogMediaMessage,
   send360DialogTextMessage,
 } from "@/src/modules/whatsapp-ordering/360dialog";
-import { getWhatsappIntegrationConfig } from "@/src/modules/marketplace/settings";
+import {
+  getWhatsappAutomationState,
+  getWhatsappIntegrationConfig,
+} from "@/src/modules/marketplace/settings";
 import { dispatchWhatsappInboundAdminNotifications } from "@/src/modules/notifications/whatsapp-admin";
 import {
   processWhatsappInboundMessage,
   type WhatsappAcceptedInboundMessage,
+  type WhatsappAssistantResult,
   type WhatsappAssistantMedia,
   type WhatsappInboundMessage,
 } from "@/src/modules/whatsapp-ordering/service";
@@ -142,6 +146,7 @@ export async function POST(request: Request) {
   const parsed: WhatsappInboundMessage = payloadResult.message;
   let acceptedInboundMessage: WhatsappAcceptedInboundMessage | null = null;
   const result = await processWhatsappInboundMessage(parsed, {
+    automatedResponsesEnabled: config.automatedResponsesEnabled,
     onInboundAccepted(message) {
       acceptedInboundMessage = message;
     },
@@ -152,18 +157,21 @@ export async function POST(request: Request) {
   }
 
   if (result.skipReply) {
-    return Response.json(
-      {
-        draftUrl: result.draftUrl,
-        ok: true,
-        reply: result.reply,
-        skipped: true,
-        status: result.status,
-      },
-      {
-        headers: { "Cache-Control": "private, no-store" },
-      },
-    );
+    return createNoReplyResponse({
+      draftUrl: result.draftUrl,
+      provider: parsed.provider,
+      status: result.status,
+    });
+  }
+
+  const latestAutomationState = await getWhatsappAutomationState();
+
+  if (!latestAutomationState.enabled) {
+    return createNoReplyResponse({
+      draftUrl: null,
+      provider: parsed.provider,
+      status: "automation_disabled",
+    });
   }
 
   if (parsed.provider === "twilio") {
@@ -222,6 +230,10 @@ async function sendWhatsappReply({
   }> = [];
 
   for (const attachment of media) {
+    if (!(await getWhatsappAutomationState()).enabled) {
+      return results;
+    }
+
     try {
       results.push({
         kind: "media",
@@ -240,6 +252,10 @@ async function sendWhatsappReply({
     }
   }
 
+  if (!(await getWhatsappAutomationState()).enabled) {
+    return results;
+  }
+
   try {
     results.push({
       kind: "text",
@@ -254,6 +270,38 @@ async function sendWhatsappReply({
   }
 
   return results;
+}
+
+function createNoReplyResponse({
+  draftUrl,
+  provider,
+  status,
+}: {
+  draftUrl: string | null;
+  provider: WhatsappInboundMessage["provider"];
+  status: WhatsappAssistantResult["status"];
+}) {
+  if (provider === "twilio") {
+    return new Response('<?xml version="1.0" encoding="UTF-8"?><Response/>', {
+      headers: {
+        "Cache-Control": "private, no-store",
+        "Content-Type": "text/xml; charset=utf-8",
+      },
+    });
+  }
+
+  return Response.json(
+    {
+      draftUrl,
+      ok: true,
+      reply: "",
+      skipped: true,
+      status,
+    },
+    {
+      headers: { "Cache-Control": "private, no-store" },
+    },
+  );
 }
 
 async function readWebhookBody(request: Request): Promise<

@@ -694,6 +694,13 @@
       "when": 1787911200000,
       "tag": "0098_sale_campaigns",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1787997600000,
+      "tag": "0099_whatsapp_automated_responses_toggle",
+      "breakpoints": true
     }
   ]
 }

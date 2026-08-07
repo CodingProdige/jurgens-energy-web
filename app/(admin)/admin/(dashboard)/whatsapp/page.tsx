@@ -27,7 +27,17 @@ export default async function AdminWhatsappPage() {
     access.session.user.adminCapabilities,
     "admin.orders.manage",
   );
+  const canManageAutomatedResponses = hasAdminCapability(
+    access.session.user.adminCapabilities,
+    "admin.settings.manage",
+  );
   const data = await getAdminWhatsappConversations();
 
-  return <AdminWhatsappManager canManage={canManage} data={data} />;
+  return (
+    <AdminWhatsappManager
+      canManage={canManage}
+      canManageAutomatedResponses={canManageAutomatedResponses}
+      data={data}
+    />
+  );
 }

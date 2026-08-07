@@ -181,12 +181,14 @@ function ChatMessage({ message }: { message: AdminWhatsappMessage }) {
 }
 
 function HeaderActions({
+  automatedResponsesEnabled,
   canManage,
   conversation,
   onSendFollowUp,
   onToggleAutomation,
   pendingAction,
 }: {
+  automatedResponsesEnabled: boolean;
   canManage: boolean;
   conversation: AdminWhatsappConversation;
   onSendFollowUp: () => void;
@@ -215,8 +217,13 @@ function HeaderActions({
           menuItemClass,
           "disabled:cursor-wait disabled:opacity-60",
         )}
-        disabled={Boolean(pendingAction)}
+        disabled={Boolean(pendingAction) || !automatedResponsesEnabled}
         onClick={onToggleAutomation}
+        title={
+          automatedResponsesEnabled
+            ? undefined
+            : "Global automated responses are disabled."
+        }
         type="button"
       >
         {pendingAction === "automation" ? (
@@ -273,10 +280,12 @@ function HeaderActions({
 }
 
 export function AdminWhatsappConversationExperience({
+  automatedResponsesEnabled,
   canManage,
   conversation,
   mediaLibrary,
 }: {
+  automatedResponsesEnabled: boolean;
   canManage: boolean;
   conversation: AdminWhatsappConversation;
   mediaLibrary: MediaLibrary;
@@ -390,6 +399,11 @@ export function AdminWhatsappConversationExperience({
                       {customerLabel}
                     </p>
                     <ConversationStatusBadge conversation={conversation} />
+                    {!automatedResponsesEnabled ? (
+                      <Badge className="h-6 rounded-md border-0 bg-slate-200 px-2 text-xs text-slate-700 dark:bg-white/10 dark:text-zinc-300">
+                        Global automation off
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="truncate text-xs text-[#667781] dark:text-zinc-400">
                     {conversation.phone} · {conversation.activity.description}
@@ -397,6 +411,7 @@ export function AdminWhatsappConversationExperience({
                 </div>
               </button>
               <HeaderActions
+                automatedResponsesEnabled={automatedResponsesEnabled}
                 canManage={canManage}
                 conversation={conversation}
                 onSendFollowUp={() => runConversationAction("follow_up")}

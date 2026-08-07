@@ -17,6 +17,7 @@ import {
   type WhatsappMediaMessageAttachment,
 } from "@/src/modules/whatsapp-ordering/360dialog";
 import {
+  getWhatsappAutomationState,
   getWhatsappFollowUpSettings,
   type WhatsappFollowUpSettings,
 } from "@/src/modules/marketplace/settings";
@@ -111,6 +112,7 @@ export type AdminWhatsappConversation = {
 };
 
 export type AdminWhatsappConversationsData = {
+  automatedResponsesEnabled: boolean;
   conversations: AdminWhatsappConversation[];
   metrics: {
     active: number;
@@ -121,6 +123,7 @@ export type AdminWhatsappConversationsData = {
     needsReply: number;
     total: number;
   };
+  whatsappOrderingEnabled: boolean;
 };
 
 export async function getAdminWhatsappConversations(): Promise<AdminWhatsappConversationsData> {
@@ -197,10 +200,14 @@ export async function getAdminWhatsappConversations(): Promise<AdminWhatsappConv
   );
 
   return {
+    automatedResponsesEnabled:
+      followUpSettings.whatsappAutomatedResponsesEnabled,
     conversations,
     metrics: {
       active: conversations.filter(
         (conversation) =>
+          followUpSettings.whatsappAutomatedResponsesEnabled &&
+          followUpSettings.whatsappOrderingEnabled &&
           conversation.status === "open" &&
           !conversation.isAutomationPaused &&
           !conversation.isMuted,
@@ -222,6 +229,7 @@ export async function getAdminWhatsappConversations(): Promise<AdminWhatsappConv
       ).length,
       total: conversations.length,
     },
+    whatsappOrderingEnabled: followUpSettings.whatsappOrderingEnabled,
   };
 }
 
@@ -693,7 +701,10 @@ export async function runDueWhatsappFollowUps({
 }: {
   limit?: number;
 } = {}): Promise<WhatsappFollowUpRunResult> {
-  const settings = await getWhatsappFollowUpSettings();
+  const [settings, automationState] = await Promise.all([
+    getWhatsappFollowUpSettings(),
+    getWhatsappAutomationState(),
+  ]);
   const result: WhatsappFollowUpRunResult = {
     attempted: 0,
     failed: 0,
@@ -707,7 +718,10 @@ export async function runDueWhatsappFollowUps({
     },
   };
 
-  if (!settings.whatsappFollowUpsEnabled) {
+  if (
+    !automationState.enabled ||
+    !settings.whatsappFollowUpsEnabled
+  ) {
     result.skipped.disabled = 1;
 
     return result;
@@ -766,6 +780,13 @@ export async function runDueWhatsappFollowUps({
     if (!isWithinWhatsappCustomerServiceWindow(row.lastInboundAt)) {
       result.skipped.outsideCustomerServiceWindow += 1;
       continue;
+    }
+
+    const latestAutomationState = await getWhatsappAutomationState();
+
+    if (!latestAutomationState.enabled) {
+      result.skipped.disabled += 1;
+      break;
     }
 
     result.attempted += 1;

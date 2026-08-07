@@ -11,9 +11,13 @@ import {
   sendAdminWhatsappConversationMessage,
   sendAdminWhatsappFollowUp,
 } from "@/src/modules/admin/whatsapp";
+import { updateWhatsappAutomatedResponsesSetting } from "@/src/modules/marketplace/settings";
 
 const conversationActionSchema = z.object({
   conversationId: z.string().uuid(),
+});
+const automatedResponsesSchema = z.object({
+  enabled: z.boolean(),
 });
 const sendMessageSchema = conversationActionSchema.extend({
   attachmentAssetId: z
@@ -48,6 +52,37 @@ export type AdminWhatsappActionResult = {
   message: string;
   ok: boolean;
 };
+
+export async function setWhatsappAutomatedResponsesEnabled(
+  input: unknown,
+): Promise<AdminWhatsappActionResult> {
+  const access = await requireAdminCapability("admin.settings.manage");
+
+  if (!access.ok) {
+    return {
+      message: "WhatsApp management access could not be confirmed.",
+      ok: false,
+    };
+  }
+
+  const parsed = automatedResponsesSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      message: "The automated response setting could not be confirmed.",
+      ok: false,
+    };
+  }
+
+  const result = await updateWhatsappAutomatedResponsesSetting({
+    actorUserId: access.session.user.id,
+    enabled: parsed.data.enabled,
+  });
+
+  revalidatePath("/whatsapp");
+
+  return result;
+}
 
 export async function pauseWhatsappAutomation(
   input: unknown,

@@ -7,6 +7,7 @@ import { RestrictedAdminPage } from "@/components/admin/restricted-admin-page";
 import { hasAdminCapability } from "@/src/modules/admin/staff";
 import { getAdminWhatsappConversation } from "@/src/modules/admin/whatsapp";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import { getWhatsappAutomationState } from "@/src/modules/marketplace/settings";
 import { getAdminMediaLibrary } from "@/src/modules/media/admin";
 
 export const metadata: Metadata = {
@@ -39,7 +40,8 @@ export default async function AdminWhatsappConversationPage({
     notFound();
   }
 
-  const [conversation, mediaLibrary] = await Promise.all([
+  const [automationState, conversation, mediaLibrary] = await Promise.all([
+    getWhatsappAutomationState(),
     getAdminWhatsappConversation(parsedConversationId.data),
     getAdminMediaLibrary(access.session.user.id),
   ]);
@@ -55,6 +57,7 @@ export default async function AdminWhatsappConversationPage({
 
   return (
     <AdminWhatsappConversationExperience
+      automatedResponsesEnabled={automationState.enabled}
       canManage={canManage}
       conversation={conversation}
       mediaLibrary={mediaLibrary}

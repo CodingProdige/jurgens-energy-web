@@ -563,6 +563,7 @@ export type MarketplaceSettings = {
   hasWhatsappApiKey: boolean;
   hasWhatsappWebhookSigningSecret: boolean;
   hasWhatsappWebhookVerifyToken: boolean;
+  whatsappAutomatedResponsesEnabled: boolean;
   whatsappBusinessPhoneNumber: string | null;
   whatsappEmailNotificationRecipients: string[];
   whatsappEmailNotificationsEnabled: boolean;
@@ -587,6 +588,7 @@ export type MarketplaceSettings = {
 
 export type WhatsappFollowUpSettings = Pick<
   MarketplaceSettings,
+  | "whatsappAutomatedResponsesEnabled"
   | "whatsappFollowUpDefaultMessage"
   | "whatsappFollowUpDelayMinutes"
   | "whatsappFollowUpDraftMessage"
@@ -596,6 +598,7 @@ export type WhatsappFollowUpSettings = Pick<
   | "whatsappFollowUpQuietHoursStart"
   | "whatsappFollowUpSupportMessage"
   | "whatsappFollowUpsEnabled"
+  | "whatsappOrderingEnabled"
 >;
 
 export type MarketplaceAdminSecrets = {
@@ -730,6 +733,7 @@ const defaultSettings: MarketplaceSettings = {
     env.WHATSAPP_WEBHOOK_SIGNING_SECRET,
   ),
   hasWhatsappWebhookVerifyToken: Boolean(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
+  whatsappAutomatedResponsesEnabled: true,
   whatsappBusinessPhoneNumber: env.WHATSAPP_ORDERING_PHONE_NUMBER ?? null,
   whatsappEmailNotificationRecipients: [],
   whatsappEmailNotificationsEnabled: false,
@@ -901,6 +905,8 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       twitterUrl: marketplaceSettings.twitterUrl,
       videoCompressionCrf: marketplaceSettings.videoCompressionCrf,
       whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
+      whatsappAutomatedResponsesEnabled:
+        marketplaceSettings.whatsappAutomatedResponsesEnabled,
       whatsappBusinessPhoneNumber:
         marketplaceSettings.whatsappBusinessPhoneNumber,
       whatsappEmailNotificationRecipients:
@@ -1121,6 +1127,8 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       settings.whatsappBusinessPhoneNumber ??
       env.WHATSAPP_ORDERING_PHONE_NUMBER ??
       null,
+    whatsappAutomatedResponsesEnabled:
+      settings.whatsappAutomatedResponsesEnabled ?? true,
     whatsappEmailNotificationRecipients:
       parseWhatsappEmailNotificationRecipients(
         settings.whatsappEmailNotificationRecipients,
@@ -2270,6 +2278,43 @@ export async function getWhatsappEmailNotificationSettings(): Promise<{
   };
 }
 
+export async function updateWhatsappAutomatedResponsesSetting({
+  actorUserId,
+  enabled,
+}: {
+  actorUserId: string;
+  enabled: boolean;
+}) {
+  const values = {
+    updatedAt: new Date(),
+    whatsappAutomatedResponsesEnabled: enabled,
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({ id: 1, ...values })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: values,
+      });
+
+    await tx.insert(auditLogs).values({
+      action: "marketplace.whatsapp_automated_responses.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({ enabled }),
+    });
+  });
+
+  return {
+    message: enabled
+      ? "Automated WhatsApp responses enabled."
+      : "Automated WhatsApp responses disabled. Incoming messages now require a manual reply.",
+    ok: true,
+  };
+}
+
 export async function getWhatsappOrderNotificationSettings(): Promise<{
   enabled: boolean;
   recipients: string[];
@@ -2286,6 +2331,8 @@ export async function getWhatsappFollowUpSettings(): Promise<WhatsappFollowUpSet
   const settings = await getMarketplaceSettings();
 
   return {
+    whatsappAutomatedResponsesEnabled:
+      settings.whatsappAutomatedResponsesEnabled,
     whatsappFollowUpDefaultMessage: settings.whatsappFollowUpDefaultMessage,
     whatsappFollowUpDelayMinutes: settings.whatsappFollowUpDelayMinutes,
     whatsappFollowUpDraftMessage: settings.whatsappFollowUpDraftMessage,
@@ -2296,6 +2343,28 @@ export async function getWhatsappFollowUpSettings(): Promise<WhatsappFollowUpSet
     whatsappFollowUpQuietHoursStart: settings.whatsappFollowUpQuietHoursStart,
     whatsappFollowUpSupportMessage: settings.whatsappFollowUpSupportMessage,
     whatsappFollowUpsEnabled: settings.whatsappFollowUpsEnabled,
+    whatsappOrderingEnabled: settings.whatsappOrderingEnabled,
+  };
+}
+
+export async function getWhatsappAutomationState() {
+  const [settings] = await db
+    .select({
+      automatedResponsesEnabled:
+        marketplaceSettings.whatsappAutomatedResponsesEnabled,
+      orderingEnabled: marketplaceSettings.whatsappOrderingEnabled,
+    })
+    .from(marketplaceSettings)
+    .where(eq(marketplaceSettings.id, 1))
+    .limit(1);
+  const automatedResponsesEnabled =
+    settings?.automatedResponsesEnabled ?? true;
+  const orderingEnabled = settings?.orderingEnabled ?? false;
+
+  return {
+    automatedResponsesEnabled,
+    enabled: orderingEnabled && automatedResponsesEnabled,
+    orderingEnabled,
   };
 }
 
@@ -2521,6 +2590,9 @@ export async function getWhatsappIntegrationConfig() {
 
   return {
     apiKey,
+    automatedResponsesEnabled:
+      settings.whatsappOrderingEnabled &&
+      settings.whatsappAutomatedResponsesEnabled,
     businessPhoneNumber,
     isConfigured: Boolean(
       settings.whatsappOrderingEnabled && apiKey && businessPhoneNumber,

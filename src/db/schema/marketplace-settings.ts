@@ -276,6 +276,11 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   whatsappOrderingEnabled: boolean("whatsapp_ordering_enabled")
     .notNull()
     .default(false),
+  whatsappAutomatedResponsesEnabled: boolean(
+    "whatsapp_automated_responses_enabled",
+  )
+    .notNull()
+    .default(true),
   whatsappProvider: varchar("whatsapp_provider", { length: 32 })
     .notNull()
     .default("360dialog"),
