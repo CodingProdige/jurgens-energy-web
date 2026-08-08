@@ -37,7 +37,7 @@ import { requireAdminCapability } from "@/src/modules/auth/permissions";
 export const metadata: Metadata = {
   title: "Admin Shipping",
   description:
-    "Book Courier Guy shipments, create waybills, and monitor delivery events.",
+    "Review Courier Guy costs, book shipments, create waybills, and monitor delivery events.",
   robots: {
     follow: false,
     index: false,
@@ -174,8 +174,9 @@ export default async function AdminShippingPage() {
                 The Courier Guy integration
               </p>
               <p className="mt-1 text-sm text-slate-600 dark:text-zinc-400">
-                Customer prices stay fixed. Provider rates are used privately
-                when an administrator books each packed drop-off shipment.
+                Customer prices stay fixed. Administrators review each live
+                provider rate and projected delivery exposure before confirming
+                a packed drop-off shipment.
               </p>
             </div>
             <Link
@@ -336,15 +337,36 @@ export default async function AdminShippingPage() {
                     </TableCell>
                     <TableCell className={dashboardTableCellClass}>
                       <div>
-                        <p className={dashboardTableMutedTextClass}>
+                        <p
+                          className={cn(
+                            dashboardTableMutedTextClass,
+                            shipment.costExceededApprovedQuote &&
+                              "font-semibold text-red-700 dark:text-red-300",
+                          )}
+                        >
                           {shipment.providerCostAmount
                             ? formatMoney(shipment.providerCostAmount)
-                            : "Not quoted"}
+                            : shipment.provider === "courier_guy" &&
+                                shipment.parcelCount === 0
+                              ? "Parcel details missing"
+                              : shipment.provider === "courier_guy" &&
+                                  shipment.parcelCount > 1
+                                ? "Parcel setup needs review"
+                                : shipment.provider === "courier_guy"
+                                  ? "Awaiting live quote"
+                                  : "Not quoted"}
                         </p>
                         <p className={dashboardTableSecondaryTextClass}>
                           {shipment.parcelCount} parcel
                           {shipment.parcelCount === 1 ? "" : "s"}
                         </p>
+                        {shipment.costExceededApprovedQuote &&
+                        shipment.approvedProviderCostAmount ? (
+                          <p className="max-w-48 text-[11px] leading-4 text-red-700 dark:text-red-300">
+                            Final cost exceeded the approved{" "}
+                            {formatMoney(shipment.approvedProviderCostAmount)} quote.
+                          </p>
+                        ) : null}
                       </div>
                     </TableCell>
                     <TableCell className={dashboardTableCellClass}>
@@ -352,6 +374,9 @@ export default async function AdminShippingPage() {
                       canManageShipments ? (
                         <CourierGuyShipmentActions
                           bookingReference={shipment.bookingReference}
+                          orderNumber={shipment.orderNumber}
+                          packedParcel={shipment.packedParcel}
+                          parcelCount={shipment.parcelCount}
                           shipmentId={shipment.id}
                           status={shipment.status}
                           trackingNumber={shipment.trackingNumber}

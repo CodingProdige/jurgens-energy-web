@@ -263,6 +263,19 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
     "courier_guy_default_service_code",
     { length: 64 },
   ),
+  courierGuyMaxBookingCostAmount: numeric(
+    "courier_guy_max_booking_cost_amount",
+    {
+      mode: "number",
+      precision: 12,
+      scale: 2,
+    },
+  ),
+  courierGuyMaxAbsorbedAmount: numeric("courier_guy_max_absorbed_amount", {
+    mode: "number",
+    precision: 12,
+    scale: 2,
+  }),
   courierGuyDropoffType: varchar("courier_guy_dropoff_type", {
     length: 32,
   })
@@ -371,6 +384,14 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   courierGuyDropoffPickupPointLabelValid: check(
     "marketplace_settings_cg_dropoff_point_label_valid",
     sql`${settings.courierGuyDropoffPickupPointLabel} IS NULL OR btrim(${settings.courierGuyDropoffPickupPointLabel}) <> ''`,
+  ),
+  courierGuyMaxBookingCostNonnegative: check(
+    "marketplace_settings_cg_max_booking_cost_nonnegative",
+    sql`${settings.courierGuyMaxBookingCostAmount} IS NULL OR ${settings.courierGuyMaxBookingCostAmount} >= 0`,
+  ),
+  courierGuyMaxAbsorbedNonnegative: check(
+    "marketplace_settings_cg_max_absorbed_nonnegative",
+    sql`${settings.courierGuyMaxAbsorbedAmount} IS NULL OR ${settings.courierGuyMaxAbsorbedAmount} >= 0`,
   ),
   shippingFlatRateNonnegative: check(
     "marketplace_settings_shipping_flat_rate_nonnegative",

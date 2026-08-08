@@ -249,6 +249,12 @@ export const shipments = pgTable(
     quoteId: uuid("quote_id").references(() => shippingRateQuotes.id, {
       onDelete: "set null",
     }),
+    bookingQuoteId: uuid("booking_quote_id").references(
+      () => shippingRateQuotes.id,
+      {
+        onDelete: "set null",
+      },
+    ),
     provider: shippingProvider("provider").notNull(),
     status: shipmentStatus("status").notNull().default("pending_booking"),
     providerEnvironment: varchar("provider_environment", { length: 16 }).$type<
@@ -274,6 +280,9 @@ export const shipments = pgTable(
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (shipment) => ({
+    bookingQuoteUnique: uniqueIndex("shipments_booking_quote_id_unique")
+      .on(shipment.bookingQuoteId)
+      .where(sql`${shipment.bookingQuoteId} IS NOT NULL`),
     courierGuyProviderShipmentUnique: uniqueIndex(
       "shipments_courier_guy_provider_shipment_unique",
     )

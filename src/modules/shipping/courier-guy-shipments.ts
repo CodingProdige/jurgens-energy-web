@@ -1,15 +1,14 @@
 import "server-only";
 
-import { and, eq, inArray, ne, or } from "drizzle-orm";
+import { and, eq, gt, inArray, ne, or } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import {
   orders,
   shipmentEvents,
-  shipmentParcels,
   shipments,
+  shippingRateQuotes,
 } from "@/src/db/schema";
-import { getBusinessDispatchContact } from "@/src/modules/business-information";
 import { reconcileOrderFulfillment } from "@/src/modules/orders/fulfillment";
 import {
   cancelCourierGuyShipment,
@@ -17,6 +16,16 @@ import {
   isCourierGuyRequestDefinitelyRejected,
   type CourierGuyRate,
 } from "@/src/modules/shipping/courier-guy-client";
+import {
+  actualCostExceededApprovedQuote,
+  prepareCourierGuyQuotedBooking,
+  resolveCourierGuySelectedService,
+} from "@/src/modules/shipping/courier-guy-booking-quotes";
+import {
+  centsToMoney,
+  evaluateCourierGuyBookingQuoteSafety,
+  selectCourierGuyRate as selectCourierGuyRateRule,
+} from "@/src/modules/shipping/courier-guy-booking-quote-rules";
 import {
   courierGuyCancellableShipmentStatuses,
   createCourierGuyBookingReference,
@@ -30,26 +39,217 @@ import {
   resolveCourierGuyShipmentStatus,
 } from "@/src/modules/shipping/courier-guy-tracking";
 import { replayUnmatchedCourierGuyWebhookEvents } from "@/src/modules/shipping/courier-guy-webhook-processing";
-import {
-  getCourierGuyIntegrationConfig,
-  getCourierGuyOperationalConfig,
-} from "@/src/modules/marketplace/settings";
+import { getCourierGuyOperationalConfig } from "@/src/modules/marketplace/settings";
 
-export async function bookCourierGuyShipment(shipmentId: string) {
+const courierGuyCostReservationStatuses = [
+  "booking",
+  "booked",
+  "waybill_ready",
+  "ready_for_collection",
+  "cancelling",
+  "collected",
+  "in_transit",
+  "out_for_delivery",
+] as const;
+
+export async function bookCourierGuyShipment(
+  shipmentId: string,
+  expectedQuoteId: string,
+) {
   let bookingReference: string | null = null;
   let providerCreationAttempted = false;
+  const existingBeforePreparation = await getCourierGuyShipmentRecord(shipmentId);
 
-  const [claimed] = await db
-    .update(shipments)
-    .set({ status: "booking", updatedAt: new Date() })
-    .where(
-      and(
-        eq(shipments.id, shipmentId),
-        eq(shipments.provider, "courier_guy"),
-        eq(shipments.status, "pending_booking"),
-      ),
-    )
-    .returning({ id: shipments.id });
+  if (
+    existingBeforePreparation?.provider === "courier_guy" &&
+    existingBeforePreparation.providerShipmentId &&
+    existingBeforePreparation.trackingNumber
+  ) {
+    if (existingBeforePreparation.bookingQuoteId !== expectedQuoteId) {
+      throw new Error(
+        "This request does not match the quote used to book the shipment.",
+      );
+    }
+
+    await synchronizeCourierGuyShipmentOutcome({
+      orderId: existingBeforePreparation.orderId,
+      shipmentId,
+    });
+
+    return {
+      alreadyBooked: true as const,
+      providerShipmentId: existingBeforePreparation.providerShipmentId,
+      trackingReference: existingBeforePreparation.trackingNumber,
+    };
+  }
+
+  if (existingBeforePreparation?.status === "booking") {
+    throw new Error(
+      `This booking has an uncertain outcome. Search The Courier Guy portal for customer reference ${createCourierGuyBookingReference(existingBeforePreparation.orderNumber, shipmentId)} before taking further action.`,
+    );
+  }
+
+  const prepared = await prepareCourierGuyQuotedBooking(
+    shipmentId,
+    expectedQuoteId,
+  );
+  const approvedProviderAmount = Number(prepared.quote.providerAmount);
+  const claimed = await db.transaction(async (tx) => {
+    const [lockedOrder] = await tx
+      .select({
+        id: orders.id,
+        shippingTotal: orders.shippingTotal,
+      })
+      .from(orders)
+      .where(eq(orders.id, prepared.context.record.orderId))
+      .limit(1)
+      .for("update");
+
+    if (!lockedOrder) {
+      throw new Error("The order could not be found before booking.");
+    }
+
+    const otherShipments = await tx
+      .select({
+        bookingQuoteAmount: shippingRateQuotes.providerAmount,
+        bookingQuoteStatus: shippingRateQuotes.status,
+        provider: shipments.provider,
+        providerCostAmount: shipments.providerCostAmount,
+        status: shipments.status,
+      })
+      .from(shipments)
+      .leftJoin(
+        shippingRateQuotes,
+        eq(shippingRateQuotes.id, shipments.bookingQuoteId),
+      )
+      .where(
+        and(
+          eq(shipments.orderId, prepared.context.record.orderId),
+          ne(shipments.id, shipmentId),
+        ),
+      );
+    let unresolvedCommittedCourierShipments = 0;
+    const otherProviderCosts = otherShipments.reduce((total, shipment) => {
+      if (shipment.providerCostAmount !== null) {
+        const providerCostAmount = Number(shipment.providerCostAmount);
+
+        if (!Number.isFinite(providerCostAmount) || providerCostAmount < 0) {
+          throw new Error(
+            "A stored carrier cost is invalid. Correct it before booking another shipment for this order.",
+          );
+        }
+
+        return total + providerCostAmount;
+      }
+
+      const isCommittedCourierShipment =
+        shipment.provider === "courier_guy" &&
+        courierGuyCostReservationStatuses.includes(
+          shipment.status as (typeof courierGuyCostReservationStatuses)[number],
+        );
+      const reservesSelectedQuote =
+        isCommittedCourierShipment &&
+        (shipment.bookingQuoteStatus === "selected" ||
+          shipment.bookingQuoteStatus === "booked") &&
+        shipment.bookingQuoteAmount !== null;
+
+      if (!reservesSelectedQuote) {
+        if (isCommittedCourierShipment) {
+          unresolvedCommittedCourierShipments += 1;
+        }
+
+        return total;
+      }
+
+      const bookingQuoteAmount = Number(shipment.bookingQuoteAmount);
+
+      if (!Number.isFinite(bookingQuoteAmount) || bookingQuoteAmount < 0) {
+        throw new Error(
+          "A reserved Courier Guy quote is invalid. Resolve it before booking another shipment for this order.",
+        );
+      }
+
+      return total + bookingQuoteAmount;
+    }, 0);
+
+    if (
+      prepared.context.config.maxAbsorbedAmount !== null &&
+      unresolvedCommittedCourierShipments > 0
+    ) {
+      throw new Error(
+        `${unresolvedCommittedCourierShipments} other committed Courier Guy shipment${unresolvedCommittedCourierShipments === 1 ? " has" : "s have"} no auditable carrier cost. Resolve ${unresolvedCommittedCourierShipments === 1 ? "it" : "them"} before booking against this order's absorbed-cost limit.`,
+      );
+    }
+
+    const serializedSafety = evaluateCourierGuyBookingQuoteSafety({
+      approvedProviderAmount,
+      customerShippingAmount: Number(lockedOrder.shippingTotal),
+      freshProviderAmount: prepared.freshRate.providerAmount,
+      maxAbsorbedAmount: prepared.context.config.maxAbsorbedAmount,
+      maxBookingCostAmount: prepared.context.config.maxBookingCostAmount,
+      otherProviderCosts,
+    });
+
+    if (!serializedSafety.allowed) {
+      if (serializedSafety.reason === "approved_quote_exceeded") {
+        throw new Error(
+          "The Courier Guy rate changed before booking. Review a fresh quote before continuing.",
+        );
+      }
+
+      if (serializedSafety.reason === "booking_cost_limit_exceeded") {
+        throw new Error(
+          `The fresh Courier Guy rate exceeds the R ${prepared.context.config.maxBookingCostAmount?.toFixed(2)} per-shipment safety limit.`,
+        );
+      }
+
+      throw new Error(
+        `Another shipment changed this order's carrier spend. Booking now would make Jurgens absorb R ${centsToMoney(serializedSafety.projectedAbsorbedAmountCents).toFixed(2)}, above the configured R ${prepared.context.config.maxAbsorbedAmount?.toFixed(2)} limit.`,
+      );
+    }
+
+    const [claimedShipment] = await tx
+      .update(shipments)
+      .set({
+        providerAccountCode: prepared.context.config.accountCode,
+        providerEnvironment: prepared.context.config.mode,
+        status: "booking",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(shipments.id, shipmentId),
+          eq(shipments.provider, "courier_guy"),
+          eq(shipments.status, "pending_booking"),
+          eq(shipments.bookingQuoteId, prepared.quote.id),
+        ),
+      )
+      .returning({ id: shipments.id });
+
+    if (!claimedShipment) {
+      return null;
+    }
+
+    const [selectedQuote] = await tx
+      .update(shippingRateQuotes)
+      .set({ status: "selected" })
+      .where(
+        and(
+          eq(shippingRateQuotes.id, prepared.quote.id),
+          eq(shippingRateQuotes.status, "quoted"),
+          gt(shippingRateQuotes.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: shippingRateQuotes.id });
+
+    if (!selectedQuote) {
+      throw new Error(
+        "The provider quote changed before booking could begin. Get a fresh quote.",
+      );
+    }
+
+    return claimedShipment;
+  });
 
   if (!claimed) {
     const existing = await getCourierGuyShipmentRecord(shipmentId);
@@ -79,203 +279,120 @@ export async function bookCourierGuyShipment(shipmentId: string) {
   }
 
   try {
-    const [record, parcels, config, dispatchContact] = await Promise.all([
-      getCourierGuyShipmentRecord(shipmentId),
-      db
-        .select()
-        .from(shipmentParcels)
-        .where(eq(shipmentParcels.shipmentId, shipmentId)),
-      getCourierGuyIntegrationConfig(),
-      getBusinessDispatchContact(),
-    ]);
-
-    if (!record) {
-      throw new Error("Shipment could not be found.");
-    }
-
-    if (!config.isConfigured || !config.accountCode || !config.apiKey) {
-      throw new Error(
-        "The active Courier Guy environment is not fully configured.",
-      );
-    }
-
-    if (!dispatchContact) {
-      throw new Error(
-        "Complete the Jurgens Energy dispatch contact name and phone number before booking.",
-      );
-    }
-
-    if (parcels.length !== 1) {
-      throw new Error(
-        "Courier Guy drop-off bookings require exactly one packed parcel per shipment.",
-      );
-    }
-
-    if (!config.dropoffPickupPointId) {
-      throw new Error("Configure a Courier Guy drop-off pickup point.");
-    }
-
-    const parcel = parcels[0]!;
-    const courierParcel = {
-      description: `Order ${record.orderNumber}`,
-      heightMm: Number(parcel.heightMm),
-      itemCount: 1,
-      lengthMm: Number(parcel.lengthMm),
-      weightGrams: Number(parcel.weightGrams),
-      widthMm: Number(parcel.widthMm),
-    };
-    const collectionOrigin = {
-      kind: "pickup_point" as const,
-      pickupPointId: config.dropoffPickupPointId,
-      provider: config.dropoffProvider,
-    };
-    const deliveryAddress = {
-      addressType: "residential" as const,
-      city: record.deliveryAddress.city,
-      company: undefined,
-      countryCode: "ZA",
-      localArea:
-        record.deliveryAddress.suburb?.trim() ||
-        record.deliveryAddress.city,
-      postalCode: record.deliveryAddress.postalCode,
-      streetAddress: [
-        record.deliveryAddress.addressLine1,
-        record.deliveryAddress.addressLine2,
-      ]
-        .filter(Boolean)
-        .join(", "),
-      zone: record.deliveryAddress.province,
-    };
-    const client = createCourierGuyClient({
-      apiBaseUrl: config.apiBaseUrl,
-      apiKey: config.apiKey,
-    });
-    const [snapshottedEnvironment] = await db
-      .update(shipments)
-      .set({
-        providerAccountCode: config.accountCode,
-        providerEnvironment: config.mode,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(shipments.id, shipmentId),
-          eq(shipments.status, "booking"),
-        ),
-      )
-      .returning({ id: shipments.id });
-
-    if (!snapshottedEnvironment) {
-      throw new Error(
-        "The shipment status changed before the Courier Guy environment could be reserved.",
-      );
-    }
-
-    const rateResult = await client.getRates({
-      collectionOrigin,
-      deliveryAddress,
-      parcels: [courierParcel],
-    });
-    const selectedRate = selectCourierGuyRate(
-      rateResult.rates,
-      config.defaultServiceCode,
-    );
-
-    if (!selectedRate) {
-      throw new Error(
-        config.defaultServiceCode
-          ? `Courier Guy service ${config.defaultServiceCode} is unavailable for this parcel.`
-          : "Courier Guy returned no service for this parcel.",
-      );
-    }
-
-    const selectedService =
-      selectedRate.serviceLevelId &&
-      /^\d+$/.test(selectedRate.serviceLevelId)
-        ? { serviceLevelId: Number(selectedRate.serviceLevelId) }
-        : selectedRate.serviceLevelId
-          ? { serviceLevelId: selectedRate.serviceLevelId }
-          : { serviceLevelCode: selectedRate.serviceCode };
+    const { context, freshRate: selectedRate, quote } = prepared;
+    const selectedService = resolveCourierGuySelectedService(selectedRate);
     bookingReference = createCourierGuyBookingReference(
-      record.orderNumber,
+      context.record.orderNumber,
       shipmentId,
     );
     providerCreationAttempted = true;
-    const booked = await client.createShipment({
-      collectionContact: {
-        mobileNumber: dispatchContact.contactPhone,
-        name: dispatchContact.contactName,
-      },
-      collectionOrigin,
+    const booked = await context.client.createShipment({
+      collectionContact: context.collectionContact,
+      collectionOrigin: context.collectionOrigin,
       customerReference: bookingReference,
       customerReferenceName: "Jurgens Energy order",
-      deliveryAddress,
-      deliveryContact: {
-        email: record.customerEmail,
-        mobileNumber: record.customerPhone,
-        name: record.customerName,
-      },
+      deliveryAddress: context.deliveryAddress,
+      deliveryContact: context.deliveryContact,
       muteNotifications: true,
-      parcels: [courierParcel],
+      parcels: [context.courierParcel],
       ...selectedService,
     });
     const now = new Date();
     const providerCost =
       booked.providerCostAmount ?? selectedRate.providerAmount;
+    const costExceededApprovedQuote = actualCostExceededApprovedQuote({
+      actualProviderAmount: providerCost,
+      approvedProviderAmount,
+    });
     const trackingUrl = createCourierGuyCustomerTrackingUrl(
       booked.trackingReference,
     );
-    const [persistedBooking] = await db
-      .update(shipments)
-      .set({
-        bookedAt: now,
-        providerCostAmount: providerCost.toFixed(2),
-        providerCostCurrency: "ZAR",
-        providerAccountCode: config.accountCode,
-        providerEnvironment: config.mode,
-        providerShipmentId: booked.providerShipmentId,
-        serviceCode: selectedRate.serviceCode,
-        serviceName: selectedRate.serviceName,
-        status: "booked",
-        trackingNumber: booked.trackingReference,
-        trackingUrl,
-        updatedAt: now,
-        waybillNumber: booked.trackingReference,
-      })
-      .where(
-        and(
-          eq(shipments.id, shipmentId),
-          eq(shipments.status, "booking"),
-        ),
-      )
-      .returning({ id: shipments.id });
+    await db.transaction(async (tx) => {
+      const [persistedBooking] = await tx
+        .update(shipments)
+        .set({
+          bookedAt: now,
+          providerCostAmount: providerCost.toFixed(2),
+          providerCostCurrency: "ZAR",
+          providerAccountCode: context.config.accountCode,
+          providerEnvironment: context.config.mode,
+          providerShipmentId: booked.providerShipmentId,
+          serviceCode: selectedRate.serviceCode,
+          serviceName: selectedRate.serviceName,
+          status: "booked",
+          trackingNumber: booked.trackingReference,
+          trackingUrl,
+          updatedAt: now,
+          waybillNumber: booked.trackingReference,
+        })
+        .where(
+          and(
+            eq(shipments.id, shipmentId),
+            eq(shipments.status, "booking"),
+            eq(shipments.bookingQuoteId, quote.id),
+          ),
+        )
+        .returning({ id: shipments.id });
 
-    if (!persistedBooking) {
-      throw new Error(
-        "The Courier Guy booking was created but could not be attached to the local shipment.",
-      );
-    }
+      if (!persistedBooking) {
+        throw new Error(
+          "The Courier Guy booking was created but could not be attached to the local shipment.",
+        );
+      }
+
+      const [bookedQuote] = await tx
+        .update(shippingRateQuotes)
+        .set({ status: "booked" })
+        .where(
+          and(
+            eq(shippingRateQuotes.id, quote.id),
+            eq(shippingRateQuotes.status, "selected"),
+          ),
+        )
+        .returning({ id: shippingRateQuotes.id });
+
+      if (!bookedQuote) {
+        throw new Error(
+          "The Courier Guy booking was created but its approved quote could not be finalized locally.",
+        );
+      }
+    });
 
     await replayUnmatchedCourierGuyWebhookEvents({
-      environment: config.mode,
+      environment: context.config.mode,
       providerShipmentId: booked.providerShipmentId,
       trackingReference: booked.trackingReference,
     }).catch(() => undefined);
 
-    const label = await client
+    const providerLabel = await context.client
       .getLabel({
         kind: "waybill",
         shipmentId: booked.providerShipmentId,
       })
       .catch(() => null);
+    const label =
+      providerLabel && new URL(providerLabel.url).protocol === "https:"
+        ? providerLabel
+        : null;
 
     await db.transaction(async (tx) => {
+      if (label) {
+        await tx
+          .update(shipments)
+          .set({ updatedAt: now, waybillUrl: label.url })
+          .where(
+            and(
+              eq(shipments.id, shipmentId),
+              eq(shipments.providerShipmentId, booked.providerShipmentId),
+            ),
+          );
+      }
+
       await tx
         .update(shipments)
         .set({
           status: label ? "waybill_ready" : "booked",
           updatedAt: now,
-          waybillUrl: label?.url ?? null,
         })
         .where(
           and(
@@ -290,7 +407,10 @@ export async function bookCourierGuyShipment(shipmentId: string) {
           message: `Booked with ${selectedRate.serviceName}.`,
           occurredAt: now,
           payload: {
+            actualCostExceededApprovedQuote: costExceededApprovedQuote,
+            approvedProviderAmount,
             bookingReference,
+            freshProviderAmount: selectedRate.providerAmount,
             providerCost,
             rate: selectedRate,
             waybillReady: Boolean(label),
@@ -303,12 +423,14 @@ export async function bookCourierGuyShipment(shipmentId: string) {
         .onConflictDoNothing();
     });
     await synchronizeCourierGuyShipmentOutcome({
-      orderId: record.orderId,
+      orderId: context.record.orderId,
       shipmentId,
     });
 
     return {
       alreadyBooked: false as const,
+      actualCostExceededApprovedQuote: costExceededApprovedQuote,
+      approvedProviderAmount,
       providerCost,
       providerShipmentId: booked.providerShipmentId,
       serviceName: selectedRate.serviceName,
@@ -321,26 +443,45 @@ export async function bookCourierGuyShipment(shipmentId: string) {
       isCourierGuyRequestDefinitelyRejected(error);
 
     if (providerDefinitelyRejected) {
-      await db
-        .update(shipments)
-        .set({
-          providerAccountCode: null,
-          providerEnvironment: null,
-          status: "pending_booking",
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(shipments.id, shipmentId),
-            eq(shipments.status, "booking"),
-          ),
-        );
+      await db.transaction(async (tx) => {
+        await tx
+          .update(shipments)
+          .set({
+            bookingQuoteId: null,
+            providerAccountCode: null,
+            providerEnvironment: null,
+            status: "pending_booking",
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(shipments.id, shipmentId),
+              eq(shipments.status, "booking"),
+              eq(shipments.bookingQuoteId, prepared.quote.id),
+            ),
+          );
+
+        await tx
+          .update(shippingRateQuotes)
+          .set({ status: "expired" })
+          .where(
+            and(
+              eq(shippingRateQuotes.id, prepared.quote.id),
+              eq(shippingRateQuotes.status, "selected"),
+            ),
+          );
+      });
     } else {
       const existing = await getCourierGuyShipmentRecord(shipmentId).catch(
         () => null,
       );
 
       if (existing?.providerShipmentId && existing.trackingNumber) {
+        await synchronizeCourierGuyShipmentOutcome({
+          orderId: existing.orderId,
+          shipmentId,
+        });
+
         return {
           alreadyBooked: true as const,
           providerShipmentId: existing.providerShipmentId,
@@ -549,6 +690,7 @@ export async function reconcileCourierGuyBooking({
   await db.transaction(async (tx) => {
     const [current] = await tx
       .select({
+        bookingQuoteId: shipments.bookingQuoteId,
         providerAccountCode: shipments.providerAccountCode,
         providerEnvironment: shipments.providerEnvironment,
         status: shipments.status,
@@ -623,6 +765,19 @@ export async function reconcileCourierGuyBooking({
       throw new Error(
         "The verified Courier Guy booking could not be attached to the shipment.",
       );
+    }
+
+    if (current.bookingQuoteId) {
+      await tx
+        .update(shippingRateQuotes)
+        .set({ status: "booked" })
+        .where(
+          and(
+            eq(shippingRateQuotes.id, current.bookingQuoteId),
+            eq(shippingRateQuotes.provider, "courier_guy"),
+            ne(shippingRateQuotes.status, "cancelled"),
+          ),
+        );
     }
   });
 
@@ -1020,26 +1175,13 @@ export function selectCourierGuyRate(
   rates: CourierGuyRate[],
   preferredServiceCode: string | null,
 ) {
-  if (preferredServiceCode) {
-    return (
-      rates.find(
-        (rate) =>
-          rate.serviceCode.toLowerCase() ===
-          preferredServiceCode.toLowerCase(),
-      ) ?? null
-    );
-  }
-
-  return (
-    [...rates].sort(
-      (first, second) => first.providerAmount - second.providerAmount,
-    )[0] ?? null
-  );
+  return selectCourierGuyRateRule(rates, preferredServiceCode);
 }
 
 async function getCourierGuyShipmentRecord(shipmentId: string) {
   const [record] = await db
     .select({
+      bookingQuoteId: shipments.bookingQuoteId,
       collectedAt: shipments.collectedAt,
       customerEmail: orders.customerEmail,
       customerName: orders.customerName,

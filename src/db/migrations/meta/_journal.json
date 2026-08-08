@@ -708,6 +708,13 @@
       "when": 1788084000000,
       "tag": "0100_sendgrid_integration_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1788170400000,
+      "tag": "0101_courier_guy_quote_first_booking",
+      "breakpoints": true
     }
   ]
 }

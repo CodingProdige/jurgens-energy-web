@@ -230,6 +230,16 @@ function normalizeWholeNumber(
   return typeof value === "number" && Number.isInteger(value) ? value : fallback;
 }
 
+function normalizeOptionalNonnegativeMoney(
+  value: number | null | undefined,
+) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return null;
+  }
+
+  return Math.max(0, Number(Number(value).toFixed(2)));
+}
+
 export type MarketplacePaymentMethodBadge = {
   iconUrl: string | null;
   label: string;
@@ -458,6 +468,8 @@ async function resolvePaymentMethodBadges(
 export type MarketplaceSettings = {
   bobgoBookingMode: "disabled" | "quote_only" | "quote_and_book";
   courierGuyDefaultServiceCode: string | null;
+  courierGuyMaxAbsorbedAmount: number | null;
+  courierGuyMaxBookingCostAmount: number | null;
   courierGuyDropoffPickupPointId: string | null;
   courierGuyDropoffPickupPointLabel: string | null;
   courierGuyDropoffProvider: string;
@@ -628,6 +640,8 @@ export type MarketplaceAdminSecrets = {
 const defaultSettings: MarketplaceSettings = {
   bobgoBookingMode: "disabled",
   courierGuyDefaultServiceCode: null,
+  courierGuyMaxAbsorbedAmount: null,
+  courierGuyMaxBookingCostAmount: null,
   courierGuyDropoffPickupPointId: "K0000",
   courierGuyDropoffPickupPointLabel: null,
   courierGuyDropoffProvider: "tcg-locker",
@@ -843,6 +857,10 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
         marketplaceSettings.bobgoWebhookTrackingUpdated,
       courierGuyDefaultServiceCode:
         marketplaceSettings.courierGuyDefaultServiceCode,
+      courierGuyMaxAbsorbedAmount:
+        marketplaceSettings.courierGuyMaxAbsorbedAmount,
+      courierGuyMaxBookingCostAmount:
+        marketplaceSettings.courierGuyMaxBookingCostAmount,
       courierGuyDropoffPickupPointId:
         marketplaceSettings.courierGuyDropoffPickupPointId,
       courierGuyDropoffPickupPointLabel:
@@ -1014,6 +1032,12 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
     ),
     courierGuyDefaultServiceCode:
       settings.courierGuyDefaultServiceCode?.trim() || null,
+    courierGuyMaxAbsorbedAmount: normalizeOptionalNonnegativeMoney(
+      settings.courierGuyMaxAbsorbedAmount,
+    ),
+    courierGuyMaxBookingCostAmount: normalizeOptionalNonnegativeMoney(
+      settings.courierGuyMaxBookingCostAmount,
+    ),
     courierGuyDropoffPickupPointId:
       settings.courierGuyDropoffPickupPointId?.trim() || null,
     courierGuyDropoffPickupPointLabel:
@@ -1538,6 +1562,8 @@ export async function updateMarketplaceCourierGuyCredentials({
 export async function updateMarketplaceShippingSettings({
   actorUserId,
   courierGuyDefaultServiceCode,
+  courierGuyMaxAbsorbedAmount,
+  courierGuyMaxBookingCostAmount,
   courierGuyDropoffPickupPointId,
   courierGuyDropoffPickupPointLabel,
   courierGuyDropoffProvider,
@@ -1560,6 +1586,8 @@ export async function updateMarketplaceShippingSettings({
 }: {
   actorUserId: string;
   courierGuyDefaultServiceCode?: string;
+  courierGuyMaxAbsorbedAmount: number | null;
+  courierGuyMaxBookingCostAmount: number | null;
   courierGuyDropoffPickupPointId?: string;
   courierGuyDropoffPickupPointLabel?: string;
   courierGuyDropoffProvider: string;
@@ -1625,6 +1653,40 @@ export async function updateMarketplaceShippingSettings({
       message: "Flat shipping must be between R0 and R1,000,000.",
     };
   }
+
+  const courierGuySafetyLimits = [
+    {
+      label: "Maximum Courier Guy booking cost",
+      value: courierGuyMaxBookingCostAmount,
+    },
+    {
+      label: "Maximum absorbed delivery difference",
+      value: courierGuyMaxAbsorbedAmount,
+    },
+  ];
+
+  for (const limit of courierGuySafetyLimits) {
+    if (
+      limit.value !== null &&
+      (!Number.isFinite(limit.value) ||
+        limit.value < 0 ||
+        limit.value > 1_000_000)
+    ) {
+      return {
+        ok: false,
+        message: `${limit.label} must be between R0 and R1,000,000, or left blank to disable it.`,
+      };
+    }
+  }
+
+  const normalizedMaxBookingCostAmount =
+    courierGuyMaxBookingCostAmount === null
+      ? null
+      : Number(courierGuyMaxBookingCostAmount.toFixed(2));
+  const normalizedMaxAbsorbedAmount =
+    courierGuyMaxAbsorbedAmount === null
+      ? null
+      : Number(courierGuyMaxAbsorbedAmount.toFixed(2));
 
   if (
     !Number.isInteger(shippingHandlingMinBusinessDays) ||
@@ -1880,6 +1942,8 @@ export async function updateMarketplaceShippingSettings({
     bobgoEnabled: false,
     courierGuyDefaultServiceCode:
       courierGuyDefaultServiceCode?.trim() || null,
+    courierGuyMaxAbsorbedAmount: normalizedMaxAbsorbedAmount,
+    courierGuyMaxBookingCostAmount: normalizedMaxBookingCostAmount,
     courierGuyDropoffPickupPointId: resolvedPickupPointId,
     courierGuyDropoffPickupPointLabel: resolvedPickupPointLabel,
     courierGuyDropoffProvider: normalizedDropoffProvider,
@@ -1920,6 +1984,8 @@ export async function updateMarketplaceShippingSettings({
       metadata: JSON.stringify({
         courierGuyDropoffType,
         courierGuyEnabled,
+        courierGuyMaxAbsorbedAmount: normalizedMaxAbsorbedAmount,
+        courierGuyMaxBookingCostAmount: normalizedMaxBookingCostAmount,
         courierGuyLiveAccountCode: normalizedLiveAccountCode,
         courierGuyMode,
         courierGuySandboxAccountCode: normalizedSandboxAccountCode,
@@ -2512,6 +2578,8 @@ async function resolveCourierGuyIntegrationConfig(
         : COURIER_GUY_SANDBOX_API_BASE_URL,
     apiKey,
     defaultServiceCode: settings.courierGuyDefaultServiceCode,
+    maxAbsorbedAmount: settings.courierGuyMaxAbsorbedAmount,
+    maxBookingCostAmount: settings.courierGuyMaxBookingCostAmount,
     dropoffPickupPointId: settings.courierGuyDropoffPickupPointId,
     dropoffProvider: settings.courierGuyDropoffProvider,
     dropoffType: settings.courierGuyDropoffType,

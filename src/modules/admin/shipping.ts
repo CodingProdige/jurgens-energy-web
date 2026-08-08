@@ -13,14 +13,22 @@ import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { createCourierGuyBookingReference } from "@/src/modules/shipping/courier-guy-operations";
 
 export type AdminShipmentRow = {
+  approvedProviderCostAmount: string | null;
   bookingReference: string;
   bookedAt: Date | null;
   createdAt: Date;
+  costExceededApprovedQuote: boolean;
   deliveredAt: Date | null;
   id: string;
   orderId: string;
   orderNumber: string;
   parcelCount: number;
+  packedParcel: {
+    heightMm: number;
+    lengthMm: number;
+    weightGrams: number;
+    widthMm: number;
+  } | null;
   provider: string;
   providerAccountCode: string | null;
   providerCostAmount: string | null;
@@ -88,6 +96,7 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
     getMarketplaceSettings(),
     db
       .select({
+        bookingQuoteId: shipments.bookingQuoteId,
         bookedAt: shipments.bookedAt,
         createdAt: shipments.createdAt,
         deliveredAt: shipments.deliveredAt,
@@ -123,6 +132,7 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
         status: shippingRateQuotes.status,
       })
       .from(shippingRateQuotes)
+      .where(eq(shippingRateQuotes.provider, "manual"))
       .orderBy(desc(shippingRateQuotes.createdAt)),
     db
       .select({
@@ -139,32 +149,59 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
   ]);
 
   const shipmentIds = shipmentRows.map((shipment) => shipment.id);
-  const parcelRows =
+  const bookingQuoteIds = shipmentRows.flatMap((shipment) =>
+    shipment.bookingQuoteId ? [shipment.bookingQuoteId] : [],
+  );
+  const [parcelRows, latestEventRows, bookingQuoteRows] = await Promise.all([
     shipmentIds.length > 0
-      ? await db
+      ? db
           .select({
+            heightMm: shipmentParcels.heightMm,
+            lengthMm: shipmentParcels.lengthMm,
             shipmentId: shipmentParcels.shipmentId,
+            weightGrams: shipmentParcels.weightGrams,
+            widthMm: shipmentParcels.widthMm,
           })
           .from(shipmentParcels)
           .where(inArray(shipmentParcels.shipmentId, shipmentIds))
-      : [];
-  const latestEventRows =
+      : Promise.resolve([]),
     shipmentIds.length > 0
-      ? await db
+      ? db
           .select({
             shipmentId: shipmentEvents.shipmentId,
           })
           .from(shipmentEvents)
           .where(inArray(shipmentEvents.shipmentId, shipmentIds))
-      : [];
+      : Promise.resolve([]),
+    bookingQuoteIds.length > 0
+      ? db
+          .select({
+            id: shippingRateQuotes.id,
+            providerAmount: shippingRateQuotes.providerAmount,
+          })
+          .from(shippingRateQuotes)
+          .where(inArray(shippingRateQuotes.id, bookingQuoteIds))
+      : Promise.resolve([]),
+  ]);
   const parcelCountByShipmentId = new Map<string, number>();
+  const parcelRowsByShipmentId = new Map<
+    string,
+    typeof parcelRows
+  >();
   const eventCountByShipmentId = new Map<string, number>();
+  const approvedCostByQuoteId = new Map(
+    bookingQuoteRows.map((quote) => [quote.id, quote.providerAmount]),
+  );
 
   for (const parcel of parcelRows) {
     parcelCountByShipmentId.set(
       parcel.shipmentId,
       (parcelCountByShipmentId.get(parcel.shipmentId) ?? 0) + 1,
     );
+    parcelRowsByShipmentId.set(parcel.shipmentId, [
+      ...(parcelRowsByShipmentId.get(parcel.shipmentId) ?? []),
+      parcel,
+    ]);
   }
 
   for (const event of latestEventRows) {
@@ -174,14 +211,38 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
     );
   }
 
-  const shipmentData = shipmentRows.map((shipment) => ({
-    ...shipment,
-    bookingReference: createCourierGuyBookingReference(
-      shipment.orderNumber,
-      shipment.id,
-    ),
-    parcelCount: parcelCountByShipmentId.get(shipment.id) ?? 0,
-  }));
+  const shipmentData = shipmentRows.map((shipment) => {
+    const packedParcels = parcelRowsByShipmentId.get(shipment.id) ?? [];
+    const packedParcel = packedParcels.length === 1 ? packedParcels[0]! : null;
+    const approvedProviderCostAmount = shipment.bookingQuoteId
+      ? approvedCostByQuoteId.get(shipment.bookingQuoteId) ?? null
+      : null;
+    const costExceededApprovedQuote = Boolean(
+      shipment.providerCostAmount !== null &&
+        approvedProviderCostAmount !== null &&
+        Math.round(Number(shipment.providerCostAmount) * 100) >
+          Math.round(Number(approvedProviderCostAmount) * 100),
+    );
+
+    return {
+      ...shipment,
+      approvedProviderCostAmount,
+      bookingReference: createCourierGuyBookingReference(
+        shipment.orderNumber,
+        shipment.id,
+      ),
+      costExceededApprovedQuote,
+      packedParcel: packedParcel
+        ? {
+            heightMm: Number(packedParcel.heightMm),
+            lengthMm: Number(packedParcel.lengthMm),
+            weightGrams: Number(packedParcel.weightGrams),
+            widthMm: Number(packedParcel.widthMm),
+          }
+        : null,
+      parcelCount: parcelCountByShipmentId.get(shipment.id) ?? 0,
+    };
+  });
 
   return {
     courierGuy: {

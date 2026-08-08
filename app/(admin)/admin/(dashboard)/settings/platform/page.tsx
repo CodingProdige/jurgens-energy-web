@@ -361,6 +361,10 @@ function SettingsSection({
           courierGuyEnabled={settings.courierGuyEnabled}
           courierGuyLiveAccountCode={settings.courierGuyLiveAccountCode}
           courierGuyLiveApiKey={secrets?.courierGuyLiveApiKey ?? null}
+          courierGuyMaxAbsorbedAmount={settings.courierGuyMaxAbsorbedAmount}
+          courierGuyMaxBookingCostAmount={
+            settings.courierGuyMaxBookingCostAmount
+          }
           courierGuyMode={settings.courierGuyMode}
           courierGuySandboxAccountCode={
             settings.courierGuySandboxAccountCode

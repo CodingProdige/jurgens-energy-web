@@ -650,6 +650,16 @@ const shippingSettingsBaseSchema = z.object({
     .max(1000)
     .optional()
     .transform((value) => value || undefined),
+  courierGuyMaxAbsorbedAmount: z.preprocess(
+    (value) =>
+      value === "" || value === null || value === undefined ? null : value,
+    z.coerce.number().finite().min(0).max(1_000_000).nullable(),
+  ),
+  courierGuyMaxBookingCostAmount: z.preprocess(
+    (value) =>
+      value === "" || value === null || value === undefined ? null : value,
+    z.coerce.number().finite().min(0).max(1_000_000).nullable(),
+  ),
   courierGuyMode: z.enum(["live", "sandbox"]).default("sandbox"),
   courierGuySandboxAccountCode: z.preprocess(
     (value) =>
@@ -1100,6 +1110,12 @@ export async function updateShippingIntegrationSettings(
     courierGuyLiveAccountCode: formData.get("courierGuyLiveAccountCode"),
     courierGuyLiveApiKey: String(
       formData.get("courierGuyLiveApiKey") ?? "",
+    ),
+    courierGuyMaxAbsorbedAmount: formData.get(
+      "courierGuyMaxAbsorbedAmount",
+    ),
+    courierGuyMaxBookingCostAmount: formData.get(
+      "courierGuyMaxBookingCostAmount",
     ),
     courierGuyMode: String(formData.get("courierGuyMode") ?? "sandbox"),
     courierGuySandboxAccountCode: formData.get(

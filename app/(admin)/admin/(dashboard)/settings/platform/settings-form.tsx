@@ -3143,6 +3143,8 @@ type NationwideShippingSettingsFormProps = {
   courierGuyEnabled: boolean;
   courierGuyLiveAccountCode: string | null;
   courierGuyLiveApiKey: string | null;
+  courierGuyMaxAbsorbedAmount: number | null;
+  courierGuyMaxBookingCostAmount: number | null;
   courierGuyMode: "live" | "sandbox";
   courierGuySandboxAccountCode: string | null;
   courierGuySandboxApiKey: string | null;
@@ -3754,6 +3756,8 @@ export function NationwideShippingSettingsForm({
   courierGuyEnabled,
   courierGuyLiveAccountCode,
   courierGuyLiveApiKey,
+  courierGuyMaxAbsorbedAmount,
+  courierGuyMaxBookingCostAmount,
   courierGuyMode,
   courierGuySandboxAccountCode,
   courierGuySandboxApiKey,
@@ -3812,6 +3816,22 @@ export function NationwideShippingSettingsForm({
     useState(courierGuyLiveAccountCode ?? "");
   const [courierGuyLiveApiKeyValue, setCourierGuyLiveApiKeyValue] = useState(
     courierGuyLiveApiKey ?? "",
+  );
+  const [
+    courierGuyMaxAbsorbedAmountValue,
+    setCourierGuyMaxAbsorbedAmountValue,
+  ] = useState(
+    courierGuyMaxAbsorbedAmount === null
+      ? ""
+      : String(courierGuyMaxAbsorbedAmount),
+  );
+  const [
+    courierGuyMaxBookingCostAmountValue,
+    setCourierGuyMaxBookingCostAmountValue,
+  ] = useState(
+    courierGuyMaxBookingCostAmount === null
+      ? ""
+      : String(courierGuyMaxBookingCostAmount),
   );
   const [dropoffType, setDropoffType] = useState<
     NationwideShippingSettingsFormProps["courierGuyDropoffType"]
@@ -4130,6 +4150,54 @@ export function NationwideShippingSettingsForm({
                 }
                 placeholder="Optional; cheapest available when blank"
               />
+            </div>
+          </div>
+
+          <div className="grid gap-4 rounded-lg border border-zinc-200 p-4 dark:border-white/10 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyMaxBookingCostAmount">
+                Maximum carrier cost per shipment (ZAR)
+              </Label>
+              <Input
+                id="courierGuyMaxBookingCostAmount"
+                max={1_000_000}
+                min={0}
+                name="courierGuyMaxBookingCostAmount"
+                onChange={(event) =>
+                  setCourierGuyMaxBookingCostAmountValue(event.target.value)
+                }
+                placeholder="Leave blank to disable"
+                step="0.01"
+                type="number"
+                value={courierGuyMaxBookingCostAmountValue}
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Booking confirmation is blocked when the fresh Courier Guy rate
+                is above this amount.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="courierGuyMaxAbsorbedAmount">
+                Maximum absorbed difference per order (ZAR)
+              </Label>
+              <Input
+                id="courierGuyMaxAbsorbedAmount"
+                max={1_000_000}
+                min={0}
+                name="courierGuyMaxAbsorbedAmount"
+                onChange={(event) =>
+                  setCourierGuyMaxAbsorbedAmountValue(event.target.value)
+                }
+                placeholder="Leave blank to disable"
+                step="0.01"
+                type="number"
+                value={courierGuyMaxAbsorbedAmountValue}
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Booking confirmation is blocked when known carrier costs would
+                exceed the delivery fee paid by the customer by more than this
+                amount.
+              </p>
             </div>
           </div>
 
