@@ -69,7 +69,7 @@ test("public proxy origin checks require an explicitly allowed same origin", () 
     isSameOriginGooglePlacesRequest({
       allowedOrigins,
       origin: null,
-      requestUrl: "https://jurgensenergy.com/api/places/autocomplete",
+      requestHost: "jurgensenergy.com",
     }),
     false,
   );
@@ -77,8 +77,15 @@ test("public proxy origin checks require an explicitly allowed same origin", () 
     isSameOriginGooglePlacesRequest({
       allowedOrigins,
       origin: "https://admin.jurgensenergy.com",
-      requestUrl:
-        "https://admin.jurgensenergy.com/api/places/autocomplete",
+      requestHost: "admin.jurgensenergy.com",
+    }),
+    true,
+  );
+  assert.equal(
+    isSameOriginGooglePlacesRequest({
+      allowedOrigins,
+      origin: "https://jurgensenergy.com",
+      requestHost: "jurgensenergy.com",
     }),
     true,
   );
@@ -86,7 +93,7 @@ test("public proxy origin checks require an explicitly allowed same origin", () 
     isSameOriginGooglePlacesRequest({
       allowedOrigins,
       origin: "https://attacker.example",
-      requestUrl: "https://jurgensenergy.com/api/places/autocomplete",
+      requestHost: "jurgensenergy.com",
     }),
     false,
   );
@@ -94,7 +101,7 @@ test("public proxy origin checks require an explicitly allowed same origin", () 
     isSameOriginGooglePlacesRequest({
       allowedOrigins,
       origin: "not a URL",
-      requestUrl: "https://jurgensenergy.com/api/places/autocomplete",
+      requestHost: "jurgensenergy.com",
     }),
     false,
   );
@@ -102,9 +109,25 @@ test("public proxy origin checks require an explicitly allowed same origin", () 
     isSameOriginGooglePlacesRequest({
       allowedOrigins,
       origin: "https://unconfigured.example",
-      requestUrl: "https://unconfigured.example/api/places/autocomplete",
+      requestHost: "unconfigured.example",
     }),
     false,
+  );
+  assert.equal(
+    isSameOriginGooglePlacesRequest({
+      allowedOrigins,
+      origin: "https://jurgensenergy.com",
+      requestHost: "attacker.example",
+    }),
+    false,
+  );
+  assert.equal(
+    isSameOriginGooglePlacesRequest({
+      allowedOrigins,
+      origin: "https://jurgensenergy.com",
+      requestHost: "jurgensenergy.com, internal:3000",
+    }),
+    true,
   );
 });
 

@@ -126,25 +126,32 @@ export type GooglePlacesErrorCode =
 export function isSameOriginGooglePlacesRequest({
   allowedOrigins,
   origin,
-  requestUrl,
+  requestHost,
 }: {
   allowedOrigins?: ReadonlySet<string>;
   origin: string | null;
-  requestUrl: string;
+  requestHost: string | null;
 }) {
-  if (!origin) {
+  if (!origin || !requestHost) {
     return false;
   }
 
   try {
     const originUrl = new URL(origin);
-    const requestOrigin = new URL(requestUrl).origin;
+    const normalizedRequestHost = requestHost
+      .split(",", 1)[0]
+      ?.trim()
+      .toLowerCase();
 
-    if (originUrl.origin !== origin || originUrl.origin !== requestOrigin) {
+    if (
+      !normalizedRequestHost ||
+      originUrl.origin !== origin ||
+      originUrl.host.toLowerCase() !== normalizedRequestHost
+    ) {
       return false;
     }
 
-    return allowedOrigins ? allowedOrigins.has(requestOrigin) : true;
+    return allowedOrigins ? allowedOrigins.has(originUrl.origin) : true;
   } catch {
     return false;
   }

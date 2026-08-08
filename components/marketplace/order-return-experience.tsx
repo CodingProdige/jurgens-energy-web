@@ -20,6 +20,9 @@ import {
 } from "@/src/modules/analytics/google";
 import { removeLocalCartItems } from "@/src/modules/cart";
 import {
+  CHECKOUT_INVOICE_FAST_POLL_ATTEMPTS,
+  CHECKOUT_PAYMENT_FAST_POLL_ATTEMPTS,
+  getCheckoutStatusPollDelay,
   getConfirmedPurchasedVariantIds,
   isCheckoutPaymentConfirmed,
 } from "@/src/modules/checkout/payment-confirmation";
@@ -69,6 +72,7 @@ export function OrderReturnExperience({
   const [invoiceDelayed, setInvoiceDelayed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const cleanedOrderIdRef = useRef<string | null>(null);
+  const refreshRequestIdRef = useRef(0);
   const trackedPurchaseOrderIdRef = useRef<string | null>(null);
   const confirmedPurchasedVariantIds = useMemo(
     () => getConfirmedPurchasedVariantIds(order),
@@ -79,6 +83,9 @@ export function OrderReturnExperience({
   const invoiceReady = order.invoice?.renderStatus === "ready";
 
   const refreshOrder = useCallback(async () => {
+    const requestId = refreshRequestIdRef.current + 1;
+    refreshRequestIdRef.current = requestId;
+
     try {
       const response = await fetch(
         `/api/checkout/orders/${order.orderId}?token=${encodeURIComponent(token)}`,
@@ -90,11 +97,19 @@ export function OrderReturnExperience({
       }
 
       const nextOrder = (await response.json()) as CheckoutOrderSummary;
+
+      if (requestId !== refreshRequestIdRef.current) {
+        return null;
+      }
+
       setOrder(nextOrder);
       setPollError(false);
       return nextOrder;
     } catch {
-      setPollError(true);
+      if (requestId === refreshRequestIdRef.current) {
+        setPollError(true);
+      }
+
       return null;
     }
   }, [order.orderId, token]);
@@ -116,29 +131,73 @@ export function OrderReturnExperience({
   }, [invoiceReady]);
 
   useEffect(() => {
-    if (isFailed || (isPaid && (invoiceReady || invoiceDelayed))) {
+    if (isFailed || (isPaid && invoiceReady)) {
       return;
     }
 
-    let attempt = 0;
-    const maxAttempts = isPaid ? 8 : 30;
-    const intervalId = window.setInterval(() => {
-      attempt += 1;
-      void refreshOrder();
+    let cancelled = false;
+    let completedAttempts = 0;
+    let timeoutId: number | null = null;
+    const fastAttempts = isPaid
+      ? CHECKOUT_INVOICE_FAST_POLL_ATTEMPTS
+      : CHECKOUT_PAYMENT_FAST_POLL_ATTEMPTS;
 
-      if (attempt >= maxAttempts) {
-        window.clearInterval(intervalId);
+    function scheduleNextPoll() {
+      timeoutId = window.setTimeout(
+        poll,
+        getCheckoutStatusPollDelay({
+          completedAttempts,
+          paymentConfirmed: isPaid,
+        }),
+      );
+    }
 
-        if (isPaid && !invoiceReady) {
+    async function poll() {
+      const nextOrder = await refreshOrder();
+
+      if (cancelled) {
+        return;
+      }
+
+      completedAttempts += 1;
+
+      if (nextOrder) {
+        const nextIsPaid = isCheckoutPaymentConfirmed(nextOrder);
+        const nextIsFailed =
+          nextOrder.status === "cancelled" ||
+          nextOrder.paymentStatus === "failed";
+        const nextInvoiceReady = nextOrder.invoice?.renderStatus === "ready";
+
+        if (
+          nextIsFailed ||
+          (!isPaid && nextIsPaid) ||
+          (nextIsPaid && nextInvoiceReady)
+        ) {
+          return;
+        }
+      }
+
+      if (completedAttempts >= fastAttempts) {
+        if (isPaid) {
           setInvoiceDelayed(true);
-        } else if (!isPaid && !isFailed) {
+        } else {
           setConfirmationDelayed(true);
         }
       }
-    }, 2000);
 
-    return () => window.clearInterval(intervalId);
-  }, [invoiceDelayed, invoiceReady, isFailed, isPaid, refreshOrder]);
+      scheduleNextPoll();
+    }
+
+    scheduleNextPoll();
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [invoiceReady, isFailed, isPaid, refreshOrder]);
 
   useEffect(() => {
     if (
@@ -289,8 +348,8 @@ export function OrderReturnExperience({
             Your order remains safely pending
           </p>
           <p className="mt-1 text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
-            Refresh the status below. If it remains pending for more than a few
-            minutes, you can check it in{" "}
+            We’ll keep checking automatically. If it remains pending for more
+            than a few minutes, you can also refresh below, check it in{" "}
             <Link
               className="font-bold text-amber-800 underline underline-offset-2 dark:text-amber-300"
               href={`/account/orders/${order.orderId}`}

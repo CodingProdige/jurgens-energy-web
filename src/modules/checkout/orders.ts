@@ -20,7 +20,10 @@ import {
   type CheckoutCustomer,
   type CreateCheckoutOrderRequest,
 } from "@/src/modules/checkout/contracts";
-import { isCheckoutPaymentConfirmed } from "@/src/modules/checkout/payment-confirmation";
+import {
+  isCheckoutPaymentConfirmed,
+  selectCheckoutPaymentConfirmation,
+} from "@/src/modules/checkout/payment-confirmation";
 import {
   createCheckoutFingerprint,
   getCheckoutFulfillmentProvider,
@@ -916,12 +919,10 @@ export async function getCheckoutOrderSummary(orderId: string, token: string) {
       .limit(1),
   ]);
 
-  const payment = paymentRows[0];
-  const paymentConfirmation = {
-    paymentStatus: payment?.status ?? "pending",
-    providerStatus: payment?.providerStatus ?? null,
-    status: order.status,
-  };
+  const paymentConfirmation = selectCheckoutPaymentConfirmation({
+    orderStatus: order.status,
+    payments: paymentRows,
+  });
 
   return {
     createdAt: order.createdAt.toISOString(),

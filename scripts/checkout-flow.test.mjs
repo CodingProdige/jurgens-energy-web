@@ -12,8 +12,12 @@ import {
 import { hasCourierGuySandboxCheckoutAccess } from "../src/modules/checkout/sandbox-access.ts";
 import { calculateCheckoutIncludedVatCents } from "../src/modules/checkout/totals.ts";
 import {
+  CHECKOUT_INVOICE_FAST_POLL_ATTEMPTS,
+  CHECKOUT_PAYMENT_FAST_POLL_ATTEMPTS,
+  getCheckoutStatusPollDelay,
   getConfirmedPurchasedVariantIds,
   isCheckoutPaymentConfirmed,
+  selectCheckoutPaymentConfirmation,
 } from "../src/modules/checkout/payment-confirmation.ts";
 
 const checkoutExperienceSource = readFileSync(
@@ -299,6 +303,57 @@ test("removes only purchased variants after a fully captured PayFast payment", (
       status: "fulfilled",
     }),
     true,
+  );
+});
+
+test("keeps polling with backoff after payment or invoice confirmation is delayed", () => {
+  assert.equal(CHECKOUT_PAYMENT_FAST_POLL_ATTEMPTS, 30);
+  assert.equal(CHECKOUT_INVOICE_FAST_POLL_ATTEMPTS, 8);
+
+  assert.equal(
+    getCheckoutStatusPollDelay({
+      completedAttempts: 29,
+      paymentConfirmed: false,
+    }),
+    2_000,
+  );
+  assert.equal(
+    getCheckoutStatusPollDelay({
+      completedAttempts: 30,
+      paymentConfirmed: false,
+    }),
+    10_000,
+  );
+  assert.equal(
+    getCheckoutStatusPollDelay({
+      completedAttempts: 54,
+      paymentConfirmed: false,
+    }),
+    30_000,
+  );
+  assert.equal(
+    getCheckoutStatusPollDelay({
+      completedAttempts: 8,
+      paymentConfirmed: true,
+    }),
+    10_000,
+  );
+});
+
+test("prefers a captured PayFast attempt when a paid order has a newer retry", () => {
+  assert.deepEqual(
+    selectCheckoutPaymentConfirmation({
+      orderStatus: "paid",
+      payments: [
+        { providerStatus: null, status: "pending" },
+        { providerStatus: "COMPLETE", status: "captured" },
+      ],
+    }),
+    {
+      paymentStatus: "captured",
+      providerStatus: "COMPLETE",
+      status: "paid",
+    },
   );
 });
 

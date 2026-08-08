@@ -63,7 +63,9 @@ export async function POST(request: Request) {
     !isSameOriginGooglePlacesRequest({
       allowedOrigins: getGooglePlacesAllowedOrigins(),
       origin: request.headers.get("origin"),
-      requestUrl: request.url,
+      requestHost:
+        request.headers.get("x-forwarded-host") ??
+        request.headers.get("host"),
     })
   ) {
     return Response.json(
