@@ -20,11 +20,13 @@ import {
   updateMarketplaceMediaSettings,
   updateMarketplaceOpenAiSettings,
   updateMarketplacePayFastSettings,
+  updateMarketplaceSendGridSettings,
   updateMarketplaceCourierGuyCredentials,
   updateMarketplaceReturnsSettings,
   updateMarketplaceShippingSettings,
   updateMarketplaceWhatsappSettings,
 } from "@/src/modules/marketplace/settings";
+import { verifySendGridConnection } from "@/src/modules/email/sendgrid";
 import { normalizePhoneNumber } from "@/src/modules/phone";
 import {
   deleteJurgensDeliveryZone,
@@ -421,6 +423,83 @@ export async function updateChatGptIntegrationSettings(
   revalidatePath("/settings/platform");
 
   return result;
+}
+
+const sendGridSettingsSchema = z.object({
+  apiKey: z
+    .string()
+    .trim()
+    .max(200, "The SendGrid API key is too long.")
+    .optional()
+    .transform((value) => value || undefined)
+    .refine(
+      (value) => !value || value.startsWith("SG."),
+      "SendGrid API keys must start with SG.",
+    ),
+  enabled: z.boolean(),
+  fromEmail: z
+    .string()
+    .trim()
+    .max(180, "The sender email is too long.")
+    .optional()
+    .transform((value) => value || undefined)
+    .refine(
+      (value) => !value || z.email().safeParse(value).success,
+      "Enter a valid sender email address.",
+    ),
+  fromName: z
+    .string()
+    .trim()
+    .min(1, "Enter a sender name.")
+    .max(120, "The sender name is too long."),
+  webhookPublicKey: z
+    .string()
+    .trim()
+    .max(4000, "The webhook verification key is too long.")
+    .optional()
+    .transform((value) => value || undefined),
+});
+
+export async function updateSendGridIntegrationSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireSettingsManageAccess();
+  const parsed = sendGridSettingsSchema.safeParse({
+    apiKey: String(formData.get("apiKey") ?? ""),
+    enabled: formData.get("enabled") === "on",
+    fromEmail: String(formData.get("fromEmail") ?? ""),
+    fromName: String(formData.get("fromName") ?? ""),
+    webhookPublicKey: String(formData.get("webhookPublicKey") ?? ""),
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Check the SendGrid integration settings.",
+    };
+  }
+
+  const result = await updateMarketplaceSendGridSettings({
+    actorUserId: session.user.id,
+    ...parsed.data,
+  });
+
+  revalidatePath("/settings/platform");
+
+  return result;
+}
+
+export async function testSendGridIntegrationSettings(
+  _state: AdminSettingsState,
+  _formData: FormData,
+): Promise<AdminSettingsState> {
+  void _state;
+  void _formData;
+  await requireSettingsManageAccess();
+
+  return verifySendGridConnection();
 }
 
 const mediaSettingsSchema = z.object({

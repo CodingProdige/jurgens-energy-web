@@ -51,6 +51,15 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   openAiReasoningEffort: varchar("openai_reasoning_effort", { length: 16 })
     .notNull()
     .default("medium"),
+  sendgridEnabled: boolean("sendgrid_enabled").notNull().default(true),
+  sendgridApiKeyEncrypted: text("sendgrid_api_key_encrypted"),
+  sendgridFromEmail: text("sendgrid_from_email"),
+  sendgridFromName: text("sendgrid_from_name")
+    .notNull()
+    .default("Jurgens Energy"),
+  sendgridWebhookPublicKeyEncrypted: text(
+    "sendgrid_webhook_public_key_encrypted",
+  ),
   freeStorageQuotaMb: integer("free_storage_quota_mb").notNull().default(512),
   maxUploadFileMb: integer("max_upload_file_mb").notNull().default(10),
   maxVideoUploadFileMb: integer("max_video_upload_file_mb")

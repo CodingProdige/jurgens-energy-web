@@ -1,6 +1,6 @@
 import { createPublicKey, createVerify } from "node:crypto";
 
-import { env } from "@/src/config/env";
+import { getSendGridIntegrationConfig } from "@/src/modules/marketplace/settings";
 import {
   recordSendGridWebhookEvents,
   type SendGridWebhookEvent,
@@ -13,8 +13,9 @@ const TIMESTAMP_HEADER = "x-twilio-email-event-webhook-timestamp";
 
 export async function POST(request: Request) {
   const body = await request.text();
+  const config = await getSendGridIntegrationConfig();
 
-  if (!env.SENDGRID_WEBHOOK_PUBLIC_KEY) {
+  if (!config.webhookPublicKey) {
     console.error("[sendgrid-webhook] public verification key is not configured.");
 
     return Response.json(
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!verifySendGridSignature(request.headers, body)) {
+  if (!verifySendGridSignature(request.headers, body, config.webhookPublicKey)) {
     return Response.json(
       { ok: false, error: "invalid_signature" },
       { status: 401 },
@@ -44,12 +45,15 @@ export async function POST(request: Request) {
   return Response.json({ ok: true, ...result });
 }
 
-function verifySendGridSignature(headers: Headers, payload: string) {
-  const publicKey = env.SENDGRID_WEBHOOK_PUBLIC_KEY;
+function verifySendGridSignature(
+  headers: Headers,
+  payload: string,
+  publicKey: string,
+) {
   const signature = headers.get(SIGNATURE_HEADER);
   const timestamp = headers.get(TIMESTAMP_HEADER);
 
-  if (!publicKey || !signature || !timestamp) {
+  if (!signature || !timestamp) {
     return false;
   }
 

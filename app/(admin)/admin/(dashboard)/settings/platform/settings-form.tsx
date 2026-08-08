@@ -77,11 +77,13 @@ import {
   restoreNotificationTemplateSettings,
   sendInAppNotificationTemplateTestSettings,
   sendNotificationTemplateTestSettings,
+  testSendGridIntegrationSettings,
   deleteJurgensDeliveryZoneSettings,
   saveJurgensDeliveryZoneSettings,
   updatePayFastPaymentSettings,
   updateCourierGuyCredentialSettings,
   updateReturnsPolicySettings,
+  updateSendGridIntegrationSettings,
   updateShippingIntegrationSettings,
   updateWhatsappOrderingSettings,
   type AdminSettingsState,
@@ -1256,6 +1258,331 @@ export function ChatGptIntegrationSettingsForm({
         {isPending ? "Saving..." : "Save ChatGPT settings"}
       </Button>
     </form>
+  );
+}
+
+type SendGridIntegrationSettingsFormProps = {
+  hasSendgridApiKey: boolean;
+  hasSendgridWebhookPublicKey: boolean;
+  sendgridEnabled: boolean;
+  sendgridFromEmail: string | null;
+  sendgridFromName: string;
+  sendgridWebhookUrl: string;
+};
+
+export function SendGridIntegrationSettingsForm({
+  hasSendgridApiKey,
+  hasSendgridWebhookPublicKey,
+  sendgridEnabled,
+  sendgridFromEmail,
+  sendgridFromName,
+  sendgridWebhookUrl,
+}: SendGridIntegrationSettingsFormProps) {
+  const [isEnabled, setIsEnabled] = useState(sendgridEnabled);
+  const [webhookUrlCopied, setWebhookUrlCopied] = useState(false);
+  const [saveState, saveAction, isSaving] = useActionState(
+    updateSendGridIntegrationSettings,
+    initialState,
+  );
+  const [testState, testAction, isTesting] = useActionState(
+    testSendGridIntegrationSettings,
+    initialState,
+  );
+  const isConfigured =
+    isEnabled && hasSendgridApiKey && Boolean(sendgridFromEmail);
+
+  async function copyWebhookUrl() {
+    try {
+      await navigator.clipboard.writeText(sendgridWebhookUrl);
+      setWebhookUrlCopied(true);
+      window.setTimeout(() => setWebhookUrlCopied(false), 1800);
+    } catch {
+      setWebhookUrlCopied(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-5">
+      <form action={saveAction} className="grid gap-5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+                <MailCheckIcon className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                  Transactional email delivery
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  Send order, invoice, account, and operational emails through
+                  SendGrid. Server environment values remain the fallback.
+                </p>
+              </div>
+            </div>
+            <Badge
+              variant="outline"
+              className={cn(
+                "shrink-0",
+                isConfigured
+                  ? "border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                  : "border-amber-500/30 text-amber-700 dark:text-amber-300",
+              )}
+            >
+              {isConfigured ? "Configured" : "Needs setup"}
+            </Badge>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={isEnabled}
+              name="enabled"
+              onCheckedChange={(checked) => setIsEnabled(checked === true)}
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                Enable SendGrid transactional email
+              </span>
+              <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                When disabled, notification delivery records remain available but
+                no new email is sent through SendGrid.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="mb-5 flex items-start gap-3">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+                <KeyRoundIcon className="size-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                  API credentials
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  Keys are encrypted before storage and are never returned to the
+                  browser after saving.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="sendgridApiKey">
+                  SendGrid API key
+                  {!hasSendgridApiKey ? (
+                    <span className="ml-1 text-red-600" aria-hidden="true">
+                      *
+                    </span>
+                  ) : null}
+                </Label>
+                <SecretTextInput
+                  id="sendgridApiKey"
+                  name="apiKey"
+                  icon="key"
+                  placeholder={
+                    hasSendgridApiKey
+                      ? "Saved - leave blank to keep current API key"
+                      : "Paste API key beginning with SG."
+                  }
+                />
+                <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  Use a restricted key with the mail.send permission.
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="sendgridWebhookPublicKey">
+                    Event webhook verification key
+                  </Label>
+                  {hasSendgridWebhookPublicKey ? (
+                    <Badge variant="outline" className="text-[10px] uppercase">
+                      Configured
+                    </Badge>
+                  ) : null}
+                </div>
+                <SecretTextInput
+                  id="sendgridWebhookPublicKey"
+                  name="webhookPublicKey"
+                  icon="key"
+                  placeholder={
+                    hasSendgridWebhookPublicKey
+                      ? "Saved - leave blank to keep current verification key"
+                      : "Optional signed webhook verification key"
+                  }
+                />
+                <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  Copy the verification key shown after enabling Signed Event
+                  Webhook in SendGrid.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="mb-5 flex items-start gap-3">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+                <MailCheckIcon className="size-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                  Verified sender
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  This identity appears in the From header for all notification
+                  templates.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="sendgridFromEmail">
+                  Sender email
+                  <span className="ml-1 text-red-600" aria-hidden="true">
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="sendgridFromEmail"
+                  name="fromEmail"
+                  type="email"
+                  autoComplete="email"
+                  defaultValue={sendgridFromEmail ?? ""}
+                  placeholder="no-reply@jurgensenergy.com"
+                />
+                <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  This address or its domain must be verified in SendGrid.
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="sendgridFromName">
+                  Sender name
+                  <span className="ml-1 text-red-600" aria-hidden="true">
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="sendgridFromName"
+                  name="fromName"
+                  defaultValue={sendgridFromName}
+                  placeholder="Jurgens Energy"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
+              <Code2Icon className="size-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                Signed Event Webhook
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Paste this URL into SendGrid so delivery, bounce, and failure
+                events update notification history.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+            <Input
+              readOnly
+              value={sendgridWebhookUrl}
+              className="min-w-0 font-mono text-xs"
+              aria-label="SendGrid event webhook URL"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={copyWebhookUrl}
+              className="h-10 shrink-0 gap-2"
+            >
+              <ClipboardIcon className="size-4" />
+              {webhookUrlCopied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+        </div>
+
+        {saveState.message ? (
+          <p
+            className={
+              saveState.ok
+                ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+                : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+            }
+            role="status"
+          >
+            {saveState.message}
+          </p>
+        ) : null}
+
+        <Button type="submit" disabled={isSaving} className="w-fit gap-2">
+          <SaveIcon className="size-4" />
+          {isSaving ? "Saving..." : "Save SendGrid settings"}
+        </Button>
+      </form>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-zinc-950 dark:text-white">
+            Test the saved API connection
+          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            Confirms the key is valid and includes mail.send without sending an
+            email. Template delivery tests remain under Notifications.
+          </p>
+          {testState.message ? (
+            <p
+              className={cn(
+                "mt-2 text-sm",
+                testState.ok
+                  ? "text-emerald-700 dark:text-emerald-300"
+                  : "text-red-700 dark:text-red-300",
+              )}
+              role="status"
+            >
+              {testState.message}
+            </p>
+          ) : null}
+        </div>
+        <form action={testAction} className="shrink-0">
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={isTesting}
+            className="h-10 gap-2"
+          >
+            {isTesting ? (
+              <LoaderCircleIcon className="size-4 animate-spin" />
+            ) : (
+              <RefreshCcwIcon className="size-4" />
+            )}
+            {isTesting ? "Testing..." : "Test connection"}
+          </Button>
+        </form>
+      </div>
+
+      <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+        Email content, recipients, delivery policies, and real template tests are
+        managed under{" "}
+        <Link
+          href="/settings/platform?section=notifications"
+          className="font-semibold text-admin-primary hover:underline"
+        >
+          Notifications
+        </Link>
+        .
+      </p>
+    </div>
   );
 }
 

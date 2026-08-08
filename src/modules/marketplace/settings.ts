@@ -547,6 +547,12 @@ export type MarketplaceSettings = {
   openAiEnabled: boolean;
   openAiModel: string;
   openAiReasoningEffort: OpenAiReasoningEffort;
+  sendgridEnabled: boolean;
+  sendgridFromEmail: string | null;
+  sendgridFromName: string;
+  sendgridWebhookUrl: string;
+  hasSendgridApiKey: boolean;
+  hasSendgridWebhookPublicKey: boolean;
   hasPayfastLiveMerchantKey: boolean;
   hasPayfastLivePassphrase: boolean;
   hasPayfastSandboxMerchantKey: boolean;
@@ -715,6 +721,15 @@ const defaultSettings: MarketplaceSettings = {
   openAiEnabled: true,
   openAiModel: env.OPENAI_MODEL,
   openAiReasoningEffort: env.OPENAI_REASONING_EFFORT,
+  sendgridEnabled: true,
+  sendgridFromEmail: env.SENDGRID_FROM_EMAIL ?? null,
+  sendgridFromName: env.SENDGRID_FROM_NAME,
+  sendgridWebhookUrl: new URL(
+    "/api/webhooks/sendgrid/events",
+    env.APP_URL,
+  ).toString(),
+  hasSendgridApiKey: Boolean(env.SENDGRID_API_KEY),
+  hasSendgridWebhookPublicKey: Boolean(env.SENDGRID_WEBHOOK_PUBLIC_KEY),
   hasPayfastLiveMerchantKey: false,
   hasPayfastLivePassphrase: false,
   hasPayfastSandboxMerchantKey: false,
@@ -789,6 +804,12 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       openAiEnabled: marketplaceSettings.openAiEnabled,
       openAiModel: marketplaceSettings.openAiModel,
       openAiReasoningEffort: marketplaceSettings.openAiReasoningEffort,
+      sendgridEnabled: marketplaceSettings.sendgridEnabled,
+      sendgridApiKeyEncrypted: marketplaceSettings.sendgridApiKeyEncrypted,
+      sendgridFromEmail: marketplaceSettings.sendgridFromEmail,
+      sendgridFromName: marketplaceSettings.sendgridFromName,
+      sendgridWebhookPublicKeyEncrypted:
+        marketplaceSettings.sendgridWebhookPublicKeyEncrypted,
       imageCompressionQuality: marketplaceSettings.imageCompressionQuality,
       instagramUrl: marketplaceSettings.instagramUrl,
       maxImageWidth: marketplaceSettings.maxImageWidth,
@@ -958,11 +979,13 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
   );
   const {
     googlePlacesApiKeyEncrypted,
-    ...settingsWithoutGooglePlacesApiKey
+    sendgridApiKeyEncrypted,
+    sendgridWebhookPublicKeyEncrypted,
+    ...safeSettings
   } = settings;
 
   return {
-    ...settingsWithoutGooglePlacesApiKey,
+    ...safeSettings,
     bobgoBookingMode: normalizeBobgoBookingMode(settings.bobgoBookingMode),
     bobgoMode: settings.bobgoMode === "live" ? "live" : "sandbox",
     contactEmail: settings.contactEmail ?? defaultSettings.contactEmail,
@@ -1088,6 +1111,21 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
     openAiModel: settings.openAiModel || env.OPENAI_MODEL,
     openAiReasoningEffort: normalizeOpenAiReasoningEffort(
       settings.openAiReasoningEffort,
+    ),
+    sendgridEnabled: settings.sendgridEnabled ?? true,
+    sendgridFromEmail:
+      settings.sendgridFromEmail?.trim() || env.SENDGRID_FROM_EMAIL || null,
+    sendgridFromName:
+      settings.sendgridFromName?.trim() || env.SENDGRID_FROM_NAME,
+    sendgridWebhookUrl: new URL(
+      "/api/webhooks/sendgrid/events",
+      env.APP_URL,
+    ).toString(),
+    hasSendgridApiKey: Boolean(
+      sendgridApiKeyEncrypted ?? env.SENDGRID_API_KEY,
+    ),
+    hasSendgridWebhookPublicKey: Boolean(
+      sendgridWebhookPublicKeyEncrypted ?? env.SENDGRID_WEBHOOK_PUBLIC_KEY,
     ),
     payfastMode: settings.payfastMode === "live" ? "live" : "sandbox",
     paymentMethodBadges,
@@ -2687,6 +2725,126 @@ export async function getMarketplaceAdminSecrets(): Promise<MarketplaceAdminSecr
   };
 }
 
+export type SendGridIntegrationConfig = {
+  apiKey: string | null;
+  enabled: boolean;
+  fromEmail: string | null;
+  fromName: string;
+  isConfigured: boolean;
+  webhookPublicKey: string | null;
+  webhookUrl: string;
+};
+
+export async function getSendGridIntegrationConfig(): Promise<SendGridIntegrationConfig> {
+  const rawSettings = await getRawMarketplaceSettings();
+  const apiKey =
+    decryptOptionalSecret(rawSettings?.sendgridApiKeyEncrypted) ??
+    env.SENDGRID_API_KEY ??
+    null;
+  const fromEmail =
+    rawSettings?.sendgridFromEmail?.trim() ||
+    env.SENDGRID_FROM_EMAIL ||
+    null;
+  const fromName =
+    rawSettings?.sendgridFromName?.trim() || env.SENDGRID_FROM_NAME;
+  const enabled = rawSettings?.sendgridEnabled ?? true;
+  const webhookPublicKey =
+    decryptOptionalSecret(rawSettings?.sendgridWebhookPublicKeyEncrypted) ??
+    env.SENDGRID_WEBHOOK_PUBLIC_KEY ??
+    null;
+
+  return {
+    apiKey,
+    enabled,
+    fromEmail,
+    fromName,
+    isConfigured: Boolean(enabled && apiKey && fromEmail),
+    webhookPublicKey,
+    webhookUrl: new URL(
+      "/api/webhooks/sendgrid/events",
+      env.APP_URL,
+    ).toString(),
+  };
+}
+
+export async function updateMarketplaceSendGridSettings({
+  actorUserId,
+  apiKey,
+  enabled,
+  fromEmail,
+  fromName,
+  webhookPublicKey,
+}: {
+  actorUserId: string;
+  apiKey?: string;
+  enabled: boolean;
+  fromEmail?: string;
+  fromName: string;
+  webhookPublicKey?: string;
+}) {
+  const existing = await getRawMarketplaceSettings();
+  const existingApiKey = decryptOptionalSecret(
+    existing?.sendgridApiKeyEncrypted,
+  );
+  const normalizedApiKey = apiKey?.trim() || undefined;
+  const normalizedWebhookPublicKey = webhookPublicKey?.trim() || undefined;
+  const nextApiKey = normalizedApiKey ?? existingApiKey ?? env.SENDGRID_API_KEY;
+  const nextFromEmail = fromEmail?.trim() || env.SENDGRID_FROM_EMAIL || null;
+  const nextApiKeyEncrypted = normalizedApiKey
+    ? encryptSecret(normalizedApiKey)
+    : (existing?.sendgridApiKeyEncrypted ?? null);
+  const nextWebhookPublicKeyEncrypted = normalizedWebhookPublicKey
+    ? encryptSecret(normalizedWebhookPublicKey)
+    : (existing?.sendgridWebhookPublicKeyEncrypted ?? null);
+
+  if (enabled && !nextApiKey) {
+    return {
+      ok: false as const,
+      message: "Add a SendGrid API key before enabling transactional email.",
+    };
+  }
+
+  if (enabled && !nextFromEmail) {
+    return {
+      ok: false as const,
+      message: "Add a verified sender email before enabling SendGrid.",
+    };
+  }
+
+  const values = {
+    sendgridApiKeyEncrypted: nextApiKeyEncrypted,
+    sendgridEnabled: enabled,
+    sendgridFromEmail: nextFromEmail,
+    sendgridFromName: fromName.trim(),
+    sendgridWebhookPublicKeyEncrypted: nextWebhookPublicKeyEncrypted,
+    updatedAt: new Date(),
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({ id: 1, ...values })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: values,
+      });
+
+    await tx.insert(auditLogs).values({
+      action: "marketplace.sendgrid_settings.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({
+        apiKeyChanged: Boolean(normalizedApiKey),
+        enabled,
+        fromEmailChanged: nextFromEmail !== existing?.sendgridFromEmail,
+        webhookPublicKeyChanged: Boolean(normalizedWebhookPublicKey),
+      }),
+    });
+  });
+
+  return { ok: true as const, message: "SendGrid integration settings saved." };
+}
+
 async function getRawMarketplaceSettings() {
   const [settings] = await db
     .select({
@@ -2738,6 +2896,12 @@ async function getRawMarketplaceSettings() {
       stripeSandboxWebhookSecretEncrypted:
         marketplaceSettings.stripeSandboxWebhookSecretEncrypted,
       openAiApiKeyEncrypted: marketplaceSettings.openAiApiKeyEncrypted,
+      sendgridApiKeyEncrypted: marketplaceSettings.sendgridApiKeyEncrypted,
+      sendgridEnabled: marketplaceSettings.sendgridEnabled,
+      sendgridFromEmail: marketplaceSettings.sendgridFromEmail,
+      sendgridFromName: marketplaceSettings.sendgridFromName,
+      sendgridWebhookPublicKeyEncrypted:
+        marketplaceSettings.sendgridWebhookPublicKeyEncrypted,
       whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
       whatsappWebhookVerifyTokenEncrypted:
         marketplaceSettings.whatsappWebhookVerifyTokenEncrypted,

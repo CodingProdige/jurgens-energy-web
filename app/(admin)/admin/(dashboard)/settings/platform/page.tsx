@@ -9,6 +9,7 @@ import {
   GlobeIcon,
   GlobeLockIcon,
   LayersIcon,
+  MailCheckIcon,
   MailIcon,
   MapPinIcon,
   MessageCircleIcon,
@@ -36,6 +37,7 @@ import {
   NationwideShippingSettingsForm,
   PayFastSettingsForm,
   ReturnsPolicySettingsForm,
+  SendGridIntegrationSettingsForm,
   SocialLinksForm,
   WhatsappOrderingSettingsForm,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/settings-form";
@@ -109,6 +111,13 @@ const settingSections = [
     description:
       "Temporarily hide public marketplace pages behind a shared preview password.",
     icon: GlobeLockIcon,
+  },
+  {
+    key: "sendgrid-integration",
+    title: "SendGrid integration",
+    description:
+      "Manage encrypted email delivery credentials, sender identity, and signed event webhooks.",
+    icon: MailCheckIcon,
   },
   {
     key: "notifications",
@@ -542,6 +551,26 @@ function SettingsSection({
     );
   }
 
+  if (section === "sendgrid-integration") {
+    return (
+      <DashboardPanel
+        title="SendGrid integration"
+        description="Manage the encrypted SendGrid API key, verified sender identity, and signed event webhook used by transactional email."
+      >
+        <SendGridIntegrationSettingsForm
+          hasSendgridApiKey={settings.hasSendgridApiKey}
+          hasSendgridWebhookPublicKey={
+            settings.hasSendgridWebhookPublicKey
+          }
+          sendgridEnabled={settings.sendgridEnabled}
+          sendgridFromEmail={settings.sendgridFromEmail}
+          sendgridFromName={settings.sendgridFromName}
+          sendgridWebhookUrl={settings.sendgridWebhookUrl}
+        />
+      </DashboardPanel>
+    );
+  }
+
   if (section === "notifications") {
     return (
       <DashboardPanel
@@ -611,9 +640,9 @@ function SettingsSection({
           <LayersIcon className="size-5 text-admin-primary" />
           <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
             PayFast mode, Courier Guy credentials, WhatsApp ordering credentials,
-            returns policy values, Google tags, media limits, compression defaults, storage
-            allocations, footer details, and social links are shared platform settings used
-            wherever those systems appear.
+            SendGrid delivery credentials, returns policy values, Google tags, media limits,
+            compression defaults, storage allocations, footer details, and social links are
+            shared platform settings used wherever those systems appear.
           </p>
         </div>
 

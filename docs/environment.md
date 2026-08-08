@@ -253,7 +253,14 @@ is not used in sandbox mode. Submitted, verification-required, and externally
 completed bank-payout refunds are reconciled by GET-only checks in the document
 worker, which starts with the Next.js server.
 
-`SENDGRID_FROM_EMAIL` must be a sender identity verified in SendGrid. If either SendGrid value is missing in local development, password reset requests keep showing the dev reset link instead of sending email.
+SendGrid can be configured under **Admin → Settings → Platform → SendGrid
+integration**. The API key and webhook verification key are encrypted in
+PostgreSQL. `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME`, and
+`SENDGRID_WEBHOOK_PUBLIC_KEY` remain server environment fallbacks for initial
+deployment and recovery. `SENDGRID_FROM_EMAIL` must be a sender identity or
+domain verified in SendGrid. If either the API key or sender email is missing in
+local development, password reset requests keep showing the dev reset link
+instead of sending email.
 
 `SENDGRID_WEBHOOK_PUBLIC_KEY` is the Verification key shown by SendGrid when Signed Event Webhook is enabled. Use the endpoint `https://jurgensenergy.com/api/webhooks/sendgrid/events` in SendGrid.
 

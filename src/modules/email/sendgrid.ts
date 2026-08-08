@@ -1,4 +1,6 @@
-import { env } from "@/src/config/env";
+import "server-only";
+
+import { getSendGridIntegrationConfig } from "@/src/modules/marketplace/settings";
 
 type SendGridEmailAddress = {
   email: string;
@@ -52,7 +54,9 @@ function isOutcomeUnknownStatus(status: number) {
 }
 
 export async function sendEmail(message: Omit<SendGridMessage, "from">) {
-  if (!env.SENDGRID_API_KEY || !env.SENDGRID_FROM_EMAIL) {
+  const config = await getSendGridIntegrationConfig();
+
+  if (!config.isConfigured || !config.apiKey || !config.fromEmail) {
     return { delivered: false, reason: "not_configured" } satisfies SendEmailResult;
   }
 
@@ -62,14 +66,14 @@ export async function sendEmail(message: Omit<SendGridMessage, "from">) {
     response = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.SENDGRID_API_KEY}`,
+        Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         ...message,
         from: {
-          email: env.SENDGRID_FROM_EMAIL,
-          name: env.SENDGRID_FROM_NAME,
+          email: config.fromEmail,
+          name: config.fromName,
         },
       } satisfies SendGridMessage),
     });
@@ -111,4 +115,67 @@ export async function sendEmail(message: Omit<SendGridMessage, "from">) {
     providerMessageId,
     providerStatus: response.status,
   } satisfies SendEmailResult;
+}
+
+export async function verifySendGridConnection() {
+  const config = await getSendGridIntegrationConfig();
+
+  if (!config.isConfigured || !config.apiKey || !config.fromEmail) {
+    return {
+      ok: false as const,
+      message: "Save an enabled API key and verified sender email first.",
+    };
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch("https://api.sendgrid.com/v3/scopes", {
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      method: "GET",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    console.error(
+      "[sendgrid] connection test failed",
+      error instanceof Error ? error.message : "unknown error",
+    );
+
+    return {
+      ok: false as const,
+      message: "Could not reach SendGrid. Check the server connection and retry.",
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      message:
+        response.status === 401 || response.status === 403
+          ? "SendGrid rejected the saved API key. Replace it with a valid key."
+          : `SendGrid connection test failed with status ${response.status}.`,
+    };
+  }
+
+  const body = (await response.json().catch(() => null)) as
+    | { scopes?: unknown }
+    | null;
+  const scopes = Array.isArray(body?.scopes)
+    ? body.scopes.filter((scope): scope is string => typeof scope === "string")
+    : [];
+
+  if (!scopes.includes("mail.send")) {
+    return {
+      ok: false as const,
+      message:
+        "The API key is valid but does not have the required mail.send permission.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    message: `SendGrid is connected with mail.send access for ${config.fromEmail}.`,
+  };
 }
