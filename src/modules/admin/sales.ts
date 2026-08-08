@@ -13,6 +13,7 @@ import {
   saleCampaignVariants,
 } from "@/src/db/schema";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import { getFriendlySalesErrorMessage } from "@/src/modules/sales/database-errors";
 
 const createSaleCampaignSchema = z.object({
   badgeText: z.string().trim().min(1).max(80).default("Sale"),
@@ -84,6 +85,8 @@ export type AdminSaleCampaign = {
 export type AdminSalesData = {
   activeCampaigns: AdminSaleCampaign[];
   products: AdminSaleProduct[];
+  salesAvailable: boolean;
+  salesUnavailableMessage: string | null;
 };
 
 type VariantForSale = {
@@ -200,10 +203,6 @@ function getSaleAvailability(
 }
 
 async function getActiveSaleRows(variantIds?: string[]) {
-  if (variantIds && variantIds.length === 0) {
-    return [];
-  }
-
   const baseFilters = [
     eq(saleCampaigns.status, "active" as const),
     eq(saleCampaignVariants.status, "active" as const),
@@ -212,31 +211,57 @@ async function getActiveSaleRows(variantIds?: string[]) {
     ? and(...baseFilters, inArray(saleCampaignVariants.variantId, variantIds))
     : and(...baseFilters);
 
-  return db
-    .select({
-      badgeText: saleCampaigns.badgeText,
-      campaignId: saleCampaigns.id,
-      campaignName: saleCampaigns.name,
-      createdAt: saleCampaigns.createdAt,
-      discountPercent: saleCampaigns.discountPercent,
-      originalCompareAtPrice: saleCampaignVariants.originalCompareAtPrice,
-      originalPrice: saleCampaignVariants.originalPrice,
-      productSlug: products.slug,
-      productTitle: products.title,
-      salePrice: saleCampaignVariants.salePrice,
-      sku: productVariants.sku,
-      title: productVariants.title,
-      variantId: saleCampaignVariants.variantId,
-    })
-    .from(saleCampaignVariants)
-    .innerJoin(
-      saleCampaigns,
-      eq(saleCampaigns.id, saleCampaignVariants.campaignId),
-    )
-    .innerJoin(productVariants, eq(productVariants.id, saleCampaignVariants.variantId))
-    .innerJoin(products, eq(products.id, productVariants.productId))
-    .where(whereCondition)
-    .orderBy(desc(saleCampaigns.createdAt), asc(products.title), asc(productVariants.title));
+  if (variantIds && variantIds.length === 0) {
+    return {
+      ok: true as const,
+      rows: [] as ActiveSaleRow[],
+    };
+  }
+
+  try {
+    const rows = await db
+      .select({
+        badgeText: saleCampaigns.badgeText,
+        campaignId: saleCampaigns.id,
+        campaignName: saleCampaigns.name,
+        createdAt: saleCampaigns.createdAt,
+        discountPercent: saleCampaigns.discountPercent,
+        originalCompareAtPrice: saleCampaignVariants.originalCompareAtPrice,
+        originalPrice: saleCampaignVariants.originalPrice,
+        productSlug: products.slug,
+        productTitle: products.title,
+        salePrice: saleCampaignVariants.salePrice,
+        sku: productVariants.sku,
+        title: productVariants.title,
+        variantId: saleCampaignVariants.variantId,
+      })
+      .from(saleCampaignVariants)
+      .innerJoin(
+        saleCampaigns,
+        eq(saleCampaigns.id, saleCampaignVariants.campaignId),
+      )
+      .innerJoin(productVariants, eq(productVariants.id, saleCampaignVariants.variantId))
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(whereCondition)
+      .orderBy(
+        desc(saleCampaigns.createdAt),
+        asc(products.title),
+        asc(productVariants.title),
+      );
+
+    return {
+      ok: true as const,
+      rows,
+    };
+  } catch (error: unknown) {
+    console.error("Failed to load active sale rows:", error);
+
+    return {
+      message: getFriendlySalesErrorMessage("read", error),
+      ok: false as const,
+      rows: [] as ActiveSaleRow[],
+    };
+  }
 }
 
 function revalidateSalePaths(productSlugs: Iterable<string>) {
@@ -260,10 +285,15 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
     return {
       activeCampaigns: [],
       products: [],
+      salesAvailable: false,
+      salesUnavailableMessage: "You do not have permission to manage product sales.",
     };
   }
 
-  const [productRows, variantRows, activeSaleRows] = await Promise.all([
+  const activeSaleResult = await getActiveSaleRows();
+  const activeSaleRows = activeSaleResult.rows;
+
+  const [productRows, variantRows] = await Promise.all([
     db
       .select({
         brandName: brands.name,
@@ -296,7 +326,6 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
       .from(productVariants)
       .innerJoin(products, eq(products.id, productVariants.productId))
       .orderBy(asc(products.title), asc(productVariants.title)),
-    getActiveSaleRows(),
   ]);
 
   const activeSaleByVariantId = new Map(
@@ -368,6 +397,10 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
       title: product.title,
       variants: variantsByProductId.get(product.id) ?? [],
     })),
+    salesAvailable: activeSaleResult.ok,
+    salesUnavailableMessage: activeSaleResult.ok
+      ? null
+      : activeSaleResult.message,
   };
 }
 
@@ -419,7 +452,16 @@ export async function createSaleCampaign(input: unknown): Promise<SaleActionResu
     };
   }
 
-  const activeSaleRows = await getActiveSaleRows(variantIds);
+  const activeSaleResult = await getActiveSaleRows(variantIds);
+
+  if (!activeSaleResult.ok) {
+    return {
+      ok: false,
+      message: activeSaleResult.message,
+    };
+  }
+
+  const activeSaleRows = activeSaleResult.rows;
   const activeSaleByVariantId = new Map(
     activeSaleRows.map((row) => [row.variantId, row]),
   );
@@ -455,65 +497,74 @@ export async function createSaleCampaign(input: unknown): Promise<SaleActionResu
     };
   });
 
-  await db.transaction(async (tx) => {
-    const [campaign] = await tx
-      .insert(saleCampaigns)
-      .values({
-        badgeText: parsed.data.badgeText,
-        createdAt: now,
-        createdByUserId: access.session.user.id,
-        discountPercent: toMoney(discountPercent),
-        name: parsed.data.name,
-        updatedAt: now,
-      })
-      .returning({ id: saleCampaigns.id });
-
-    if (!campaign) {
-      throw new Error("Sale campaign could not be created.");
-    }
-
-    await tx.insert(saleCampaignVariants).values(
-      saleRows.map((row) => ({
-        campaignId: campaign.id,
-        createdAt: now,
-        originalCompareAtPrice: row.originalCompareAtPrice,
-        originalPrice: row.originalPrice,
-        salePrice: row.salePrice,
-        updatedAt: now,
-        variantId: row.variantId,
-      })),
-    );
-
-    for (const row of saleRows) {
-      await tx
-        .update(productVariants)
-        .set({
-          compareAtPrice: row.originalPrice,
-          price: row.salePrice,
+  try {
+    await db.transaction(async (tx) => {
+      const [campaign] = await tx
+        .insert(saleCampaigns)
+        .values({
+          badgeText: parsed.data.badgeText,
+          createdAt: now,
+          createdByUserId: access.session.user.id,
+          discountPercent: toMoney(discountPercent),
+          name: parsed.data.name,
+          updatedAt: now,
         })
-        .where(eq(productVariants.id, row.variantId));
-    }
+        .returning({ id: saleCampaigns.id });
 
-    for (const productId of new Set(saleRows.map((row) => row.productId))) {
-      await tx
-        .update(products)
-        .set({ updatedAt: now })
-        .where(eq(products.id, productId));
-    }
+      if (!campaign) {
+        throw new Error("Sale campaign could not be created.");
+      }
 
-    await tx.insert(auditLogs).values({
-      action: "sale_campaign.created",
-      actorUserId: access.session.user.id,
-      entityId: campaign.id,
-      entityType: "sale_campaign",
-      metadata: JSON.stringify({
-        badgeText: parsed.data.badgeText,
-        discountPercent,
-        name: parsed.data.name,
-        variantIds,
-      }),
+      await tx.insert(saleCampaignVariants).values(
+        saleRows.map((row) => ({
+          campaignId: campaign.id,
+          createdAt: now,
+          originalCompareAtPrice: row.originalCompareAtPrice,
+          originalPrice: row.originalPrice,
+          salePrice: row.salePrice,
+          updatedAt: now,
+          variantId: row.variantId,
+        })),
+      );
+
+      for (const row of saleRows) {
+        await tx
+          .update(productVariants)
+          .set({
+            compareAtPrice: row.originalPrice,
+            price: row.salePrice,
+          })
+          .where(eq(productVariants.id, row.variantId));
+      }
+
+      for (const productId of new Set(saleRows.map((row) => row.productId))) {
+        await tx
+          .update(products)
+          .set({ updatedAt: now })
+          .where(eq(products.id, productId));
+      }
+
+      await tx.insert(auditLogs).values({
+        action: "sale_campaign.created",
+        actorUserId: access.session.user.id,
+        entityId: campaign.id,
+        entityType: "sale_campaign",
+        metadata: JSON.stringify({
+          badgeText: parsed.data.badgeText,
+          discountPercent,
+          name: parsed.data.name,
+          variantIds,
+        }),
+      });
     });
-  });
+  } catch (error: unknown) {
+    console.error("Failed to create sale campaign:", error);
+
+    return {
+      ok: false,
+      message: getFriendlySalesErrorMessage("create", error),
+    };
+  }
 
   revalidateSalePaths(saleRows.map((row) => row.productSlug));
 
@@ -544,8 +595,16 @@ export async function endSaleCampaign(input: unknown): Promise<SaleActionResult>
     };
   }
 
-  const saleRows = await getActiveSaleRows();
-  const campaignRows = saleRows.filter(
+  const activeSaleResult = await getActiveSaleRows();
+
+  if (!activeSaleResult.ok) {
+    return {
+      ok: false,
+      message: activeSaleResult.message,
+    };
+  }
+
+  const campaignRows = activeSaleResult.rows.filter(
     (row) => row.campaignId === parsed.data.campaignId,
   );
 
@@ -558,16 +617,17 @@ export async function endSaleCampaign(input: unknown): Promise<SaleActionResult>
 
   const now = new Date();
 
-  await db.transaction(async (tx) => {
-    for (const row of campaignRows) {
-      await tx
-        .update(productVariants)
-        .set({
-          compareAtPrice: row.originalCompareAtPrice,
-          price: row.originalPrice,
-        })
-        .where(eq(productVariants.id, row.variantId));
-    }
+  try {
+    await db.transaction(async (tx) => {
+      for (const row of campaignRows) {
+        await tx
+          .update(productVariants)
+          .set({
+            compareAtPrice: row.originalCompareAtPrice,
+            price: row.originalPrice,
+          })
+          .where(eq(productVariants.id, row.variantId));
+      }
 
     await tx
       .update(saleCampaignVariants)
@@ -604,16 +664,24 @@ export async function endSaleCampaign(input: unknown): Promise<SaleActionResult>
         .where(eq(products.id, productId));
     }
 
-    await tx.insert(auditLogs).values({
-      action: "sale_campaign.ended",
-      actorUserId: access.session.user.id,
-      entityId: parsed.data.campaignId,
-      entityType: "sale_campaign",
-      metadata: JSON.stringify({
-        variantIds: campaignRows.map((row) => row.variantId),
-      }),
+      await tx.insert(auditLogs).values({
+        action: "sale_campaign.ended",
+        actorUserId: access.session.user.id,
+        entityId: parsed.data.campaignId,
+        entityType: "sale_campaign",
+        metadata: JSON.stringify({
+          variantIds: campaignRows.map((row) => row.variantId),
+        }),
+      });
     });
-  });
+  } catch (error: unknown) {
+    console.error("Failed to end sale campaign:", error);
+
+    return {
+      ok: false,
+      message: getFriendlySalesErrorMessage("end", error),
+    };
+  }
 
   revalidateSalePaths(campaignRows.map((row) => row.productSlug));
 
@@ -642,21 +710,31 @@ export async function deleteSaleCampaign(input: unknown): Promise<SaleActionResu
     };
   }
 
-  const activeRows = (await getActiveSaleRows()).filter(
+  const activeSaleResult = await getActiveSaleRows();
+
+  if (!activeSaleResult.ok) {
+    return {
+      ok: false,
+      message: activeSaleResult.message,
+    };
+  }
+
+  const activeRows = activeSaleResult.rows.filter(
     (row) => row.campaignId === parsed.data.campaignId,
   );
   const now = new Date();
 
-  await db.transaction(async (tx) => {
-    for (const row of activeRows) {
-      await tx
-        .update(productVariants)
-        .set({
-          compareAtPrice: row.originalCompareAtPrice,
-          price: row.originalPrice,
-        })
-        .where(eq(productVariants.id, row.variantId));
-    }
+  try {
+    await db.transaction(async (tx) => {
+      for (const row of activeRows) {
+        await tx
+          .update(productVariants)
+          .set({
+            compareAtPrice: row.originalCompareAtPrice,
+            price: row.originalPrice,
+          })
+          .where(eq(productVariants.id, row.variantId));
+      }
 
     if (activeRows.length > 0) {
       const affectedProductRows = await tx
@@ -672,20 +750,33 @@ export async function deleteSaleCampaign(input: unknown): Promise<SaleActionResu
       }
     }
 
-    await tx
-      .delete(saleCampaigns)
-      .where(eq(saleCampaigns.id, parsed.data.campaignId));
+      const [deletedCampaign] = await tx
+        .delete(saleCampaigns)
+        .where(eq(saleCampaigns.id, parsed.data.campaignId))
+        .returning({ id: saleCampaigns.id });
 
-    await tx.insert(auditLogs).values({
-      action: "sale_campaign.deleted",
-      actorUserId: access.session.user.id,
-      entityId: parsed.data.campaignId,
-      entityType: "sale_campaign",
-      metadata: JSON.stringify({
-        restoredActiveVariants: activeRows.map((row) => row.variantId),
-      }),
+      if (!deletedCampaign) {
+        throw new Error("Sale campaign was not found");
+      }
+
+      await tx.insert(auditLogs).values({
+        action: "sale_campaign.deleted",
+        actorUserId: access.session.user.id,
+        entityId: parsed.data.campaignId,
+        entityType: "sale_campaign",
+        metadata: JSON.stringify({
+          restoredActiveVariants: activeRows.map((row) => row.variantId),
+        }),
+      });
     });
-  });
+  } catch (error: unknown) {
+    console.error("Failed to delete sale campaign:", error);
+
+    return {
+      ok: false,
+      message: getFriendlySalesErrorMessage("delete", error),
+    };
+  }
 
   revalidateSalePaths(activeRows.map((row) => row.productSlug));
 

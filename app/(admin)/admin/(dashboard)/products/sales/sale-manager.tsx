@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import {
+  AlertTriangleIcon,
   BadgePercentIcon,
   Loader2Icon,
   RotateCcwIcon,
@@ -206,6 +207,10 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
   }
 
   function createSale() {
+    if (!data.salesAvailable) {
+      return;
+    }
+
     startTransition(async () => {
       const response = await createSaleCampaignAction({
         badgeText,
@@ -253,6 +258,19 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
   return (
     <div className="grid gap-4">
       <StatusMessage result={result} />
+
+      {!data.salesAvailable ? (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <AlertTriangleIcon className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold">Sales management is unavailable</p>
+            <p className="mt-1 text-sm">
+              {data.salesUnavailableMessage ??
+                "The sales campaign storage could not be loaded."}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <section className={cn(dashboardPanelClass, "grid gap-4 p-4")}>
         <div className="flex items-start gap-3">
@@ -371,6 +389,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
             className="border-[#ff5a1f] bg-[#ff5a1f] text-white hover:bg-[#e84d18]"
             disabled={
               isPending ||
+              !data.salesAvailable ||
               selectedVariantIds.length === 0 ||
               !name.trim() ||
               !badgeText.trim() ||
@@ -407,7 +426,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
                 key={campaign.id}
                 onDelete={deleteSale}
                 onEnd={endSale}
-                pending={isPending}
+                pending={isPending || !data.salesAvailable}
               />
             ))}
           </div>

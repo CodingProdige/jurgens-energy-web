@@ -35,6 +35,7 @@ import {
   getMarketplaceVariantStockStatus,
   type MarketplaceStockStatus,
 } from "@/src/modules/marketplace/stock-status";
+import { isMissingSalesSchemaError } from "@/src/modules/sales/database-errors";
 import { filterPopulatedShopMenuCategories } from "@/src/modules/marketplace/shop-menu-categories";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import {
@@ -264,28 +265,42 @@ async function getActiveSaleBadgeTextByProductId(productIds: string[]) {
     return new Map<string, string>();
   }
 
-  const rows = await db
-    .select({
-      badgeText: saleCampaigns.badgeText,
-      productId: productVariants.productId,
-    })
-    .from(saleCampaignVariants)
-    .innerJoin(
-      saleCampaigns,
-      eq(saleCampaigns.id, saleCampaignVariants.campaignId),
-    )
-    .innerJoin(
-      productVariants,
-      eq(productVariants.id, saleCampaignVariants.variantId),
-    )
-    .where(
-      and(
-        inArray(productVariants.productId, uniqueProductIds),
-        eq(saleCampaigns.status, "active"),
-        eq(saleCampaignVariants.status, "active"),
-      ),
-    )
-    .orderBy(desc(saleCampaigns.createdAt));
+  let rows: Array<{ badgeText: string; productId: string }>;
+
+  try {
+    rows = await db
+      .select({
+        badgeText: saleCampaigns.badgeText,
+        productId: productVariants.productId,
+      })
+      .from(saleCampaignVariants)
+      .innerJoin(
+        saleCampaigns,
+        eq(saleCampaigns.id, saleCampaignVariants.campaignId),
+      )
+      .innerJoin(
+        productVariants,
+        eq(productVariants.id, saleCampaignVariants.variantId),
+      )
+      .where(
+        and(
+          inArray(productVariants.productId, uniqueProductIds),
+          eq(saleCampaigns.status, "active"),
+          eq(saleCampaignVariants.status, "active"),
+        ),
+      )
+      .orderBy(desc(saleCampaigns.createdAt));
+  } catch (error: unknown) {
+    if (isMissingSalesSchemaError(error)) {
+      console.warn(
+        "Sales campaign tables are unavailable; using standard sale badges.",
+      );
+
+      return new Map<string, string>();
+    }
+
+    throw error;
+  }
 
   const badgeTextByProductId = new Map<string, string>();
 
