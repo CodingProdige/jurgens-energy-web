@@ -15,6 +15,14 @@ export type CourierGuyBookingQuoteSafety = {
     | null;
 };
 
+export type CourierGuyOrderBookingSafetyReason = {
+  packageIndex: number | null;
+  reason:
+    | "approved_quote_exceeded"
+    | "booking_cost_limit_exceeded"
+    | "absorbed_cost_limit_exceeded";
+};
+
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalize);
@@ -149,6 +157,82 @@ export function evaluateCourierGuyBookingQuoteSafety({
     projectedAbsorbedAmountCents: projection.projectedAbsorbedAmountCents,
     projectedProviderSpendCents: projection.projectedProviderSpendCents,
     reason: null,
+  };
+}
+
+export function evaluateCourierGuyOrderBookingSafety({
+  approvedPackageAmounts,
+  customerShippingAmount,
+  freshPackageAmounts,
+  maxAbsorbedAmount,
+  maxBookingCostAmount,
+  otherProviderCosts,
+}: {
+  approvedPackageAmounts: number[];
+  customerShippingAmount: number;
+  freshPackageAmounts: number[];
+  maxAbsorbedAmount: number | null;
+  maxBookingCostAmount: number | null;
+  otherProviderCosts: number;
+}) {
+  if (
+    approvedPackageAmounts.length === 0 ||
+    approvedPackageAmounts.length !== freshPackageAmounts.length
+  ) {
+    throw new Error(
+      "The approved and fresh Courier Guy package quote sets must match.",
+    );
+  }
+
+  const approvedPackageAmountCents = approvedPackageAmounts.map(moneyToCents);
+  const freshPackageAmountCents = freshPackageAmounts.map(moneyToCents);
+  const reasons: CourierGuyOrderBookingSafetyReason[] = [];
+
+  freshPackageAmountCents.forEach((freshAmountCents, packageIndex) => {
+    if (freshAmountCents > approvedPackageAmountCents[packageIndex]!) {
+      reasons.push({ packageIndex, reason: "approved_quote_exceeded" });
+      return;
+    }
+
+    if (
+      maxBookingCostAmount !== null &&
+      freshAmountCents > moneyToCents(maxBookingCostAmount)
+    ) {
+      reasons.push({ packageIndex, reason: "booking_cost_limit_exceeded" });
+    }
+  });
+
+  const freshPackageTotalCents = freshPackageAmountCents.reduce(
+    (total, value) => total + value,
+    0,
+  );
+
+  if (!Number.isSafeInteger(freshPackageTotalCents)) {
+    throw new Error("The Courier Guy package total is too large.");
+  }
+
+  const projection = calculateCourierGuyOrderCostProjection({
+    customerShippingAmount,
+    otherProviderCosts,
+    selectedProviderAmount: centsToMoney(freshPackageTotalCents),
+  });
+
+  if (
+    maxAbsorbedAmount !== null &&
+    projection.projectedAbsorbedAmountCents > moneyToCents(maxAbsorbedAmount)
+  ) {
+    reasons.push({
+      packageIndex: null,
+      reason: "absorbed_cost_limit_exceeded",
+    });
+  }
+
+  return {
+    allowed: reasons.length === 0,
+    approvedPackageAmountCents,
+    freshPackageAmountCents,
+    projection,
+    reasons,
   };
 }
 

@@ -28,6 +28,10 @@ import type {
 } from "@/src/modules/marketplace/account/data";
 import { ProductReviewForm } from "@/src/modules/marketplace/account/product-review-form";
 import { RetryPaymentButton } from "@/src/modules/marketplace/account/retry-payment-button";
+import {
+  getCustomerCourierGuyPackageCount,
+  getCustomerCourierGuyPackageNumber,
+} from "@/src/modules/marketplace/account/shipment-tracking";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-ZA", {
   dateStyle: "medium",
@@ -296,17 +300,33 @@ function DetailPanel({
 }
 
 function ShipmentTimeline({
+  packageCount,
+  packageNumber,
   shipment,
 }: {
+  packageCount: number | null;
+  packageNumber: number | null;
   shipment: CustomerOrderDetail["shipments"][number];
 }) {
   return (
-    <div className="grid gap-4">
+    <article className="grid min-w-0 gap-4 rounded-md border border-[#deded7] p-4 dark:border-white/10">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-black capitalize">
-            {humanizeStatus(shipment.status)}
-          </p>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-black">
+              {packageNumber !== null && packageCount !== null
+                ? `Package ${packageNumber} of ${packageCount}`
+                : `${humanizeStatus(shipment.provider)} delivery`}
+            </p>
+            <Badge
+              className={cn(
+                "h-6 rounded-full border-0 px-2.5 text-[11px] font-bold capitalize",
+                statusBadgeClass(shipment.status),
+              )}
+            >
+              {humanizeStatus(shipment.status)}
+            </Badge>
+          </div>
           <p className="mt-1 text-xs text-[#777770] dark:text-[#aaa9a1]">
             {shipment.trackingNumber
               ? `Tracking ${shipment.trackingNumber}`
@@ -327,6 +347,29 @@ function ShipmentTimeline({
           </a>
         ) : null}
       </div>
+
+      {shipment.contents.length > 0 ? (
+        <div className="rounded-md bg-[#f7f7f2] px-3 py-3 dark:bg-white/[0.05]">
+          <p className="text-[11px] font-black uppercase tracking-wide text-[#777770] dark:text-[#aaa9a1]">
+            Inside this package
+          </p>
+          <ul className="mt-2 grid gap-1.5">
+            {shipment.contents.map((item) => (
+              <li
+                className="flex min-w-0 items-start justify-between gap-3 text-xs"
+                key={item.orderItemId}
+              >
+                <span className="min-w-0 break-words text-[#555550] dark:text-[#d4d4cd]">
+                  {item.title}
+                </span>
+                <span className="shrink-0 font-black tabular-nums">
+                  Qty {item.quantity}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {shipment.events.length > 0 ? (
         <ol className="grid gap-0">
@@ -372,13 +415,16 @@ function ShipmentTimeline({
           starts moving your order.
         </p>
       )}
-    </div>
+    </article>
   );
 }
 
 export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
   const latestPayment = order.payments[0] ?? null;
   const address = order.deliveryAddress;
+  const courierGuyPackageCount = getCustomerCourierGuyPackageCount(
+    order.shipments,
+  );
 
   return (
     <div className="grid min-w-0 gap-5">
@@ -510,7 +556,12 @@ export function OrderDetailView({ order }: { order: CustomerOrderDetail }) {
 
               {order.shipments.length > 0 ? (
                 order.shipments.map((shipment) => (
-                  <ShipmentTimeline key={shipment.id} shipment={shipment} />
+                  <ShipmentTimeline
+                    key={shipment.id}
+                    packageCount={courierGuyPackageCount}
+                    packageNumber={getCustomerCourierGuyPackageNumber(shipment)}
+                    shipment={shipment}
+                  />
                 ))
               ) : order.schedules.length === 0 ? (
                 <div className="flex items-start gap-3 rounded-md bg-[#f7f7f2] p-4 dark:bg-white/[0.05]">

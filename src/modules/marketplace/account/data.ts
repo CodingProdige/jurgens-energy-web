@@ -17,9 +17,15 @@ import {
   productVariants,
   reviews,
   shipmentEvents,
+  shipmentParcelItems,
+  shipmentParcels,
   shipments,
   users,
 } from "@/src/db/schema";
+import {
+  groupCustomerShipmentPackageContents,
+  type CustomerShipmentPackageContent,
+} from "@/src/modules/marketplace/account/shipment-tracking";
 
 const orderIdSchema = z.string().uuid();
 const activeShipmentStatuses = [
@@ -118,6 +124,7 @@ export type CustomerOrderDetail = {
     windowLabel: string | null;
   }>;
   shipments: Array<{
+    contents: CustomerShipmentPackageContent[];
     deliveredAt: Date | null;
     events: Array<{
       id: string;
@@ -127,6 +134,7 @@ export type CustomerOrderDetail = {
       status: string;
     }>;
     id: string;
+    packageSequence: number | null;
     provider: string;
     status: string;
     trackingNumber: string | null;
@@ -412,6 +420,7 @@ export const getCustomerOrderDetail = cache(
           .select({
             deliveredAt: shipments.deliveredAt,
             id: shipments.id,
+            packageSequence: shipments.packageSequence,
             provider: shipments.provider,
             status: shipments.status,
             trackingNumber: shipments.trackingNumber,
@@ -420,7 +429,11 @@ export const getCustomerOrderDetail = cache(
           })
           .from(shipments)
           .where(eq(shipments.orderId, order.id))
-          .orderBy(desc(shipments.createdAt)),
+          .orderBy(
+            asc(shipments.packageSequence),
+            asc(shipments.createdAt),
+            asc(shipments.id),
+          ),
         db
           .select({
             deliveryInstructions:
@@ -435,9 +448,9 @@ export const getCustomerOrderDetail = cache(
       ]);
 
     const shipmentIds = shipmentRows.map((shipment) => shipment.id);
-    const eventRows =
+    const [eventRows, packageContentRows, reviewRows] = await Promise.all([
       shipmentIds.length > 0
-        ? await db
+        ? db
             .select({
               id: shipmentEvents.id,
               location: shipmentEvents.location,
@@ -449,26 +462,55 @@ export const getCustomerOrderDetail = cache(
             .from(shipmentEvents)
             .where(inArray(shipmentEvents.shipmentId, shipmentIds))
             .orderBy(asc(shipmentEvents.occurredAt))
-      : [];
-    const reviewRows = await db
-      .select({
-        body: reviews.body,
-        createdAt: reviews.createdAt,
-        id: reviews.id,
-        orderItemId: reviews.orderItemId,
-        rating: reviews.rating,
-        rejectedReason: reviews.rejectedReason,
-        status: reviews.status,
-        title: reviews.title,
-        updatedAt: reviews.updatedAt,
-      })
-      .from(reviews)
-      .where(
-        and(
-          eq(reviews.orderId, order.id),
-          eq(reviews.userId, account.id),
+        : Promise.resolve([]),
+      shipmentIds.length > 0
+        ? db
+            .select({
+              orderItemId: shipmentParcelItems.orderItemId,
+              quantity: shipmentParcelItems.quantity,
+              shipmentId: shipmentParcels.shipmentId,
+              title: orderItems.title,
+            })
+            .from(shipmentParcelItems)
+            .innerJoin(
+              shipmentParcels,
+              eq(shipmentParcels.id, shipmentParcelItems.parcelId),
+            )
+            .innerJoin(
+              orderItems,
+              eq(orderItems.id, shipmentParcelItems.orderItemId),
+            )
+            .where(
+              and(
+                inArray(shipmentParcels.shipmentId, shipmentIds),
+                eq(orderItems.orderId, order.id),
+              ),
+            )
+            .orderBy(
+              asc(shipmentParcelItems.createdAt),
+              asc(shipmentParcelItems.id),
+            )
+        : Promise.resolve([]),
+      db
+        .select({
+          body: reviews.body,
+          createdAt: reviews.createdAt,
+          id: reviews.id,
+          orderItemId: reviews.orderItemId,
+          rating: reviews.rating,
+          rejectedReason: reviews.rejectedReason,
+          status: reviews.status,
+          title: reviews.title,
+          updatedAt: reviews.updatedAt,
+        })
+        .from(reviews)
+        .where(
+          and(
+            eq(reviews.orderId, order.id),
+            eq(reviews.userId, account.id),
+          ),
         ),
-      );
+    ]);
     const reviewsByOrderItemId = new Map(
       reviewRows
         .filter((review) => review.orderItemId)
@@ -481,6 +523,9 @@ export const getCustomerOrderDetail = cache(
       string,
       CustomerOrderDetail["shipments"][number]["events"]
     >();
+    const contentsByShipmentId = groupCustomerShipmentPackageContents(
+      packageContentRows,
+    );
 
     for (const event of eventRows) {
       const current = eventsByShipmentId.get(event.shipmentId) ?? [];
@@ -545,6 +590,7 @@ export const getCustomerOrderDetail = cache(
       schedules: scheduleRows,
       shipments: shipmentRows.map((shipment) => ({
         ...shipment,
+        contents: contentsByShipmentId.get(shipment.id) ?? [],
         events: eventsByShipmentId.get(shipment.id) ?? [],
         trackingUrl: safeTrackingUrl(shipment.trackingUrl),
       })),

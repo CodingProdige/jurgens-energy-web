@@ -347,8 +347,11 @@ export default async function AdminShippingPage() {
                           {shipment.providerCostAmount
                             ? formatMoney(shipment.providerCostAmount)
                             : shipment.provider === "courier_guy" &&
+                                shipment.packingPlanRevision === null
+                              ? "Manual packing required"
+                            : shipment.provider === "courier_guy" &&
                                 shipment.parcelCount === 0
-                              ? "Parcel details missing"
+                              ? "Packing plan needs review"
                               : shipment.provider === "courier_guy" &&
                                   shipment.parcelCount > 1
                                 ? "Parcel setup needs review"
@@ -374,9 +377,8 @@ export default async function AdminShippingPage() {
                       canManageShipments ? (
                         <CourierGuyShipmentActions
                           bookingReference={shipment.bookingReference}
-                          orderNumber={shipment.orderNumber}
-                          packedParcel={shipment.packedParcel}
-                          parcelCount={shipment.parcelCount}
+                          orderId={shipment.orderId}
+                          packingPlanRevision={shipment.packingPlanRevision}
                           shipmentId={shipment.id}
                           status={shipment.status}
                           trackingNumber={shipment.trackingNumber}

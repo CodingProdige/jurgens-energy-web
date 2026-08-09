@@ -5,6 +5,7 @@ import { and, eq, gt, inArray, ne, or } from "drizzle-orm";
 import { db } from "@/src/db";
 import {
   orders,
+  paymentRefunds,
   shipmentEvents,
   shipments,
   shippingRateQuotes,
@@ -33,6 +34,7 @@ import {
   matchesCourierGuyBookingReference,
 } from "@/src/modules/shipping/courier-guy-operations";
 import { sendCourierGuyShipmentStatusNotification } from "@/src/modules/shipping/courier-guy-notifications";
+import { synchronizeCourierGuyBookingBatchAfterReconciliation } from "@/src/modules/shipping/courier-guy-order-booking-state";
 import {
   createCourierGuyTrackingEventId,
   resolveCourierGuyMilestones,
@@ -50,6 +52,11 @@ const courierGuyCostReservationStatuses = [
   "collected",
   "in_transit",
   "out_for_delivery",
+  "delivered",
+  "failed_delivery",
+  "returned",
+  "undeliverable",
+  "cancelled",
 ] as const;
 
 export async function bookCourierGuyShipment(
@@ -93,12 +100,21 @@ export async function bookCourierGuyShipment(
     shipmentId,
     expectedQuoteId,
   );
+
+  if (prepared.context.packingPlan.status !== "booking") {
+    throw new Error(
+      "Confirm the complete order-level quote before booking Courier Guy packages.",
+    );
+  }
+
   const approvedProviderAmount = Number(prepared.quote.providerAmount);
   const claimed = await db.transaction(async (tx) => {
     const [lockedOrder] = await tx
       .select({
+        currency: orders.currency,
         id: orders.id,
         shippingTotal: orders.shippingTotal,
+        status: orders.status,
       })
       .from(orders)
       .where(eq(orders.id, prepared.context.record.orderId))
@@ -107,6 +123,24 @@ export async function bookCourierGuyShipment(
 
     if (!lockedOrder) {
       throw new Error("The order could not be found before booking.");
+    }
+
+    const [refund] = await tx
+      .select({ id: paymentRefunds.id })
+      .from(paymentRefunds)
+      .where(eq(paymentRefunds.orderId, lockedOrder.id))
+      .limit(1);
+
+    if (
+      lockedOrder.status !== "paid" ||
+      lockedOrder.currency !== "ZAR" ||
+      refund
+    ) {
+      throw new Error(
+        refund
+          ? "This order has a refund record and cannot be booked with Courier Guy."
+          : "Only paid ZAR orders can be booked with Courier Guy.",
+      );
     }
 
     const otherShipments = await tx
@@ -536,11 +570,34 @@ export async function reconcileCourierGuyBooking({
 }) {
   const record = await getCourierGuyShipmentRecord(shipmentId);
 
-  if (
-    !record ||
-    record.provider !== "courier_guy" ||
-    record.status !== "booking"
-  ) {
+  if (!record || record.provider !== "courier_guy") {
+    throw new Error(
+      "Only Courier Guy shipments awaiting booking reconciliation can be adopted.",
+    );
+  }
+
+  const requestedTrackingReference = enteredTrackingReference.trim();
+
+  if (record.status !== "booking") {
+    if (
+      record.providerShipmentId &&
+      record.trackingNumber &&
+      record.trackingNumber === requestedTrackingReference
+    ) {
+      await synchronizeCourierGuyBookingBatchAfterReconciliation(shipmentId);
+
+      return {
+        bookingReference: createCourierGuyBookingReference(
+          record.orderNumber,
+          shipmentId,
+        ),
+        providerShipmentId: record.providerShipmentId,
+        status: record.status,
+        trackingReference: record.trackingNumber,
+        waybillUrl: record.waybillUrl,
+      };
+    }
+
     throw new Error(
       "Only Courier Guy shipments awaiting booking reconciliation can be adopted.",
     );
@@ -563,7 +620,7 @@ export async function reconcileCourierGuyBooking({
     );
   }
 
-  const trackingReference = enteredTrackingReference.trim();
+  const trackingReference = requestedTrackingReference;
   const client = createCourierGuyClient({
     apiBaseUrl: config.apiBaseUrl,
     apiKey: config.apiKey,
@@ -790,6 +847,7 @@ export async function reconcileCourierGuyBooking({
     orderId: record.orderId,
     shipmentId,
   });
+  await synchronizeCourierGuyBookingBatchAfterReconciliation(shipmentId);
 
   return {
     bookingReference: expectedBookingReference,
@@ -954,6 +1012,7 @@ export async function refreshCourierGuyShipment(shipmentId: string) {
     orderId: record.orderId,
     shipmentId,
   });
+  await synchronizeCourierGuyBookingBatchAfterReconciliation(shipmentId);
 
   return {
     eventCount,

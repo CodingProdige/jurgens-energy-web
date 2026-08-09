@@ -5,7 +5,10 @@ import { z } from "zod";
 
 import { db } from "@/src/db";
 import {
+  courierGuyPackingPlans,
+  orderItems,
   orders,
+  shipmentParcelItems,
   shipmentParcels,
   shipments,
   shippingRateQuotes,
@@ -26,7 +29,10 @@ import {
 } from "@/src/modules/shipping/courier-guy-booking-quote-rules";
 import { getCourierGuyIntegrationConfig } from "@/src/modules/marketplace/settings";
 
-const BOOKING_QUOTE_LIFETIME_MS = 10 * 60 * 1000;
+// Large manual orders can contain many physical packages. Confirmation always
+// re-fetches the exact service price, so this window only preserves enough time
+// to quote and review the whole set without weakening the final price guard.
+const BOOKING_QUOTE_LIFETIME_MS = 30 * 60 * 1000;
 const activeShipmentStatuses = [
   "pending_booking",
   "booking",
@@ -53,14 +59,6 @@ const bookingQuotePayloadSchema = z
     shipmentId: z.string().uuid(),
   })
   .passthrough();
-
-const shipmentParcelInputSchema = z.object({
-  heightMm: z.number().finite().positive().max(999_999_999),
-  lengthMm: z.number().finite().positive().max(999_999_999),
-  shipmentId: z.string().uuid(),
-  weightGrams: z.number().finite().positive().max(999_999_999),
-  widthMm: z.number().finite().positive().max(999_999_999),
-});
 
 export type CourierGuyBookingQuoteView = {
   allowed: boolean;
@@ -112,7 +110,16 @@ function buildFingerprintSnapshot(
     deliveryAddress: context.deliveryAddress,
     environment: context.config.mode,
     orderId: context.record.orderId,
+    packingPlanRevision: context.packingPlan.revision,
     parcel: {
+      assignedItems: [...context.assignedItems]
+        .sort((first, second) =>
+          first.orderItemId.localeCompare(second.orderItemId),
+        )
+        .map((item) => ({
+          orderItemId: item.orderItemId,
+          quantity: item.quantity,
+        })),
       heightMm: context.parcel.heightMm,
       id: context.parcel.id,
       lengthMm: context.parcel.lengthMm,
@@ -137,6 +144,8 @@ async function getCourierGuyBookingContext(shipmentId: string) {
       id: shipments.id,
       orderId: orders.id,
       orderNumber: orders.orderNumber,
+      packageSequence: shipments.packageSequence,
+      packingPlanRevision: shipments.packingPlanRevision,
       provider: shipments.provider,
       sellerId: shipments.sellerId,
       shippingTotal: orders.shippingTotal,
@@ -160,11 +169,17 @@ async function getCourierGuyBookingContext(shipmentId: string) {
     throw new Error("Only pending Courier Guy shipments can be quoted.");
   }
 
-  const [parcels, config, dispatchContact] = await Promise.all([
+  const [parcels, packingPlan, config, dispatchContact] = await Promise.all([
     db
       .select()
       .from(shipmentParcels)
       .where(eq(shipmentParcels.shipmentId, shipmentId)),
+    db
+      .select()
+      .from(courierGuyPackingPlans)
+      .where(eq(courierGuyPackingPlans.orderId, record.orderId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
     getCourierGuyIntegrationConfig(),
     getBusinessDispatchContact(),
   ]);
@@ -179,6 +194,17 @@ async function getCourierGuyBookingContext(shipmentId: string) {
     );
   }
 
+  if (
+    !packingPlan ||
+    record.packingPlanRevision === null ||
+    record.packingPlanRevision !== packingPlan.revision ||
+    !["confirmed", "booking"].includes(packingPlan.status)
+  ) {
+    throw new Error(
+      "Confirm the complete manual packing plan before requesting Courier Guy quotes.",
+    );
+  }
+
   if (parcels.length !== 1) {
     throw new Error(
       `Exactly one packed parcel is required before quoting; this shipment currently has ${parcels.length}.`,
@@ -190,10 +216,44 @@ async function getCourierGuyBookingContext(shipmentId: string) {
   }
 
   const parcel = parcels[0]!;
+  const assignedItems = await db
+    .select({
+      orderId: orderItems.orderId,
+      orderItemId: orderItems.id,
+      quantity: shipmentParcelItems.quantity,
+      sku: orderItems.skuSnapshot,
+      title: orderItems.title,
+    })
+    .from(shipmentParcelItems)
+    .innerJoin(orderItems, eq(orderItems.id, shipmentParcelItems.orderItemId))
+    .where(eq(shipmentParcelItems.parcelId, parcel.id));
+
+  if (
+    assignedItems.length === 0 ||
+    assignedItems.some((item) => item.orderId !== record.orderId)
+  ) {
+    throw new Error(
+      "This package does not have a valid manual order-item allocation.",
+    );
+  }
+
+  const itemCount = assignedItems.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
+  const manifest = assignedItems
+    .map((item) => `${item.sku?.trim() || item.title} x${item.quantity}`)
+    .join(", ");
+  const packageLabel = record.packageSequence
+    ? `package ${record.packageSequence}`
+    : "package";
   const courierParcel = {
-    description: `Order ${record.orderNumber}`,
+    description: `Order ${record.orderNumber} ${packageLabel}: ${manifest}`.slice(
+      0,
+      255,
+    ),
     heightMm: Number(parcel.heightMm),
-    itemCount: 1,
+    itemCount,
     lengthMm: Number(parcel.lengthMm),
     weightGrams: Number(parcel.weightGrams),
     widthMm: Number(parcel.widthMm),
@@ -234,6 +294,7 @@ async function getCourierGuyBookingContext(shipmentId: string) {
       apiBaseUrl: config.apiBaseUrl,
       apiKey: config.apiKey,
     }),
+    assignedItems,
     collectionContact,
     collectionOrigin,
     config,
@@ -241,6 +302,7 @@ async function getCourierGuyBookingContext(shipmentId: string) {
     deliveryAddress,
     deliveryContact,
     parcel,
+    packingPlan,
     record,
   };
 }
@@ -698,110 +760,6 @@ export async function expireCourierGuyBookingQuote(
             : sql`${shipments.bookingQuoteId} IS NULL`,
         ),
       );
-  });
-}
-
-export async function saveCourierGuyShipmentParcel({
-  heightMm,
-  lengthMm,
-  shipmentId,
-  weightGrams,
-  widthMm,
-}: {
-  heightMm: number;
-  lengthMm: number;
-  shipmentId: string;
-  weightGrams: number;
-  widthMm: number;
-}) {
-  const parsed = shipmentParcelInputSchema.safeParse({
-    heightMm,
-    lengthMm,
-    shipmentId,
-    weightGrams,
-    widthMm,
-  });
-
-  if (!parsed.success) {
-    throw new Error(
-      parsed.error.issues[0]?.message ?? "Check the packed parcel details.",
-    );
-  }
-
-  return db.transaction(async (tx) => {
-    const [shipment] = await tx
-      .select({
-        bookingQuoteId: shipments.bookingQuoteId,
-        provider: shipments.provider,
-        status: shipments.status,
-      })
-      .from(shipments)
-      .where(eq(shipments.id, parsed.data.shipmentId))
-      .limit(1)
-      .for("update");
-
-    if (!shipment || shipment.provider !== "courier_guy") {
-      throw new Error("Courier Guy shipment could not be found.");
-    }
-
-    if (shipment.status !== "pending_booking") {
-      throw new Error("Parcel details can only be changed before booking.");
-    }
-
-    const parcels = await tx
-      .select({ id: shipmentParcels.id })
-      .from(shipmentParcels)
-      .where(eq(shipmentParcels.shipmentId, parsed.data.shipmentId));
-
-    if (parcels.length > 1) {
-      throw new Error(
-        "This drop-off shipment has multiple parcels and needs manual review before it can be edited.",
-      );
-    }
-
-    const values = {
-      heightMm: parsed.data.heightMm,
-      lengthMm: parsed.data.lengthMm,
-      weightGrams: parsed.data.weightGrams,
-      widthMm: parsed.data.widthMm,
-    };
-
-    if (parcels[0]) {
-      await tx
-        .update(shipmentParcels)
-        .set(values)
-        .where(eq(shipmentParcels.id, parcels[0].id));
-    } else {
-      await tx.insert(shipmentParcels).values({
-        ...values,
-        reference: `ADMIN-${parsed.data.shipmentId.slice(0, 8)}`,
-        shipmentId: parsed.data.shipmentId,
-      });
-    }
-
-    if (shipment.bookingQuoteId) {
-      await tx
-        .update(shippingRateQuotes)
-        .set({ status: "expired" })
-        .where(
-          and(
-            eq(shippingRateQuotes.id, shipment.bookingQuoteId),
-            eq(shippingRateQuotes.status, "quoted"),
-          ),
-        );
-    }
-
-    await tx
-      .update(shipments)
-      .set({ bookingQuoteId: null, updatedAt: new Date() })
-      .where(
-        and(
-          eq(shipments.id, shipmentId),
-          eq(shipments.status, "pending_booking"),
-        ),
-      );
-
-    return { created: parcels.length === 0 };
   });
 }
 

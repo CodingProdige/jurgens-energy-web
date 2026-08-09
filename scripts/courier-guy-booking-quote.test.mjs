@@ -7,21 +7,22 @@ import {
   centsToMoney,
   createCourierGuyBookingQuoteFingerprint,
   evaluateCourierGuyBookingQuoteSafety,
+  evaluateCourierGuyOrderBookingSafety,
   findCourierGuyRateForStoredService,
   moneyToCents,
   selectCourierGuyRate,
 } from "../src/modules/shipping/courier-guy-booking-quote-rules.ts";
 
-const shippingActionSource = readFileSync(
+const packingActionSource = readFileSync(
   new URL(
-    "../app/(admin)/admin/(dashboard)/shipping/actions.ts",
+    "../app/(admin)/admin/(dashboard)/shipping/orders/[orderId]/actions.ts",
     import.meta.url,
   ),
   "utf8",
 );
-const shipmentActionsSource = readFileSync(
+const packingManagerSource = readFileSync(
   new URL(
-    "../app/(admin)/admin/(dashboard)/shipping/shipment-actions.tsx",
+    "../app/(admin)/admin/(dashboard)/shipping/orders/[orderId]/packing-manager.tsx",
     import.meta.url,
   ),
   "utf8",
@@ -36,6 +37,13 @@ const bookingQuoteServiceSource = readFileSync(
 const shipmentServiceSource = readFileSync(
   new URL(
     "../src/modules/shipping/courier-guy-shipments.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const orderBookingServiceSource = readFileSync(
+  new URL(
+    "../src/modules/shipping/courier-guy-order-booking.ts",
     import.meta.url,
   ),
   "utf8",
@@ -312,6 +320,49 @@ test("counts the customer delivery fee once across all order shipment costs", ()
   assert.equal(overLimit.reason, "absorbed_cost_limit_exceeded");
 });
 
+test("evaluates a complete multi-package order against one delivery fee", () => {
+  const safe = evaluateCourierGuyOrderBookingSafety({
+    approvedPackageAmounts: [80, 90],
+    customerShippingAmount: 150,
+    freshPackageAmounts: [80, 90],
+    maxAbsorbedAmount: 20,
+    maxBookingCostAmount: 100,
+    otherProviderCosts: 0,
+  });
+  const overAggregateLimit = evaluateCourierGuyOrderBookingSafety({
+    approvedPackageAmounts: [80, 90.01],
+    customerShippingAmount: 150,
+    freshPackageAmounts: [80, 90.01],
+    maxAbsorbedAmount: 20,
+    maxBookingCostAmount: 100,
+    otherProviderCosts: 0,
+  });
+
+  assert.equal(safe.allowed, true);
+  assert.equal(safe.projection.projectedProviderSpendCents, 17_000);
+  assert.equal(safe.projection.projectedAbsorbedAmountCents, 2_000);
+  assert.equal(overAggregateLimit.allowed, false);
+  assert.deepEqual(overAggregateLimit.reasons, [
+    { packageIndex: null, reason: "absorbed_cost_limit_exceeded" },
+  ]);
+});
+
+test("blocks one increased package before a multi-package booking starts", () => {
+  const result = evaluateCourierGuyOrderBookingSafety({
+    approvedPackageAmounts: [80, 90],
+    customerShippingAmount: 200,
+    freshPackageAmounts: [80, 90.01],
+    maxAbsorbedAmount: null,
+    maxBookingCostAmount: null,
+    otherProviderCosts: 0,
+  });
+
+  assert.equal(result.allowed, false);
+  assert.deepEqual(result.reasons, [
+    { packageIndex: 1, reason: "approved_quote_exceeded" },
+  ]);
+});
+
 test("preserves unused order-level delivery margin without reporting absorbed cost", () => {
   assert.deepEqual(
     calculateCourierGuyOrderCostProjection({
@@ -396,35 +447,75 @@ test("converts shipping money through integer cents safely", () => {
   assert.throws(() => centsToMoney(1.5), /whole number/);
 });
 
-test("books only the exact local quote displayed for confirmation", () => {
-  const confirmationAction = sourceBetween(
-    shippingActionSource,
-    "const bookingConfirmationSchema",
-    "const trackingReferenceSchema",
+test("books only the exact stored order quote batch reviewed by the admin", () => {
+  const bookingSchema = sourceBetween(
+    packingActionSource,
+    "const bookingActionSchema",
+    "async function requireShippingManageAccess",
+  );
+  const confirmationUi = sourceBetween(
+    packingManagerSource,
+    "function BookingResultPanel",
+    "function QuoteReview",
+  );
+  const storedBatchLookup = sourceBetween(
+    orderBookingServiceSource,
+    "async function loadBatchForConfirmation",
+    "export async function confirmCourierGuyOrderBooking",
+  );
+  const confirmationService = orderBookingServiceSource.slice(
+    orderBookingServiceSource.indexOf(
+      "export async function confirmCourierGuyOrderBooking",
+    ),
   );
 
-  assert.match(confirmationAction, /quoteId:\s*z\.string\(\)\.uuid\(\)/);
-  assert.match(confirmationAction, /shipmentId:\s*shipmentIdSchema/);
+  assert.match(bookingSchema, /batchId:\s*uuidSchema/);
+  assert.match(bookingSchema, /orderId:\s*uuidSchema/);
   assert.doesNotMatch(
-    confirmationAction,
-    /providerAmount|serviceCode|maxBookingCostAmount/,
+    bookingSchema,
+    /quoteId|shipmentId|providerAmount|serviceCode|maxBookingCostAmount/,
+  );
+
+  assert.match(
+    confirmationUi,
+    /<input name="batchId" type="hidden" value=\{quote\.batchId\} \/>/,
   );
   assert.match(
-    shipmentActionsSource,
-    /<input type="hidden" name="quoteId" value=\{quoteId\} \/>/,
+    confirmationUi,
+    /<input name="orderId" type="hidden" value=\{orderId\} \/>/,
   );
-  assert.match(shipmentActionsSource, /quoteId=\{quote\.quoteId\}/);
   assert.doesNotMatch(
-    shipmentActionsSource,
-    /name="(?:providerAmount|serviceCode|maxBookingCostAmount)"/,
+    confirmationUi,
+    /name="(?:quoteId|shipmentId|providerAmount|serviceCode|maxBookingCostAmount)"/,
+  );
+
+  assert.match(
+    packingActionSource,
+    /confirmCourierGuyOrderBooking\(\{\s*actorUserId:\s*session\.user\.id,\s*batchId:\s*parsed\.data\.batchId,\s*orderId:\s*parsed\.data\.orderId,?\s*\}\)/,
   );
   assert.match(
-    shippingActionSource,
-    /bookCourierGuyShipment\(shipmentId, quoteId\)/,
+    storedBatchLookup,
+    /eq\(courierGuyBookingBatches\.id, parsed\.data\.batchId\)/,
   );
   assert.match(
-    shipmentServiceSource,
-    /prepareCourierGuyQuotedBooking\(\s*shipmentId,\s*expectedQuoteId,?\s*\)/,
+    storedBatchLookup,
+    /eq\(courierGuyBookingBatches\.orderId, parsed\.data\.orderId\)/,
+  );
+  assert.match(
+    storedBatchLookup,
+    /quoteId:\s*courierGuyBookingBatchItems\.quoteId/,
+  );
+  assert.match(
+    storedBatchLookup,
+    /shipmentBookingQuoteId:\s*shipments\.bookingQuoteId/,
+  );
+  assert.match(
+    confirmationService,
+    /item\.shipmentBookingQuoteId !== item\.quoteId/,
+  );
+  assert.match(
+    confirmationService,
+    /prepareCourierGuyQuotedBooking\(\s*item\.shipmentId,\s*item\.quoteId,?\s*\)/,
   );
   assert.match(
     bookingQuoteServiceSource,

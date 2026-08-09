@@ -52,20 +52,21 @@ export function planOrderShipments(
       return;
     }
 
-    const plan =
-      item.deliveryMethod === "jurgens_local"
-        ? jurgensPlan
-        : (courierPlansBySeller.get(item.sellerId ?? "") ?? {
-            parcels: [],
-            provider: "courier_guy",
-            sellerId: item.sellerId,
-          });
+    if (item.deliveryMethod === "courier_guy") {
+      const sellerKey = item.sellerId ?? "";
 
-    if (item.deliveryMethod === "jurgens_local") {
-      hasJurgensItems = true;
-    } else {
-      courierPlansBySeller.set(item.sellerId ?? "", plan);
+      if (!courierPlansBySeller.has(sellerKey)) {
+        courierPlansBySeller.set(sellerKey, {
+          parcels: [],
+          provider: "courier_guy",
+          sellerId: item.sellerId,
+        });
+      }
+
+      return;
     }
+
+    hasJurgensItems = true;
 
     const hasMeasurements =
       item.heightMm !== null &&
@@ -79,7 +80,7 @@ export function planOrderShipments(
 
     if (hasMeasurements) {
       for (let unitIndex = 0; unitIndex < item.quantity; unitIndex += 1) {
-        plan.parcels.push({
+        jurgensPlan.parcels.push({
           declaredValue: roundMoney(item.unitPrice),
           heightMm: item.heightMm!,
           lengthMm: item.lengthMm!,
@@ -93,15 +94,7 @@ export function planOrderShipments(
 
   return [
     ...(hasJurgensItems ? [jurgensPlan] : []),
-    ...Array.from(courierPlansBySeller.values()).flatMap((plan) =>
-      plan.parcels.length > 0
-        ? plan.parcels.map((parcel) => ({
-            parcels: [parcel],
-            provider: "courier_guy" as const,
-            sellerId: plan.sellerId,
-          }))
-        : [plan],
-    ),
+    ...Array.from(courierPlansBySeller.values()),
   ];
 }
 

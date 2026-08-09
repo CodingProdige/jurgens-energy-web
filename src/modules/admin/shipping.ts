@@ -22,6 +22,7 @@ export type AdminShipmentRow = {
   id: string;
   orderId: string;
   orderNumber: string;
+  packingPlanRevision: number | null;
   parcelCount: number;
   packedParcel: {
     heightMm: number;
@@ -103,6 +104,7 @@ export async function getAdminShippingData(): Promise<AdminShippingData> {
         id: shipments.id,
         orderId: shipments.orderId,
         orderNumber: orders.orderNumber,
+        packingPlanRevision: shipments.packingPlanRevision,
         provider: shipments.provider,
         providerAccountCode: shipments.providerAccountCode,
         providerCostAmount: shipments.providerCostAmount,

@@ -16,8 +16,9 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { orders } from "@/src/db/schema/orders";
+import { orderItems, orders } from "@/src/db/schema/orders";
 import { sellers } from "@/src/db/schema/sellers";
+import { users } from "@/src/db/schema/users";
 
 export const shippingProvider = pgEnum("shipping_provider", [
   "manual",
@@ -51,6 +52,37 @@ export const shipmentStatus = pgEnum("shipment_status", [
   "cancelled",
 ]);
 
+export const courierGuyPackingPlanStatus = pgEnum(
+  "courier_guy_packing_plan_status",
+  ["draft", "confirmed", "booking", "reconciliation_required", "booked"],
+);
+
+export const courierGuyBookingBatchStatus = pgEnum(
+  "courier_guy_booking_batch_status",
+  [
+    "quoted",
+    "booking",
+    "partially_booked",
+    "needs_reconciliation",
+    "booked",
+    "expired",
+    "failed",
+  ],
+);
+
+export const courierGuyBookingBatchItemStatus = pgEnum(
+  "courier_guy_booking_batch_item_status",
+  [
+    "quoted",
+    "queued",
+    "attempting",
+    "booked",
+    "failed",
+    "needs_reconciliation",
+    "released",
+  ],
+);
+
 export const jurgensDeliveryScheduleStatuses = [
   "scheduled",
   "preparing",
@@ -63,6 +95,30 @@ export const jurgensDeliveryScheduleStatuses = [
 
 export type JurgensDeliveryScheduleStatus =
   (typeof jurgensDeliveryScheduleStatuses)[number];
+
+export const courierGuyPackingPlans = pgTable(
+  "courier_guy_packing_plans",
+  {
+    orderId: uuid("order_id")
+      .primaryKey()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull().default(0),
+    status: courierGuyPackingPlanStatus("status").notNull().default("draft"),
+    confirmedAt: timestamp("confirmed_at", { mode: "date" }),
+    confirmedByUserId: uuid("confirmed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (plan) => ({
+    revisionNonnegative: check(
+      "courier_guy_packing_plans_revision_nonnegative",
+      sql`${plan.revision} >= 0`,
+    ),
+    statusIdx: index("courier_guy_packing_plans_status_idx").on(plan.status),
+  }),
+);
 
 export const sellerFulfillmentProfiles = pgTable(
   "seller_fulfillment_profiles",
@@ -257,6 +313,8 @@ export const shipments = pgTable(
     ),
     provider: shippingProvider("provider").notNull(),
     status: shipmentStatus("status").notNull().default("pending_booking"),
+    packageSequence: integer("package_sequence"),
+    packingPlanRevision: integer("packing_plan_revision"),
     providerEnvironment: varchar("provider_environment", { length: 16 }).$type<
       "live" | "sandbox"
     >(),
@@ -283,6 +341,20 @@ export const shipments = pgTable(
     bookingQuoteUnique: uniqueIndex("shipments_booking_quote_id_unique")
       .on(shipment.bookingQuoteId)
       .where(sql`${shipment.bookingQuoteId} IS NOT NULL`),
+    courierGuyOrderPackageSequenceUnique: uniqueIndex(
+      "shipments_courier_guy_order_package_sequence_unique",
+    )
+      .on(shipment.orderId, shipment.packageSequence)
+      .where(
+        sql`${shipment.provider} = 'courier_guy' AND ${shipment.packageSequence} IS NOT NULL`,
+      ),
+    courierGuyOrderRevisionIdx: index(
+      "shipments_courier_guy_order_revision_idx",
+    ).on(
+      shipment.orderId,
+      shipment.provider,
+      shipment.packingPlanRevision,
+    ),
     courierGuyProviderShipmentUnique: uniqueIndex(
       "shipments_courier_guy_provider_shipment_unique",
     )
@@ -336,6 +408,149 @@ export const shipments = pgTable(
           AND char_length(${shipment.providerCostCurrency}) = 3
         )`,
     ),
+    packageSequencePositive: check(
+      "shipments_package_sequence_positive",
+      sql`${shipment.packageSequence} IS NULL OR ${shipment.packageSequence} > 0`,
+    ),
+    packingPlanRevisionPositive: check(
+      "shipments_packing_plan_revision_positive",
+      sql`${shipment.packingPlanRevision} IS NULL OR ${shipment.packingPlanRevision} >= 1`,
+    ),
+  }),
+);
+
+export const courierGuyBookingBatches = pgTable(
+  "courier_guy_booking_batches",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    packingRevision: integer("packing_revision").notNull(),
+    status: courierGuyBookingBatchStatus("status").notNull().default("quoted"),
+    currency: varchar("currency", { length: 3 }).notNull().default("ZAR"),
+    customerShippingAmount: numeric("customer_shipping_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    alreadyCommittedProviderAmount: numeric(
+      "already_committed_provider_amount",
+      { precision: 12, scale: 2 },
+    ).notNull(),
+    approvedProviderAmount: numeric("approved_provider_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    projectedProviderSpend: numeric("projected_provider_spend", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    projectedAbsorbedAmount: numeric("projected_absorbed_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    fingerprint: varchar("fingerprint", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    startedAt: timestamp("started_at", { mode: "date" }),
+    completedAt: timestamp("completed_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (batch) => ({
+    activeOrderRevisionUnique: uniqueIndex(
+      "courier_guy_booking_batches_active_order_revision_unique",
+    )
+      .on(batch.orderId, batch.packingRevision)
+      .where(
+        sql`${batch.status} IN ('quoted', 'booking', 'needs_reconciliation')`,
+      ),
+    amountNonnegative: check(
+      "courier_guy_booking_batches_amount_nonnegative",
+      sql`${batch.customerShippingAmount} >= 0
+        AND ${batch.alreadyCommittedProviderAmount} >= 0
+        AND ${batch.approvedProviderAmount} >= 0
+        AND ${batch.projectedProviderSpend} >= 0
+        AND ${batch.projectedAbsorbedAmount} >= 0`,
+    ),
+    currencyValid: check(
+      "courier_guy_booking_batches_currency_valid",
+      sql`char_length(${batch.currency}) = 3`,
+    ),
+    orderRevisionIdx: index(
+      "courier_guy_booking_batches_order_revision_idx",
+    ).on(batch.orderId, batch.packingRevision),
+    packingRevisionPositive: check(
+      "courier_guy_booking_batches_packing_revision_positive",
+      sql`${batch.packingRevision} >= 1`,
+    ),
+    statusExpiryIdx: index(
+      "courier_guy_booking_batches_status_expiry_idx",
+    ).on(batch.status, batch.expiresAt),
+  }),
+);
+
+export const courierGuyBookingBatchItems = pgTable(
+  "courier_guy_booking_batch_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => courierGuyBookingBatches.id, { onDelete: "cascade" }),
+    shipmentId: uuid("shipment_id")
+      .notNull()
+      .references(() => shipments.id, { onDelete: "restrict" }),
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => shippingRateQuotes.id, { onDelete: "restrict" }),
+    packageSequence: integer("package_sequence").notNull(),
+    status: courierGuyBookingBatchItemStatus("status")
+      .notNull()
+      .default("quoted"),
+    approvedProviderAmount: numeric("approved_provider_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    providerCostAmount: numeric("provider_cost_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    lastError: text("last_error"),
+    attemptedAt: timestamp("attempted_at", { mode: "date" }),
+    completedAt: timestamp("completed_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (item) => ({
+    approvedProviderAmountNonnegative: check(
+      "courier_guy_booking_batch_items_approved_amount_nonnegative",
+      sql`${item.approvedProviderAmount} >= 0`,
+    ),
+    batchShipmentUnique: unique(
+      "courier_guy_booking_batch_items_batch_shipment_unique",
+    ).on(item.batchId, item.shipmentId),
+    batchPackageSequenceUnique: unique(
+      "courier_guy_booking_batch_items_batch_package_sequence_unique",
+    ).on(item.batchId, item.packageSequence),
+    batchStatusIdx: index(
+      "courier_guy_booking_batch_items_batch_status_idx",
+    ).on(item.batchId, item.status),
+    packageSequencePositive: check(
+      "courier_guy_booking_batch_items_package_sequence_positive",
+      sql`${item.packageSequence} > 0`,
+    ),
+    providerCostNonnegative: check(
+      "courier_guy_booking_batch_items_provider_cost_nonnegative",
+      sql`${item.providerCostAmount} IS NULL OR ${item.providerCostAmount} >= 0`,
+    ),
+    quoteUnique: unique(
+      "courier_guy_booking_batch_items_quote_id_unique",
+    ).on(item.quoteId),
+    shipmentIdx: index(
+      "courier_guy_booking_batch_items_shipment_id_idx",
+    ).on(item.shipmentId),
   }),
 );
 
@@ -367,6 +582,35 @@ export const shipmentParcels = pgTable("shipment_parcels", {
   declaredValue: numeric("declared_value", { precision: 12, scale: 2 }),
   reference: varchar("reference", { length: 160 }),
 });
+
+export const shipmentParcelItems = pgTable(
+  "shipment_parcel_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    parcelId: uuid("parcel_id")
+      .notNull()
+      .references(() => shipmentParcels.id, { onDelete: "cascade" }),
+    orderItemId: uuid("order_item_id")
+      .notNull()
+      .references(() => orderItems.id, { onDelete: "cascade" }),
+    quantity: integer("quantity").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (item) => ({
+    orderItemIdx: index("shipment_parcel_items_order_item_id_idx").on(
+      item.orderItemId,
+    ),
+    parcelIdx: index("shipment_parcel_items_parcel_id_idx").on(item.parcelId),
+    parcelOrderItemUnique: unique(
+      "shipment_parcel_items_parcel_order_item_unique",
+    ).on(item.parcelId, item.orderItemId),
+    quantityPositive: check(
+      "shipment_parcel_items_quantity_positive",
+      sql`${item.quantity} > 0`,
+    ),
+  }),
+);
 
 export const shipmentEvents = pgTable(
   "shipment_events",
