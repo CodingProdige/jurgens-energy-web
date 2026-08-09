@@ -17,6 +17,7 @@ const eventId = "67074af3-6c01-4f63-84a1-f43ad4f6314a";
 
 test("defines the complete first-party checkout funnel without a stored abandoned status", () => {
   assert.deepEqual(checkoutAnalyticsEventNames, [
+    "add_to_cart",
     "started",
     "address_completed",
     "shipping_completed",
@@ -127,6 +128,44 @@ test("strict public validation rejects server linkage, PII extras, and unsafe va
   );
 });
 
+test("add-to-cart accepts only product identifiers and a positive quantity", () => {
+  assert.equal(
+    checkoutAnalyticsPublicEventInputSchema.safeParse({
+      event: "add_to_cart",
+      eventId,
+      landingPath: "/products/example",
+      product: {
+        productId: "158c3663-4f89-428c-b9c7-8bb463f49a72",
+        quantity: 2,
+        variantId: "b0e89b2d-546c-42f7-b605-9899db1bc88c",
+      },
+      sessionId,
+    }).success,
+    true,
+  );
+  assert.equal(
+    checkoutAnalyticsPublicEventInputSchema.safeParse({
+      event: "add_to_cart",
+      eventId,
+      sessionId,
+    }).success,
+    false,
+  );
+  assert.equal(
+    checkoutAnalyticsPublicEventInputSchema.safeParse({
+      event: "started",
+      eventId,
+      product: {
+        productId: "158c3663-4f89-428c-b9c7-8bb463f49a72",
+        quantity: 1,
+        variantId: "b0e89b2d-546c-42f7-b605-9899db1bc88c",
+      },
+      sessionId,
+    }).success,
+    false,
+  );
+});
+
 test("advances failed sessions through retry and keeps completion terminal", () => {
   const startedAt = new Date("2026-08-09T08:00:00.000Z");
   const failedAt = new Date("2026-08-09T08:03:00.000Z");
@@ -185,9 +224,15 @@ test("keeps active funnel progress monotonic when browser events arrive late", (
     event: "started",
     occurredAt: new Date("2026-08-09T08:02:00.000Z"),
   });
+  const delayedCartAdd = advanceCheckoutAnalyticsLifecycle({
+    current: delayedStart,
+    event: "add_to_cart",
+    occurredAt: new Date("2026-08-09T08:03:00.000Z"),
+  });
 
   assert.deepEqual(delayedRedirect, orderCreated);
   assert.deepEqual(delayedStart, orderCreated);
+  assert.deepEqual(delayedCartAdd, orderCreated);
 });
 
 test("classifies only a coarse device category", () => {
@@ -238,9 +283,16 @@ test("requires an explicitly allowed same-origin analytics request", () => {
 });
 
 test("migration stores no raw IP, user agent, or customer contact fields", async () => {
-  const [migration, service] = await Promise.all([
+  const [migration, cartMigration, service] = await Promise.all([
     readFile(
       new URL("../src/db/migrations/0103_checkout_analytics.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/db/migrations/0105_cart_journey_analytics.sql",
+        import.meta.url,
+      ),
       "utf8",
     ),
     readFile(
@@ -255,6 +307,203 @@ test("migration stores no raw IP, user agent, or customer contact fields", async
   assert.doesNotMatch(migration, /ip_address|user_agent|customer_email|customer_phone/);
   assert.match(service, /pg_advisory_xact_lock\(hashtext/);
   assert.match(service, /onConflictDoNothing\(\{ target: checkoutAnalyticsEvents\.id \}\)/);
+  assert.match(cartMigration, /'add_to_cart' BEFORE 'started'/);
+  assert.match(cartMigration, /"cart_started_at" timestamp/);
+  assert.match(cartMigration, /"checkout_started_at" timestamp/);
+  assert.match(cartMigration, /"last_cart_activity_at" timestamp/);
+  assert.match(cartMigration, /"quantity_delta" integer/);
+  assert.doesNotMatch(
+    cartMigration,
+    /ip_address|user_agent|customer_email|customer_phone/,
+  );
+});
+
+test("cart additions use a stable commerce journey and trusted server snapshots", async () => {
+  const [client, cart, service] = await Promise.all([
+    readFile(
+      new URL("../src/modules/analytics/checkout-client.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/modules/cart/local-cart.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/modules/analytics/checkout.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(client, /jurgens:analytics:commerce-session:v2/);
+  assert.match(client, /LEGACY_CHECKOUT_ANALYTICS_SESSION_STORAGE_KEY/);
+  assert.doesNotMatch(client, /existing\.cartSignature === cartSignature/);
+  assert.match(cart, /recordAddToCartAnalyticsEvent/);
+  assert.match(
+    cart,
+    /recordLocalCartAddition\(item, nextQuantity - item\.quantity\)/,
+  );
+  assert.match(service, /innerJoin\(products/);
+  assert.match(service, /linkedProduct\.productId !== parsed\.product\.productId/);
+  assert.match(service, /productTitleSnapshot: productSnapshot\?\.productTitle/);
+  assert.match(service, /brandNameSnapshot: productSnapshot\?\.brandName/);
+  assert.match(service, /CheckoutAnalyticsCompletedSessionError/);
+  assert.match(client, /analytics_session_completed/);
+});
+
+test("commerce session survives cart signature changes and migrates legacy checkout state", async () => {
+  const storage = new Map();
+  const originalWindow = globalThis.window;
+  const originalDocument = globalThis.document;
+
+  globalThis.window = {
+    location: {
+      origin: "https://jurgensenergy.com",
+      pathname: "/products/example",
+    },
+    sessionStorage: {
+      getItem(key) {
+        return storage.get(key) ?? null;
+      },
+      removeItem(key) {
+        storage.delete(key);
+      },
+      setItem(key, value) {
+        storage.set(key, value);
+      },
+    },
+  };
+  globalThis.document = { referrer: "" };
+
+  try {
+    const {
+      completeCheckoutAnalyticsSession,
+      getOrCreateCheckoutAnalyticsSession,
+    } = await import("../src/modules/analytics/checkout-client.ts");
+    const first = getOrCreateCheckoutAnalyticsSession("cart-a", 1_000);
+    const changedCart = getOrCreateCheckoutAnalyticsSession("cart-b", 2_000);
+    const expired = getOrCreateCheckoutAnalyticsSession(
+      "cart-b",
+      2_000 + 30 * 60 * 1_000 + 1,
+    );
+
+    assert.ok(first);
+    assert.equal(changedCart, first);
+    assert.notEqual(expired, first);
+
+    completeCheckoutAnalyticsSession();
+    storage.set(
+      "jurgens:analytics:checkout-session:v1",
+      JSON.stringify({
+        cartSignature: "legacy-cart",
+        lastActivityAt: 4_000,
+        sessionId,
+        version: 1,
+      }),
+    );
+
+    assert.equal(
+      getOrCreateCheckoutAnalyticsSession("changed-legacy-cart", 5_000),
+      sessionId,
+    );
+    assert.equal(
+      storage.has("jurgens:analytics:checkout-session:v1"),
+      false,
+    );
+    assert.equal(
+      storage.has("jurgens:analytics:commerce-session:v2"),
+      true,
+    );
+  } finally {
+    if (originalWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = originalWindow;
+    }
+
+    if (originalDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = originalDocument;
+    }
+  }
+});
+
+test("a completed session rotates once before recording a new cart addition", async () => {
+  const requests = [];
+  const storage = new Map();
+  const originalDocument = globalThis.document;
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  let finishSecondRequest;
+  const secondRequest = new Promise((resolve) => {
+    finishSecondRequest = resolve;
+  });
+
+  globalThis.window = {
+    location: {
+      origin: "https://jurgensenergy.com",
+      pathname: "/products/example",
+    },
+    sessionStorage: {
+      getItem(key) {
+        return storage.get(key) ?? null;
+      },
+      removeItem(key) {
+        storage.delete(key);
+      },
+      setItem(key, value) {
+        storage.set(key, value);
+      },
+    },
+  };
+  globalThis.document = { referrer: "" };
+  globalThis.fetch = async (_url, init) => {
+    requests.push(JSON.parse(init.body));
+
+    if (requests.length === 1) {
+      return Response.json(
+        { error: "analytics_session_completed" },
+        { status: 409 },
+      );
+    }
+
+    finishSecondRequest();
+    return Response.json({ ok: true }, { status: 201 });
+  };
+
+  try {
+    const { recordAddToCartAnalyticsEvent } = await import(
+      "../src/modules/analytics/checkout-client.ts"
+    );
+
+    recordAddToCartAnalyticsEvent({
+      productId: "158c3663-4f89-428c-b9c7-8bb463f49a72",
+      quantity: 1,
+      variantId: "b0e89b2d-546c-42f7-b605-9899db1bc88c",
+    });
+    await secondRequest;
+
+    assert.equal(requests.length, 2);
+    assert.notEqual(requests[0].sessionId, requests[1].sessionId);
+  } finally {
+    if (originalWindow === undefined) {
+      delete globalThis.window;
+    } else {
+      globalThis.window = originalWindow;
+    }
+
+    if (originalDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = originalDocument;
+    }
+
+    if (originalFetch === undefined) {
+      delete globalThis.fetch;
+    } else {
+      globalThis.fetch = originalFetch;
+    }
+  }
 });
 
 test("checkout and PayFast lifecycle are wired to first-party telemetry", async () => {

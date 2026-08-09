@@ -7,7 +7,9 @@ import {
 } from "lucide-react";
 
 import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
+import { PublicSupportAgentCards } from "@/components/marketplace/public-support-team";
 import type { PublicBusinessIdentity } from "@/src/modules/business-information";
+import type { PublicSupportAgent } from "@/src/modules/support-agents/server";
 import {
   ContentActionPanel,
   ContentHero,
@@ -38,9 +40,11 @@ const storeCategories = [
 export function AboutPage({
   businessIdentity,
   deliveryTimingDescription,
+  supportAgents,
 }: {
   businessIdentity: PublicBusinessIdentity;
   deliveryTimingDescription: string;
+  supportAgents: PublicSupportAgent[];
 }) {
   return (
     <article>
@@ -101,6 +105,19 @@ export function AboutPage({
             </div>
           </div>
         </section>
+
+        {supportAgents.length > 0 ? (
+          <section className="mt-14 sm:mt-20">
+            <ContentSectionHeading
+              description="Meet the people whose direct public contact details are available for product, ordering and after-sales support."
+              eyebrow="Our team"
+              title="People you can reach."
+            />
+            <div className="mt-8">
+              <PublicSupportAgentCards agents={supportAgents} />
+            </div>
+          </section>
+        ) : null}
 
         <PublicBusinessIdentityDisclosure
           className="my-14 sm:my-20"

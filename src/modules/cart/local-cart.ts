@@ -1,3 +1,4 @@
+import { recordAddToCartAnalyticsEvent } from "@/src/modules/analytics/checkout-client";
 import { getExchangeRequirementText } from "@/src/modules/cart/exchange-requirements";
 
 export type LocalCartPurchaseType = "standard" | "exchange";
@@ -259,12 +260,32 @@ function emitLocalCartUpdated() {
   );
 }
 
+function recordLocalCartAddition(
+  item: Pick<LocalCartItem, "productId" | "variantId">,
+  quantity: number,
+) {
+  if (quantity <= 0) {
+    return;
+  }
+
+  try {
+    recordAddToCartAnalyticsEvent({
+      productId: item.productId,
+      quantity,
+      variantId: item.variantId,
+    });
+  } catch {
+    // First-party telemetry must never prevent a cart change.
+  }
+}
+
 export function addLocalCartItem(input: LocalCartInput): LocalCartState {
   const items = readLocalCartItems();
   const existingItemIndex = items.findIndex(
     (item) => item.variantId === input.variantId,
   );
   const nextQuantity = normalizeQuantity(input.quantity);
+  let quantityAdded = nextQuantity;
   const updatedAt = new Date().toISOString();
   const purchaseType: LocalCartPurchaseType =
     input.purchaseType === "exchange" ? "exchange" : "standard";
@@ -287,6 +308,7 @@ export function addLocalCartItem(input: LocalCartInput): LocalCartState {
   if (existingItemIndex >= 0) {
     const existingItem = items[existingItemIndex];
     const combinedQuantity = normalizeQuantity(existingItem.quantity + nextQuantity);
+    quantityAdded = Math.max(0, combinedQuantity - existingItem.quantity);
     const combinedEmptySize =
       exchangeRequiredEmptyCylinderSize ??
       existingItem.exchangeRequiredEmptyCylinderSize;
@@ -343,7 +365,11 @@ export function addLocalCartItem(input: LocalCartInput): LocalCartState {
   });
   emitLocalCartUpdated();
 
-  return getLocalCartState();
+  const state = getLocalCartState();
+
+  recordLocalCartAddition(input, quantityAdded);
+
+  return state;
 }
 
 export function updateLocalCartItemQuantity(
@@ -377,7 +403,11 @@ export function updateLocalCartItemQuantity(
   writeLocalCartItems(items);
   emitLocalCartUpdated();
 
-  return getLocalCartState();
+  const state = getLocalCartState();
+
+  recordLocalCartAddition(item, nextQuantity - item.quantity);
+
+  return state;
 }
 
 export function removeLocalCartItems(variantIds: string[]): LocalCartState {

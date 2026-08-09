@@ -15,12 +15,14 @@ import {
 
 import { createMarketplaceWhatsAppHref } from "@/components/marketplace/marketplace-whatsapp-button";
 import { PublicEmailAddress } from "@/components/marketplace/public-email-address";
+import { PublicSupportAgentCards } from "@/components/marketplace/public-support-team";
 import {
   ContentActionPanel,
   ContentHero,
   ContentSectionHeading,
 } from "@/src/modules/marketplace/content/content-page";
 import { getCustomerSupportContactDetails } from "@/src/modules/customer-support/server";
+import { getPublicSupportAgents } from "@/src/modules/support-agents/server";
 
 type SupportContactMethod = {
   external: boolean;
@@ -82,7 +84,10 @@ function phoneHref(phoneNumber: string) {
 }
 
 export async function SupportPage() {
-  const support = await getCustomerSupportContactDetails();
+  const [support, supportAgents] = await Promise.all([
+    getCustomerSupportContactDetails(),
+    getPublicSupportAgents("support"),
+  ]);
   const whatsappUrl = createMarketplaceWhatsAppHref(support.whatsappPhone);
   const contactMethods: SupportContactMethod[] = [
     ...support.phoneNumbers.flatMap((phoneNumber, index) => {
@@ -249,6 +254,19 @@ export async function SupportPage() {
             </p>
           </aside>
         </section>
+
+        {supportAgents.length > 0 ? (
+          <section className="mt-14 sm:mt-20">
+            <ContentSectionHeading
+              description="Contact a published team member directly using the business details shown on their profile."
+              eyebrow="Support team"
+              title="People ready to help."
+            />
+            <div className="mt-8">
+              <PublicSupportAgentCards agents={supportAgents} />
+            </div>
+          </section>
+        ) : null}
 
         <div className="mt-12 sm:mt-16">
           <ContentActionPanel

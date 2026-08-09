@@ -5,8 +5,10 @@ import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { env } from "@/src/config/env";
 import {
+  CheckoutAnalyticsCompletedSessionError,
   CheckoutAnalyticsConflictError,
   CheckoutAnalyticsOrderNotFoundError,
+  CheckoutAnalyticsProductNotFoundError,
   recordCheckoutAnalyticsEvent,
 } from "@/src/modules/analytics/checkout";
 import {
@@ -199,9 +201,20 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (error instanceof CheckoutAnalyticsCompletedSessionError) {
+      return Response.json(
+        {
+          error: "analytics_session_completed",
+          message: "A new commerce journey is required.",
+        },
+        { headers: noStoreHeaders, status: 409 },
+      );
+    }
+
     if (
       error instanceof CheckoutAnalyticsConflictError ||
-      error instanceof CheckoutAnalyticsOrderNotFoundError
+      error instanceof CheckoutAnalyticsOrderNotFoundError ||
+      error instanceof CheckoutAnalyticsProductNotFoundError
     ) {
       return Response.json(
         {

@@ -47,7 +47,7 @@ export default async function RegisterPage({
     : null;
 
   return (
-    <MarketplaceGate>
+    <MarketplaceGate allowTidioLauncher={false}>
       <MarketplaceAuthScreen
         action={registerCustomerWithPassword}
         googleAction={googleAction}

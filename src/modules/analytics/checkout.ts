@@ -7,7 +7,10 @@ import { db } from "@/src/db";
 import {
   checkoutAnalyticsEvents,
   checkoutAnalyticsSessions,
+  brands,
   orders,
+  products,
+  productVariants,
 } from "@/src/db/schema";
 import {
   advanceCheckoutAnalyticsLifecycle,
@@ -82,10 +85,24 @@ export class CheckoutAnalyticsConflictError extends Error {
   }
 }
 
+export class CheckoutAnalyticsCompletedSessionError extends Error {
+  constructor() {
+    super("The checkout analytics session is already complete.");
+    this.name = "CheckoutAnalyticsCompletedSessionError";
+  }
+}
+
 export class CheckoutAnalyticsOrderNotFoundError extends Error {
   constructor() {
     super("The linked checkout order does not exist.");
     this.name = "CheckoutAnalyticsOrderNotFoundError";
+  }
+}
+
+export class CheckoutAnalyticsProductNotFoundError extends Error {
+  constructor() {
+    super("The analytics product or variant does not exist.");
+    this.name = "CheckoutAnalyticsProductNotFoundError";
   }
 }
 
@@ -152,6 +169,38 @@ export async function recordCheckoutAnalyticsEvent(
     }
 
     let linkedOrderUserId: string | null = null;
+    let productSnapshot: {
+      brandName: string | null;
+      productId: string;
+      productTitle: string;
+      variantId: string;
+      variantTitle: string;
+    } | null = null;
+
+    if (parsed.product) {
+      const [linkedProduct] = await transaction
+        .select({
+          brandName: brands.name,
+          productId: products.id,
+          productTitle: products.title,
+          variantId: productVariants.id,
+          variantTitle: productVariants.title,
+        })
+        .from(productVariants)
+        .innerJoin(products, eq(products.id, productVariants.productId))
+        .leftJoin(brands, eq(brands.id, products.brandId))
+        .where(eq(productVariants.id, parsed.product.variantId))
+        .limit(1);
+
+      if (
+        !linkedProduct ||
+        linkedProduct.productId !== parsed.product.productId
+      ) {
+        throw new CheckoutAnalyticsProductNotFoundError();
+      }
+
+      productSnapshot = linkedProduct;
+    }
 
     if (parsed.orderId) {
       const [linkedOrder] = await transaction
@@ -181,6 +230,9 @@ export async function recordCheckoutAnalyticsEvent(
         campaignAttributionSnapshot:
           context.campaignAttribution ?? null,
         cartValue,
+        cartStartedAt:
+          parsed.event === "add_to_cart" ? occurredAt : null,
+        checkoutStartedAt: parsed.event === "started" ? occurredAt : null,
         completedAt: initial.completedAt,
         currency: parsed.cart?.currency ?? null,
         deviceCategory: context.deviceCategory ?? "unknown",
@@ -190,6 +242,8 @@ export async function recordCheckoutAnalyticsEvent(
         itemCount: parsed.cart?.itemCount ?? null,
         landingPath: parsed.landingPath ?? null,
         lastErrorCode: parsed.errorCode ?? null,
+        lastCartActivityAt:
+          parsed.event === "add_to_cart" ? occurredAt : null,
         lastSeenAt: occurredAt,
         latestStep: initial.latestStep,
         orderId: parsed.orderId ?? null,
@@ -229,6 +283,13 @@ export async function recordCheckoutAnalyticsEvent(
       throw new CheckoutAnalyticsConflictError();
     }
 
+    if (
+      parsed.event === "add_to_cart" &&
+      currentSession.status === "completed"
+    ) {
+      throw new CheckoutAnalyticsCompletedSessionError();
+    }
+
     const effectiveOrderId = parsed.orderId ?? currentSession.orderId;
     const effectiveUserId =
       contextUserId ?? currentSession.userId ?? linkedOrderUserId;
@@ -254,9 +315,15 @@ export async function recordCheckoutAnalyticsEvent(
         itemCount: parsed.cart?.itemCount ?? null,
         occurredAt,
         orderId: effectiveOrderId,
+        brandNameSnapshot: productSnapshot?.brandName ?? null,
+        productId: productSnapshot?.productId ?? null,
+        productTitleSnapshot: productSnapshot?.productTitle ?? null,
+        quantityDelta: parsed.product?.quantity ?? null,
         sessionId: parsed.sessionId,
         totalQuantity: parsed.cart?.totalQuantity ?? null,
         userId: effectiveUserId,
+        variantId: productSnapshot?.variantId ?? null,
+        variantTitleSnapshot: productSnapshot?.variantTitle ?? null,
       })
       .onConflictDoNothing({ target: checkoutAnalyticsEvents.id })
       .returning({ id: checkoutAnalyticsEvents.id });
@@ -288,6 +355,9 @@ export async function recordCheckoutAnalyticsEvent(
           context.campaignAttribution ??
           null,
         cartValue: cartValue ?? currentSession.cartValue,
+        cartStartedAt:
+          currentSession.cartStartedAt ??
+          (parsed.event === "add_to_cart" ? occurredAt : null),
         completedAt: lifecycle.completedAt,
         currency: parsed.cart?.currency ?? currentSession.currency,
         deviceCategory:
@@ -295,10 +365,17 @@ export async function recordCheckoutAnalyticsEvent(
             ? (context.deviceCategory ?? "unknown")
             : currentSession.deviceCategory,
         failedAt: lifecycle.failedAt,
+        checkoutStartedAt:
+          currentSession.checkoutStartedAt ??
+          (parsed.event === "started" ? occurredAt : null),
         itemCount: parsed.cart?.itemCount ?? currentSession.itemCount,
         landingPath: currentSession.landingPath ?? parsed.landingPath ?? null,
         lastErrorCode:
           parsed.errorCode ?? currentSession.lastErrorCode,
+        lastCartActivityAt:
+          parsed.event === "add_to_cart"
+            ? occurredAt
+            : currentSession.lastCartActivityAt,
         lastSeenAt: occurredAt,
         latestStep: lifecycle.latestStep,
         orderId: effectiveOrderId,

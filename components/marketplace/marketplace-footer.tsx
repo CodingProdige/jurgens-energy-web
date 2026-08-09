@@ -14,6 +14,7 @@ import {
 import { JurgensEnergyLogo } from "@/components/brand/jurgens-energy-logo";
 import { PublicBusinessIdentityDisclosure } from "@/components/marketplace/public-business-identity";
 import { PublicEmailAddress } from "@/components/marketplace/public-email-address";
+import { PublicSupportAgentFooterList } from "@/components/marketplace/public-support-team";
 import {
   FacebookMark,
   InstagramMark,
@@ -28,6 +29,7 @@ import { policyLinks } from "@/src/modules/marketplace/policies/links";
 import { getPublicDeliveryTimingDescription } from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { findShopMenuCategory } from "@/src/modules/marketplace/shop-menu-categories";
+import { getPublicSupportAgents } from "@/src/modules/support-agents/server";
 
 function createFooterServices(deliveryTimingDescription: string) {
   return [
@@ -77,12 +79,14 @@ function createWhatsappUrl(phoneNumber: string | null) {
 }
 
 export async function MarketplaceFooter() {
-  const [businessIdentity, settings, shopMenuData, support] = await Promise.all([
-    getPublicBusinessIdentity(),
-    getMarketplaceSettings(),
-    getMarketplaceShopMenuData(),
-    getCustomerSupportContactDetails(),
-  ]);
+  const [businessIdentity, settings, shopMenuData, support, footerSupportAgents] =
+    await Promise.all([
+      getPublicBusinessIdentity(),
+      getMarketplaceSettings(),
+      getMarketplaceShopMenuData(),
+      getCustomerSupportContactDetails(),
+      getPublicSupportAgents("footer"),
+    ]);
   const accessoriesCategory = findShopMenuCategory(
     shopMenuData.categories,
     (category) =>
@@ -294,6 +298,8 @@ export async function MarketplaceFooter() {
             </div>
           ) : null}
         </section>
+
+        <PublicSupportAgentFooterList agents={footerSupportAgents} />
 
         <PublicBusinessIdentityDisclosure
           appearance="footer"

@@ -47,7 +47,7 @@ export default async function SignInPage({
   );
 
   return (
-    <MarketplaceGate>
+    <MarketplaceGate allowTidioLauncher={false}>
       <MarketplaceAuthScreen
         action={signInCustomerWithPassword}
         googleAction={googleAction}

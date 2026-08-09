@@ -171,7 +171,7 @@ export function AccountPageShell({
   ];
 
   return (
-    <MarketplaceGate>
+    <MarketplaceGate allowTidioLauncher={false}>
       <div className="min-h-screen bg-[#f7f7f2] text-[#080808] dark:bg-[#080808] dark:text-[#f7f7f2]">
         <MarketplaceHeader />
         <main className="w-full overflow-x-clip pb-12 sm:mx-auto sm:w-[min(1500px,calc(100%-1rem))]">

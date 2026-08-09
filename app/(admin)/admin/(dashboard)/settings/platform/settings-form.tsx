@@ -85,6 +85,7 @@ import {
   updateReturnsPolicySettings,
   updateSendGridIntegrationSettings,
   updateShippingIntegrationSettings,
+  updateCustomerSupportSettings,
   updateWhatsappOrderingSettings,
   type AdminSettingsState,
 } from "@/app/(admin)/admin/(dashboard)/settings/platform/actions";
@@ -94,7 +95,10 @@ import type {
   AdminMediaAsset,
   getAdminMediaLibrary,
 } from "@/src/modules/media/admin";
-import type { MarketplacePaymentMethodBadge } from "@/src/modules/marketplace/settings";
+import type {
+  MarketplacePaymentMethodBadge,
+  StorefrontSupportProvider,
+} from "@/src/modules/marketplace/settings";
 import type {
   MarketplaceReturnAcceptance,
   MarketplaceReturnLabelResponsibility,
@@ -1988,6 +1992,267 @@ function PayFastCredentialPanel({
   );
 }
 
+type CustomerSupportSettingsFormProps = {
+  canManage: boolean;
+  hasWhatsappApiKey: boolean;
+  storefrontSupportProvider: StorefrontSupportProvider;
+  tidioEnabled: boolean;
+  tidioPublicKey: string | null;
+  whatsappBusinessPhoneNumber: string | null;
+  whatsappEnabled: boolean;
+};
+
+export function CustomerSupportSettingsForm({
+  canManage,
+  hasWhatsappApiKey,
+  storefrontSupportProvider,
+  tidioEnabled,
+  tidioPublicKey,
+  whatsappBusinessPhoneNumber,
+  whatsappEnabled,
+}: CustomerSupportSettingsFormProps) {
+  const [whatsappEnabledValue, setWhatsappEnabledValue] =
+    useState(whatsappEnabled);
+  const [tidioEnabledValue, setTidioEnabledValue] = useState(tidioEnabled);
+  const [tidioPublicKeyValue, setTidioPublicKeyValue] = useState(
+    tidioPublicKey ?? "",
+  );
+  const [supportProvider, setSupportProvider] =
+    useState<StorefrontSupportProvider>(storefrontSupportProvider);
+  const [state, formAction, isPending] = useActionState(
+    updateCustomerSupportSettings,
+    initialState,
+  );
+  const whatsappConfigured = Boolean(
+    hasWhatsappApiKey && whatsappBusinessPhoneNumber,
+  );
+  const tidioConfigured = /^[a-z0-9]{32}$/.test(
+    tidioPublicKeyValue.trim(),
+  );
+
+  return (
+    <form action={formAction} className="grid gap-5">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#16a34a]/10 text-[#16a34a]">
+              <MessageCircleIcon className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                  360dialog WhatsApp
+                </h3>
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {whatsappConfigured ? "Configured" : "Needs setup"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Controls the complete 360dialog service, including inbound
+                conversations, transactional messages, and manual replies.
+              </p>
+            </div>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <Checkbox
+              checked={whatsappEnabledValue}
+              disabled={!canManage}
+              name="whatsappEnabled"
+              onCheckedChange={(checked) => {
+                const nextEnabled = checked === true;
+                setWhatsappEnabledValue(nextEnabled);
+
+                if (!nextEnabled && supportProvider === "whatsapp") {
+                  setSupportProvider("off");
+                }
+              }}
+            />
+            <span className="grid gap-1">
+              <span className="font-semibold text-zinc-950 dark:text-white">
+                Enable 360dialog service
+              </span>
+              <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Turning this off disables WhatsApp operations. It does not
+                erase the saved credentials or automation settings.
+              </span>
+            </span>
+          </label>
+
+          {!whatsappConfigured ? (
+            <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              Add the 360dialog API key and WhatsApp business number under{" "}
+              <Link
+                className="font-semibold underline underline-offset-2"
+                href="/settings/platform?section=whatsapp-ordering"
+              >
+                WhatsApp integration
+              </Link>{" "}
+              before enabling this service.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+              <Globe2Icon className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                  Tidio live chat
+                </h3>
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {tidioConfigured ? "Configured" : "Needs setup"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Enables Tidio as an available support service. The storefront
+                launcher is selected separately below.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+              <Checkbox
+                checked={tidioEnabledValue}
+                disabled={!canManage}
+                name="tidioEnabled"
+                onCheckedChange={(checked) => {
+                  const nextEnabled = checked === true;
+                  setTidioEnabledValue(nextEnabled);
+
+                  if (!nextEnabled && supportProvider === "tidio") {
+                    setSupportProvider("off");
+                  }
+                }}
+              />
+              <span className="grid gap-1">
+                <span className="font-semibold text-zinc-950 dark:text-white">
+                  Enable Tidio service
+                </span>
+                <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                  The widget is only loaded when Tidio is enabled and selected
+                  as the storefront launcher.
+                </span>
+              </span>
+            </label>
+
+            <div className="grid gap-2">
+              <Label htmlFor="tidioPublicKey">Tidio public project key</Label>
+              <Input
+                autoComplete="off"
+                disabled={!canManage}
+                id="tidioPublicKey"
+                maxLength={32}
+                name="tidioPublicKey"
+                onChange={(event) => setTidioPublicKeyValue(event.target.value)}
+                placeholder="Paste the public project key only"
+                value={tidioPublicKeyValue}
+              />
+              <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+                Paste only the 32-character lowercase key from Tidio. Script
+                tags, HTML, and URLs are rejected and are never stored.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="mb-5 flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-admin-primary/10 text-admin-primary">
+            <MousePointerClickIcon className="size-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Storefront support launcher
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
+              Deliberately choose the one floating support button customers see.
+              This does not enable either underlying service.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid max-w-2xl gap-2">
+          <Label htmlFor="storefrontSupportProvider">Visible launcher</Label>
+          <Select
+            disabled={!canManage}
+            name="storefrontSupportProvider"
+            value={supportProvider}
+            onValueChange={(value) => {
+              if (
+                value === "off" ||
+                value === "whatsapp" ||
+                value === "tidio"
+              ) {
+                setSupportProvider(value);
+              }
+            }}
+          >
+            <SelectTrigger className="w-full" id="storefrontSupportProvider">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent
+              align="start"
+              className="max-w-[calc(100vw-2rem)]"
+            >
+              <SelectItem value="off">Off — show no floating launcher</SelectItem>
+              <SelectItem
+                disabled={!whatsappEnabledValue || !whatsappConfigured}
+                value="whatsapp"
+              >
+                WhatsApp — 360dialog support button
+              </SelectItem>
+              <SelectItem
+                disabled={!tidioEnabledValue || !tidioConfigured}
+                value="tidio"
+              >
+                Tidio — live chat widget
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
+            A service must be enabled and configured before it can be selected.
+            Both services may remain enabled while only one launcher is visible.
+          </p>
+        </div>
+      </div>
+
+      {state.message ? (
+        <p
+          className={
+            state.ok
+              ? "rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-200"
+              : "rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-200"
+          }
+        >
+          {state.message}
+        </p>
+      ) : null}
+
+      {!canManage ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+          You can review these settings, but changing them requires the
+          settings-management capability.
+        </p>
+      ) : null}
+
+      <Button
+        type="submit"
+        disabled={!canManage || isPending}
+        className="w-fit gap-2"
+      >
+        <SaveIcon className="size-4" />
+        {isPending ? "Saving..." : "Save customer support settings"}
+      </Button>
+    </form>
+  );
+}
+
 type WhatsappOrderingSettingsFormProps = {
   hasWhatsappApiKey: boolean;
   hasWhatsappWebhookSigningSecret: boolean;
@@ -2041,7 +2306,6 @@ export function WhatsappOrderingSettingsForm({
   whatsappWebhookUrl,
   whatsappWebhookVerifyToken,
 }: WhatsappOrderingSettingsFormProps) {
-  const [isEnabled, setIsEnabled] = useState(whatsappOrderingEnabled);
   const [businessPhoneValue, setBusinessPhoneValue] = useState(
     whatsappBusinessPhoneNumber ?? "",
   );
@@ -2117,33 +2381,41 @@ export function WhatsappOrderingSettingsForm({
             <MessageCircleIcon className="size-4" />
           </span>
           <div>
-            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
-              WhatsApp ordering controls
-            </h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+                WhatsApp integration details
+              </h3>
+              <Badge variant="outline" className="text-[10px] uppercase">
+                {whatsappOrderingEnabled ? "Service enabled" : "Service off"}
+              </Badge>
+            </div>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
-              Receive customer WhatsApp messages, create secure checkout draft
-              links, and send replies back through 360dialog.
+              Configure the 360dialog number, credentials, callbacks, alerts,
+              and automation. Service activation and the visible storefront
+              launcher are controlled under Customer support.
             </p>
           </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <label className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
-            <Checkbox
-              checked={isEnabled}
-              name="enabled"
-              onCheckedChange={(checked) => setIsEnabled(checked === true)}
-            />
+          <div className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3 text-sm dark:border-white/10">
+            <MessageCircleIcon className="mt-0.5 size-4 shrink-0 text-[#16a34a]" />
             <span className="grid gap-1">
               <span className="font-semibold text-zinc-950 dark:text-white">
-                Enable WhatsApp ordering
+                Service and launcher controls
               </span>
               <span className="text-xs leading-5 text-slate-500 dark:text-zinc-400">
-                Shows the marketplace WhatsApp button and lets webhook replies
-                send through the configured provider.
+                Use the dedicated{" "}
+                <Link
+                  className="font-semibold text-admin-primary underline underline-offset-2"
+                  href="/settings/platform?section=customer-support"
+                >
+                  Customer support settings
+                </Link>{" "}
+                to turn 360dialog on or off and choose the public support button.
               </span>
             </span>
-          </label>
+          </div>
 
           <div className="grid gap-2">
             <Label htmlFor="businessPhoneNumber">

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const checkoutAnalyticsEventNames = [
+  "add_to_cart",
   "started",
   "address_completed",
   "shipping_completed",
@@ -34,6 +35,7 @@ export type CheckoutAnalyticsDeviceCategory =
   (typeof checkoutAnalyticsDeviceCategories)[number];
 
 export const checkoutAnalyticsProgressEventNames = [
+  "add_to_cart",
   "started",
   "address_completed",
   "shipping_completed",
@@ -107,12 +109,21 @@ const checkoutCartSnapshotSchema = z
   })
   .strict();
 
+const checkoutAnalyticsProductSchema = z
+  .object({
+    productId: z.string().uuid(),
+    quantity: z.number().int().min(1).max(99),
+    variantId: z.string().uuid(),
+  })
+  .strict();
+
 const publicCheckoutAnalyticsEventFields = {
   cart: checkoutCartSnapshotSchema.optional(),
   errorCode: errorCodeSchema.optional(),
   event: z.enum(checkoutAnalyticsEventNames),
   eventId: z.string().uuid(),
   landingPath: safePathSchema.optional(),
+  product: checkoutAnalyticsProductSchema.optional(),
   referrerHost: referrerHostSchema.optional(),
   sessionId: z.string().uuid(),
 };
@@ -121,6 +132,11 @@ function validateCheckoutAnalyticsEvent(
   value: {
     errorCode?: string;
     event: CheckoutAnalyticsEventName;
+    product?: {
+      productId: string;
+      quantity: number;
+      variantId: string;
+    };
   },
   context: z.RefinementCtx,
 ) {
@@ -140,6 +156,22 @@ function validateCheckoutAnalyticsEvent(
       code: "custom",
       message: "Error codes are only accepted for failed checkout events.",
       path: ["errorCode"],
+    });
+  }
+
+  if (value.event === "add_to_cart" && !value.product) {
+    context.addIssue({
+      code: "custom",
+      message: "Add-to-cart events require a product and quantity.",
+      path: ["product"],
+    });
+  }
+
+  if (value.event !== "add_to_cart" && value.product) {
+    context.addIssue({
+      code: "custom",
+      message: "Product details are only accepted for add-to-cart events.",
+      path: ["product"],
     });
   }
 }

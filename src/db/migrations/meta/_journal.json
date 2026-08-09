@@ -729,6 +729,20 @@
       "when": 1788343200000,
       "tag": "0103_checkout_analytics",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1788429600000,
+      "tag": "0104_customer_support_channels",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1788516000000,
+      "tag": "0105_cart_journey_analytics",
+      "breakpoints": true
     }
   ]
 }

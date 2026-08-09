@@ -7,6 +7,7 @@ import {
   createAdminAnalyticsMetricComparison,
   getAdminAnalyticsTelemetryCoverage,
   getAdminAnalyticsBucketIndex,
+  isCartJourneyAbandoned,
   isProviderConfirmedCapturedPayment,
   resolveAdminAnalyticsRange,
 } from "../src/modules/admin/analytics-core.ts";
@@ -218,6 +219,55 @@ test("failed checkout wins over inactivity and abandonment starts at 30 minutes"
       now,
     ),
     "failed",
+  );
+});
+
+test("cart abandonment requires 30 minutes of inactivity and no checkout start", () => {
+  const now = new Date("2026-08-09T12:00:00.000Z");
+  const cartStartedAt = new Date("2026-08-09T10:00:00.000Z");
+  const boundary = new Date(
+    now.getTime() - CHECKOUT_ABANDONMENT_WINDOW_MS,
+  );
+
+  assert.equal(
+    isCartJourneyAbandoned(
+      { cartStartedAt, checkoutStartedAt: null, lastCartActivityAt: boundary },
+      now,
+    ),
+    true,
+  );
+  assert.equal(
+    isCartJourneyAbandoned(
+      {
+        cartStartedAt,
+        checkoutStartedAt: null,
+        lastCartActivityAt: new Date(boundary.getTime() + 1),
+      },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    isCartJourneyAbandoned(
+      {
+        cartStartedAt,
+        checkoutStartedAt: new Date("2026-08-09T10:15:00.000Z"),
+        lastCartActivityAt: boundary,
+      },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    isCartJourneyAbandoned(
+      {
+        cartStartedAt: null,
+        checkoutStartedAt: null,
+        lastCartActivityAt: null,
+      },
+      now,
+    ),
+    false,
   );
 });
 

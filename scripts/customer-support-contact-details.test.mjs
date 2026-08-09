@@ -39,6 +39,7 @@ test("prefers Marketplace Settings support channels and Business Information add
       contactPhonePrimary: "+27 82 123 4567",
       contactPhoneSecondary: "+27 82 123 4567",
       whatsappBusinessPhoneNumber: "  +27 71 234 5678  ",
+      whatsappOrderingEnabled: true,
     },
   });
 
@@ -67,6 +68,7 @@ test("falls back to Business Information when support settings are empty", () =>
       contactPhonePrimary: "",
       contactPhoneSecondary: "",
       whatsappBusinessPhoneNumber: null,
+      whatsappOrderingEnabled: false,
     },
   });
 
@@ -85,6 +87,7 @@ test("hides registration details without hiding support channels", () => {
       contactPhonePrimary: "+27 82 123 4567",
       contactPhoneSecondary: "",
       whatsappBusinessPhoneNumber: null,
+      whatsappOrderingEnabled: false,
     },
   });
 
@@ -107,6 +110,7 @@ test("does not repeat the same voice and WhatsApp phone in a contact sentence", 
       contactPhonePrimary: "+27 82 123 4567",
       contactPhoneSecondary: "",
       whatsappBusinessPhoneNumber: "+27821234567",
+      whatsappOrderingEnabled: true,
     },
   });
 
@@ -114,4 +118,19 @@ test("does not repeat the same voice and WhatsApp phone in a contact sentence", 
     formatCustomerSupportContactSentence(details),
     "Contact Jurgens Energy: email help@example.com; call +27 82 123 4567.",
   );
+});
+
+test("hides the configured WhatsApp contact while the 360dialog service is off", () => {
+  const details = createCustomerSupportContactDetails({
+    business,
+    settings: {
+      contactEmail: "help@example.com",
+      contactPhonePrimary: "+27 82 123 4567",
+      contactPhoneSecondary: "",
+      whatsappBusinessPhoneNumber: "+27712345678",
+      whatsappOrderingEnabled: false,
+    },
+  });
+
+  assert.equal(details.whatsappPhone, null);
 });

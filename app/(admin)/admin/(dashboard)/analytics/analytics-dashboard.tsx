@@ -3,19 +3,29 @@ import Link from "next/link";
 import {
   ArrowDownRightIcon,
   ArrowUpRightIcon,
+  BadgeCheckIcon,
   BanknoteIcon,
   CheckCircle2Icon,
+  CircleOffIcon,
   CircleHelpIcon,
   Clock3Icon,
   CreditCardIcon,
   GaugeIcon,
   MapPinIcon,
   MousePointerClickIcon,
+  PackagePlusIcon,
   PackageSearchIcon,
   ReceiptTextIcon,
   TriangleAlertIcon,
+  RouteIcon,
+  ShoppingCartIcon,
   WalletCardsIcon,
 } from "lucide-react";
+
+import {
+  CartJourneyChart,
+  type AnalyticsCartJourneyPoint,
+} from "@/app/(admin)/admin/(dashboard)/analytics/cart-journey-chart";
 
 import {
   CheckoutOutcomeChart,
@@ -64,7 +74,12 @@ export type AnalyticsKpi = {
   direction: "down" | "neutral" | "up";
   format: AnalyticsMetricFormat;
   id:
+    | "abandoned_carts"
+    | "add_to_cart_actions"
     | "average_order_value"
+    | "cart_journeys"
+    | "cart_to_checkout"
+    | "cart_to_purchase"
     | "checkout_conversion"
     | "checkout_sessions"
     | "gross_sales"
@@ -90,6 +105,15 @@ export type AnalyticsProductRow = {
   id: string;
   orders: number;
   revenue: number;
+  title: string;
+  units: number;
+};
+
+export type AnalyticsAddedProductRow = {
+  actions: number;
+  brand: string | null;
+  cartJourneys: number;
+  id: string;
   title: string;
   units: number;
 };
@@ -135,6 +159,16 @@ export type AnalyticsPaymentHealthView = AnalyticsPaymentHealth & {
 };
 
 export type AnalyticsDashboardViewModel = {
+  cartComparisonEnabled: boolean;
+  cartKpis: AnalyticsKpi[];
+  cartTelemetry: {
+    comparisonCoverage: "full" | "none" | "partial";
+    coverage: "full" | "none" | "partial";
+    note: string;
+    startedAt: string | null;
+    trackedJourneys: number;
+  };
+  cartTrend: AnalyticsCartJourneyPoint[];
   channels: AnalyticsChannelRow[];
   checkoutOutcomes: AnalyticsCheckoutOutcome[];
   checkoutOutcomeTotal: number;
@@ -160,6 +194,7 @@ export type AnalyticsDashboardViewModel = {
     status: "active" | "starting";
     trackedSessions: number;
   };
+  topAddedProducts: AnalyticsAddedProductRow[];
   topProducts: AnalyticsProductRow[];
 };
 
@@ -167,7 +202,12 @@ const kpiIcons: Record<
   AnalyticsKpi["id"],
   ComponentType<{ className?: string }>
 > = {
+  abandoned_carts: CircleOffIcon,
+  add_to_cart_actions: PackagePlusIcon,
   average_order_value: ReceiptTextIcon,
+  cart_journeys: ShoppingCartIcon,
+  cart_to_checkout: RouteIcon,
+  cart_to_purchase: BadgeCheckIcon,
   checkout_conversion: GaugeIcon,
   checkout_sessions: MousePointerClickIcon,
   gross_sales: BanknoteIcon,
@@ -321,6 +361,25 @@ export function createAnalyticsDashboardViewModel({
 
     return paidOrders > 0 ? (point.grossSales ?? 0) / paidOrders : 0;
   });
+  const currentCartPoints = analytics.cartSeries.filter(
+    (point) => point.start !== null,
+  );
+  const addToCartSparkline = currentCartPoints.map(
+    (point) => point.addToCartActions ?? 0,
+  );
+  const cartJourneySparkline = currentCartPoints.map(
+    (point) => point.cartJourneys ?? 0,
+  );
+  const cartToCheckoutSparkline = currentCartPoints.map((point) => {
+    const carts = point.cartJourneys ?? 0;
+
+    return carts > 0 ? ((point.checkoutStarts ?? 0) / carts) * 100 : 0;
+  });
+  const cartToPurchaseSparkline = currentCartPoints.map((point) => {
+    const carts = point.cartJourneys ?? 0;
+
+    return carts > 0 ? ((point.purchases ?? 0) / carts) * 100 : 0;
+  });
   const comparisonLabel = comparisonEnabled
     ? comparisonLabelForRange(analytics.range.key)
     : null;
@@ -330,8 +389,93 @@ export function createAnalyticsDashboardViewModel({
     comparisonTelemetryCoverage === "full";
   const checkoutMetricCoverage =
     analytics.telemetry.coverage === "partial" ? "partial" : "full";
+  const cartComparisonAvailable =
+    analytics.telemetry.cartCoverage === "full" &&
+    analytics.telemetry.cartComparisonCoverage === "full";
+  const cartMetricCoverage =
+    analytics.telemetry.cartCoverage === "partial" ? "partial" : "full";
 
   return {
+    cartComparisonEnabled: comparisonEnabled && cartComparisonAvailable,
+    cartKpis: [
+      toKpi({
+        available: analytics.telemetry.cartCoverage !== "none",
+        comparisonAvailable: cartComparisonAvailable,
+        comparisonEnabled,
+        coverage: cartMetricCoverage,
+        description: adminAnalyticsMetricDefinitions.addToCartActions,
+        format: "number",
+        id: "add_to_cart_actions",
+        label: "Add-to-cart actions",
+        metric: analytics.summary.addToCartActions,
+        sparkline: addToCartSparkline,
+      }),
+      toKpi({
+        available: analytics.telemetry.cartCoverage !== "none",
+        comparisonAvailable: cartComparisonAvailable,
+        comparisonEnabled,
+        coverage: cartMetricCoverage,
+        description: adminAnalyticsMetricDefinitions.uniqueCartJourneys,
+        format: "number",
+        id: "cart_journeys",
+        label: "Unique cart journeys",
+        metric: analytics.summary.uniqueCartJourneys,
+        sparkline: cartJourneySparkline,
+      }),
+      toKpi({
+        available: analytics.telemetry.cartCoverage !== "none",
+        comparisonAvailable: cartComparisonAvailable,
+        comparisonEnabled,
+        coverage: cartMetricCoverage,
+        description: adminAnalyticsMetricDefinitions.cartToCheckoutRate,
+        format: "percent",
+        id: "cart_to_checkout",
+        label: "Cart to checkout",
+        metric: analytics.summary.cartToCheckoutRate,
+        sparkline: cartToCheckoutSparkline,
+      }),
+      toKpi({
+        available: analytics.telemetry.cartCoverage !== "none",
+        comparisonAvailable: cartComparisonAvailable,
+        comparisonEnabled,
+        coverage: cartMetricCoverage,
+        description: adminAnalyticsMetricDefinitions.cartToPurchaseRate,
+        format: "percent",
+        id: "cart_to_purchase",
+        label: "Cart to purchase",
+        metric: analytics.summary.cartToPurchaseRate,
+        sparkline: cartToPurchaseSparkline,
+      }),
+      toKpi({
+        available: analytics.telemetry.cartCoverage !== "none",
+        comparisonAvailable: cartComparisonAvailable,
+        comparisonEnabled,
+        coverage: cartMetricCoverage,
+        description: adminAnalyticsMetricDefinitions.abandonedCarts,
+        direction: "down",
+        format: "number",
+        id: "abandoned_carts",
+        label: "Abandoned carts",
+        metric: analytics.summary.abandonedCarts,
+        sparkline: [],
+      }),
+    ],
+    cartTelemetry: {
+      comparisonCoverage: analytics.telemetry.cartComparisonCoverage,
+      coverage: analytics.telemetry.cartCoverage,
+      note: analytics.telemetry.cartNote,
+      startedAt: analytics.telemetry.firstTrackedCartAt,
+      trackedJourneys: analytics.summary.uniqueCartJourneys.value,
+    },
+    cartTrend: currentCartPoints.map((point) => ({
+      addToCartActions: point.addToCartActions,
+      cartJourneys: point.cartJourneys,
+      comparisonAddToCartActions:
+        comparisonEnabled && cartComparisonAvailable
+          ? point.comparisonAddToCartActions
+          : null,
+      label: point.label ?? "",
+    })),
     channels: analytics.channels.map((row) => ({
       conversionRate: row.checkoutConversionRate,
       label: row.label,
@@ -510,6 +654,14 @@ export function createAnalyticsDashboardViewModel({
         : "starting",
       trackedSessions: analytics.checkoutOutcomes.total,
     },
+    topAddedProducts: analytics.topAddedProducts.map((row) => ({
+      actions: row.actions,
+      brand: row.brand,
+      cartJourneys: row.uniqueCartJourneys,
+      id: row.id,
+      title: row.title,
+      units: row.quantity,
+    })),
     topProducts: analytics.topProducts.map((row) => ({
       brand: row.brand,
       category: row.category,
@@ -826,6 +978,72 @@ function TelemetryNotice({ data }: { data: AnalyticsDashboardViewModel }) {
   );
 }
 
+function CartTelemetryNotice({ data }: { data: AnalyticsDashboardViewModel }) {
+  const comparisonHasGap =
+    data.comparisonEnabled &&
+    data.cartTelemetry.comparisonCoverage !== "full";
+
+  if (data.cartTelemetry.coverage === "full" && !comparisonHasGap) {
+    return null;
+  }
+
+  const startedLabel = data.cartTelemetry.startedAt
+    ? formatDate(data.cartTelemetry.startedAt)
+    : null;
+  const isStarting = data.cartTelemetry.coverage === "none";
+
+  return (
+    <section
+      className={cn(
+        "flex min-w-0 flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-start",
+        isStarting
+          ? "border-amber-400/35 bg-amber-500/[0.08] dark:border-amber-400/20 dark:bg-amber-500/[0.06]"
+          : "border-sky-400/30 bg-sky-500/[0.06] dark:border-sky-400/20 dark:bg-sky-500/[0.05]",
+      )}
+    >
+      <span
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-full",
+          isStarting
+            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+            : "bg-sky-500/12 text-sky-700 dark:text-sky-300",
+        )}
+      >
+        <ShoppingCartIcon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-zinc-950 dark:text-white">
+            {isStarting
+              ? "Cart journey analytics starts here"
+              : data.cartTelemetry.coverage === "partial"
+                ? "Cart analytics covers part of this range"
+                : "Comparison cart analytics is incomplete"}
+          </p>
+          <Badge
+            className={cn(
+              "border-0",
+              isStarting
+                ? "bg-amber-500/15 text-amber-800 dark:text-amber-200"
+                : "bg-sky-500/12 text-sky-800 dark:text-sky-200",
+            )}
+          >
+            {data.cartTelemetry.trackedJourneys.toLocaleString("en-ZA")} journeys
+          </Badge>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-zinc-300">
+          {data.cartTelemetry.note}
+          {startedLabel ? ` Tracking began ${startedLabel} SAST.` : ""}
+          {comparisonHasGap
+            ? " Cart changes are hidden until both periods have complete first-party coverage."
+            : ""}
+          {" "}A cart journey represents one browser session, not an identifiable person.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function Funnel({ stages }: { stages: AnalyticsFunnelStage[] }) {
   const hasActivity = stages.some((stage) => stage.count > 0);
 
@@ -838,7 +1056,7 @@ function Funnel({ stages }: { stages: AnalyticsFunnelStage[] }) {
             Funnel waiting for tracked sessions
           </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-zinc-500">
-            Each checkout milestone will appear here with its stage-to-stage drop-off.
+            Each cart and checkout milestone will appear here with its stage-to-stage drop-off.
           </p>
         </div>
       </div>
@@ -892,15 +1110,71 @@ function Funnel({ stages }: { stages: AnalyticsFunnelStage[] }) {
   );
 }
 
-function RankingEmpty({ label }: { label: string }) {
+function RankingEmpty({
+  detail = "Results will appear as commerce activity is recorded.",
+  label,
+}: {
+  detail?: string;
+  label: string;
+}) {
   return (
     <div className="grid min-h-44 place-items-center rounded-lg border border-dashed border-slate-200 px-4 text-center dark:border-white/10">
       <div>
         <PackageSearchIcon className="mx-auto size-5 text-slate-400 dark:text-zinc-500" />
         <p className="mt-2 text-xs text-slate-500 dark:text-zinc-500">
-          {label} will appear after successful orders are recorded.
+          {label}: {detail}
         </p>
       </div>
+    </div>
+  );
+}
+
+function AddedProductRanking({ rows }: { rows: AnalyticsAddedProductRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <RankingEmpty
+        detail="products will rank once customers add them to a cart."
+        label="No product additions yet"
+      />
+    );
+  }
+
+  const maximum = Math.max(...rows.map((row) => row.units), 1);
+
+  return (
+    <div className="grid gap-4">
+      {rows.map((row, index) => (
+        <div className="min-w-0" key={row.id}>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/10 font-mono text-[11px] font-semibold text-primary dark:bg-primary/15 dark:text-brand-amber">
+              {index + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-zinc-950 dark:text-white">
+                    {row.title}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-500 dark:text-zinc-500">
+                    {row.brand ?? "Unbranded"} ·{" "}
+                    {row.cartJourneys.toLocaleString("en-ZA")} carts ·{" "}
+                    {row.actions.toLocaleString("en-ZA")} actions
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-mono text-xs font-semibold tabular-nums text-zinc-950 dark:text-white">
+                    {row.units.toLocaleString("en-ZA")}
+                  </p>
+                  <p className="mt-0.5 text-[9px] uppercase tracking-wide text-slate-400 dark:text-zinc-600">
+                    units added
+                  </p>
+                </div>
+              </div>
+              <RankingBar percentage={(row.units / maximum) * 100} />
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1235,7 +1509,7 @@ function EmptyPeriodNotice({ telemetryOnly }: { telemetryOnly: boolean }) {
       <p className="mx-auto mt-1 max-w-xl text-xs leading-5 text-slate-500 dark:text-zinc-400">
         {telemetryOnly
           ? "This is not counted as zero conversion: no first-party checkout telemetry exists for the selected range. New tracked sessions will populate the funnel and outcome views automatically."
-          : "The selected period contains no paid orders, payment attempts, or tracked checkout sessions. Choose a wider range to review earlier activity."}
+          : "The selected period contains no cart journeys, paid orders, payment attempts, or tracked checkout sessions. Choose a wider range to review earlier activity."}
       </p>
     </section>
   );
@@ -1257,6 +1531,7 @@ export function AnalyticsDashboard({
     data.sales.some(
       (point) => (point.sales ?? 0) > 0 || (point.orders ?? 0) > 0,
     ) ||
+    data.cartKpis.some((metric) => metric.available && metric.value > 0) ||
     data.checkoutOutcomeTotal > 0 ||
     data.paymentHealth.total > 0;
   const checkoutOutcomeValues = Object.fromEntries(
@@ -1288,6 +1563,78 @@ export function AnalyticsDashboard({
           />
         ))}
       </section>
+
+      <div className="mt-2 flex min-w-0 flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">
+              Cart engagement
+            </h2>
+            <MetricInfo
+              description="First-party cart journeys connect product additions to checkout starts and provider-confirmed purchases."
+              label="Cart engagement"
+            />
+          </div>
+          <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+            See what customers add, where journeys stop, and how carts convert.
+          </p>
+        </div>
+        <p className="mt-1 text-[11px] text-slate-500 dark:text-zinc-500 sm:mt-0">
+          Unique journeys are browser sessions, not identifiable people.
+        </p>
+      </div>
+
+      <CartTelemetryNotice data={data} />
+
+      <section
+        aria-label="Cart engagement indicators"
+        className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5"
+      >
+        {data.cartKpis.map((metric) => (
+          <KpiCard
+            comparisonLabel={data.comparisonLabel}
+            currency={data.currency}
+            key={metric.id}
+            metric={metric}
+          />
+        ))}
+      </section>
+
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[1.5fr_0.5fr]">
+        <Panel
+          description={
+            data.cartComparisonEnabled && data.comparisonLabel
+              ? `Add-to-cart actions and unique cart journeys against ${data.comparisonLabel}.`
+              : "Add-to-cart actions and unique cart journeys across the selected period."
+          }
+          title="Cart activity over time"
+        >
+          <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-slate-500 dark:text-zinc-400">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-primary" /> Add-to-cart actions
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2.5 rounded-full bg-brand-amber" /> Unique cart journeys
+            </span>
+            {data.cartComparisonEnabled ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-4 border-t border-dashed border-slate-400" /> Previous add-to-cart actions
+              </span>
+            ) : null}
+          </div>
+          <CartJourneyChart
+            comparisonEnabled={data.cartComparisonEnabled}
+            data={data.cartTrend}
+          />
+        </Panel>
+
+        <Panel
+          description={adminAnalyticsPanelDefinitions.topAddedProducts}
+          title="Most added products"
+        >
+          <AddedProductRanking rows={data.topAddedProducts} />
+        </Panel>
+      </div>
 
       {!hasActivity ? (
         <EmptyPeriodNotice telemetryOnly={coverage === "none"} />
@@ -1354,8 +1701,8 @@ export function AnalyticsDashboard({
         </Panel>
 
         <Panel
-          description="Stage completion is measured from tracked checkout starts, with loss from the preceding stage."
-          title="Checkout funnel and drop-off"
+          description={adminAnalyticsPanelDefinitions.cartFunnel}
+          title="Commerce funnel and drop-off"
         >
           <Funnel stages={data.funnel} />
         </Panel>

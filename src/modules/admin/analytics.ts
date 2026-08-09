@@ -35,6 +35,7 @@ import {
   getAdminAnalyticsTelemetryCoverage,
   getAdminAnalyticsBucketIndex,
   getAdminAnalyticsBucketStart,
+  isCartJourneyAbandoned,
   isAdminAnalyticsRangeKey,
   resolveAdminAnalyticsRange,
 } from "@/src/modules/admin/analytics-core";
@@ -60,14 +61,35 @@ export type AdminAnalyticsSerializedRange = Readonly<{
 }>;
 
 export type AdminAnalyticsSummary = Readonly<{
+  addToCartActions: AdminAnalyticsMetricComparison;
+  abandonedCarts: AdminAnalyticsMetricComparison;
   abandonedCheckouts: AdminAnalyticsMetricComparison;
   averageOrderValue: AdminAnalyticsMetricComparison;
+  cartToCheckoutRate: AdminAnalyticsMetricComparison;
+  cartToPurchaseRate: AdminAnalyticsMetricComparison;
   checkoutConversionRate: AdminAnalyticsMetricComparison;
   checkoutStarts: AdminAnalyticsMetricComparison;
   grossSales: AdminAnalyticsMetricComparison;
   netSales: AdminAnalyticsMetricComparison;
   paidOrders: AdminAnalyticsMetricComparison;
   refundedAmount: AdminAnalyticsMetricComparison;
+  uniqueCartJourneys: AdminAnalyticsMetricComparison;
+}>;
+
+export type AdminAnalyticsCartSeriesPoint = Readonly<{
+  addToCartActions: number | null;
+  cartJourneys: number | null;
+  checkoutStarts: number | null;
+  comparisonAddToCartActions: number | null;
+  comparisonCartJourneys: number | null;
+  comparisonCheckoutStarts: number | null;
+  comparisonLabel: string | null;
+  comparisonPurchases: number | null;
+  comparisonStart: string | null;
+  key: string;
+  label: string | null;
+  purchases: number | null;
+  start: string | null;
 }>;
 
 export type AdminAnalyticsSalesSeriesPoint = Readonly<{
@@ -115,12 +137,10 @@ export type AdminAnalyticsOutcomeSeriesPoint = Readonly<{
 export type AdminAnalyticsFunnelStage = Readonly<{
   dropOffRateFromPrevious: number;
   key:
-    | "address_completed"
+    | "added_to_cart"
     | "checkout_started"
     | "order_created"
-    | "payment_reached"
-    | "shipping_completed"
-    | "successful";
+    | "payment_confirmed";
   label: string;
   rateFromStart: number;
   sessions: number;
@@ -150,6 +170,15 @@ export type AdminAnalyticsTopProduct = Readonly<{
   productSales: number;
   title: string;
   units: number;
+}>;
+
+export type AdminAnalyticsTopAddedProduct = Readonly<{
+  actions: number;
+  brand: string | null;
+  id: string;
+  quantity: number;
+  title: string;
+  uniqueCartJourneys: number;
 }>;
 
 export type AdminAnalyticsChannelRow = Readonly<{
@@ -196,16 +225,23 @@ export type AdminAnalyticsRecentCheckout = Readonly<{
 }>;
 
 export type AdminAnalyticsTelemetry = Readonly<{
+  cartComparisonCoverage: "full" | "none" | "partial";
+  cartCoverage: "full" | "none" | "partial";
+  cartNote: string;
   comparisonCoverage: "full" | "none" | "partial";
+  comparisonRangeIncludesPreCartInstrumentationHistory: boolean;
   comparisonRangeIncludesPreInstrumentationHistory: boolean;
   coverage: "full" | "none" | "partial";
   firstTrackedCheckoutAt: string | null;
+  firstTrackedCartAt: string | null;
   note: string;
   paidOrdersBeforeTracking: number;
   selectedRangeIncludesPreInstrumentationHistory: boolean;
+  selectedRangeIncludesPreCartInstrumentationHistory: boolean;
 }>;
 
 export type AdminCommerceAnalytics = Readonly<{
+  cartSeries: AdminAnalyticsCartSeriesPoint[];
   channels: AdminAnalyticsChannelRow[];
   checkoutOutcomes: AdminAnalyticsOutcomeCounts;
   currency: "ZAR";
@@ -219,18 +255,27 @@ export type AdminCommerceAnalytics = Readonly<{
   salesSeries: AdminAnalyticsSalesSeriesPoint[];
   summary: AdminAnalyticsSummary;
   telemetry: AdminAnalyticsTelemetry;
+  topAddedProducts: AdminAnalyticsTopAddedProduct[];
   topProducts: AdminAnalyticsTopProduct[];
 }>;
 
 export const adminAnalyticsMetricDefinitions = {
+  addToCartActions:
+    "Every first-party add-to-cart action recorded in the selected period. Repeated additions in one cart journey are counted separately.",
+  abandonedCarts:
+    "Cart journeys started in the selected period with no checkout start and at least 30 minutes since their last cart activity.",
   abandonedCheckouts:
     "Checkout sessions with no captured payment, no explicit failure and at least 30 minutes without activity.",
   averageOrderValue:
     "Gross sales divided by provider-confirmed paid orders in the selected period.",
+  cartToCheckoutRate:
+    "Cart journeys started in the period that subsequently reached checkout.",
+  cartToPurchaseRate:
+    "Cart journeys started in the period that subsequently linked to a provider-confirmed captured payment.",
   checkoutConversionRate:
     "Checkout sessions started in the period that link to a provider-confirmed captured payment.",
   checkoutStarts:
-    "Distinct first-party checkout sessions first seen in the selected period.",
+    "Distinct first-party cart journeys whose checkout started in the selected period.",
   grossSales:
     "Grand totals of orders with a provider-confirmed captured payment, before completed refunds.",
   netSales:
@@ -239,15 +284,21 @@ export const adminAnalyticsMetricDefinitions = {
     "Distinct orders paid in the period with a COMPLETE PayFast capture. Later-refunded orders remain part of historical gross sales.",
   refundedAmount:
     "Refunds whose payment workflow reached completed status during the selected period.",
+  uniqueCartJourneys:
+    "Distinct first-party cart journeys whose first add-to-cart action occurred in the selected period. This is a session measure, not a count of identifiable people.",
 } as const;
 
 export const adminAnalyticsPanelDefinitions = {
+  cartFunnel:
+    "Cart journeys that began in the selected period, followed through checkout, order creation and provider-confirmed payment.",
   channels:
     "First-party checkout sessions and captured orders grouped by consent-aware campaign source or referrer. Direct / untracked includes visits without attributable campaign data.",
   paymentHealth:
     "Payment attempts are grouped by the period in which each attempt was created. Open reconciliation exceptions are a current global workload, not a period cohort.",
   topProducts:
     "Gross product-line sales from captured orders in the period. Product sales exclude delivery charges and are shown before refunds.",
+  topAddedProducts:
+    "Products ranked by units added to carts during the selected period. Actions count add interactions; cart journeys count distinct first-party sessions.",
 } as const;
 
 type PaidOrderRow = {
@@ -266,6 +317,8 @@ type CompletedRefundRow = {
 type CheckoutSessionRow = {
   campaignAttribution: CampaignAttributionSnapshot | null;
   cartValue: string | null;
+  cartStartedAt: Date | null;
+  checkoutStartedAt: Date | null;
   currency: string | null;
   deviceCategory: "desktop" | "mobile" | "tablet" | "unknown";
   firstSeenAt: Date;
@@ -274,6 +327,7 @@ type CheckoutSessionRow = {
   itemCount: number | null;
   landingPath: string | null;
   lastErrorCode: string | null;
+  lastCartActivityAt: Date | null;
   lastSeenAt: Date;
   latestStep: CheckoutAnalyticsEventName;
   orderGrandTotal: string | null;
@@ -283,6 +337,10 @@ type CheckoutSessionRow = {
   referrerHost: string | null;
   status: "active" | "completed" | "failed";
   totalQuantity: number | null;
+};
+
+type CartAddEventRow = {
+  occurredAt: Date;
 };
 
 type MutableSalesValues = {
@@ -297,6 +355,13 @@ type MutableOutcomeValues = {
   pending: number;
   started: number;
   successful: number;
+};
+
+type MutableCartValues = {
+  addToCartActions: number;
+  cartJourneys: number;
+  checkoutStarts: number;
+  purchases: number;
 };
 
 function toNumber(value: string | number | null | undefined) {
@@ -518,6 +583,15 @@ function emptyOutcomeValues(): MutableOutcomeValues {
   };
 }
 
+function emptyCartValues(): MutableCartValues {
+  return {
+    addToCartActions: 0,
+    cartJourneys: 0,
+    checkoutStarts: 0,
+    purchases: 0,
+  };
+}
+
 function getSessionEventProgress(
   events: ReadonlySet<CheckoutAnalyticsEventName>,
   row: CheckoutSessionRow,
@@ -526,13 +600,8 @@ function getSessionEventProgress(
     names.some((name) => events.has(name));
   const orderCreated =
     Boolean(row.orderId) || hasAny("order_created", "payment_confirmed");
-  const paymentReached =
-    orderCreated ||
-    hasAny("payment_reached", "payment_attempted", "payfast_redirected");
-  const shippingCompleted = paymentReached || hasAny("shipping_completed");
-  const addressCompleted = shippingCompleted || hasAny("address_completed");
 
-  return { addressCompleted, orderCreated, paymentReached, shippingCompleted };
+  return { orderCreated };
 }
 
 function buildFunnel(
@@ -554,21 +623,15 @@ function buildFunnel(
     label: string;
     sessions: number;
   }> = [
-    { key: "checkout_started", label: "Checkout started", sessions: startCount },
     {
-      key: "address_completed",
-      label: "Address completed",
-      sessions: progress.filter((item) => item.addressCompleted).length,
+      key: "added_to_cart",
+      label: "Added to cart",
+      sessions: startCount,
     },
     {
-      key: "shipping_completed",
-      label: "Shipping completed",
-      sessions: progress.filter((item) => item.shippingCompleted).length,
-    },
-    {
-      key: "payment_reached",
-      label: "Payment reached",
-      sessions: progress.filter((item) => item.paymentReached).length,
+      key: "checkout_started",
+      label: "Checkout started",
+      sessions: sessions.filter((item) => item.checkoutStartedAt).length,
     },
     {
       key: "order_created",
@@ -576,8 +639,8 @@ function buildFunnel(
       sessions: progress.filter((item) => item.orderCreated).length,
     },
     {
-      key: "successful",
-      label: "Payment captured",
+      key: "payment_confirmed",
+      label: "Payment confirmed",
       sessions: sessions.filter((item) => item.hasCapturedPayment).length,
     },
   ];
@@ -595,21 +658,29 @@ function buildFunnel(
 }
 
 function createSeries({
+  comparisonAddEvents,
+  comparisonCartSessions,
   comparisonOrders,
   comparisonRefunds,
-  comparisonSessions,
+  comparisonCheckoutSessions,
+  currentAddEvents,
+  currentCartSessions,
   currentOrders,
   currentRefunds,
-  currentSessions,
+  currentCheckoutSessions,
   now,
   range,
 }: {
+  comparisonAddEvents: CartAddEventRow[];
+  comparisonCartSessions: CheckoutSessionRow[];
   comparisonOrders: PaidOrderRow[];
   comparisonRefunds: CompletedRefundRow[];
-  comparisonSessions: CheckoutSessionRow[];
+  comparisonCheckoutSessions: CheckoutSessionRow[];
+  currentAddEvents: CartAddEventRow[];
+  currentCartSessions: CheckoutSessionRow[];
   currentOrders: PaidOrderRow[];
   currentRefunds: CompletedRefundRow[];
-  currentSessions: CheckoutSessionRow[];
+  currentCheckoutSessions: CheckoutSessionRow[];
   now: Date;
   range: ReturnType<typeof resolveAdminAnalyticsRange>;
 }) {
@@ -634,6 +705,14 @@ function createSeries({
   const comparisonOutcomes = Array.from(
     { length: comparisonBucketCount },
     emptyOutcomeValues,
+  );
+  const currentCart = Array.from(
+    { length: range.bucketCount },
+    emptyCartValues,
+  );
+  const comparisonCart = Array.from(
+    { length: comparisonBucketCount },
+    emptyCartValues,
   );
 
   const addOrders = (
@@ -679,8 +758,12 @@ function createSeries({
     start: Date,
   ) => {
     for (const session of rows) {
+      if (!session.checkoutStartedAt) {
+        continue;
+      }
+
       const index = getAdminAnalyticsBucketIndex(
-        session.firstSeenAt,
+        session.checkoutStartedAt,
         start,
         range.bucketMilliseconds,
         values.length,
@@ -704,13 +787,123 @@ function createSeries({
     }
   };
 
+  const addCartJourneyStarts = (
+    rows: CheckoutSessionRow[],
+    values: MutableCartValues[],
+    start: Date,
+  ) => {
+    for (const session of rows) {
+      if (!session.cartStartedAt) {
+        continue;
+      }
+
+      const index = getAdminAnalyticsBucketIndex(
+        session.cartStartedAt,
+        start,
+        range.bucketMilliseconds,
+        values.length,
+      );
+
+      if (index >= 0) {
+        values[index].cartJourneys += 1;
+      }
+    }
+  };
+  const addCheckoutStarts = (
+    rows: CheckoutSessionRow[],
+    values: MutableCartValues[],
+    start: Date,
+  ) => {
+    for (const session of rows) {
+      if (!session.cartStartedAt || !session.checkoutStartedAt) {
+        continue;
+      }
+
+      const index = getAdminAnalyticsBucketIndex(
+        session.cartStartedAt,
+        start,
+        range.bucketMilliseconds,
+        values.length,
+      );
+
+      if (index >= 0) {
+        values[index].checkoutStarts += 1;
+      }
+    }
+  };
+  const addPurchases = (
+    rows: CheckoutSessionRow[],
+    values: MutableCartValues[],
+    start: Date,
+  ) => {
+    for (const session of rows) {
+      if (!session.cartStartedAt || !session.hasCapturedPayment) {
+        continue;
+      }
+
+      const index = getAdminAnalyticsBucketIndex(
+        session.cartStartedAt,
+        start,
+        range.bucketMilliseconds,
+        values.length,
+      );
+
+      if (index >= 0) {
+        values[index].purchases += 1;
+      }
+    }
+  };
+  const addCartActions = (
+    rows: CartAddEventRow[],
+    values: MutableCartValues[],
+    start: Date,
+  ) => {
+    for (const event of rows) {
+      const index = getAdminAnalyticsBucketIndex(
+        event.occurredAt,
+        start,
+        range.bucketMilliseconds,
+        values.length,
+      );
+
+      if (index >= 0) {
+        values[index].addToCartActions += 1;
+      }
+    }
+  };
+
   addOrders(currentOrders, currentSales, range.start);
   addOrders(comparisonOrders, comparisonSales, range.comparisonStart);
   addRefunds(currentRefunds, currentSales, range.start);
   addRefunds(comparisonRefunds, comparisonSales, range.comparisonStart);
-  addSessions(currentSessions, currentOutcomes, range.start);
-  addSessions(comparisonSessions, comparisonOutcomes, range.comparisonStart);
+  addSessions(currentCheckoutSessions, currentOutcomes, range.start);
+  addSessions(
+    comparisonCheckoutSessions,
+    comparisonOutcomes,
+    range.comparisonStart,
+  );
+  addCartJourneyStarts(currentCartSessions, currentCart, range.start);
+  addCartJourneyStarts(
+    comparisonCartSessions,
+    comparisonCart,
+    range.comparisonStart,
+  );
+  addCheckoutStarts(currentCartSessions, currentCart, range.start);
+  addCheckoutStarts(
+    comparisonCartSessions,
+    comparisonCart,
+    range.comparisonStart,
+  );
+  addPurchases(currentCartSessions, currentCart, range.start);
+  addPurchases(
+    comparisonCartSessions,
+    comparisonCart,
+    range.comparisonStart,
+  );
+  addCartActions(currentAddEvents, currentCart, range.start);
+  addCartActions(comparisonAddEvents, comparisonCart, range.comparisonStart);
 
+  const cartSeries: AdminAnalyticsCartSeriesPoint[] = [];
   const salesSeries: AdminAnalyticsSalesSeriesPoint[] = [];
   const outcomeSeries: AdminAnalyticsOutcomeSeriesPoint[] = [];
 
@@ -735,7 +928,29 @@ function createSeries({
     const previousSale = comparisonSales[index] ?? null;
     const currentOutcome = currentOutcomes[index] ?? null;
     const previousOutcome = comparisonOutcomes[index] ?? null;
+    const currentCartValues = currentCart[index] ?? null;
+    const previousCartValues = comparisonCart[index] ?? null;
 
+    cartSeries.push({
+      addToCartActions: currentCartValues?.addToCartActions ?? null,
+      cartJourneys: currentCartValues?.cartJourneys ?? null,
+      checkoutStarts: currentCartValues?.checkoutStarts ?? null,
+      comparisonAddToCartActions:
+        previousCartValues?.addToCartActions ?? null,
+      comparisonCartJourneys: previousCartValues?.cartJourneys ?? null,
+      comparisonCheckoutStarts: previousCartValues?.checkoutStarts ?? null,
+      comparisonLabel: previousStart
+        ? formatBucketLabel(previousStart, range.granularity)
+        : null,
+      comparisonPurchases: previousCartValues?.purchases ?? null,
+      comparisonStart: previousStart?.toISOString() ?? null,
+      key: `bucket-${index}`,
+      label: currentStart
+        ? formatBucketLabel(currentStart, range.granularity)
+        : null,
+      purchases: currentCartValues?.purchases ?? null,
+      start: currentStart?.toISOString() ?? null,
+    });
     salesSeries.push({
       comparisonGrossSales: previousSale
         ? roundMoney(previousSale.grossSales)
@@ -788,7 +1003,7 @@ function createSeries({
     });
   }
 
-  return { outcomeSeries, salesSeries };
+  return { cartSeries, outcomeSeries, salesSeries };
 }
 
 function summarizeOutcomes(
@@ -848,12 +1063,33 @@ export async function getAdminCommerceAnalytics(
   );
   const checkoutPeriod = or(
     and(
-      gte(checkoutAnalyticsSessions.firstSeenAt, range.start),
-      lt(checkoutAnalyticsSessions.firstSeenAt, range.end),
+      gte(checkoutAnalyticsSessions.checkoutStartedAt, range.start),
+      lt(checkoutAnalyticsSessions.checkoutStartedAt, range.end),
     ),
     and(
-      gte(checkoutAnalyticsSessions.firstSeenAt, range.comparisonStart),
-      lt(checkoutAnalyticsSessions.firstSeenAt, range.comparisonEnd),
+      gte(checkoutAnalyticsSessions.checkoutStartedAt, range.comparisonStart),
+      lt(checkoutAnalyticsSessions.checkoutStartedAt, range.comparisonEnd),
+    ),
+  );
+  const cartPeriod = or(
+    and(
+      gte(checkoutAnalyticsSessions.cartStartedAt, range.start),
+      lt(checkoutAnalyticsSessions.cartStartedAt, range.end),
+    ),
+    and(
+      gte(checkoutAnalyticsSessions.cartStartedAt, range.comparisonStart),
+      lt(checkoutAnalyticsSessions.cartStartedAt, range.comparisonEnd),
+    ),
+  );
+  const sessionPeriod = or(checkoutPeriod, cartPeriod);
+  const addEventPeriod = or(
+    and(
+      gte(checkoutAnalyticsEvents.occurredAt, range.start),
+      lt(checkoutAnalyticsEvents.occurredAt, range.end),
+    ),
+    and(
+      gte(checkoutAnalyticsEvents.occurredAt, range.comparisonStart),
+      lt(checkoutAnalyticsEvents.occurredAt, range.comparisonEnd),
     ),
   );
   const successfulOrderPayment = sql<boolean>`exists (
@@ -876,6 +1112,8 @@ export async function getAdminCommerceAnalytics(
     completedRefundRows,
     sessionRows,
     sessionEventRows,
+    cartAddEventRows,
+    topAddedProductRows,
     topProductRows,
     paymentHealthRows,
     rejectedWebhookRows,
@@ -916,6 +1154,8 @@ export async function getAdminCommerceAnalytics(
         campaignAttribution:
           checkoutAnalyticsSessions.campaignAttributionSnapshot,
         cartValue: checkoutAnalyticsSessions.cartValue,
+        cartStartedAt: checkoutAnalyticsSessions.cartStartedAt,
+        checkoutStartedAt: checkoutAnalyticsSessions.checkoutStartedAt,
         currency: checkoutAnalyticsSessions.currency,
         deviceCategory: checkoutAnalyticsSessions.deviceCategory,
         firstSeenAt: checkoutAnalyticsSessions.firstSeenAt,
@@ -924,6 +1164,7 @@ export async function getAdminCommerceAnalytics(
         itemCount: checkoutAnalyticsSessions.itemCount,
         landingPath: checkoutAnalyticsSessions.landingPath,
         lastErrorCode: checkoutAnalyticsSessions.lastErrorCode,
+        lastCartActivityAt: checkoutAnalyticsSessions.lastCartActivityAt,
         lastSeenAt: checkoutAnalyticsSessions.lastSeenAt,
         latestStep: checkoutAnalyticsSessions.latestStep,
         orderGrandTotal: orders.grandTotal,
@@ -936,7 +1177,7 @@ export async function getAdminCommerceAnalytics(
       })
       .from(checkoutAnalyticsSessions)
       .leftJoin(orders, eq(orders.id, checkoutAnalyticsSessions.orderId))
-      .where(checkoutPeriod),
+      .where(sessionPeriod),
     db
       .select({
         eventName: checkoutAnalyticsEvents.eventName,
@@ -947,7 +1188,43 @@ export async function getAdminCommerceAnalytics(
         checkoutAnalyticsSessions,
         eq(checkoutAnalyticsSessions.id, checkoutAnalyticsEvents.sessionId),
       )
-      .where(checkoutPeriod),
+      .where(or(checkoutPeriod, cartPeriod)),
+    db
+      .select({
+        occurredAt: checkoutAnalyticsEvents.occurredAt,
+      })
+      .from(checkoutAnalyticsEvents)
+      .where(
+        and(
+          eq(checkoutAnalyticsEvents.eventName, "add_to_cart"),
+          addEventPeriod,
+        ),
+      ),
+    db
+      .select({
+        actions: sql<number>`count(*)::int`,
+        brand: sql<string | null>`max(${checkoutAnalyticsEvents.brandNameSnapshot})`,
+        id: checkoutAnalyticsEvents.productId,
+        quantity: sql<number>`coalesce(sum(${checkoutAnalyticsEvents.quantityDelta}), 0)::int`,
+        title: sql<string>`coalesce(max(${checkoutAnalyticsEvents.productTitleSnapshot}), max(${products.title}), 'Unknown product')`,
+        uniqueCartJourneys: sql<number>`count(distinct ${checkoutAnalyticsEvents.sessionId})::int`,
+      })
+      .from(checkoutAnalyticsEvents)
+      .leftJoin(products, eq(products.id, checkoutAnalyticsEvents.productId))
+      .where(
+        and(
+          eq(checkoutAnalyticsEvents.eventName, "add_to_cart"),
+          isNotNull(checkoutAnalyticsEvents.productId),
+          gte(checkoutAnalyticsEvents.occurredAt, range.start),
+          lt(checkoutAnalyticsEvents.occurredAt, range.end),
+        ),
+      )
+      .groupBy(checkoutAnalyticsEvents.productId)
+      .orderBy(
+        sql`sum(${checkoutAnalyticsEvents.quantityDelta}) desc`,
+        sql`count(*) desc`,
+      )
+      .limit(8),
     db
       .select({
         brand: brands.name,
@@ -1038,7 +1315,8 @@ export async function getAdminCommerceAnalytics(
       .where(eq(paymentReconciliationExceptions.status, "open")),
     db
       .select({
-        firstTrackedCheckoutAt: sql<Date | null>`min(${checkoutAnalyticsSessions.firstSeenAt})`,
+        firstTrackedCartAt: sql<Date | null>`min(${checkoutAnalyticsSessions.cartStartedAt})`,
+        firstTrackedCheckoutAt: sql<Date | null>`min(${checkoutAnalyticsSessions.checkoutStartedAt})`,
       })
       .from(checkoutAnalyticsSessions),
   ]);
@@ -1062,12 +1340,41 @@ export async function getAdminCommerceAnalytics(
       range.comparisonEnd,
     ),
   );
-  const currentSessions = normalizedSessionRows.filter((session) =>
-    isInPeriod(session.firstSeenAt, range.start, range.end),
+  const normalizedCartAddEventRows = cartAddEventRows as CartAddEventRow[];
+  const currentCartSessions = normalizedSessionRows.filter(
+    (session) =>
+      session.cartStartedAt &&
+      isInPeriod(session.cartStartedAt, range.start, range.end),
   );
-  const comparisonSessions = normalizedSessionRows.filter((session) =>
+  const comparisonCartSessions = normalizedSessionRows.filter(
+    (session) =>
+      session.cartStartedAt &&
+      isInPeriod(
+        session.cartStartedAt,
+        range.comparisonStart,
+        range.comparisonEnd,
+      ),
+  );
+  const currentCheckoutSessions = normalizedSessionRows.filter(
+    (session) =>
+      session.checkoutStartedAt &&
+      isInPeriod(session.checkoutStartedAt, range.start, range.end),
+  );
+  const comparisonCheckoutSessions = normalizedSessionRows.filter(
+    (session) =>
+      session.checkoutStartedAt &&
+      isInPeriod(
+        session.checkoutStartedAt,
+        range.comparisonStart,
+        range.comparisonEnd,
+      ),
+  );
+  const currentAddEvents = normalizedCartAddEventRows.filter((event) =>
+    isInPeriod(event.occurredAt, range.start, range.end),
+  );
+  const comparisonAddEvents = normalizedCartAddEventRows.filter((event) =>
     isInPeriod(
-      session.firstSeenAt,
+      event.occurredAt,
       range.comparisonStart,
       range.comparisonEnd,
     ),
@@ -1084,8 +1391,11 @@ export async function getAdminCommerceAnalytics(
     eventNamesBySessionId.set(event.sessionId, names);
   }
 
-  const currentOutcomes = summarizeOutcomes(currentSessions, now);
-  const comparisonOutcomes = summarizeOutcomes(comparisonSessions, now);
+  const currentOutcomes = summarizeOutcomes(currentCheckoutSessions, now);
+  const comparisonOutcomes = summarizeOutcomes(
+    comparisonCheckoutSessions,
+    now,
+  );
   const currentGrossSales = currentOrders.reduce(
     (total, order) => total + toNumber(order.grandTotal),
     0,
@@ -1108,18 +1418,23 @@ export async function getAdminCommerceAnalytics(
     comparisonOrders.length > 0
       ? comparisonGrossSales / comparisonOrders.length
       : 0;
-  const { outcomeSeries, salesSeries } = createSeries({
+  const { cartSeries, outcomeSeries, salesSeries } = createSeries({
+    comparisonAddEvents,
+    comparisonCartSessions,
+    comparisonCheckoutSessions,
     comparisonOrders,
     comparisonRefunds,
-    comparisonSessions,
+    currentAddEvents,
+    currentCartSessions,
+    currentCheckoutSessions,
     currentOrders,
     currentRefunds,
-    currentSessions,
     now,
     range,
   });
   const firstTrackedCheckoutAt =
     telemetryRows[0]?.firstTrackedCheckoutAt ?? null;
+  const firstTrackedCartAt = telemetryRows[0]?.firstTrackedCartAt ?? null;
   const [paidBeforeTrackingRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(orders)
@@ -1142,6 +1457,16 @@ export async function getAdminCommerceAnalytics(
     range.comparisonEnd,
     firstTrackedCheckoutAt,
   );
+  const cartCoverage = getAdminAnalyticsTelemetryCoverage(
+    range.start,
+    range.end,
+    firstTrackedCartAt,
+  );
+  const cartComparisonCoverage = getAdminAnalyticsTelemetryCoverage(
+    range.comparisonStart,
+    range.comparisonEnd,
+    firstTrackedCartAt,
+  );
   const paymentHealth = paymentHealthRows[0] ?? {
     attempts: 0,
     captured: 0,
@@ -1151,12 +1476,31 @@ export async function getAdminCommerceAnalytics(
     providerReportedFailed: 0,
     refunded: 0,
   };
+  const currentAbandonedCarts = currentCartSessions.filter((session) =>
+    isCartJourneyAbandoned(session, now),
+  ).length;
+  const comparisonAbandonedCarts = comparisonCartSessions.filter((session) =>
+    isCartJourneyAbandoned(session, now),
+  ).length;
+  const currentCartCheckouts = currentCartSessions.filter(
+    (session) => session.checkoutStartedAt,
+  ).length;
+  const comparisonCartCheckouts = comparisonCartSessions.filter(
+    (session) => session.checkoutStartedAt,
+  ).length;
+  const currentCartPurchases = currentCartSessions.filter(
+    (session) => session.hasCapturedPayment,
+  ).length;
+  const comparisonCartPurchases = comparisonCartSessions.filter(
+    (session) => session.hasCapturedPayment,
+  ).length;
 
   return {
-    channels: buildChannelBreakdown(currentOrders, currentSessions),
+    cartSeries,
+    channels: buildChannelBreakdown(currentOrders, currentCheckoutSessions),
     checkoutOutcomes: currentOutcomes,
     currency: "ZAR",
-    funnel: buildFunnel(currentSessions, eventNamesBySessionId),
+    funnel: buildFunnel(currentCartSessions, eventNamesBySessionId),
     generatedAt: now.toISOString(),
     outcomeSeries,
     paymentHealth: {
@@ -1190,7 +1534,7 @@ export async function getAdminCommerceAnalytics(
       start: range.start.toISOString(),
       timeZone: range.timeZone,
     },
-    recentCheckouts: currentSessions
+    recentCheckouts: currentCheckoutSessions
       .map((session) => ({
         outcome: classifyCheckoutAnalyticsOutcome(
           {
@@ -1219,7 +1563,9 @@ export async function getAdminCommerceAnalytics(
         currency: session.currency ?? "ZAR",
         deviceCategory: session.deviceCategory,
         errorCode: session.lastErrorCode,
-        firstSeenAt: session.firstSeenAt.toISOString(),
+        firstSeenAt:
+          session.checkoutStartedAt?.toISOString() ??
+          session.firstSeenAt.toISOString(),
         id: session.id,
         itemCount: session.itemCount,
         landingPath: session.landingPath,
@@ -1247,6 +1593,14 @@ export async function getAdminCommerceAnalytics(
       })),
     salesSeries,
     summary: {
+      addToCartActions: createAdminAnalyticsMetricComparison(
+        currentAddEvents.length,
+        comparisonAddEvents.length,
+      ),
+      abandonedCarts: createAdminAnalyticsMetricComparison(
+        currentAbandonedCarts,
+        comparisonAbandonedCarts,
+      ),
       abandonedCheckouts: createAdminAnalyticsMetricComparison(
         currentOutcomes.abandoned,
         comparisonOutcomes.abandoned,
@@ -1255,13 +1609,27 @@ export async function getAdminCommerceAnalytics(
         roundMoney(currentAov),
         roundMoney(comparisonAov),
       ),
+      cartToCheckoutRate: createAdminAnalyticsMetricComparison(
+        toPercent(currentCartCheckouts, currentCartSessions.length),
+        toPercent(
+          comparisonCartCheckouts,
+          comparisonCartSessions.length,
+        ),
+      ),
+      cartToPurchaseRate: createAdminAnalyticsMetricComparison(
+        toPercent(currentCartPurchases, currentCartSessions.length),
+        toPercent(
+          comparisonCartPurchases,
+          comparisonCartSessions.length,
+        ),
+      ),
       checkoutConversionRate: createAdminAnalyticsMetricComparison(
         toPercent(currentOutcomes.successful, currentOutcomes.total),
         toPercent(comparisonOutcomes.successful, comparisonOutcomes.total),
       ),
       checkoutStarts: createAdminAnalyticsMetricComparison(
-        currentSessions.length,
-        comparisonSessions.length,
+        currentCheckoutSessions.length,
+        comparisonCheckoutSessions.length,
       ),
       grossSales: createAdminAnalyticsMetricComparison(
         roundMoney(currentGrossSales),
@@ -1279,13 +1647,28 @@ export async function getAdminCommerceAnalytics(
         roundMoney(currentRefundedAmount),
         roundMoney(comparisonRefundedAmount),
       ),
+      uniqueCartJourneys: createAdminAnalyticsMetricComparison(
+        currentCartSessions.length,
+        comparisonCartSessions.length,
+      ),
     },
     telemetry: {
+      cartComparisonCoverage,
+      cartCoverage,
+      cartNote:
+        cartCoverage === "full"
+          ? "First-party cart telemetry covers this entire selected period."
+          : cartCoverage === "partial"
+            ? "Cart metrics cover only the portion after first-party cart tracking was deployed; earlier cart activity cannot be backfilled."
+            : "No first-party cart activity was recorded in this historical period. Cart history starts from deployment and cannot be backfilled.",
       comparisonCoverage,
+      comparisonRangeIncludesPreCartInstrumentationHistory:
+        cartComparisonCoverage !== "full",
       comparisonRangeIncludesPreInstrumentationHistory:
         comparisonCoverage !== "full",
       coverage,
       firstTrackedCheckoutAt: firstTrackedCheckoutAt?.toISOString() ?? null,
+      firstTrackedCartAt: firstTrackedCartAt?.toISOString() ?? null,
       note:
         coverage === "full"
           ? "First-party checkout telemetry covers this entire selected period."
@@ -1294,7 +1677,23 @@ export async function getAdminCommerceAnalytics(
             : "Sales are complete, but no first-party checkout sessions were recorded in this historical period.",
       paidOrdersBeforeTracking: paidBeforeTrackingRow?.count ?? 0,
       selectedRangeIncludesPreInstrumentationHistory: coverage !== "full",
+      selectedRangeIncludesPreCartInstrumentationHistory:
+        cartCoverage !== "full",
     },
+    topAddedProducts: topAddedProductRows.flatMap((product) =>
+      product.id
+        ? [
+            {
+              actions: product.actions,
+              brand: product.brand,
+              id: product.id,
+              quantity: product.quantity,
+              title: product.title,
+              uniqueCartJourneys: product.uniqueCartJourneys,
+            },
+          ]
+        : [],
+    ),
     topProducts: topProductRows.map((product) => ({
       brand: product.brand,
       category: product.category,

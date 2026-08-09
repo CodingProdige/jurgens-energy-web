@@ -61,6 +61,12 @@ export type CommercePaymentOutcomeInput = Readonly<{
   status: string;
 }>;
 
+export type CartJourneyAbandonmentInput = Readonly<{
+  cartStartedAt: Date | null;
+  checkoutStartedAt: Date | null;
+  lastCartActivityAt: Date | null;
+}>;
+
 function assertValidDate(value: Date, label: string) {
   if (!Number.isFinite(value.getTime())) {
     throw new Error(`${label} must be a valid date.`);
@@ -258,6 +264,27 @@ export function classifyCheckoutAnalyticsOutcome(
   }
 
   return "pending";
+}
+
+export function isCartJourneyAbandoned(
+  input: CartJourneyAbandonmentInput,
+  now = new Date(),
+) {
+  assertValidDate(now, "now");
+
+  if (!input.cartStartedAt || input.checkoutStartedAt) {
+    return false;
+  }
+
+  const lastCartActivityAt = input.lastCartActivityAt ?? input.cartStartedAt;
+
+  assertValidDate(input.cartStartedAt, "cartStartedAt");
+  assertValidDate(lastCartActivityAt, "lastCartActivityAt");
+
+  return (
+    lastCartActivityAt.getTime() <=
+    now.getTime() - CHECKOUT_ABANDONMENT_WINDOW_MS
+  );
 }
 
 export function isProviderConfirmedCapturedPayment(

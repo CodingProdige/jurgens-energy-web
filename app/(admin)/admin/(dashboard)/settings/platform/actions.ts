@@ -13,7 +13,9 @@ import {
   marketplaceReturnProductConditionOptions,
   marketplaceReturnRestockingFeeOptions,
   openAiReasoningEfforts,
+  storefrontSupportProviderOptions,
   updateMarketplaceComingSoonSettings,
+  updateMarketplaceCustomerSupportSettings,
   updateMarketplaceFooterSettings,
   updateMarketplaceGoogleMarketingSettings,
   updateMarketplaceGooglePlacesSettings,
@@ -911,7 +913,6 @@ const whatsappSettingsSchema = z
     emailNotificationsEnabled: z.coerce.boolean().default(false),
     emailNotifyInboundMessage: z.coerce.boolean().default(false),
     emailNotifyNewConversation: z.coerce.boolean().default(false),
-    enabled: z.coerce.boolean().default(false),
     followUpDefaultMessage: z
       .string()
       .trim()
@@ -1029,7 +1030,6 @@ export async function updateWhatsappOrderingSettings(
       formData.get("emailNotifyInboundMessage") === "on",
     emailNotifyNewConversation:
       formData.get("emailNotifyNewConversation") === "on",
-    enabled: formData.get("enabled") === "on",
     followUpDefaultMessage: String(formData.get("followUpDefaultMessage") ?? ""),
     followUpDelayMinutes: String(formData.get("followUpDelayMinutes") ?? "30"),
     followUpDraftMessage: String(formData.get("followUpDraftMessage") ?? ""),
@@ -1079,6 +1079,57 @@ export async function updateWhatsappOrderingSettings(
   });
 
   revalidatePath("/");
+  revalidatePath("/settings/platform");
+
+  return result;
+}
+
+const tidioPublicKeySchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => !value || /^[a-z0-9]{32}$/.test(value),
+    "Use the 32-character lowercase Tidio public project key, not a script tag or URL.",
+  )
+  .transform((value) => value || null);
+
+const customerSupportSettingsSchema = z.object({
+  storefrontSupportProvider: z.enum(storefrontSupportProviderOptions),
+  tidioEnabled: z.boolean(),
+  tidioPublicKey: tidioPublicKeySchema,
+  whatsappEnabled: z.boolean(),
+});
+
+export async function updateCustomerSupportSettings(
+  _state: AdminSettingsState,
+  formData: FormData,
+): Promise<AdminSettingsState> {
+  const session = await requireSettingsManageAccess();
+  const parsed = customerSupportSettingsSchema.safeParse({
+    storefrontSupportProvider: String(
+      formData.get("storefrontSupportProvider") ?? "off",
+    ),
+    tidioEnabled: formData.get("tidioEnabled") === "on",
+    tidioPublicKey: String(formData.get("tidioPublicKey") ?? ""),
+    whatsappEnabled: formData.get("whatsappEnabled") === "on",
+  });
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Check the customer support settings.",
+    };
+  }
+
+  const result = await updateMarketplaceCustomerSupportSettings({
+    ...parsed.data,
+    actorUserId: session.user.id,
+  });
+
+  revalidatePath("/");
+  revalidatePath("/about");
+  revalidatePath("/support");
   revalidatePath("/settings/platform");
 
   return result;

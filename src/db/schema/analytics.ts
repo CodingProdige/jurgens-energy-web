@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { orders } from "@/src/db/schema/orders";
+import { products, productVariants } from "@/src/db/schema/products";
 import { users } from "@/src/db/schema/users";
 import {
   checkoutAnalyticsDeviceCategories,
@@ -63,6 +64,9 @@ export const checkoutAnalyticsSessions = pgTable(
       .notNull()
       .default("unknown"),
     lastErrorCode: varchar("last_error_code", { length: 120 }),
+    cartStartedAt: timestamp("cart_started_at", { mode: "date" }),
+    checkoutStartedAt: timestamp("checkout_started_at", { mode: "date" }),
+    lastCartActivityAt: timestamp("last_cart_activity_at", { mode: "date" }),
     firstSeenAt: timestamp("first_seen_at", { mode: "date" })
       .notNull()
       .defaultNow(),
@@ -82,6 +86,12 @@ export const checkoutAnalyticsSessions = pgTable(
     completedAtIdx: index(
       "checkout_analytics_sessions_completed_at_idx",
     ).on(session.completedAt),
+    cartStartedAtIdx: index(
+      "checkout_analytics_sessions_cart_started_at_idx",
+    ).on(session.cartStartedAt),
+    checkoutStartedAtIdx: index(
+      "checkout_analytics_sessions_checkout_started_at_idx",
+    ).on(session.checkoutStartedAt),
     firstSeenAtIdx: index("checkout_analytics_sessions_first_seen_at_idx").on(
       session.firstSeenAt,
     ),
@@ -119,6 +129,16 @@ export const checkoutAnalyticsEvents = pgTable(
     orderId: uuid("order_id").references(() => orders.id, {
       onDelete: "set null",
     }),
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "set null",
+    }),
+    variantId: uuid("variant_id").references(() => productVariants.id, {
+      onDelete: "set null",
+    }),
+    productTitleSnapshot: varchar("product_title_snapshot", { length: 240 }),
+    variantTitleSnapshot: varchar("variant_title_snapshot", { length: 180 }),
+    brandNameSnapshot: varchar("brand_name_snapshot", { length: 160 }),
+    quantityDelta: integer("quantity_delta"),
     cartValue: numeric("cart_value", { precision: 12, scale: 2 }),
     currency: varchar("currency", { length: 3 }),
     itemCount: integer("item_count"),
@@ -146,6 +166,13 @@ export const checkoutAnalyticsEvents = pgTable(
     orderOccurredAtIdx: index(
       "checkout_analytics_events_order_id_occurred_at_idx",
     ).on(event.orderId, event.occurredAt),
+    productOccurredAtIdx: index(
+      "checkout_analytics_events_product_id_occurred_at_idx",
+    ).on(event.productId, event.occurredAt),
+    quantityDeltaPositive: check(
+      "checkout_analytics_events_quantity_delta_positive_check",
+      sql`${event.quantityDelta} IS NULL OR ${event.quantityDelta} > 0`,
+    ),
     sessionOccurredAtIdx: index(
       "checkout_analytics_events_session_id_occurred_at_idx",
     ).on(event.sessionId, event.occurredAt),

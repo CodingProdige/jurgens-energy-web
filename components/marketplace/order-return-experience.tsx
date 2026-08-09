@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { completeCheckoutAnalyticsSession } from "@/src/modules/analytics/checkout-client";
 import {
   trackGoogleAdsConversion,
   trackGoogleEvent,
@@ -220,6 +221,7 @@ export function OrderReturnExperience({
     }
 
     removeLocalCartItems(confirmedPurchasedVariantIds);
+    completeCheckoutAnalyticsSession();
     cleanedOrderIdRef.current = order.orderId;
 
     try {

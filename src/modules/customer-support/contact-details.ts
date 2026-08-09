@@ -27,6 +27,7 @@ type CustomerSupportMarketplaceSettings = Pick<
   | "contactPhonePrimary"
   | "contactPhoneSecondary"
   | "whatsappBusinessPhoneNumber"
+  | "whatsappOrderingEnabled"
 >;
 
 export type CustomerSupportContactDetails = {
@@ -82,9 +83,9 @@ export function createCustomerSupportContactDetails({
     settings.contactPhonePrimary,
     settings.contactPhoneSecondary,
   ]);
-  const configuredWhatsappPhone = cleanOptionalValue(
-    settings.whatsappBusinessPhoneNumber,
-  );
+  const configuredWhatsappPhone = settings.whatsappOrderingEnabled
+    ? cleanOptionalValue(settings.whatsappBusinessPhoneNumber)
+    : null;
   const registrationDetailsVisible =
     business.publicRegistrationDetailsEnabled;
 

@@ -58,7 +58,7 @@ export const privacyPolicy: PolicyDocument = {
       title: "1. Who this policy applies to",
       paragraphs: [
         "Jurgens Energy operates this online store and is the responsible party for personal information processed through the website, customer accounts, checkout, order support, and our direct communications with you.",
-        "This policy applies when you browse the store, create an account, place or discuss an order, request a cylinder exchange, contact support, or communicate with us through WhatsApp, email, telephone, or another channel. A third-party website or service linked from our store has its own privacy practices.",
+        "This policy applies when you browse the store, create an account, place or discuss an order, request a cylinder exchange, contact support, or communicate with us through website live chat, WhatsApp, email, telephone, or another channel. A third-party website or service linked from our store has its own privacy practices.",
       ],
     },
     {
@@ -72,7 +72,7 @@ export const privacyPolicy: PolicyDocument = {
         "Order and fulfilment details, including products, quantities, delivery address, delivery instructions, order history, and cylinder-exchange information.",
         "Address-search text and the selected address details when you choose to use address autocomplete. You can always enter an address manually instead.",
         "Payment-related records, such as the payment method type, payment status, and transaction reference. Payment providers process card or bank credentials under their own security and privacy terms; we do not need your card PIN or online-banking password.",
-        "Messages and support records, including WhatsApp conversations, emails, call notes, requests, complaints, and return or refund information.",
+        "Messages and support records, including website live-chat and WhatsApp conversations, emails, call notes, requests, complaints, and return or refund information.",
         "Device and usage information, such as IP address, browser and device type, pages viewed, referring links, approximate location derived from an IP address, and security or diagnostic logs.",
         "Preferences you choose, including language, currency, theme, cookie choices, and communication preferences.",
       ],
@@ -82,6 +82,7 @@ export const privacyPolicy: PolicyDocument = {
       title: "3. How we receive information",
       paragraphs: [
         "Most information comes directly from you when you use the store or contact us. We may also receive limited information automatically from your browser, or from service providers involved in authentication, payments, delivery, analytics, fraud prevention, or communications.",
+        "When Tidio live chat is selected and available, its third-party widget is loaded only after you deliberately open website chat. Tidio then processes the chat content and the browser, device, network, and contact information needed to operate the conversation under its own privacy terms.",
         "When address autocomplete is enabled and you type in an address-search field, the search text and selected place request are sent to Google Maps Platform so that matching addresses can be suggested and the address fields can be completed. Google processes that request under the Google Maps Platform Terms of Service at https://cloud.google.com/maps-platform/terms and Google Privacy Policy at https://policies.google.com/privacy. Autocomplete is optional and the entered address remains editable.",
         "If another person places an order for you or gives us your details as a recipient, that person must be authorised to do so and must make you aware that your details will be used for delivery and order support.",
       ],
@@ -108,7 +109,8 @@ export const privacyPolicy: PolicyDocument = {
         "We do not sell or rent personal information. We may share the minimum information needed with trusted operators and other recipients who help us provide the service or meet a legal obligation.",
       ],
       bullets: [
-        "Hosting, database, authentication, security, analytics, customer-support, and other technology providers.",
+        "Hosting, database, authentication, security, analytics, and other technology providers.",
+        "Customer-support providers, including Tidio when you deliberately open the configured website chat.",
         "Google Maps Platform when you choose to use address autocomplete.",
         "Payment processors, banks, and fraud-prevention providers involved in a transaction.",
         "Couriers, delivery partners, suppliers, or approved return-collection teams that need order and contact details to fulfil an order or return.",
@@ -122,14 +124,17 @@ export const privacyPolicy: PolicyDocument = {
       title: "6. Cookies, local storage, and analytics",
       paragraphs: [
         "The website uses cookies or similar browser storage for essential functions such as security, sign-in, cart contents, currency, theme, online-store access, and remembering your privacy choices. Essential storage is required for those functions and is not used to create an advertising profile.",
+        "We use privacy-conscious first-party commerce telemetry to understand whether a shopping journey progresses from adding a product to the cart through checkout and a confirmed purchase. This may record a random journey identifier, product and variant identifiers, quantity, cart totals, broad device category, and checkout milestones. It does not store a raw IP address or full browser user-agent, and it is used for store operations, reliability, and aggregate performance reporting rather than third-party advertising.",
+        "When available, website live chat is optional. The Tidio widget is not loaded merely because you visit a page; it loads after you deliberately open chat and may then use browser storage to preserve the conversation and operate the support service. You can continue to use the published telephone, email, or other direct-contact options without opening the widget.",
         "Where configured, Google Analytics and Google Ads may measure page visits, product interactions, enquiries, completed purchases, and which campaign led to an order. These optional tools start with analytics and advertising storage denied. They receive the choice made through the cookie controls, and the advertising-attribution record is stored only after advertising consent. A captured campaign record may include UTM campaign values or a Google click identifier and is retained for up to 90 days so that an order can be attributed to the campaign that led to it.",
         "You can change or withdraw optional consent at any time through Cookie settings. Withdrawal updates Google Consent Mode, removes applicable first-party measurement cookies that are accessible to the website, and clears our campaign-attribution cookie. You can also limit or delete browser storage through your browser settings. Blocking essential storage may prevent sign-in, checkout, saved preferences, or other parts of the store from working correctly.",
       ],
     },
     {
-      id: "whatsapp",
-      title: "7. WhatsApp and electronic communications",
+      id: "support-communications",
+      title: "7. Live chat, WhatsApp, and electronic communications",
       paragraphs: [
+        "When you open website live chat, we and the configured live-chat provider use the conversation and the details you submit to answer questions, support an order, and keep a support record. A team member or configured automated assistant may respond.",
         "When you contact us on WhatsApp, we use the conversation and your number to answer questions, support an order, and keep a record of the interaction. Automated replies may assist first, and a team member may take over a conversation. WhatsApp and Meta also process information under their own terms.",
         "Service messages about an enquiry or order are different from marketing. We send electronic marketing only as permitted by law and provide a practical way to opt out. You may reply STOP or ask us through any listed contact channel to stop marketing. Opting out of marketing does not prevent essential order, delivery, or account messages.",
       ],

@@ -20,6 +20,7 @@ import {
 import { env } from "@/src/config/env";
 import { hashPassword, verifyPassword } from "@/src/modules/auth/service";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
+import { normalizeTidioPublicKey } from "@/src/modules/marketplace/tidio";
 import { normalizePhoneNumber } from "@/src/modules/phone";
 import { decryptSecret, encryptSecret } from "@/src/modules/security/secrets";
 import {
@@ -63,6 +64,13 @@ export const defaultWhatsappFollowUpMessages = {
 } as const;
 export const maxWhatsappEmailNotificationRecipients = 20;
 export const maxWhatsappOrderNotificationRecipients = 10;
+export const storefrontSupportProviderOptions = [
+  "off",
+  "whatsapp",
+  "tidio",
+] as const;
+export type StorefrontSupportProvider =
+  (typeof storefrontSupportProviderOptions)[number];
 export const marketplaceReturnAcceptanceOptions = [
   "defective_and_non_defective",
   "defective_only",
@@ -103,6 +111,16 @@ function getWhatsappWebhookUrl() {
 
 function normalizeWhatsappProvider(value: string | null | undefined): "360dialog" {
   return value === "360dialog" ? "360dialog" : "360dialog";
+}
+
+function normalizeStorefrontSupportProvider(
+  value: string | null | undefined,
+): StorefrontSupportProvider {
+  return storefrontSupportProviderOptions.includes(
+    value as StorefrontSupportProvider,
+  )
+    ? (value as StorefrontSupportProvider)
+    : "off";
 }
 
 function normalizeOpenAiReasoningEffort(
@@ -572,6 +590,9 @@ export type MarketplaceSettings = {
   stripeLivePublishableKey: string | null;
   stripeMode: "live" | "sandbox";
   stripeSandboxPublishableKey: string | null;
+  storefrontSupportProvider: StorefrontSupportProvider;
+  tidioEnabled: boolean;
+  tidioPublicKey: string | null;
   twitterUrl: string | null;
   hasStripeLiveSecretKey: boolean;
   hasStripeLiveWebhookSecret: boolean;
@@ -751,6 +772,9 @@ const defaultSettings: MarketplaceSettings = {
   stripeLivePublishableKey: null,
   stripeMode: "sandbox",
   stripeSandboxPublishableKey: null,
+  storefrontSupportProvider: "off",
+  tidioEnabled: false,
+  tidioPublicKey: null,
   twitterUrl: null,
   hasStripeLiveSecretKey: false,
   hasStripeLiveWebhookSecret: false,
@@ -941,6 +965,10 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
         marketplaceSettings.stripeSandboxSecretKeyEncrypted,
       stripeSandboxWebhookSecretEncrypted:
         marketplaceSettings.stripeSandboxWebhookSecretEncrypted,
+      storefrontSupportProvider:
+        marketplaceSettings.storefrontSupportProvider,
+      tidioEnabled: marketplaceSettings.tidioEnabled,
+      tidioPublicKey: marketplaceSettings.tidioPublicKey,
       twitterUrl: marketplaceSettings.twitterUrl,
       videoCompressionCrf: marketplaceSettings.videoCompressionCrf,
       whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
@@ -1164,6 +1192,11 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       settings.payfastSandboxPassphraseEncrypted,
     ),
     stripeMode: settings.stripeMode === "live" ? "live" : "sandbox",
+    storefrontSupportProvider: normalizeStorefrontSupportProvider(
+      settings.storefrontSupportProvider,
+    ),
+    tidioEnabled: settings.tidioEnabled ?? false,
+    tidioPublicKey: normalizeTidioPublicKey(settings.tidioPublicKey),
     hasStripeLiveSecretKey: Boolean(settings.stripeLiveSecretKeyEncrypted),
     hasStripeLiveWebhookSecret: Boolean(
       settings.stripeLiveWebhookSecretEncrypted,
@@ -2161,7 +2194,6 @@ export async function updateMarketplaceWhatsappSettings({
   emailNotificationsEnabled,
   emailNotifyInboundMessage,
   emailNotifyNewConversation,
-  enabled,
   followUpDefaultMessage,
   followUpDelayMinutes,
   followUpDraftMessage,
@@ -2185,7 +2217,6 @@ export async function updateMarketplaceWhatsappSettings({
   emailNotificationsEnabled: boolean;
   emailNotifyInboundMessage: boolean;
   emailNotifyNewConversation: boolean;
-  enabled: boolean;
   followUpDefaultMessage: string;
   followUpDelayMinutes: number;
   followUpDraftMessage: string;
@@ -2223,17 +2254,14 @@ export async function updateMarketplaceWhatsappSettings({
           ? encryptSecret(env.WHATSAPP_WEBHOOK_SIGNING_SECRET)
           : null));
 
-  if (enabled && !businessPhoneNumber) {
+  if (
+    existing?.whatsappOrderingEnabled &&
+    (!businessPhoneNumber || !nextApiKey)
+  ) {
     return {
       ok: false,
-      message: "Add the WhatsApp business phone number before enabling ordering.",
-    };
-  }
-
-  if (enabled && !nextApiKey) {
-    return {
-      ok: false,
-      message: "Add the 360dialog API key before enabling WhatsApp ordering.",
+      message:
+        "Keep the 360dialog API key and WhatsApp business number configured while the service is enabled. Disable it under Customer support first if you need to remove its configuration.",
     };
   }
 
@@ -2304,7 +2332,6 @@ export async function updateMarketplaceWhatsappSettings({
         whatsappOrderNotificationRecipients:
           normalizedOrderNotificationRecipients,
         whatsappOrderNotificationsEnabled: orderNotificationsEnabled,
-        whatsappOrderingEnabled: enabled,
         whatsappProvider: provider,
         whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
         whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
@@ -2337,7 +2364,6 @@ export async function updateMarketplaceWhatsappSettings({
           whatsappOrderNotificationRecipients:
             normalizedOrderNotificationRecipients,
           whatsappOrderNotificationsEnabled: orderNotificationsEnabled,
-          whatsappOrderingEnabled: enabled,
           whatsappProvider: provider,
           whatsappWebhookSigningSecretEncrypted: nextWebhookSigningSecret,
           whatsappWebhookVerifyTokenEncrypted: nextWebhookVerifyToken,
@@ -2357,13 +2383,115 @@ export async function updateMarketplaceWhatsappSettings({
         orderNotificationRecipientCount:
           normalizedOrderNotificationRecipients.length,
         orderNotificationsEnabled,
-        orderingEnabled: enabled,
         recipientCount: normalizedEmailNotificationRecipients.length,
       }),
     });
   });
 
   return { ok: true, message: "WhatsApp settings saved." };
+}
+
+export async function updateMarketplaceCustomerSupportSettings({
+  actorUserId,
+  storefrontSupportProvider,
+  tidioEnabled,
+  tidioPublicKey,
+  whatsappEnabled,
+}: {
+  actorUserId: string;
+  storefrontSupportProvider: StorefrontSupportProvider;
+  tidioEnabled: boolean;
+  tidioPublicKey: string | null;
+  whatsappEnabled: boolean;
+}) {
+  const [rawSettings, settings] = await Promise.all([
+    getRawMarketplaceSettings(),
+    getMarketplaceSettings(),
+  ]);
+  const trimmedTidioPublicKey = tidioPublicKey?.trim() || null;
+  const normalizedTidioPublicKey = normalizeTidioPublicKey(tidioPublicKey);
+  const hasWhatsappApiKey = Boolean(
+    rawSettings?.whatsappApiKeyEncrypted ?? env.DIALOGUE_API_KEY,
+  );
+  const hasWhatsappBusinessNumber = Boolean(
+    settings.whatsappBusinessPhoneNumber?.trim(),
+  );
+
+  if (trimmedTidioPublicKey && !normalizedTidioPublicKey) {
+    return {
+      ok: false,
+      message:
+        "Use the 32-character lowercase Tidio public project key, not a script tag or URL.",
+    };
+  }
+
+  if (whatsappEnabled && (!hasWhatsappApiKey || !hasWhatsappBusinessNumber)) {
+    return {
+      ok: false,
+      message:
+        "Add the 360dialog API key and WhatsApp business number before enabling the service.",
+    };
+  }
+
+  if (tidioEnabled && !normalizedTidioPublicKey) {
+    return {
+      ok: false,
+      message: "Add the Tidio public project key before enabling Tidio.",
+    };
+  }
+
+  if (storefrontSupportProvider === "whatsapp" && !whatsappEnabled) {
+    return {
+      ok: false,
+      message:
+        "Enable the 360dialog service before choosing its storefront support button.",
+    };
+  }
+
+  if (storefrontSupportProvider === "tidio" && !tidioEnabled) {
+    return {
+      ok: false,
+      message:
+        "Enable the Tidio service before choosing its storefront support button.",
+    };
+  }
+
+  const values = {
+    storefrontSupportProvider,
+    tidioEnabled,
+    tidioPublicKey: normalizedTidioPublicKey,
+    updatedAt: new Date(),
+    whatsappOrderingEnabled: whatsappEnabled,
+  };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(marketplaceSettings)
+      .values({ id: 1, ...values })
+      .onConflictDoUpdate({
+        target: marketplaceSettings.id,
+        set: values,
+      });
+
+    await tx.insert(auditLogs).values({
+      action: "marketplace.customer_support_settings.updated",
+      actorUserId,
+      entityType: "marketplace_settings",
+      metadata: JSON.stringify({
+        storefrontSupportProvider,
+        tidioEnabled,
+        tidioPublicKeyChanged:
+          normalizedTidioPublicKey !== settings.tidioPublicKey,
+        tidioPublicKeyConfigured: Boolean(normalizedTidioPublicKey),
+        whatsappEnabled,
+      }),
+    });
+  });
+
+  return {
+    ok: true as const,
+    message: "Customer support settings saved.",
+  };
 }
 
 export async function getWhatsappEmailNotificationSettings(): Promise<{
@@ -2375,7 +2503,9 @@ export async function getWhatsappEmailNotificationSettings(): Promise<{
   const settings = await getMarketplaceSettings();
 
   return {
-    enabled: settings.whatsappEmailNotificationsEnabled,
+    enabled:
+      settings.whatsappOrderingEnabled &&
+      settings.whatsappEmailNotificationsEnabled,
     notifyInboundMessage: settings.whatsappEmailNotifyInboundMessage,
     notifyNewConversation: settings.whatsappEmailNotifyNewConversation,
     recipients: settings.whatsappEmailNotificationRecipients,
@@ -2426,7 +2556,9 @@ export async function getWhatsappOrderNotificationSettings(): Promise<{
   const settings = await getMarketplaceSettings();
 
   return {
-    enabled: settings.whatsappOrderNotificationsEnabled,
+    enabled:
+      settings.whatsappOrderingEnabled &&
+      settings.whatsappOrderNotificationsEnabled,
     recipients: settings.whatsappOrderNotificationRecipients,
   };
 }
@@ -2971,6 +3103,7 @@ async function getRawMarketplaceSettings() {
       sendgridWebhookPublicKeyEncrypted:
         marketplaceSettings.sendgridWebhookPublicKeyEncrypted,
       whatsappApiKeyEncrypted: marketplaceSettings.whatsappApiKeyEncrypted,
+      whatsappOrderingEnabled: marketplaceSettings.whatsappOrderingEnabled,
       whatsappWebhookVerifyTokenEncrypted:
         marketplaceSettings.whatsappWebhookVerifyTokenEncrypted,
       whatsappWebhookSigningSecretEncrypted:

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <MarketplaceGate>
+    <MarketplaceGate allowTidioLauncher={false}>
       <ForgotPasswordScreen
         action={requestCustomerPasswordReset}
         accent="gold"

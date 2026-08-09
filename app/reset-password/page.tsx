@@ -26,7 +26,7 @@ export default async function ResetPasswordPage({
   const isTokenValid = token ? await isPasswordResetTokenValid(token) : false;
 
   return (
-    <MarketplaceGate>
+    <MarketplaceGate allowTidioLauncher={false}>
       <ResetPasswordScreen
         action={resetPassword}
         token={token}

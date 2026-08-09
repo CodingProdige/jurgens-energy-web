@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Admin Analytics",
   description:
-    "Review Jurgens Energy sales, checkout conversion, product performance, and payment health.",
+    "Review Jurgens Energy cart engagement, sales, checkout conversion, product performance, and payment health.",
   robots: {
     follow: false,
     index: false,

@@ -298,6 +298,13 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   whatsappOrderingEnabled: boolean("whatsapp_ordering_enabled")
     .notNull()
     .default(false),
+  tidioEnabled: boolean("tidio_enabled").notNull().default(false),
+  tidioPublicKey: text("tidio_public_key"),
+  storefrontSupportProvider: varchar("storefront_support_provider", {
+    length: 16,
+  })
+    .notNull()
+    .default("off"),
   whatsappAutomatedResponsesEnabled: boolean(
     "whatsapp_automated_responses_enabled",
   )
@@ -373,6 +380,14 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   whatsappFollowUpDefaultMessage: text("whatsapp_follow_up_default_message"),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 }, (settings) => ({
+  storefrontSupportProviderValid: check(
+    "marketplace_settings_storefront_support_provider_check",
+    sql`${settings.storefrontSupportProvider} IN ('off', 'whatsapp', 'tidio')`,
+  ),
+  tidioPublicKeyValid: check(
+    "marketplace_settings_tidio_public_key_check",
+    sql`${settings.tidioPublicKey} IS NULL OR ${settings.tidioPublicKey} ~ '^[a-z0-9]{32}$'`,
+  ),
   courierGuyLiveAccountCodeValid: check(
     "marketplace_settings_courier_guy_live_account_code_valid",
     sql`${settings.courierGuyLiveAccountCode} IS NULL OR btrim(${settings.courierGuyLiveAccountCode}) <> ''`,

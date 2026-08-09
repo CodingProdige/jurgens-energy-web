@@ -144,6 +144,15 @@ export async function POST(request: Request) {
   }
 
   const parsed: WhatsappInboundMessage = payloadResult.message;
+
+  if (!config.whatsappOrderingEnabled) {
+    return createNoReplyResponse({
+      draftUrl: null,
+      provider: parsed.provider,
+      status: "automation_disabled",
+    });
+  }
+
   let acceptedInboundMessage: WhatsappAcceptedInboundMessage | null = null;
   const result = await processWhatsappInboundMessage(parsed, {
     automatedResponsesEnabled: config.automatedResponsesEnabled,

@@ -29,6 +29,7 @@ import {
 import { getJurgensDeliveryZones } from "@/src/modules/shipping/jurgens-delivery";
 import {
   ChatGptIntegrationSettingsForm,
+  CustomerSupportSettingsForm,
   SettingsForm,
   GoogleMarketingSettingsForm,
   GooglePlacesSettingsForm,
@@ -45,6 +46,8 @@ import { getAdminMediaLibrary } from "@/src/modules/media/admin";
 import { hasAdminCapability } from "@/src/modules/admin/staff";
 import { getAdminNotificationSettings } from "@/src/modules/notifications/templates";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import { SupportAgentManager } from "@/app/(admin)/admin/(dashboard)/settings/platform/support-team/support-agent-manager";
+import { getAdminSupportAgents } from "@/src/modules/support-agents/server";
 
 export const metadata: Metadata = {
   title: "Admin Settings",
@@ -78,10 +81,17 @@ const settingSections = [
     icon: RefreshCcwIcon,
   },
   {
-    key: "whatsapp-ordering",
-    title: "WhatsApp ordering",
+    key: "customer-support",
+    title: "Customer support",
     description:
-      "Manage 360dialog credentials, webhook URL, and the quick WhatsApp support assistant.",
+      "Enable 360dialog and Tidio independently, then choose the one storefront support launcher customers see.",
+    icon: MessageCircleIcon,
+  },
+  {
+    key: "whatsapp-ordering",
+    title: "WhatsApp integration",
+    description:
+      "Manage advanced 360dialog credentials, callbacks, alerts, and WhatsApp automation.",
     icon: MessageCircleIcon,
   },
   {
@@ -216,6 +226,14 @@ export default async function AdminSettingsPage({
     selectedSection === "social-links"
       ? await getAdminMediaLibrary(session.user.id)
       : null;
+  const supportAgents =
+    selectedSection === "customer-support"
+      ? await getAdminSupportAgents()
+      : [];
+  const supportAgentMediaLibrary =
+    selectedSection === "customer-support" && canManageSettings
+      ? await getAdminMediaLibrary(session.user.id)
+      : null;
   const jurgensDeliveryZones =
     selectedSection === "shipping" ? await getJurgensDeliveryZones() : [];
 
@@ -248,6 +266,7 @@ export default async function AdminSettingsPage({
       {selectedSection ? (
         <section className="w-full">
           <SettingsSection
+            canManageSettings={canManageSettings}
             footerMediaLibrary={footerMediaLibrary}
             notificationMediaLibrary={notificationMediaLibrary}
             jurgensDeliveryZones={jurgensDeliveryZones}
@@ -256,6 +275,8 @@ export default async function AdminSettingsPage({
             section={selectedSection}
             secrets={secrets}
             settings={settings}
+            supportAgentMediaLibrary={supportAgentMediaLibrary}
+            supportAgents={supportAgents}
           />
         </section>
       ) : (
@@ -297,6 +318,7 @@ function SettingsMenu() {
 }
 
 function SettingsSection({
+  canManageSettings,
   footerMediaLibrary,
   notificationMediaLibrary,
   jurgensDeliveryZones,
@@ -305,7 +327,10 @@ function SettingsSection({
   section,
   secrets,
   settings,
+  supportAgentMediaLibrary,
+  supportAgents,
 }: {
+  canManageSettings: boolean;
   footerMediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
   notificationMediaLibrary: Awaited<ReturnType<typeof getAdminMediaLibrary>> | null;
   jurgensDeliveryZones: Awaited<ReturnType<typeof getJurgensDeliveryZones>>;
@@ -314,6 +339,10 @@ function SettingsSection({
   section: SettingSectionKey;
   secrets: Awaited<ReturnType<typeof getMarketplaceAdminSecrets>> | null;
   settings: Awaited<ReturnType<typeof getMarketplaceSettings>>;
+  supportAgentMediaLibrary: Awaited<
+    ReturnType<typeof getAdminMediaLibrary>
+  > | null;
+  supportAgents: Awaited<ReturnType<typeof getAdminSupportAgents>>;
 }) {
   if (section === "payfast-payments") {
     return (
@@ -429,11 +458,37 @@ function SettingsSection({
     );
   }
 
+  if (section === "customer-support") {
+    return (
+      <div className="grid gap-6">
+        <DashboardPanel
+          title="Customer support"
+          description="Control the 360dialog and Tidio services independently, then explicitly choose whether the storefront shows WhatsApp, Tidio, or no floating support launcher."
+        >
+          <CustomerSupportSettingsForm
+            canManage={canManageSettings}
+            hasWhatsappApiKey={settings.hasWhatsappApiKey}
+            storefrontSupportProvider={settings.storefrontSupportProvider}
+            tidioEnabled={settings.tidioEnabled}
+            tidioPublicKey={settings.tidioPublicKey}
+            whatsappBusinessPhoneNumber={settings.whatsappBusinessPhoneNumber}
+            whatsappEnabled={settings.whatsappOrderingEnabled}
+          />
+        </DashboardPanel>
+        <SupportAgentManager
+          agents={supportAgents}
+          canManage={canManageSettings}
+          mediaLibrary={supportAgentMediaLibrary}
+        />
+      </div>
+    );
+  }
+
   if (section === "whatsapp-ordering") {
     return (
       <DashboardPanel
-        title="WhatsApp ordering"
-        description="Manage 360dialog provider credentials, the public webhook URL, and the marketplace WhatsApp ordering switch."
+        title="WhatsApp integration"
+        description="Manage advanced 360dialog credentials, callbacks, email alerts, paid-order notifications, and follow-up automation. Service activation is controlled under Customer support."
       >
         <WhatsappOrderingSettingsForm
           hasWhatsappApiKey={settings.hasWhatsappApiKey}
