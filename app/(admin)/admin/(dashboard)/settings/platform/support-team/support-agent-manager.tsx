@@ -184,7 +184,10 @@ function AgentEditorDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl border border-slate-200 bg-white text-zinc-950 shadow-2xl dark:border-white/10 dark:bg-[#101214] dark:text-white">
-        <form action={formAction}>
+        <form
+          action={formAction}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
           <DialogHeader>
             <DialogTitle>{agent ? "Edit support agent" : "Add support agent"}</DialogTitle>
             <DialogDescription>

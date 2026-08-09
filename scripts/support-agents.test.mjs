@@ -10,6 +10,9 @@ function read(relativePath) {
 
 const publicServiceSource = read("src/modules/support-agents/server.ts");
 const publicTeamSource = read("components/marketplace/public-support-team.tsx");
+const supportAgentManagerSource = read(
+  "app/(admin)/admin/(dashboard)/settings/platform/support-team/support-agent-manager.tsx",
+);
 
 function validAgentInput(overrides = {}) {
   return {
@@ -85,4 +88,15 @@ test("public directory never reads internal user identity fields", () => {
   assert.match(publicServiceSource, /normalizePhoneNumber\(agent\.publicPhone/);
   assert.match(publicTeamSource, /normalizePhoneNumber\(phoneNumber/);
   assert.doesNotMatch(publicTeamSource, /dangerouslySetInnerHTML/);
+});
+
+test("support agent editor keeps its body scrollable and footer reachable", () => {
+  assert.match(
+    supportAgentManagerSource,
+    /<form\s+action=\{formAction\}\s+className="flex min-h-0 flex-1 flex-col overflow-hidden"\s*>/,
+  );
+  assert.match(
+    supportAgentManagerSource,
+    /<DialogBody className="grid gap-5">[\s\S]*<DialogFooter>/,
+  );
 });
