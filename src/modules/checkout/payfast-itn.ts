@@ -13,6 +13,7 @@ import {
   shipments,
   shippingRateQuotes,
 } from "@/src/db/schema";
+import { recordCheckoutAnalyticsEventForOrder } from "@/src/modules/analytics/checkout";
 import {
   enqueueJurgensDeliveryStatusNotification,
   sendJurgensDeliveryStatusNotification,
@@ -409,6 +410,21 @@ async function processPayFastItnFields({
         }
       }
     });
+
+    if (providerStatus === "FAILED") {
+      await recordCheckoutAnalyticsEventForOrder({
+        errorCode: "payfast_payment_failed",
+        event: "checkout_failed",
+        eventId: crypto.randomUUID(),
+        orderId: paymentRow.orderId,
+      }).catch((error) => {
+        console.error("[payfast-itn] checkout analytics update failed", {
+          error: error instanceof Error ? error.message : "unknown_error",
+          orderId: paymentRow.orderId,
+          providerStatus,
+        });
+      });
+    }
 
     return { completed: false, orderId: paymentRow.orderId, providerStatus };
   }
@@ -816,6 +832,18 @@ async function processPayFastItnFields({
       orderId: paymentRow.orderId,
     }).catch(() => null);
   }
+
+  await recordCheckoutAnalyticsEventForOrder({
+    event: "payment_confirmed",
+    eventId: crypto.randomUUID(),
+    orderId: paymentRow.orderId,
+  }).catch((error) => {
+    console.error("[payfast-itn] checkout analytics update failed", {
+      error: error instanceof Error ? error.message : "unknown_error",
+      orderId: paymentRow.orderId,
+      providerStatus,
+    });
+  });
 
   onStage("completed");
   return {

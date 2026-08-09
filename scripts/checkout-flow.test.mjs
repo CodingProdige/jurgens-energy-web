@@ -11,6 +11,7 @@ import {
 } from "../src/modules/checkout/flow.ts";
 import { hasCourierGuySandboxCheckoutAccess } from "../src/modules/checkout/sandbox-access.ts";
 import { calculateCheckoutIncludedVatCents } from "../src/modules/checkout/totals.ts";
+import { getCheckoutTaxSummaryLabel } from "../src/modules/tax/vat-display.ts";
 import {
   CHECKOUT_INVOICE_FAST_POLL_ATTEMPTS,
   CHECKOUT_PAYMENT_FAST_POLL_ATTEMPTS,
@@ -234,8 +235,10 @@ test("keeps private courier costs out of customer-facing checkout copy", () => {
   );
 });
 
-test("labels checkout VAT as already included instead of adding it to total", () => {
-  assert.match(checkoutExperienceSource, /<span>Includes VAT<\/span>/);
+test("labels checkout tax accurately without adding it to total", () => {
+  assert.match(checkoutExperienceSource, /<span>\{taxSummaryLabel\}<\/span>/);
+  assert.equal(getCheckoutTaxSummaryLabel(true), "Included VAT");
+  assert.equal(getCheckoutTaxSummaryLabel(false), "No VAT charged");
   assert.equal(
     (checkoutExperienceSource.match(/const grandTotal = subtotal \+ shippingTotal;/g) ??
       []).length,

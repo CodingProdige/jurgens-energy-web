@@ -27,3 +27,4 @@ export * from "@/src/db/schema/whatsapp";
 export * from "@/src/db/schema/static-page-seo";
 export * from "@/src/db/schema/contact-inquiries";
 export * from "@/src/db/schema/inventory";
+export * from "@/src/db/schema/analytics";

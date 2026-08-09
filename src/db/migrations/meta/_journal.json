@@ -722,6 +722,13 @@
       "when": 1788256800000,
       "tag": "0102_courier_guy_manual_packing",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1788343200000,
+      "tag": "0103_checkout_analytics",
+      "breakpoints": true
     }
   ]
 }

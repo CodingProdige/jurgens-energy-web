@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { XCircleIcon } from "lucide-react";
@@ -6,6 +7,7 @@ import { notFound } from "next/navigation";
 import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { MarketplaceHeader } from "@/components/marketplace/marketplace-header";
+import { recordCheckoutAnalyticsEventForOrder } from "@/src/modules/analytics/checkout";
 import { getCheckoutOrderSummary } from "@/src/modules/checkout/orders";
 
 export const metadata: Metadata = {
@@ -38,6 +40,20 @@ export default async function CheckoutCancelPage({
 
   if (!order) {
     notFound();
+  }
+
+  if (order.status !== "paid" && order.status !== "fulfilled") {
+    await recordCheckoutAnalyticsEventForOrder({
+      errorCode: "payfast_customer_cancelled",
+      event: "payment_cancelled",
+      eventId: randomUUID(),
+      orderId: order.orderId,
+    }).catch((error) => {
+      console.error("[checkout-cancel] checkout analytics update failed", {
+        error: error instanceof Error ? error.message : "unknown_error",
+        orderId: order.orderId,
+      });
+    });
   }
 
   return (

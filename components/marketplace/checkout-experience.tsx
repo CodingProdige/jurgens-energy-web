@@ -51,6 +51,12 @@ import {
   trackGoogleEvent,
   type GoogleAnalyticsItem,
 } from "@/src/modules/analytics/google";
+import {
+  getOrCreateCheckoutAnalyticsSession,
+  recordCheckoutAnalyticsEvent,
+  type CheckoutAnalyticsCartSnapshot,
+} from "@/src/modules/analytics/checkout-client";
+import type { CheckoutAnalyticsEventName } from "@/src/modules/analytics/checkout-contracts";
 import type {
   CheckoutAddressBookIntent,
   CheckoutAddressPrefill,
@@ -415,6 +421,8 @@ export function CheckoutExperience({
   const trackedBeginCheckoutSignaturesRef = useRef(new Set<string>());
   const trackedShippingInfoSignaturesRef = useRef(new Set<string>());
   const trackedPaymentInfoSignaturesRef = useRef(new Set<string>());
+  const checkoutAnalyticsSessionIdRef = useRef<string | null>(null);
+  const trackedCheckoutMilestonesRef = useRef(new Set<string>());
 
   useEffect(() => {
     let isMounted = true;
@@ -625,6 +633,61 @@ export function CheckoutExperience({
     : 0;
   const selectedProductCount =
     cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
+  const checkoutSessionCartSnapshot = useMemo<CheckoutAnalyticsCartSnapshot | null>(
+    () =>
+      checkoutAnalytics
+        ? {
+            currency: "ZAR",
+            itemCount: cart?.items.length ?? 0,
+            totalQuantity: selectedProductCount,
+            value: Number(grandTotal.toFixed(2)),
+          }
+        : null,
+    [cart?.items.length, checkoutAnalytics, grandTotal, selectedProductCount],
+  );
+  const recordInternalCheckoutEvent = useCallback(
+    (
+      event: CheckoutAnalyticsEventName,
+      options: {
+        deduplicate?: boolean;
+        errorCode?: string;
+      } = {},
+    ) => {
+      if (!checkoutAnalytics || !checkoutSessionCartSnapshot) {
+        return;
+      }
+
+      const sessionId =
+        checkoutAnalyticsSessionIdRef.current ??
+        getOrCreateCheckoutAnalyticsSession(checkoutAnalytics.signature);
+
+      if (!sessionId) {
+        return;
+      }
+
+      checkoutAnalyticsSessionIdRef.current = sessionId;
+      const deduplicationKey = `${sessionId}:${event}`;
+
+      if (
+        options.deduplicate !== false &&
+        trackedCheckoutMilestonesRef.current.has(deduplicationKey)
+      ) {
+        return;
+      }
+
+      if (options.deduplicate !== false) {
+        trackedCheckoutMilestonesRef.current.add(deduplicationKey);
+      }
+
+      recordCheckoutAnalyticsEvent({
+        cart: checkoutSessionCartSnapshot,
+        errorCode: options.errorCode,
+        event,
+        sessionId,
+      });
+    },
+    [checkoutAnalytics, checkoutSessionCartSnapshot],
+  );
   const checkoutStepIndex = CHECKOUT_STEPS.indexOf(checkoutStep);
   const allGroupsAvailable = Boolean(
     quotes &&
@@ -742,6 +805,8 @@ export function CheckoutExperience({
       return;
     }
 
+    recordInternalCheckoutEvent("started");
+
     if (
       trackedBeginCheckoutSignaturesRef.current.has(
         checkoutAnalytics.signature,
@@ -756,7 +821,12 @@ export function CheckoutExperience({
       items: checkoutAnalytics.items,
       value: checkoutAnalytics.value,
     });
-  }, [cartReviewRequired, checkoutAnalytics, isLoadingCart]);
+  }, [
+    cartReviewRequired,
+    checkoutAnalytics,
+    isLoadingCart,
+    recordInternalCheckoutEvent,
+  ]);
 
   useEffect(() => {
     if (
@@ -1013,6 +1083,7 @@ export function CheckoutExperience({
     }
 
     setStepError(null);
+    recordInternalCheckoutEvent("address_completed");
     setCheckoutStep("shipping");
     setFurthestCheckoutStep((current) => Math.max(current, 1));
 
@@ -1028,6 +1099,8 @@ export function CheckoutExperience({
 
     setStepError(null);
     setError(null);
+    recordInternalCheckoutEvent("shipping_completed");
+    recordInternalCheckoutEvent("payment_reached");
     setCheckoutStep("payment");
     setFurthestCheckoutStep(2);
   }
@@ -1120,6 +1193,10 @@ export function CheckoutExperience({
 
     setIsCreatingOrder(true);
     setError(null);
+    recordInternalCheckoutEvent("payment_attempted", {
+      deduplicate: false,
+    });
+    let checkoutFailureCode = "checkout_request_failed";
 
     try {
       if (
@@ -1159,6 +1236,12 @@ export function CheckoutExperience({
           ...customer,
           phone: normalizedCustomerPhone,
         },
+        ...(checkoutAnalyticsSessionIdRef.current
+          ? {
+              checkoutAnalyticsSessionId:
+                checkoutAnalyticsSessionIdRef.current,
+            }
+          : {}),
         deliveryAddress: address,
         deliverySelections: quotes.groups.map((group) => ({
           groupKey: group.groupKey,
@@ -1187,16 +1270,26 @@ export function CheckoutExperience({
         method: "POST",
       });
       const payload = (await response.json()) as {
+        error?: string;
         message?: string;
         paymentForm?: HostedPayFastSubmission;
       };
 
       if (!response.ok || !payload.paymentForm) {
+        checkoutFailureCode =
+          payload.error && /^[a-z0-9][a-z0-9._:-]{0,119}$/.test(payload.error)
+            ? payload.error
+            : "checkout_request_rejected";
         throw new Error(payload.message ?? "Checkout could not be started.");
       }
 
+      recordInternalCheckoutEvent("payfast_redirected");
       submitHostedPayFastForm(payload.paymentForm);
     } catch (caughtError) {
+      recordInternalCheckoutEvent("checkout_failed", {
+        deduplicate: false,
+        errorCode: checkoutFailureCode,
+      });
       setError(
         caughtError instanceof Error
           ? caughtError.message

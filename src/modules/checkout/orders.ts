@@ -12,6 +12,7 @@ import {
   productVariants,
   shippingRateQuotes,
 } from "@/src/db/schema";
+import { recordCheckoutAnalyticsEvent } from "@/src/modules/analytics/checkout";
 import { validateCartLines } from "@/src/modules/cart/server";
 import {
   createCheckoutOrderRequestSchema,
@@ -92,6 +93,37 @@ function createCheckoutRequestFingerprint(
     .createHash("sha256")
     .update(JSON.stringify({ input, userId }))
     .digest("hex");
+}
+
+async function recordCreatedOrderCheckoutAnalytics({
+  campaignAttribution,
+  orderId,
+  sessionId,
+  userId,
+}: {
+  campaignAttribution?: CampaignAttributionSnapshot | null;
+  orderId: string;
+  sessionId?: string;
+  userId: string | null;
+}) {
+  if (!sessionId) {
+    return;
+  }
+
+  await recordCheckoutAnalyticsEvent(
+    {
+      event: "order_created",
+      eventId: crypto.randomUUID(),
+      orderId,
+      sessionId,
+    },
+    { campaignAttribution, userId },
+  ).catch((error) => {
+    console.error("[checkout] order-created analytics failed", {
+      error: error instanceof Error ? error.message : "unknown_error",
+      orderId,
+    });
+  });
 }
 
 async function getIdempotentCheckoutReplay({
@@ -369,6 +401,12 @@ export async function createHostedCheckoutOrder(
   });
 
   if (replay) {
+    await recordCreatedOrderCheckoutAnalytics({
+      campaignAttribution: context.campaignAttribution,
+      orderId: replay.orderId,
+      sessionId: parsed.checkoutAnalyticsSessionId,
+      userId,
+    });
     return replay;
   }
 
@@ -833,6 +871,13 @@ export async function createHostedCheckoutOrder(
     }
 
     return { ...order, paymentId: payment.id };
+  });
+
+  await recordCreatedOrderCheckoutAnalytics({
+    campaignAttribution: context.campaignAttribution,
+    orderId: created.id,
+    sessionId: parsed.checkoutAnalyticsSessionId,
+    userId,
   });
 
   await notifyAdminsOfCreatedOrder(created.id).catch((error) => {
