@@ -6,6 +6,7 @@ import {
   gte,
   isNotNull,
   lt,
+  min,
   or,
   sql,
 } from "drizzle-orm";
@@ -1315,8 +1316,10 @@ export async function getAdminCommerceAnalytics(
       .where(eq(paymentReconciliationExceptions.status, "open")),
     db
       .select({
-        firstTrackedCartAt: sql<Date | null>`min(${checkoutAnalyticsSessions.cartStartedAt})`,
-        firstTrackedCheckoutAt: sql<Date | null>`min(${checkoutAnalyticsSessions.checkoutStartedAt})`,
+        firstTrackedCartAt: min(checkoutAnalyticsSessions.cartStartedAt),
+        firstTrackedCheckoutAt: min(
+          checkoutAnalyticsSessions.checkoutStartedAt,
+        ),
       })
       .from(checkoutAnalyticsSessions),
   ]);

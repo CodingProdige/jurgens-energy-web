@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -11,6 +12,11 @@ import {
   isProviderConfirmedCapturedPayment,
   resolveAdminAnalyticsRange,
 } from "../src/modules/admin/analytics-core.ts";
+
+const analyticsServiceSource = readFileSync(
+  new URL("../src/modules/admin/analytics.ts", import.meta.url),
+  "utf8",
+);
 
 test("rolling analytics ranges use exact equal comparison periods", () => {
   const now = new Date("2026-08-09T10:15:30.000Z");
@@ -182,6 +188,21 @@ test("telemetry coverage distinguishes current and pre-instrumentation history",
       new Date("2026-07-31T23:59:59.000Z"),
     ),
     "full",
+  );
+});
+
+test("telemetry timestamp aggregates preserve Drizzle date decoding", () => {
+  assert.match(
+    analyticsServiceSource,
+    /firstTrackedCartAt:\s*min\(checkoutAnalyticsSessions\.cartStartedAt\)/,
+  );
+  assert.match(
+    analyticsServiceSource,
+    /firstTrackedCheckoutAt:\s*min\(\s*checkoutAnalyticsSessions\.checkoutStartedAt,?\s*\)/,
+  );
+  assert.doesNotMatch(
+    analyticsServiceSource,
+    /sql<Date \| null>`min\(\$\{checkoutAnalyticsSessions\.(?:cartStartedAt|checkoutStartedAt)\}\)`/,
   );
 });
 
