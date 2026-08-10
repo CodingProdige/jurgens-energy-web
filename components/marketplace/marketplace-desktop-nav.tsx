@@ -8,9 +8,11 @@ import type { MarketplaceNavItem } from "@/components/marketplace/marketplace-mo
 import { MarketplaceShopMenu } from "@/components/marketplace/marketplace-shop-menu";
 import { cn } from "@/lib/utils";
 import type { MarketplaceShopMenuData } from "@/src/modules/marketplace/catalog";
+import type { MarketplaceSaleCampaign } from "@/src/modules/marketplace/sales";
 
 type MarketplaceDesktopNavProps = {
   navItems: readonly MarketplaceNavItem[];
+  saleCampaigns: readonly MarketplaceSaleCampaign[];
   saleProductCount: number;
   shopMenuData: MarketplaceShopMenuData;
   whatsappHref: string | null;
@@ -45,6 +47,7 @@ function isActiveNavItem(pathname: string, href: string, label: string) {
 
 export function MarketplaceDesktopNav({
   navItems,
+  saleCampaigns,
   saleProductCount,
   shopMenuData,
   whatsappHref,
@@ -85,6 +88,7 @@ export function MarketplaceDesktopNav({
               active={active}
               data={shopMenuData}
               key={label}
+              saleCampaigns={saleCampaigns}
               whatsappHref={whatsappHref}
             />
           );

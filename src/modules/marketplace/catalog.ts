@@ -127,6 +127,7 @@ export type MarketplaceProductCard = {
 export type MarketplaceSaleBadge = {
   campaignId: string;
   color: string;
+  endsAt: string | null;
   iconName: string | null;
   text: string;
 };
@@ -149,6 +150,7 @@ export type MarketplaceVariant = {
   optionValues: string[];
   price: string;
   requiresExchangeEmpty: boolean;
+  saleBadge: MarketplaceSaleBadge | null;
   sku: string;
   soldQuantity: number;
   stockOnHand: number;
@@ -293,6 +295,7 @@ async function getActiveSaleBadgeByProductId(
         badgeByProductId.set(productId, {
           campaignId: campaign.id,
           color: campaign.badgeColor,
+          endsAt: campaign.endsAt,
           iconName: campaign.badgeIcon,
           text: campaign.badgeText,
         });
@@ -301,6 +304,37 @@ async function getActiveSaleBadgeByProductId(
   }
 
   return badgeByProductId;
+}
+
+async function getActiveSaleBadgeByVariantId(variantIds: string[]) {
+  const uniqueVariantIds = Array.from(new Set(variantIds));
+
+  if (uniqueVariantIds.length === 0) {
+    return new Map<string, MarketplaceSaleBadge>();
+  }
+
+  const requestedVariantIds = new Set(uniqueVariantIds);
+  const campaigns = await getActiveMarketplaceSaleCampaigns();
+  const badgeByVariantId = new Map<string, MarketplaceSaleBadge>();
+
+  for (const campaign of campaigns) {
+    for (const variantId of campaign.variantIds) {
+      if (
+        requestedVariantIds.has(variantId) &&
+        !badgeByVariantId.has(variantId)
+      ) {
+        badgeByVariantId.set(variantId, {
+          campaignId: campaign.id,
+          color: campaign.badgeColor,
+          endsAt: campaign.endsAt,
+          iconName: campaign.badgeIcon,
+          text: campaign.badgeText,
+        });
+      }
+    }
+  }
+
+  return badgeByVariantId;
 }
 
 function getQuickAddVariantId(
@@ -1986,6 +2020,9 @@ export async function getMarketplaceProductBySlug(
       getMarketplaceProductImageUrl(row),
     ]),
   );
+  const saleBadgeByVariantId = await getActiveSaleBadgeByVariantId(
+    activeVariantRows.map((variant) => variant.id),
+  );
   const variants = activeVariantRows.map((variant): MarketplaceVariant => ({
     barcode: variant.barcode,
     compareAtPrice: variant.compareAtPrice,
@@ -2001,6 +2038,7 @@ export async function getMarketplaceProductBySlug(
     optionValues: variant.optionValues,
     price: variant.price,
     requiresExchangeEmpty: variant.requiresExchangeEmpty,
+    saleBadge: saleBadgeByVariantId.get(variant.id) ?? null,
     sku: variant.sku,
     soldQuantity: soldQuantityByVariantId.get(variant.id) ?? 0,
     stockOnHand: variant.stockOnHand,

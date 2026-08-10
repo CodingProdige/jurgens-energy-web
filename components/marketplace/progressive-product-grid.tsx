@@ -49,6 +49,8 @@ export function ProgressiveProductGrid({
   filters,
   initialPage,
   initialProducts,
+  initialRevision,
+  initialTotalCount,
   initialTotalPages,
   priceTaxDisclosure = "Final price",
 }: {
@@ -56,6 +58,7 @@ export function ProgressiveProductGrid({
   filters: MarketplaceCatalogFilters;
   initialPage: number;
   initialProducts: MarketplaceProductCardData[];
+  initialRevision: string;
   initialTotalCount: number;
   initialTotalPages: number;
   priceTaxDisclosure?: string;
@@ -66,9 +69,34 @@ export function ProgressiveProductGrid({
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const authoritativeRevisionRef = useRef(initialRevision);
   const loadingRef = useRef(false);
+  const requestVersionRef = useRef(0);
   const trackedProductIdsRef = useRef(new Set<string>());
   const hasMore = loadedPage < totalPages;
+
+  useEffect(() => {
+    if (authoritativeRevisionRef.current === initialRevision) {
+      return;
+    }
+
+    authoritativeRevisionRef.current = initialRevision;
+    requestVersionRef.current += 1;
+    abortCatalogRequest(abortControllerRef.current);
+    abortControllerRef.current = null;
+    loadingRef.current = false;
+    setProducts(initialProducts);
+    setLoadedPage(initialPage);
+    setTotalPages(initialTotalPages);
+    setIsLoading(false);
+    setLoadError(null);
+  }, [
+    initialPage,
+    initialProducts,
+    initialRevision,
+    initialTotalCount,
+    initialTotalPages,
+  ]);
 
   useEffect(() => {
     const newlyVisibleProducts = products.filter(
@@ -138,6 +166,9 @@ export function ProgressiveProductGrid({
     setLoadError(null);
     abortCatalogRequest(abortControllerRef.current);
     const abortController = new AbortController();
+    const requestVersion = requestVersionRef.current + 1;
+
+    requestVersionRef.current = requestVersion;
     abortControllerRef.current = abortController;
 
     try {
@@ -157,6 +188,13 @@ export function ProgressiveProductGrid({
         throw new Error("Catalog batch response was invalid.");
       }
 
+      if (
+        abortController.signal.aborted ||
+        requestVersion !== requestVersionRef.current
+      ) {
+        return;
+      }
+
       setProducts((currentProducts) => {
         const productsById = new Map(
           currentProducts.map((product) => [product.id, product]),
@@ -172,19 +210,26 @@ export function ProgressiveProductGrid({
       setTotalPages(payload.totalPages);
       updateBrowserPage(payload.page);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
+      if (
+        requestVersion !== requestVersionRef.current ||
+        (error instanceof DOMException && error.name === "AbortError")
+      ) {
         return;
       }
 
       setLoadError("More products could not be loaded. Try again.");
     } finally {
-      loadingRef.current = false;
-      setIsLoading(false);
+      if (requestVersion === requestVersionRef.current) {
+        abortControllerRef.current = null;
+        loadingRef.current = false;
+        setIsLoading(false);
+      }
     }
   }, [context, filters, loadedPage, totalPages, updateBrowserPage]);
 
   useEffect(
     () => () => {
+      requestVersionRef.current += 1;
       abortCatalogRequest(abortControllerRef.current);
     },
     [],

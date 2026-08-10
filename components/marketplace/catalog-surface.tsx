@@ -9,6 +9,7 @@ import { MarketplaceSaleCampaignHeader } from "@/components/marketplace/marketpl
 import { ProgressiveProductGrid } from "@/components/marketplace/progressive-product-grid";
 import type { MarketplaceCatalogPageData } from "@/src/modules/marketplace/catalog";
 import type { MarketplaceCatalogFilters } from "@/src/modules/marketplace/catalog-filters";
+import { getMarketplaceCatalogProductRevision } from "@/src/modules/marketplace/catalog-product-revision";
 import type { MarketplaceSaleCampaign } from "@/src/modules/marketplace/sales";
 
 function getContextDescription(data: MarketplaceCatalogPageData) {
@@ -60,6 +61,12 @@ export function MarketplaceCatalogSurface({
     ? selectedSaleCampaign?.href ?? "/sale"
     : getBaseHref(data);
   const feedKey = JSON.stringify({ context: data.context, filters });
+  const productRevision = getMarketplaceCatalogProductRevision({
+    initialPage: data.page,
+    products: data.products,
+    totalCount: data.totalCount,
+    totalPages: data.totalPages,
+  });
   const controlsData = {
     context: data.context,
     currencyCode: data.currencyCode,
@@ -126,6 +133,7 @@ export function MarketplaceCatalogSurface({
                   filters={filters}
                   initialPage={data.page}
                   initialProducts={data.products}
+                  initialRevision={productRevision}
                   initialTotalCount={data.totalCount}
                   initialTotalPages={data.totalPages}
                   key={feedKey}

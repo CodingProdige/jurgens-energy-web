@@ -150,6 +150,15 @@ export function MarketplaceGoogleRuntime({
         });
       }
 
+      if (anchor.dataset.analyticsPromotionId || anchor.dataset.analyticsPromotionName) {
+        trackGoogleEvent("select_promotion", {
+          creative_name: anchor.dataset.analyticsCreativeName,
+          creative_slot: anchor.dataset.analyticsCreativeSlot,
+          promotion_id: anchor.dataset.analyticsPromotionId,
+          promotion_name: anchor.dataset.analyticsPromotionName,
+        });
+      }
+
       const eventName = getLeadClickEventName(href);
 
       if (!eventName) {

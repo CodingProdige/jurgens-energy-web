@@ -1,4 +1,4 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { db } from "@/src/db";
@@ -20,6 +20,7 @@ export type MarketplaceSaleCampaign = {
   createdAt: string;
   ctaLabel: string;
   discountPercent: string;
+  endsAt: string | null;
   headerPriority: number;
   headerVisible: boolean;
   href: string;
@@ -35,6 +36,7 @@ export type MarketplaceSaleCampaign = {
 type MarketplaceSaleCampaignRow = Omit<
   MarketplaceSaleCampaign,
   | "createdAt"
+  | "endsAt"
   | "href"
   | "productCount"
   | "productIds"
@@ -43,6 +45,7 @@ type MarketplaceSaleCampaignRow = Omit<
   | "variantIds"
 > & {
   createdAt: Date;
+  endsAt: Date | null;
   productId: string;
   publicHeadline: string | null;
   variantId: string;
@@ -72,6 +75,7 @@ function groupMarketplaceSaleCampaigns(rows: MarketplaceSaleCampaignRow[]) {
       createdAt: row.createdAt.toISOString(),
       ctaLabel: row.ctaLabel,
       discountPercent: row.discountPercent,
+      endsAt: row.endsAt?.toISOString() ?? null,
       headerPriority: row.headerPriority,
       headerVisible: row.headerVisible,
       href: createMarketplaceSaleCampaignHref(row.id),
@@ -107,6 +111,8 @@ export const getActiveMarketplaceSaleCampaigns = cache(
     let rows: MarketplaceSaleCampaignRow[];
 
     try {
+      const now = new Date();
+
       rows = await db
         .select({
           badgeColor: saleCampaigns.badgeColor,
@@ -115,6 +121,7 @@ export const getActiveMarketplaceSaleCampaigns = cache(
           createdAt: saleCampaigns.createdAt,
           ctaLabel: saleCampaigns.ctaLabel,
           discountPercent: saleCampaigns.discountPercent,
+          endsAt: saleCampaigns.endsAt,
           headerPriority: saleCampaigns.headerPriority,
           headerVisible: saleCampaigns.headerVisible,
           id: saleCampaigns.id,
@@ -136,6 +143,8 @@ export const getActiveMarketplaceSaleCampaigns = cache(
         .where(
           and(
             eq(saleCampaigns.status, "active"),
+            lte(saleCampaigns.startsAt, now),
+            or(isNull(saleCampaigns.endsAt), gt(saleCampaigns.endsAt, now)),
             eq(saleCampaignVariants.status, "active"),
             eq(productVariants.status, "active"),
             eq(productVariants.isActive, true),

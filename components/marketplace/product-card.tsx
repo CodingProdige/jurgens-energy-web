@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FlameIcon, RefreshCcwIcon, StarIcon } from "lucide-react";
 
 import { MarketplaceCampaignIcon } from "@/components/marketplace/marketplace-campaign-icon";
+import { MarketplaceSaleCountdown } from "@/components/marketplace/marketplace-sale-countdown";
 import { MarketplaceProductFulfillmentBadge } from "@/components/marketplace/product-fulfillment-badge";
 import { ProductCardQuickAddButton } from "@/components/marketplace/product-card-quick-add-button";
 import { ProductCardQuickLook } from "@/components/marketplace/product-card-quick-look";
@@ -180,6 +181,14 @@ export function MarketplaceProductCard({
               product={product}
             />
           </div>
+
+          {product.saleBadge?.endsAt ? (
+            <MarketplaceSaleCountdown
+              className="w-fit"
+              endsAt={product.saleBadge.endsAt}
+              label={product.saleBadge.text}
+            />
+          ) : null}
 
           <div className="flex min-w-0 flex-wrap items-center gap-0.5 sm:gap-1">
             {lowStockLabel ? (

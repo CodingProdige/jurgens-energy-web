@@ -76,6 +76,12 @@ export type GoogleAnalyticsEventParameters = {
     tax?: number;
     transaction_id: string;
   };
+  select_promotion: {
+    creative_name?: string;
+    creative_slot?: string;
+    promotion_id?: string;
+    promotion_name?: string;
+  };
   remove_from_cart: CartEvent;
   search: { search_term: string };
   select_item: {
@@ -89,6 +95,12 @@ export type GoogleAnalyticsEventParameters = {
     item_list_id?: string;
     item_list_name?: string;
     items: GoogleAnalyticsItem[];
+  };
+  view_promotion: {
+    creative_name?: string;
+    creative_slot?: string;
+    promotion_id?: string;
+    promotion_name?: string;
   };
   whatsapp_click: {
     page_path: string;

@@ -6,15 +6,18 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertTriangleIcon,
   BadgePercentIcon,
+  CalendarClockIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ClockIcon,
   FilterIcon,
   ImageOffIcon,
   Layers3Icon,
   Loader2Icon,
   PackageSearchIcon,
   PaletteIcon,
+  PlayIcon,
   RotateCcwIcon,
   SearchIcon,
   Trash2Icon,
@@ -34,7 +37,6 @@ import {
   dashboardTableContainerClass,
   dashboardTableHeadClass,
   dashboardTableHeaderRowClass,
-  dashboardTableMutedTextClass,
   dashboardTablePrimaryTextClass,
   dashboardTableRowClass,
   dashboardTableSecondaryTextClass,
@@ -81,19 +83,25 @@ import type {
 import {
   buildSalesMetrics,
   countHiddenSelected,
+  findConflictingSaleReservation,
   filterSaleProducts,
   getFilteredEligibleVariantIds,
   getProductSelectionState,
+  getProspectiveSaleBasePrice,
   paginateSaleProducts,
   updateSelectedVariantIds,
   type SaleEligibilityFilter,
+  type ProspectiveSaleWindow,
   type SaleStockFilter,
 } from "@/src/modules/admin/sales-presentation";
 
 import {
+  cancelScheduledSaleCampaignAction,
   createSaleCampaignAction,
   deleteSaleCampaignAction,
   endSaleCampaignAction,
+  startSaleCampaignNowAction,
+  updateSaleCampaignScheduleAction,
   updateSaleCampaignAppearanceAction,
 } from "./actions";
 import {
@@ -121,16 +129,251 @@ function formatMoney(value: number | string | null) {
   }).format(Number.isFinite(amount) ? amount : 0);
 }
 
-function formatDate(value: string) {
+type SaleScheduleMode = "now" | "scheduled";
+
+type JohannesburgDateTimeParts = {
+  date: string;
+  time: string;
+};
+
+function getJohannesburgDateTimeParts(
+  value: Date | string,
+): JohannesburgDateTimeParts {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (!Number.isFinite(date.getTime())) {
+    return { date: "", time: "" };
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+  }).formatToParts(date);
+  const partByType = new Map(parts.map((part) => [part.type, part.value]));
+
+  return {
+    date: `${partByType.get("year")}-${partByType.get("month")}-${partByType.get("day")}`,
+    time: `${partByType.get("hour")}:${partByType.get("minute")}`,
+  };
+}
+
+function getJohannesburgLocalDateTime(value: Date | string) {
+  const parts = getJohannesburgDateTimeParts(value);
+
+  return parts.date && parts.time ? `${parts.date}T${parts.time}` : "";
+}
+
+function combineLocalDateTime(date: string, time: string) {
+  return date && time ? `${date}T${time}` : "";
+}
+
+function parseJohannesburgLocalDateTime(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const timestamp = new Date(`${value}:00+02:00`).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function formatCampaignDateTime(value: string | null) {
+  if (!value) {
+    return "No automatic end";
+  }
+
   const date = new Date(value);
 
   return Number.isFinite(date.getTime())
     ? new Intl.DateTimeFormat("en-ZA", {
         day: "numeric",
+        hour: "2-digit",
+        hourCycle: "h23",
+        minute: "2-digit",
         month: "short",
+        timeZone: "Africa/Johannesburg",
         year: "numeric",
       }).format(date)
-    : "Unknown date";
+    : "Not set";
+}
+
+function formatRelativeDuration(milliseconds: number) {
+  const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60_000));
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${Math.max(1, minutes)}m`;
+}
+
+function getCampaignTimingLabel(
+  campaign: AdminSaleCampaign,
+  nowMilliseconds: number | null,
+) {
+  const targetValue =
+    campaign.status === "scheduled" ? campaign.startsAt : campaign.endsAt;
+
+  if (!targetValue) {
+    return "No automatic end";
+  }
+
+  const target = new Date(targetValue).getTime();
+
+  if (!nowMilliseconds || !Number.isFinite(target)) {
+    return campaign.status === "scheduled" ? "Scheduled" : "Active";
+  }
+
+  const difference = target - nowMilliseconds;
+
+  if (difference <= 0) {
+    return campaign.status === "scheduled"
+      ? "Waiting to start"
+      : "Ending shortly";
+  }
+
+  return `${campaign.status === "scheduled" ? "Starts" : "Ends"} in ${formatRelativeDuration(difference)}`;
+}
+
+function getScheduleValidationMessage({
+  endDate,
+  endTime,
+  mode,
+  nowMilliseconds,
+  startDate,
+  startTime,
+}: {
+  endDate: string;
+  endTime: string;
+  mode: SaleScheduleMode;
+  nowMilliseconds: number | null;
+  startDate: string;
+  startTime: string;
+}) {
+  const endLocal = combineLocalDateTime(endDate, endTime);
+  const endMilliseconds = parseJohannesburgLocalDateTime(endLocal);
+
+  if (!endDate || !endTime || endMilliseconds === null) {
+    return "Choose a valid campaign end date and time.";
+  }
+
+  if (nowMilliseconds && endMilliseconds <= nowMilliseconds) {
+    return "The campaign end must be in the future.";
+  }
+
+  if (mode === "now") {
+    return null;
+  }
+
+  const startLocal = combineLocalDateTime(startDate, startTime);
+  const startMilliseconds = parseJohannesburgLocalDateTime(startLocal);
+
+  if (!startDate || !startTime || startMilliseconds === null) {
+    return "Choose a valid scheduled start date and time.";
+  }
+
+  if (nowMilliseconds && startMilliseconds <= nowMilliseconds) {
+    return "The scheduled start must be in the future.";
+  }
+
+  if (endMilliseconds <= startMilliseconds) {
+    return "The campaign end must be after its scheduled start.";
+  }
+
+  return null;
+}
+
+function CampaignStatusBadge({ campaign }: { campaign: AdminSaleCampaign }) {
+  return campaign.status === "scheduled" ? (
+    <Badge className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200">
+      Scheduled
+    </Badge>
+  ) : (
+    <Badge className="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+      Active
+    </Badge>
+  );
+}
+
+function JohannesburgDateTimeFields({
+  date,
+  disabled = false,
+  errorId,
+  idPrefix,
+  invalid = false,
+  label,
+  onDateChange,
+  onTimeChange,
+  required = false,
+  time,
+}: {
+  date: string;
+  disabled?: boolean;
+  errorId?: string;
+  idPrefix: string;
+  invalid?: boolean;
+  label: string;
+  onDateChange: (value: string) => void;
+  onTimeChange: (value: string) => void;
+  required?: boolean;
+  time: string;
+}) {
+  return (
+    <fieldset className="grid min-w-0 gap-2">
+      <legend className="text-sm font-semibold text-zinc-950 dark:text-white">
+        {label} {required ? <span className="text-red-600">*</span> : null}
+      </legend>
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+        <label
+          className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600 dark:text-zinc-300"
+          htmlFor={`${idPrefix}-date`}
+        >
+          Date
+          <DashboardInput
+            aria-describedby={errorId}
+            aria-invalid={invalid || undefined}
+            aria-required={required ? "true" : undefined}
+            disabled={disabled}
+            id={`${idPrefix}-date`}
+            onChange={(event) => onDateChange(event.target.value)}
+            required={required}
+            type="date"
+            value={date}
+          />
+        </label>
+        <label
+          className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600 dark:text-zinc-300"
+          htmlFor={`${idPrefix}-time`}
+        >
+          Time
+          <DashboardInput
+            aria-describedby={errorId}
+            aria-invalid={invalid || undefined}
+            aria-required={required ? "true" : undefined}
+            disabled={disabled}
+            id={`${idPrefix}-time`}
+            onChange={(event) => onTimeChange(event.target.value)}
+            required={required}
+            step="60"
+            type="time"
+            value={time}
+          />
+        </label>
+      </div>
+    </fieldset>
+  );
 }
 
 function humanizeStatus(status: string) {
@@ -462,16 +705,24 @@ function VariantAvailabilityBadge({ variant }: { variant: AdminSaleVariant }) {
 
 function CampaignTableRows({
   campaign,
+  nowMilliseconds,
+  onCancelSchedule,
   onDelete,
   onEnd,
   onEditAppearance,
+  onEditSchedule,
+  onStartNow,
   pending,
   productBySlug,
 }: {
   campaign: AdminSaleCampaign;
+  nowMilliseconds: number | null;
+  onCancelSchedule: (campaign: AdminSaleCampaign) => void;
   onDelete: (campaign: AdminSaleCampaign) => void;
   onEnd: (campaign: AdminSaleCampaign) => void;
   onEditAppearance: (campaign: AdminSaleCampaign) => void;
+  onEditSchedule: (campaign: AdminSaleCampaign) => void;
+  onStartNow: (campaign: AdminSaleCampaign) => void;
   pending: boolean;
   productBySlug: ReadonlyMap<string, AdminSaleProduct>;
 }) {
@@ -515,6 +766,14 @@ function CampaignTableRows({
         </TableCell>
         <TableCell className={dashboardTableCellClass}>
           <div className="grid justify-items-start gap-1.5">
+            <CampaignStatusBadge campaign={campaign} />
+            <span className={dashboardTableSecondaryTextClass}>
+              {getCampaignTimingLabel(campaign, nowMilliseconds)}
+            </span>
+          </div>
+        </TableCell>
+        <TableCell className={dashboardTableCellClass}>
+          <div className="grid justify-items-start gap-1.5">
             <Badge
               className="gap-1 border-transparent"
               style={{
@@ -546,14 +805,21 @@ function CampaignTableRows({
           </p>
         </TableCell>
         <TableCell
+          className={cn(dashboardTableCellClass, "whitespace-normal")}
+        >
+          <p className={dashboardTablePrimaryTextClass}>
+            Starts {formatCampaignDateTime(campaign.startsAt)}
+          </p>
+          <p className={dashboardTableSecondaryTextClass}>
+            {campaign.endsAt
+              ? `Ends ${formatCampaignDateTime(campaign.endsAt)}`
+              : "No automatic end"}
+          </p>
+        </TableCell>
+        <TableCell
           className={cn(dashboardTableCellClass, dashboardTablePrimaryTextClass)}
         >
           {Number(campaign.discountPercent)}% off
-        </TableCell>
-        <TableCell
-          className={cn(dashboardTableCellClass, dashboardTableMutedTextClass)}
-        >
-          {formatDate(campaign.createdAt)}
         </TableCell>
         <TableCell
           className={cn(
@@ -576,6 +842,15 @@ function CampaignTableRows({
                 Edit appearance
               </button>
               <button
+                className={menuItemClass}
+                disabled={pending}
+                onClick={() => onEditSchedule(campaign)}
+                type="button"
+              >
+                <CalendarClockIcon className="size-4" />
+                Edit schedule
+              </button>
+              <button
                 aria-controls={campaignDetailsId}
                 aria-expanded={expanded}
                 className={menuItemClass}
@@ -590,15 +865,38 @@ function CampaignTableRows({
                 )}
                 {expanded ? "Hide details" : "Show details"}
               </button>
-              <button
-                className={menuItemClass}
-                disabled={pending}
-                onClick={() => onEnd(campaign)}
-                type="button"
-              >
-                <RotateCcwIcon className="size-4" />
-                End & restore
-              </button>
+              {campaign.status === "scheduled" ? (
+                <>
+                  <button
+                    className={menuItemClass}
+                    disabled={pending}
+                    onClick={() => onStartNow(campaign)}
+                    type="button"
+                  >
+                    <PlayIcon className="size-4" />
+                    Start now
+                  </button>
+                  <button
+                    className={menuItemClass}
+                    disabled={pending}
+                    onClick={() => onCancelSchedule(campaign)}
+                    type="button"
+                  >
+                    <XIcon className="size-4" />
+                    Cancel schedule
+                  </button>
+                </>
+              ) : (
+                <button
+                  className={menuItemClass}
+                  disabled={pending}
+                  onClick={() => onEnd(campaign)}
+                  type="button"
+                >
+                  <RotateCcwIcon className="size-4" />
+                  End & restore
+                </button>
+              )}
               <button
                 className="flex h-12 w-full items-center gap-3 bg-red-50/80 px-4 text-sm text-red-600 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
                 disabled={pending}
@@ -618,7 +916,7 @@ function CampaignTableRows({
           className="border-slate-200 bg-slate-50/70 hover:bg-slate-50/70 dark:border-white/10 dark:bg-black/10 dark:hover:bg-black/10"
           id={campaignDetailsId}
         >
-          <TableCell className="whitespace-normal p-0" colSpan={6}>
+          <TableCell className="whitespace-normal p-0" colSpan={7}>
             <div
               aria-labelledby={campaignHeadingId}
               className="divide-y divide-slate-200 dark:divide-white/10"
@@ -687,11 +985,20 @@ function CampaignTableRows({
 export function AdminSaleManager({ data }: { data: AdminSalesData }) {
   const router = useRouter();
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const lifecycleBoundaryTimerRef = useRef<number | null>(null);
+  const lifecycleRetryTimerRef = useRef<number | null>(null);
+  const refreshedLifecycleBoundaryKeysRef = useRef(new Set<string>());
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<SaleActionResult | null>(null);
   const [name, setName] = useState("");
   const [badgeText, setBadgeText] = useState("Sale");
   const [discountPercent, setDiscountPercent] = useState("10");
+  const [scheduleMode, setScheduleMode] = useState<SaleScheduleMode>("now");
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [nowMilliseconds, setNowMilliseconds] = useState<number | null>(null);
   const [appearance, setAppearance] = useState<CampaignAppearanceValue>(
     defaultCampaignAppearance,
   );
@@ -720,11 +1027,114 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
     useState<AdminSaleCampaign | null>(null);
   const [campaignToEnd, setCampaignToEnd] =
     useState<AdminSaleCampaign | null>(null);
+  const [campaignToStart, setCampaignToStart] =
+    useState<AdminSaleCampaign | null>(null);
+  const [campaignToCancel, setCampaignToCancel] =
+    useState<AdminSaleCampaign | null>(null);
+  const [campaignToSchedule, setCampaignToSchedule] =
+    useState<AdminSaleCampaign | null>(null);
+  const [scheduleDraftStartDate, setScheduleDraftStartDate] = useState("");
+  const [scheduleDraftStartTime, setScheduleDraftStartTime] = useState("");
+  const [scheduleDraftEndDate, setScheduleDraftEndDate] = useState("");
+  const [scheduleDraftEndTime, setScheduleDraftEndTime] = useState("");
   const [confirmLossSaleOpen, setConfirmLossSaleOpen] = useState(false);
 
+  const numericDiscount = Number(discountPercent);
+  const createScheduleError = getScheduleValidationMessage({
+    endDate,
+    endTime,
+    mode: scheduleMode,
+    nowMilliseconds,
+    startDate,
+    startTime,
+  });
+  const prospectiveWindow = useMemo<ProspectiveSaleWindow | null>(() => {
+    if (createScheduleError || nowMilliseconds === null) {
+      return null;
+    }
+
+    const endsAt = parseJohannesburgLocalDateTime(
+      combineLocalDateTime(endDate, endTime),
+    );
+    const startsAt =
+      scheduleMode === "now"
+        ? nowMilliseconds
+        : parseJohannesburgLocalDateTime(
+            combineLocalDateTime(startDate, startTime),
+          );
+
+    return endsAt !== null && startsAt !== null
+      ? { endsAt, startsAt }
+      : null;
+  }, [
+    createScheduleError,
+    endDate,
+    endTime,
+    nowMilliseconds,
+    scheduleMode,
+    startDate,
+    startTime,
+  ]);
+  const presentedProducts = useMemo(
+    () =>
+      data.products.map((product) => ({
+        ...product,
+        variants: product.variants.map((variant) => {
+          if (!prospectiveWindow) {
+            return variant.selectable
+              ? {
+                  ...variant,
+                  selectable: false,
+                  unavailableReason:
+                    "Set a valid campaign start and end time to select this variant.",
+                }
+              : variant;
+          }
+
+          if (
+            variant.availabilityCode !== "active_campaign" &&
+            variant.availabilityCode !== "scheduled_campaign"
+          ) {
+            return variant;
+          }
+
+          const conflict = findConflictingSaleReservation(
+            variant.id,
+            prospectiveWindow,
+            data.activeCampaigns,
+          );
+
+          if (!conflict) {
+            return {
+              ...variant,
+              price:
+                scheduleMode === "scheduled"
+                  ? getProspectiveSaleBasePrice(
+                      variant.id,
+                      variant.price,
+                      prospectiveWindow,
+                      data.activeCampaigns,
+                    )
+                  : variant.price,
+              selectable: true,
+              unavailableReason: null,
+            };
+          }
+
+          return {
+            ...variant,
+            activeCampaignId: conflict.id,
+            activeCampaignName: conflict.name,
+            selectable: false,
+            unavailableReason: `The proposed campaign timing overlaps ${conflict.name}.`,
+          };
+        }),
+      })),
+    [data.activeCampaigns, data.products, prospectiveWindow, scheduleMode],
+  );
   const variants = useMemo(
-    () => data.products.flatMap((product) => product.variants),
-    [data.products],
+    () => presentedProducts.flatMap((product) => product.variants),
+    [presentedProducts],
   );
   const productBySlug = useMemo(
     () => new Map(data.products.map((product) => [product.slug, product])),
@@ -760,7 +1170,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
   const normalizedQuery = query.trim().toLowerCase();
   const filteredProducts = useMemo(
     () =>
-      filterSaleProducts<AdminSaleVariant, AdminSaleProduct>(data.products, {
+      filterSaleProducts<AdminSaleVariant, AdminSaleProduct>(presentedProducts, {
         brand: brandFilter,
         category: categoryFilter,
         eligibility: eligibilityFilter,
@@ -771,7 +1181,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
     [
       brandFilter,
       categoryFilter,
-      data.products,
+      presentedProducts,
       eligibilityFilter,
       inventoryFilter,
       productStatusFilter,
@@ -823,7 +1233,20 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
   const allPageExpanded =
     pageProducts.length > 0 &&
     pageProducts.every((product) => expandedProductIds.has(product.id));
-  const numericDiscount = Number(discountPercent);
+  const scheduleDraftError = getScheduleValidationMessage({
+    endDate: scheduleDraftEndDate,
+    endTime: scheduleDraftEndTime,
+    mode: campaignToSchedule?.status === "scheduled" ? "scheduled" : "now",
+    nowMilliseconds,
+    startDate: scheduleDraftStartDate,
+    startTime: scheduleDraftStartTime,
+  });
+  const activeCampaignCount = data.activeCampaigns.filter(
+    (campaign) => campaign.status === "active",
+  ).length;
+  const scheduledCampaignCount = data.activeCampaigns.filter(
+    (campaign) => campaign.status === "scheduled",
+  ).length;
   const lossMakingSelectedVariants = selectedVariants.filter((variant) => {
     const costPrice = Number(variant.costPrice);
     const salePrice = getSalePrice(variant.price, numericDiscount);
@@ -853,11 +1276,14 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
     !Number.isInteger(appearance.headerPriority) ||
     appearance.headerPriority < 0 ||
     appearance.headerPriority > 32767 ||
+    Boolean(createScheduleError) ||
+    !prospectiveWindow ||
+    selectedVariants.some((variant) => !variant.selectable) ||
     !Number.isFinite(numericDiscount) ||
     numericDiscount < 1 ||
     numericDiscount > 95;
   const metricCounts = buildSalesMetrics(
-    data.products,
+    prospectiveWindow ? presentedProducts : data.products,
     selectedVariantIds,
     data.activeCampaigns.length,
   );
@@ -901,14 +1327,16 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
       },
       {
         color: "#b94718",
-        description: "Sale campaigns currently changing public variant prices.",
+        description:
+          "Sale campaigns that are active now or waiting for a scheduled start.",
         id: "campaigns",
         label: "Campaigns",
         value: metricCounts.activeCampaigns,
       },
       {
         color: "red",
-        description: "Variants blocked by product status, variant status, or pricing.",
+        description:
+          "Variants blocked by status, pricing, or the proposed campaign timing.",
         id: "blocked",
         label: "Blocked",
         value: metricCounts.blockedVariants,
@@ -923,6 +1351,124 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
       metricCounts.selectedVariants,
       metricCounts.variants,
     ],
+  );
+
+  useEffect(() => {
+    function updateNow() {
+      setNowMilliseconds(Date.now());
+    }
+
+    updateNow();
+    const interval = window.setInterval(updateNow, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (lifecycleBoundaryTimerRef.current !== null) {
+      window.clearTimeout(lifecycleBoundaryTimerRef.current);
+      lifecycleBoundaryTimerRef.current = null;
+    }
+
+    const currentTime = Date.now();
+    const boundaryCandidates = data.activeCampaigns.flatMap((campaign) => {
+      const candidates: Array<{
+        key: string;
+        timestamp: number;
+      }> = [];
+
+      if (campaign.status === "scheduled") {
+        const startsAt = Date.parse(campaign.startsAt);
+
+        if (Number.isFinite(startsAt)) {
+          candidates.push({
+            key: `${campaign.id}:starts:${startsAt}`,
+            timestamp: startsAt,
+          });
+        }
+      }
+
+      if (campaign.endsAt) {
+        const endsAt = Date.parse(campaign.endsAt);
+
+        if (Number.isFinite(endsAt)) {
+          candidates.push({
+            key: `${campaign.id}:ends:${endsAt}`,
+            timestamp: endsAt,
+          });
+        }
+      }
+
+      return candidates;
+    });
+    const unseenCandidates = boundaryCandidates.filter(
+      (candidate) =>
+        !refreshedLifecycleBoundaryKeysRef.current.has(candidate.key),
+    );
+    const dueCandidates = unseenCandidates.filter(
+      (candidate) => candidate.timestamp <= currentTime,
+    );
+
+    function refreshForBoundaries(
+      candidates: Array<{ key: string; timestamp: number }>,
+    ) {
+      for (const candidate of candidates) {
+        refreshedLifecycleBoundaryKeysRef.current.add(candidate.key);
+      }
+
+      router.refresh();
+
+      if (lifecycleRetryTimerRef.current !== null) {
+        window.clearTimeout(lifecycleRetryTimerRef.current);
+      }
+
+      lifecycleRetryTimerRef.current = window.setTimeout(() => {
+        lifecycleRetryTimerRef.current = null;
+        router.refresh();
+      }, 10_000);
+    }
+
+    if (dueCandidates.length > 0) {
+      lifecycleBoundaryTimerRef.current = window.setTimeout(() => {
+        lifecycleBoundaryTimerRef.current = null;
+        refreshForBoundaries(dueCandidates);
+      }, 0);
+    } else {
+      const nextCandidate = unseenCandidates.sort(
+        (first, second) => first.timestamp - second.timestamp,
+      )[0];
+
+      if (nextCandidate) {
+        const delay = Math.max(0, nextCandidate.timestamp - currentTime + 250);
+
+        if (delay <= 2_147_000_000) {
+          lifecycleBoundaryTimerRef.current = window.setTimeout(() => {
+            lifecycleBoundaryTimerRef.current = null;
+            refreshForBoundaries([nextCandidate]);
+          }, delay);
+        }
+      }
+    }
+
+    return () => {
+      if (lifecycleBoundaryTimerRef.current !== null) {
+        window.clearTimeout(lifecycleBoundaryTimerRef.current);
+        lifecycleBoundaryTimerRef.current = null;
+      }
+    };
+  }, [data.activeCampaigns, nowMilliseconds, router]);
+
+  useEffect(
+    () => () => {
+      if (lifecycleBoundaryTimerRef.current !== null) {
+        window.clearTimeout(lifecycleBoundaryTimerRef.current);
+      }
+
+      if (lifecycleRetryTimerRef.current !== null) {
+        window.clearTimeout(lifecycleRetryTimerRef.current);
+      }
+    },
+    [],
   );
 
   useEffect(() => {
@@ -1049,7 +1595,13 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
         ...appearance,
         badgeText,
         discountPercent: numericDiscount,
+        endsAtLocal: combineLocalDateTime(endDate, endTime),
         name,
+        scheduleMode,
+        startsAtLocal:
+          scheduleMode === "scheduled"
+            ? combineLocalDateTime(startDate, startTime)
+            : getJohannesburgLocalDateTime(new Date()),
         variantIds: selectedVariants.map((variant) => variant.id),
       });
 
@@ -1059,6 +1611,11 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
         setName("");
         setBadgeText("Sale");
         setDiscountPercent("10");
+        setScheduleMode("now");
+        setStartDate("");
+        setStartTime("");
+        setEndDate("");
+        setEndTime("");
         setAppearance(defaultCampaignAppearance);
         setSelectedVariantIds(new Set());
         setConfirmLossSaleOpen(false);
@@ -1135,6 +1692,73 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
     });
   }
 
+  function editCampaignSchedule(campaign: AdminSaleCampaign) {
+    const startParts = getJohannesburgDateTimeParts(campaign.startsAt);
+    const endParts = campaign.endsAt
+      ? getJohannesburgDateTimeParts(campaign.endsAt)
+      : { date: "", time: "" };
+
+    setResult(null);
+    setCampaignToSchedule(campaign);
+    setScheduleDraftStartDate(startParts.date);
+    setScheduleDraftStartTime(startParts.time);
+    setScheduleDraftEndDate(endParts.date);
+    setScheduleDraftEndTime(endParts.time);
+  }
+
+  function saveCampaignSchedule() {
+    if (!campaignToSchedule || scheduleDraftError) {
+      return;
+    }
+
+    startTransition(async () => {
+      const response = await updateSaleCampaignScheduleAction({
+        campaignId: campaignToSchedule.id,
+        endsAtLocal: combineLocalDateTime(
+          scheduleDraftEndDate,
+          scheduleDraftEndTime,
+        ),
+        startsAtLocal:
+          campaignToSchedule.status === "scheduled"
+            ? combineLocalDateTime(
+                scheduleDraftStartDate,
+                scheduleDraftStartTime,
+              )
+            : "",
+      });
+      setResult(response);
+
+      if (response.ok) {
+        setCampaignToSchedule(null);
+        router.refresh();
+      }
+    });
+  }
+
+  function startScheduledCampaign(campaignId: string) {
+    startTransition(async () => {
+      const response = await startSaleCampaignNowAction({ campaignId });
+      setResult(response);
+
+      if (response.ok) {
+        setCampaignToStart(null);
+        router.refresh();
+      }
+    });
+  }
+
+  function cancelScheduledCampaign(campaignId: string) {
+    startTransition(async () => {
+      const response = await cancelScheduledSaleCampaignAction({ campaignId });
+      setResult(response);
+
+      if (response.ok) {
+        setCampaignToCancel(null);
+        router.refresh();
+      }
+    });
+  }
+
   return (
     <div className="grid min-w-0 gap-4">
       <DashboardCompactMetrics
@@ -1164,7 +1788,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
           </span>
           <div>
             <h2 className="text-lg font-bold text-zinc-950 dark:text-white">
-              Create sale
+              {scheduleMode === "scheduled" ? "Schedule sale" : "Create sale"}
             </h2>
             <p className="text-sm text-slate-500 dark:text-zinc-400">
               Choose products, expand their variants, and select exactly what the
@@ -1215,6 +1839,122 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
               value={discountPercent}
             />
           </label>
+        </div>
+
+        <div className="grid min-w-0 gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Campaign timing
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
+              Choose when the sale should begin and set a deliberate end time.
+            </p>
+          </div>
+
+          <div
+            aria-label="Campaign start mode"
+            className="grid gap-2 sm:grid-cols-2"
+            role="group"
+          >
+            <button
+              aria-pressed={scheduleMode === "now"}
+              className={cn(
+                "flex min-w-0 items-start gap-3 rounded-lg border p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-primary",
+                scheduleMode === "now"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-slate-200 bg-white text-zinc-800 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-100 dark:hover:bg-white/[0.07]",
+              )}
+              disabled={isPending || !data.salesAvailable}
+              onClick={() => setScheduleMode("now")}
+              type="button"
+            >
+              <PlayIcon className="mt-0.5 size-4 shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-sm font-bold">Start now</span>
+                <span className="mt-0.5 block text-xs font-normal opacity-75">
+                  Activate prices as soon as this campaign is created.
+                </span>
+              </span>
+            </button>
+            <button
+              aria-pressed={scheduleMode === "scheduled"}
+              className={cn(
+                "flex min-w-0 items-start gap-3 rounded-lg border p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-primary",
+                scheduleMode === "scheduled"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-slate-200 bg-white text-zinc-800 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-100 dark:hover:bg-white/[0.07]",
+              )}
+              disabled={isPending || !data.salesAvailable}
+              onClick={() => setScheduleMode("scheduled")}
+              type="button"
+            >
+              <CalendarClockIcon className="mt-0.5 size-4 shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-sm font-bold">Schedule start</span>
+                <span className="mt-0.5 block text-xs font-normal opacity-75">
+                  Keep current prices until the scheduled time arrives.
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+            {scheduleMode === "scheduled" ? (
+              <JohannesburgDateTimeFields
+                date={startDate}
+                disabled={isPending || !data.salesAvailable}
+                errorId={createScheduleError ? "create-sale-schedule-error" : undefined}
+                idPrefix="create-sale-start"
+                invalid={Boolean(createScheduleError)}
+                label="Starts"
+                onDateChange={setStartDate}
+                onTimeChange={setStartTime}
+                required
+                time={startTime}
+              />
+            ) : (
+              <div className="grid content-start gap-1 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                <p className="text-sm font-bold">Starts immediately</p>
+                <p className="text-xs">
+                  The exact Johannesburg start time is recorded when you confirm
+                  creation.
+                </p>
+              </div>
+            )}
+            <JohannesburgDateTimeFields
+              date={endDate}
+              disabled={isPending || !data.salesAvailable}
+              errorId={createScheduleError ? "create-sale-schedule-error" : undefined}
+              idPrefix="create-sale-end"
+              invalid={Boolean(createScheduleError)}
+              label="Ends"
+              onDateChange={setEndDate}
+              onTimeChange={setEndTime}
+              required
+              time={endTime}
+            />
+          </div>
+
+          <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-300">
+            <ClockIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+            <p>
+              All campaign times use Africa/Johannesburg (SAST, UTC+2). The sale
+              activates and ends automatically at these exact local times.
+            </p>
+          </div>
+          {createScheduleError ? (
+            <p
+              className="text-xs font-semibold text-red-600 dark:text-red-300"
+              id="create-sale-schedule-error"
+              role="alert"
+            >
+              {createScheduleError}
+            </p>
+          ) : (
+            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              Campaign timing is valid.
+            </p>
+          )}
         </div>
 
         <div className="grid min-w-0 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
@@ -1377,7 +2117,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
               type="button"
             >
               {isPending ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
-              Create sale
+                {scheduleMode === "scheduled" ? "Schedule sale" : "Create sale"}
             </DashboardButton>
           </div>
         </div>
@@ -1619,7 +2359,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
                 {isPending ? (
                   <Loader2Icon className="size-3.5 animate-spin" />
                 ) : null}
-                Create sale
+                {scheduleMode === "scheduled" ? "Schedule sale" : "Create sale"}
               </DashboardButton>
             </div>
           </div>
@@ -1636,7 +2376,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
         <div className="flex flex-col gap-1 border-b border-slate-200 p-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold text-zinc-950 dark:text-white">
-              Active sale campaigns
+              Sale campaigns
             </h2>
             <p className="text-sm text-slate-500 dark:text-zinc-400">
               Public sale collection: {" "}
@@ -1645,27 +2385,31 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
               </a>
             </p>
           </div>
-          <Badge variant="secondary">
-            {data.activeCampaigns.length} active
-          </Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary">{activeCampaignCount} active</Badge>
+            <Badge variant="secondary">{scheduledCampaignCount} scheduled</Badge>
+          </div>
         </div>
-        <Table className={cn(dashboardTableClass, "min-w-[880px] table-fixed")}>
+        <Table className={cn(dashboardTableClass, "min-w-[1120px] table-fixed")}>
           <TableHeader>
             <TableRow className={dashboardTableHeaderRowClass}>
-              <TableHead className={cn(dashboardTableHeadClass, "w-[30%]")}>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[24%]")}>
                 Campaign
               </TableHead>
-              <TableHead className={cn(dashboardTableHeadClass, "w-[22%]")}>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[12%]")}>
+                Status
+              </TableHead>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[18%]")}>
                 Appearance
               </TableHead>
-              <TableHead className={cn(dashboardTableHeadClass, "w-[16%]")}>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[12%]")}>
                 Scope
               </TableHead>
-              <TableHead className={cn(dashboardTableHeadClass, "w-[12%]")}>
-                Discount
+              <TableHead className={cn(dashboardTableHeadClass, "w-[24%]")}>
+                Timing (SAST)
               </TableHead>
-              <TableHead className={cn(dashboardTableHeadClass, "w-[14%]")}>
-                Started
+              <TableHead className={cn(dashboardTableHeadClass, "w-[10%]")}>
+                Discount
               </TableHead>
               <TableHead
                 className={cn(
@@ -1684,6 +2428,11 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
                 <CampaignTableRows
                   campaign={campaign}
                   key={campaign.id}
+                  nowMilliseconds={nowMilliseconds}
+                  onCancelSchedule={(nextCampaign) => {
+                    setResult(null);
+                    setCampaignToCancel(nextCampaign);
+                  }}
                   onDelete={(nextCampaign) => {
                     setResult(null);
                     setCampaignToDelete(nextCampaign);
@@ -1693,20 +2442,25 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
                     setCampaignToEnd(nextCampaign);
                   }}
                   onEditAppearance={editCampaignAppearance}
+                  onEditSchedule={editCampaignSchedule}
+                  onStartNow={(nextCampaign) => {
+                    setResult(null);
+                    setCampaignToStart(nextCampaign);
+                  }}
                   pending={isPending || !data.salesAvailable}
                   productBySlug={productBySlug}
                 />
               ))
             ) : (
               <TableRow className="border-0 hover:bg-transparent">
-                <TableCell className="whitespace-normal px-5 py-12" colSpan={6}>
+                <TableCell className="whitespace-normal px-5 py-12" colSpan={7}>
                   <div className="mx-auto grid max-w-sm place-items-center gap-2 text-center">
                     <span className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-zinc-400">
                       <BadgePercentIcon className="size-5" />
                     </span>
                     <div>
                       <p className="text-sm font-bold text-zinc-950 dark:text-white">
-                        No active sale campaigns
+                        No active or scheduled campaigns
                       </p>
                       <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
                         Select eligible variants above to create the first one.
@@ -1780,6 +2534,204 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
       <Dialog
         onOpenChange={(open) => {
           if (!open && !isPending) {
+            setCampaignToSchedule(null);
+          }
+        }}
+        open={Boolean(campaignToSchedule)}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Edit campaign schedule</DialogTitle>
+            <DialogDescription>
+              {campaignToSchedule?.status === "scheduled"
+                ? "Change when this campaign starts or ends."
+                : "This campaign is already active, so only its end time can be changed."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="grid gap-4">
+            {result && !result.ok ? <StatusMessage result={result} /> : null}
+            {campaignToSchedule ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-bold text-zinc-950 dark:text-white">
+                  {campaignToSchedule.name}
+                </p>
+                <CampaignStatusBadge campaign={campaignToSchedule} />
+              </div>
+            ) : null}
+            <JohannesburgDateTimeFields
+              date={scheduleDraftStartDate}
+              disabled={isPending || campaignToSchedule?.status !== "scheduled"}
+              errorId={scheduleDraftError ? "edit-sale-schedule-error" : undefined}
+              idPrefix="edit-sale-start"
+              invalid={
+                Boolean(scheduleDraftError) &&
+                campaignToSchedule?.status === "scheduled"
+              }
+              label={
+                campaignToSchedule?.status === "scheduled"
+                  ? "Starts"
+                  : "Started (cannot be changed)"
+              }
+              onDateChange={setScheduleDraftStartDate}
+              onTimeChange={setScheduleDraftStartTime}
+              required={campaignToSchedule?.status === "scheduled"}
+              time={scheduleDraftStartTime}
+            />
+            <JohannesburgDateTimeFields
+              date={scheduleDraftEndDate}
+              disabled={isPending}
+              errorId={scheduleDraftError ? "edit-sale-schedule-error" : undefined}
+              idPrefix="edit-sale-end"
+              invalid={Boolean(scheduleDraftError)}
+              label="Ends"
+              onDateChange={setScheduleDraftEndDate}
+              onTimeChange={setScheduleDraftEndTime}
+              required
+              time={scheduleDraftEndTime}
+            />
+            <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-300">
+              <ClockIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+              <p>
+                Times use Africa/Johannesburg (SAST, UTC+2). Schedule changes
+                affect the automatic activation or ending of this campaign.
+              </p>
+            </div>
+            {scheduleDraftError ? (
+              <p
+                className="text-xs font-semibold text-red-600 dark:text-red-300"
+                id="edit-sale-schedule-error"
+                role="alert"
+              >
+                {scheduleDraftError}
+              </p>
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <DashboardButton
+              disabled={isPending}
+              onClick={() => setCampaignToSchedule(null)}
+              type="button"
+            >
+              Cancel
+            </DashboardButton>
+            <DashboardButton
+              className="border-primary bg-primary text-white hover:bg-[#e84d18] dark:border-primary dark:bg-primary dark:text-white"
+              disabled={isPending || !campaignToSchedule || Boolean(scheduleDraftError)}
+              onClick={saveCampaignSchedule}
+              type="button"
+            >
+              {isPending ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
+              Save schedule
+            </DashboardButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setCampaignToStart(null);
+          }
+        }}
+        open={Boolean(campaignToStart)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Start this sale now?</DialogTitle>
+            <DialogDescription>
+              Its selected variants will switch to sale prices immediately
+              instead of waiting for the scheduled start.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="grid gap-3">
+            {result && !result.ok ? <StatusMessage result={result} /> : null}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+              <p className="font-bold">{campaignToStart?.name}</p>
+              <p className="mt-1">
+                {campaignToStart?.endsAt
+                  ? `The existing end time of ${formatCampaignDateTime(campaignToStart.endsAt)} remains unchanged.`
+                  : "This legacy campaign has no automatic end; you can add one through Edit schedule."}
+              </p>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <DashboardButton
+              disabled={isPending}
+              onClick={() => setCampaignToStart(null)}
+              type="button"
+            >
+              Keep scheduled
+            </DashboardButton>
+            <DashboardButton
+              className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800 dark:border-emerald-500 dark:bg-emerald-600 dark:text-white"
+              disabled={isPending || !campaignToStart}
+              onClick={() => {
+                if (campaignToStart) {
+                  startScheduledCampaign(campaignToStart.id);
+                }
+              }}
+              type="button"
+            >
+              {isPending ? <Loader2Icon className="size-3.5 animate-spin" /> : <PlayIcon className="size-3.5" />}
+              Start sale now
+            </DashboardButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setCampaignToCancel(null);
+          }
+        }}
+        open={Boolean(campaignToCancel)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel this scheduled sale?</DialogTitle>
+            <DialogDescription>
+              The campaign will not start and current product prices will remain
+              unchanged.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="grid gap-3">
+            {result && !result.ok ? <StatusMessage result={result} /> : null}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-100">
+              <p className="font-bold">{campaignToCancel?.name}</p>
+              <p className="mt-1">
+                Scheduled for {campaignToCancel ? formatCampaignDateTime(campaignToCancel.startsAt) : "a future time"}.
+              </p>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <DashboardButton
+              disabled={isPending}
+              onClick={() => setCampaignToCancel(null)}
+              type="button"
+            >
+              Keep scheduled
+            </DashboardButton>
+            <DashboardButton
+              className="border-red-600 bg-red-600 text-white hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:text-white"
+              disabled={isPending || !campaignToCancel}
+              onClick={() => {
+                if (campaignToCancel) {
+                  cancelScheduledCampaign(campaignToCancel.id);
+                }
+              }}
+              type="button"
+            >
+              {isPending ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
+              Cancel schedule
+            </DashboardButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
             setCampaignToDelete(null);
           }
         }}
@@ -1789,8 +2741,9 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
           <DialogHeader>
             <DialogTitle>Delete sale campaign?</DialogTitle>
             <DialogDescription>
-              This permanently removes the campaign after restoring its original
-              variant prices.
+              {campaignToDelete?.status === "scheduled"
+                ? "This permanently removes the campaign before it can start. Current prices remain unchanged."
+                : "This permanently removes the campaign after restoring its original variant prices."}
             </DialogDescription>
           </DialogHeader>
           <DialogBody>
@@ -1799,8 +2752,10 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
               <p className="font-bold">{campaignToDelete?.name}</p>
               <p className="mt-1">
                 {campaignToDelete?.variants.length ?? 0} variant
-                {(campaignToDelete?.variants.length ?? 0) === 1 ? "" : "s"} will
-                have their original prices restored first.
+                {(campaignToDelete?.variants.length ?? 0) === 1 ? "" : "s"}{" "}
+                {campaignToDelete?.status === "scheduled"
+                  ? "will be released from this schedule."
+                  : "will have their original prices restored first."}
               </p>
             </div>
           </DialogBody>
@@ -1823,7 +2778,9 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
               type="button"
             >
               {isPending ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
-              Delete and restore prices
+              {campaignToDelete?.status === "scheduled"
+                ? "Delete scheduled sale"
+                : "Delete and restore prices"}
             </DashboardButton>
           </DialogFooter>
         </DialogContent>
@@ -1935,7 +2892,9 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
               type="button"
             >
               {isPending ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
-              Create below-cost sale
+              {scheduleMode === "scheduled"
+                ? "Schedule below-cost sale"
+                : "Create below-cost sale"}
             </DashboardButton>
           </DialogFooter>
         </DialogContent>

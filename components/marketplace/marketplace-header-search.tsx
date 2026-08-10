@@ -18,6 +18,7 @@ import {
 } from "react";
 
 import { cn } from "@/lib/utils";
+import { trackGoogleEvent } from "@/src/modules/analytics/google";
 
 type MarketplaceSearchSuggestion = {
   brandName: string | null;
@@ -251,11 +252,13 @@ export function MarketplaceHeaderSearch({
     }
 
     setRecentSearches(persistRecentSearch(term));
+    trackGoogleEvent("search", { search_term: term });
   }
 
   function handleNavigate(term: string) {
     setFocused(false);
     setRecentSearches(persistRecentSearch(term));
+    trackGoogleEvent("search", { search_term: term.trim() });
   }
 
   return (

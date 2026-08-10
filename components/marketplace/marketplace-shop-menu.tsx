@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import {
   BadgeCheckIcon,
@@ -18,32 +17,27 @@ import {
   TruckIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   MarketplaceShopMenuCategory,
   MarketplaceShopMenuData,
-  MarketplaceShopMenuProduct,
 } from "@/src/modules/marketplace/catalog";
+import { MarketplaceCampaignIcon } from "@/components/marketplace/marketplace-campaign-icon";
+import { MarketplaceSaleCountdown } from "@/components/marketplace/marketplace-sale-countdown";
 import { MarketplaceWhatsAppIcon } from "@/components/marketplace/marketplace-whatsapp-button";
 import { cn } from "@/lib/utils";
+import { trackGoogleEvent } from "@/src/modules/analytics/google";
+import type { MarketplaceSaleCampaign } from "@/src/modules/marketplace/sales";
+import {
+  getReadableSaleCampaignForeground,
+  normalizeSaleCampaignColor,
+} from "@/src/modules/sales/campaign-presentation";
+
+const maximumMegaMenuOffers = 3;
 
 function categoryHref(category: MarketplaceShopMenuCategory) {
   return `/categories/${category.path}`;
-}
-
-function findLpgCategory(categories: MarketplaceShopMenuCategory[]) {
-  return (
-    categories.find((category) =>
-      ["gas-cylinders", "lpg-cylinders"].includes(category.slug),
-    ) ??
-    categories.find((category) => {
-      const text = `${category.name} ${category.slug}`.toLowerCase();
-
-      return text.includes("cylinder") && !text.includes("accessor");
-    }) ??
-    null
-  );
 }
 
 function CategoryIcon({ category }: { category: MarketplaceShopMenuCategory }) {
@@ -65,44 +59,69 @@ function CategoryIcon({ category }: { category: MarketplaceShopMenuCategory }) {
   return <Icon aria-hidden="true" className="size-6 text-[#ff5a1f]" />;
 }
 
-function ExchangeableProductCard({
-  product,
+function formatCampaignDiscount(discountPercent: string) {
+  const discount = Number(discountPercent);
+
+  if (!Number.isFinite(discount)) {
+    return `${discountPercent}% off`;
+  }
+
+  return `${new Intl.NumberFormat("en-ZA", {
+    maximumFractionDigits: 2,
+  }).format(discount)}% off`;
+}
+
+function CurrentOfferCard({
+  campaign,
   onNavigate,
 }: {
-  product: MarketplaceShopMenuProduct;
+  campaign: MarketplaceSaleCampaign;
   onNavigate: () => void;
 }) {
+  const backgroundColor = normalizeSaleCampaignColor(campaign.badgeColor);
+  const foregroundColor = getReadableSaleCampaignForeground(backgroundColor);
+
   return (
     <Link
       className="marketplace-product-card flex min-w-0 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
-      href={`/products/${product.slug}`}
+      href={campaign.href}
+      data-analytics-creative-name={campaign.badgeText?.trim() || campaign.name}
+      data-analytics-creative-slot="shop_mega_menu"
+      data-analytics-promotion-id={campaign.id}
+      data-analytics-promotion-name={campaign.name}
       onClick={onNavigate}
       prefetch={false}
     >
       <span
-        className="relative grid aspect-[1/1] size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-white/[0.08]"
-        data-shop-menu-product-media-container=""
+        className="grid size-12 shrink-0 place-items-center rounded-md shadow-sm"
+        style={{ backgroundColor, color: foregroundColor }}
       >
-        {product.imageUrl ? (
-          <Image
-            alt=""
-            className="object-contain"
-            fill
-            sizes="64px"
-            src={product.imageUrl}
-            unoptimized
-          />
-        ) : (
-          <FuelIcon className="size-6 text-[#ff5a1f]" />
-        )}
+        <MarketplaceCampaignIcon className="size-5" name={campaign.badgeIcon} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[11px] font-black uppercase text-white">
-          {product.title}
+        <span className="block truncate text-[12px] font-black uppercase text-white">
+          {campaign.publicHeadline?.trim() || campaign.name}
         </span>
-        <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.08em] text-[#ff5a1f]">
-          Exchange supported
+        <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.05em] text-white/60">
+          <span
+            className="rounded-full px-1.5 py-0.5 font-black"
+            style={{ backgroundColor, color: foregroundColor }}
+          >
+            {formatCampaignDiscount(campaign.discountPercent)}
+          </span>
+          <span>
+            {campaign.productCount} product
+            {campaign.productCount === 1 ? "" : "s"}
+          </span>
         </span>
+        {campaign.endsAt ? (
+          <MarketplaceSaleCountdown
+            className="mt-2 w-fit"
+            endsAt={campaign.endsAt}
+            label="Offer"
+            variant="menu"
+          />
+        ) : null}
       </span>
       <ChevronRightIcon className="size-4 shrink-0 text-[#ff5a1f]" />
     </Link>
@@ -112,10 +131,12 @@ function ExchangeableProductCard({
 export function MarketplaceShopMenu({
   active = false,
   data,
+  saleCampaigns,
   whatsappHref,
 }: {
   active?: boolean;
   data: MarketplaceShopMenuData;
+  saleCampaigns: readonly MarketplaceSaleCampaign[];
   whatsappHref: string | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -123,10 +144,22 @@ export function MarketplaceShopMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lpgCategory = findLpgCategory(data.categories);
-  const topLevelCategories = data.categories.filter(
-    (category) => category.id !== lpgCategory?.id,
+  const featuredSaleCampaigns = useMemo(
+    () =>
+      [...saleCampaigns]
+        .sort(
+          (left, right) =>
+            right.headerPriority - left.headerPriority ||
+            left.name.localeCompare(right.name),
+        )
+        .slice(0, maximumMegaMenuOffers),
+    [saleCampaigns],
   );
+  const additionalSaleCampaignCount = Math.max(
+    0,
+    saleCampaigns.length - featuredSaleCampaigns.length,
+  );
+  const topLevelCategories = data.categories;
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimerRef.current) {
@@ -164,6 +197,15 @@ export function MarketplaceShopMenu({
       return;
     }
 
+    featuredSaleCampaigns.forEach((campaign) => {
+      trackGoogleEvent("view_promotion", {
+        creative_name: campaign.badgeText?.trim() || campaign.name,
+        creative_slot: "shop_mega_menu",
+        promotion_id: campaign.id,
+        promotion_name: campaign.name,
+      });
+    });
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         closeMenu();
@@ -189,7 +231,7 @@ export function MarketplaceShopMenu({
       window.removeEventListener("resize", updatePanelPosition);
       window.removeEventListener("scroll", updatePanelPosition, true);
     };
-  }, [closeMenu, open, updatePanelPosition]);
+  }, [closeMenu, featuredSaleCampaigns, open, updatePanelPosition]);
 
   useEffect(
     () => () => {
@@ -310,34 +352,46 @@ export function MarketplaceShopMenu({
               <div className="flex items-end justify-between gap-3 border-b border-white/15 pb-3">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#ff5a1f]">
-                    Cylinder options
+                    Current offers
                   </p>
-                  <h2 className="mt-1 text-base font-black uppercase">Exchangeable cylinders</h2>
+                  <h2 className="mt-1 text-base font-black uppercase">Live sale campaigns</h2>
                 </div>
                 <Link
                   className="shrink-0 text-[10px] font-black uppercase text-white/55 focus-visible:outline-none focus-visible:text-[#ff5a1f]"
-                  href="/products?exchange=1"
+                  href="/sale"
                   onClick={closeMenu}
                   prefetch={false}
                 >
-                  View all
+                  View all sales
                 </Link>
               </div>
-              {data.exchangeableLpgProducts.length > 0 ? (
+              {featuredSaleCampaigns.length > 0 ? (
                 <div className="mt-4 max-h-[min(48vh,420px)] overflow-y-auto pr-1 [scrollbar-color:#ff5a1f_#1a1a1a]">
                   <div className="grid gap-2">
-                    {data.exchangeableLpgProducts.map((product) => (
-                      <ExchangeableProductCard
-                        key={product.id}
+                    {featuredSaleCampaigns.map((campaign) => (
+                      <CurrentOfferCard
+                        campaign={campaign}
+                        key={campaign.id}
                         onNavigate={closeMenu}
-                        product={product}
                       />
                     ))}
                   </div>
+                  {additionalSaleCampaignCount > 0 ? (
+                    <Link
+                      className="mt-3 flex h-9 items-center justify-between rounded-md border border-white/15 px-3 text-[10px] font-black uppercase text-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]"
+                      href="/sale"
+                      onClick={closeMenu}
+                      prefetch={false}
+                    >
+                      {additionalSaleCampaignCount} more live offer
+                      {additionalSaleCampaignCount === 1 ? "" : "s"}
+                      <ChevronRightIcon className="size-3.5 text-[#ff5a1f]" />
+                    </Link>
+                  ) : null}
                 </div>
               ) : (
                 <div className="mt-4 rounded-lg border border-white/10 p-5 text-sm text-white/60">
-                  No exchangeable cylinder products are available right now.
+                  No live campaign is running right now. {data.hasCurrentDeals ? "Browse the current deal collection for marked-down products." : "Check back soon for the next offer."}
                 </div>
               )}
             </section>

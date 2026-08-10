@@ -7,6 +7,7 @@ import {
   getMarketplaceCatalogActiveFilterCount,
   parseMarketplaceCatalogFilters,
 } from "../src/modules/marketplace/catalog-filters.ts";
+import { getMarketplaceCatalogProductRevision } from "../src/modules/marketplace/catalog-product-revision.ts";
 import {
   getReadableSaleCampaignForeground,
   normalizeSaleCampaignColor,
@@ -64,4 +65,40 @@ test("normalizes campaign colors and chooses a readable foreground", () => {
   assert.equal(normalizeSaleCampaignColor("invalid"), "#FF5A1F");
   assert.equal(getReadableSaleCampaignForeground("#FFFFFF"), "#080808");
   assert.equal(getReadableSaleCampaignForeground("#080808"), "#FFFFFF");
+});
+
+test("catalog revisions change when an authoritative sale snapshot expires", () => {
+  const activeSale = {
+    initialPage: 2,
+    products: [
+      {
+        id: "heater",
+        isOnSale: true,
+        priceLabel: "R 899,00",
+        saleBadge: {
+          campaignId,
+          endsAt: "2026-08-10T18:00:00.000Z",
+          text: "Winter sale",
+        },
+      },
+    ],
+    totalCount: 25,
+    totalPages: 2,
+  };
+  const activeRevision = getMarketplaceCatalogProductRevision(activeSale);
+  const repeatedRevision = getMarketplaceCatalogProductRevision(activeSale);
+  const expiredRevision = getMarketplaceCatalogProductRevision({
+    ...activeSale,
+    products: [
+      {
+        id: "heater",
+        isOnSale: false,
+        priceLabel: "R 999,00",
+        saleBadge: null,
+      },
+    ],
+  });
+
+  assert.equal(repeatedRevision, activeRevision);
+  assert.notEqual(expiredRevision, activeRevision);
 });

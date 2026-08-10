@@ -19,6 +19,7 @@ export type SalePresentationVariant = {
   activeCampaignId?: string | null;
   activeCampaignName?: string | null;
   availabilityCode?: string;
+  campaignStatus?: "active" | "scheduled" | null;
   id: string;
   optionValues?: readonly string[];
   productSlug?: string;
@@ -69,6 +70,20 @@ export type SaleProductPage<TProduct> = {
   totalProducts: number;
 };
 
+export type ProspectiveSaleWindow = {
+  endsAt: number;
+  startsAt: number;
+};
+
+export type SaleCampaignReservation = {
+  endsAt: string | null;
+  id: string;
+  name: string;
+  startsAt: string;
+  status?: "active" | "scheduled";
+  variants: readonly { originalPrice?: string; variantId: string }[];
+};
+
 export const defaultSalePresentationFilters: SalePresentationFilters = {
   brand: "all",
   category: "all",
@@ -77,6 +92,98 @@ export const defaultSalePresentationFilters: SalePresentationFilters = {
   productStatus: "all",
   query: "",
 };
+
+function toReservationBoundary(
+  value: string | null,
+  fallback: number,
+) {
+  if (!value) {
+    return fallback;
+  }
+
+  const milliseconds = Date.parse(value);
+
+  return Number.isFinite(milliseconds) ? milliseconds : fallback;
+}
+
+export function saleWindowsOverlap(
+  first: ProspectiveSaleWindow,
+  second: { endsAt: number | null; startsAt: number },
+) {
+  const secondEnd = second.endsAt ?? Number.POSITIVE_INFINITY;
+
+  return first.startsAt < secondEnd && second.startsAt < first.endsAt;
+}
+
+/**
+ * Finds the first reservation whose half-open [start, end) window intersects
+ * the proposed campaign window. Invalid legacy dates are treated
+ * conservatively as unbounded rather than making a product selectable.
+ */
+export function findConflictingSaleReservation(
+  variantId: string,
+  prospectiveWindow: ProspectiveSaleWindow,
+  campaigns: readonly SaleCampaignReservation[],
+) {
+  for (const campaign of campaigns) {
+    if (!campaign.variants.some((variant) => variant.variantId === variantId)) {
+      continue;
+    }
+
+    const startsAt = toReservationBoundary(
+      campaign.startsAt,
+      Number.NEGATIVE_INFINITY,
+    );
+    const endsAt = campaign.endsAt
+      ? toReservationBoundary(campaign.endsAt, Number.POSITIVE_INFINITY)
+      : null;
+
+    if (saleWindowsOverlap(prospectiveWindow, { endsAt, startsAt })) {
+      return campaign;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The live variant price is already discounted while a managed campaign is
+ * active. A later, non-overlapping scheduled campaign must preview its
+ * discount from that campaign's saved original price, matching the server's
+ * create-sale calculation.
+ */
+export function getProspectiveSaleBasePrice(
+  variantId: string,
+  currentPrice: string,
+  prospectiveWindow: ProspectiveSaleWindow,
+  campaigns: readonly SaleCampaignReservation[],
+) {
+  for (const campaign of campaigns) {
+    if (campaign.status !== "active") {
+      continue;
+    }
+
+    const campaignEnd = toReservationBoundary(
+      campaign.endsAt,
+      Number.POSITIVE_INFINITY,
+    );
+
+    if (campaignEnd > prospectiveWindow.startsAt) {
+      continue;
+    }
+
+    const reservation = campaign.variants.find(
+      (variant) => variant.variantId === variantId,
+    );
+    const originalPrice = Number(reservation?.originalPrice);
+
+    if (Number.isFinite(originalPrice) && originalPrice > 0) {
+      return reservation?.originalPrice ?? currentPrice;
+    }
+  }
+
+  return currentPrice;
+}
 
 function normalizeSearchValue(value: string | null | undefined) {
   return value?.trim().toLocaleLowerCase() ?? "";
@@ -99,6 +206,13 @@ function matchesEntityFilter(
 }
 
 function isVariantOnSale(variant: SalePresentationVariant) {
+  if (
+    variant.campaignStatus === "scheduled" ||
+    variant.availabilityCode === "scheduled_campaign"
+  ) {
+    return false;
+  }
+
   return (
     variant.availabilityCode === "active_campaign" ||
     variant.availabilityCode === "compare_at_sale" ||

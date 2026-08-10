@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { trackGoogleEvent } from "@/src/modules/analytics/google";
 import type { ContactInquiryActionState } from "@/app/(marketplace)/(content)/contact/actions";
 
 const initialState: ContactInquiryActionState = {};
@@ -20,10 +21,16 @@ export type ContactInquiryAction = (
 export function ContactForm({ action }: { action: ContactInquiryAction }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const trackedSubmissionIds = useRef(new Set<string>());
 
   useEffect(() => {
     if (state.status === "success" && state.submissionId) {
       formRef.current?.reset();
+
+      if (!trackedSubmissionIds.current.has(state.submissionId)) {
+        trackedSubmissionIds.current.add(state.submissionId);
+        trackGoogleEvent("generate_lead", { lead_source: "contact_form" });
+      }
     }
   }, [state.status, state.submissionId]);
 

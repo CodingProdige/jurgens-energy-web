@@ -750,6 +750,13 @@
       "when": 1788602400000,
       "tag": "0106_sale_campaign_appearance",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1788688800000,
+      "tag": "0107_sale_campaign_scheduling",
+      "breakpoints": true
     }
   ]
 }

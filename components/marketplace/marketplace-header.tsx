@@ -142,6 +142,7 @@ export async function MarketplaceHeader() {
 
         <MarketplaceDesktopNav
           navItems={navItems}
+          saleCampaigns={saleCampaigns}
           saleProductCount={saleProductCount}
           shopMenuData={shopMenuData}
           whatsappHref={whatsappHref}

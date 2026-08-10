@@ -19,6 +19,7 @@ import {
 } from "react";
 
 import { MarketplaceCampaignIcon } from "@/components/marketplace/marketplace-campaign-icon";
+import { trackGoogleEvent } from "@/src/modules/analytics/google";
 import type { MarketplaceSaleCampaign } from "@/src/modules/marketplace/sales";
 import {
   getReadableSaleCampaignForeground,
@@ -92,6 +93,19 @@ export function MarketplaceSaleSpotlight({
   const campaign = featuredCampaigns[currentIndex];
   const rotationPaused =
     prefersReducedMotion || isHovered || isFocused || isManuallyPaused;
+
+  useEffect(() => {
+    if (!campaign) {
+      return;
+    }
+
+    trackGoogleEvent("view_promotion", {
+      creative_name: campaign.badgeText?.trim() || campaign.name,
+      creative_slot: "header_sale_spotlight",
+      promotion_id: campaign.id,
+      promotion_name: campaign.name,
+    });
+  }, [campaign]);
 
   useEffect(() => {
     if (campaignCount < 2 || rotationPaused) {
@@ -191,6 +205,10 @@ export function MarketplaceSaleSpotlight({
         aria-live={rotationPaused ? "polite" : "off"}
         className="flex min-w-0 flex-1 items-center justify-center gap-2 px-2 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-current"
         href={campaign.href}
+        data-analytics-creative-name={campaign.badgeText?.trim() || campaign.name}
+        data-analytics-creative-slot="header_sale_spotlight"
+        data-analytics-promotion-id={campaign.id}
+        data-analytics-promotion-name={campaign.name}
         prefetch={false}
       >
         <span

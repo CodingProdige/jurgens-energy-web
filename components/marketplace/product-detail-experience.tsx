@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
+import { MarketplaceSaleCountdown } from "@/components/marketplace/marketplace-sale-countdown";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
 import {
   Dialog,
@@ -1696,6 +1697,14 @@ function ProductBuyBox({
           <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400 sm:text-[11px]">
             {priceTaxDisclosure}
           </p>
+          {selectedVariant?.saleBadge?.endsAt ? (
+            <MarketplaceSaleCountdown
+              className="mt-3 w-fit"
+              endsAt={selectedVariant.saleBadge.endsAt}
+              label={selectedVariant.saleBadge.text}
+              variant="prominent"
+            />
+          ) : null}
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
             <ProductStockStatusBadge
               lowStockQuantity={selectedLowStockQuantity}
@@ -1951,6 +1960,14 @@ function MobileProductPurchaseSummary({
           <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400">
             {priceTaxDisclosure}
           </p>
+          {selectedVariant?.saleBadge?.endsAt ? (
+            <MarketplaceSaleCountdown
+              className="mt-1.5 w-fit"
+              endsAt={selectedVariant.saleBadge.endsAt}
+              label={selectedVariant.saleBadge.text}
+              variant="prominent"
+            />
+          ) : null}
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <ProductStockStatusBadge
               compact

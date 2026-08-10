@@ -18,13 +18,14 @@ import { productVariants } from "@/src/db/schema/products";
 import { users } from "@/src/db/schema/users";
 
 export const saleCampaignStatus = pgEnum("sale_campaign_status", [
+  "scheduled",
   "active",
   "ended",
 ]);
 
 export const saleCampaignVariantStatus = pgEnum(
   "sale_campaign_variant_status",
-  ["active", "ended"],
+  ["scheduled", "active", "ended"],
 );
 
 export const saleCampaigns = pgTable(
@@ -48,6 +49,14 @@ export const saleCampaigns = pgTable(
       scale: 2,
     }).notNull(),
     status: saleCampaignStatus("status").notNull().default("active"),
+    startsAt: timestamp("starts_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    endsAt: timestamp("ends_at", { mode: "date", withTimezone: true }),
+    activatedAt: timestamp("activated_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -65,6 +74,15 @@ export const saleCampaigns = pgTable(
       campaign.status,
       campaign.headerVisible,
       campaign.headerPriority,
+    ),
+    lifecycleIdx: index("sale_campaigns_lifecycle_idx").on(
+      campaign.status,
+      campaign.startsAt,
+      campaign.endsAt,
+    ),
+    scheduleWindowCheck: check(
+      "sale_campaigns_schedule_window_check",
+      sql`${campaign.endsAt} is null or ${campaign.endsAt} > ${campaign.startsAt}`,
     ),
     statusIdx: index("sale_campaigns_status_idx").on(campaign.status),
   }),
