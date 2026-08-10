@@ -12,8 +12,6 @@ import {
   productVariants,
   products,
   reviews,
-  saleCampaigns,
-  saleCampaignVariants,
 } from "@/src/db/schema";
 import {
   convertFromZar,
@@ -35,8 +33,8 @@ import {
   getMarketplaceVariantStockStatus,
   type MarketplaceStockStatus,
 } from "@/src/modules/marketplace/stock-status";
-import { isMissingSalesSchemaError } from "@/src/modules/sales/database-errors";
 import { filterPopulatedShopMenuCategories } from "@/src/modules/marketplace/shop-menu-categories";
+import { getActiveMarketplaceSaleCampaigns } from "@/src/modules/marketplace/sales";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import {
   getEmptyProductRatingSummary,
@@ -111,6 +109,7 @@ export type MarketplaceProductCard = {
   id: string;
   inStock: boolean;
   isOnSale: boolean;
+  saleBadge: MarketplaceSaleBadge | null;
   saleBadgeText: string | null;
   lowStockQuantity: number | null;
   priceLabel: string;
@@ -123,6 +122,13 @@ export type MarketplaceProductCard = {
   stockStatus: MarketplaceStockStatus;
   title: string;
   variantCount: number;
+};
+
+export type MarketplaceSaleBadge = {
+  campaignId: string;
+  color: string;
+  iconName: string | null;
+  text: string;
 };
 
 export type MarketplaceProductOptionSchema = {
@@ -258,59 +264,43 @@ function getProductCardSaleData(
   };
 }
 
-async function getActiveSaleBadgeTextByProductId(productIds: string[]) {
+async function getActiveSaleBadgeByProductId(
+  productIds: string[],
+  preferredCampaignId?: string | null,
+) {
   const uniqueProductIds = Array.from(new Set(productIds));
 
   if (uniqueProductIds.length === 0) {
-    return new Map<string, string>();
+    return new Map<string, MarketplaceSaleBadge>();
   }
 
-  let rows: Array<{ badgeText: string; productId: string }>;
+  const requestedProductIds = new Set(uniqueProductIds);
+  const campaigns = await getActiveMarketplaceSaleCampaigns();
+  const orderedCampaigns = preferredCampaignId
+    ? [
+        ...campaigns.filter((campaign) => campaign.id === preferredCampaignId),
+        ...campaigns.filter((campaign) => campaign.id !== preferredCampaignId),
+      ]
+    : campaigns;
+  const badgeByProductId = new Map<string, MarketplaceSaleBadge>();
 
-  try {
-    rows = await db
-      .select({
-        badgeText: saleCampaigns.badgeText,
-        productId: productVariants.productId,
-      })
-      .from(saleCampaignVariants)
-      .innerJoin(
-        saleCampaigns,
-        eq(saleCampaigns.id, saleCampaignVariants.campaignId),
-      )
-      .innerJoin(
-        productVariants,
-        eq(productVariants.id, saleCampaignVariants.variantId),
-      )
-      .where(
-        and(
-          inArray(productVariants.productId, uniqueProductIds),
-          eq(saleCampaigns.status, "active"),
-          eq(saleCampaignVariants.status, "active"),
-        ),
-      )
-      .orderBy(desc(saleCampaigns.createdAt));
-  } catch (error: unknown) {
-    if (isMissingSalesSchemaError(error)) {
-      console.warn(
-        "Sales campaign tables are unavailable; using standard sale badges.",
-      );
-
-      return new Map<string, string>();
-    }
-
-    throw error;
-  }
-
-  const badgeTextByProductId = new Map<string, string>();
-
-  for (const row of rows) {
-    if (!badgeTextByProductId.has(row.productId)) {
-      badgeTextByProductId.set(row.productId, row.badgeText);
+  for (const campaign of orderedCampaigns) {
+    for (const productId of campaign.productIds) {
+      if (
+        requestedProductIds.has(productId) &&
+        !badgeByProductId.has(productId)
+      ) {
+        badgeByProductId.set(productId, {
+          campaignId: campaign.id,
+          color: campaign.badgeColor,
+          iconName: campaign.badgeIcon,
+          text: campaign.badgeText,
+        });
+      }
     }
   }
 
-  return badgeTextByProductId;
+  return badgeByProductId;
 }
 
 function getQuickAddVariantId(
@@ -525,7 +515,7 @@ export async function getMarketplaceCatalog({
     productMediaByProductId,
     ratingSummariesByProductId,
     soldQuantityByProductId,
-    saleBadgeTextByProductId,
+    saleBadgeByProductId,
     categoriesList,
     brandsList,
   ] =
@@ -548,7 +538,7 @@ export async function getMarketplaceCatalog({
       getProductCardMediaByProductId(productIds),
       getProductRatingSummariesByProductId(productIds),
       getSoldQuantityByProductId(productIds),
-      getActiveSaleBadgeTextByProductId(productIds),
+      getActiveSaleBadgeByProductId(productIds),
       getMarketplaceCategories(),
       getMarketplaceBrands(),
     ]);
@@ -580,6 +570,7 @@ export async function getMarketplaceCatalog({
   const productsList = filteredRows.map((row): MarketplaceProductCard => {
     const variants = variantsByProductId.get(row.id) ?? [];
     const ratingSummary = getRatingSummary(ratingSummariesByProductId, row.id);
+    const saleBadge = saleBadgeByProductId.get(row.id) ?? null;
 
     return {
       averageRating: ratingSummary.averageRating,
@@ -598,7 +589,8 @@ export async function getMarketplaceCatalog({
       previewVideo:
         productMediaByProductId.get(row.id)?.previewVideo ?? null,
       ...getProductCardSaleData(variants, currencyContext),
-      saleBadgeText: saleBadgeTextByProductId.get(row.id) ?? null,
+      saleBadge,
+      saleBadgeText: saleBadge?.text ?? null,
       quickAddVariantId: getQuickAddVariantId(variants),
       reviewCount: ratingSummary.reviewCount,
       shortDescription: row.shortDescription,
@@ -695,6 +687,7 @@ function getRecordOnSale(record: MarketplaceCatalogFilterRecord) {
 }
 
 function matchesCatalogRecord({
+  campaignProductIds,
   categoryPathByFilterValue,
   context,
   currencyContext,
@@ -702,6 +695,7 @@ function matchesCatalogRecord({
   omitFacet,
   record,
 }: {
+  campaignProductIds: ReadonlySet<string> | null;
   categoryPathByFilterValue: ReadonlyMap<string, string>;
   context: MarketplaceCatalogPageContext;
   currencyContext: CurrencyContext;
@@ -722,6 +716,13 @@ function matchesCatalogRecord({
   }
 
   if (context.kind === "brand" && record.row.brandSlug !== context.slug) {
+    return false;
+  }
+
+  if (
+    filters.campaignId &&
+    (!campaignProductIds || !campaignProductIds.has(record.row.id))
+  ) {
     return false;
   }
 
@@ -1091,11 +1092,19 @@ export async function getMarketplaceCatalogPage({
   filters: MarketplaceCatalogFilters;
   pageSize?: number;
 }): Promise<MarketplaceCatalogPageData> {
-  const [rows, categoriesList, brandsList] = await Promise.all([
+  const [rows, categoriesList, brandsList, activeSaleCampaigns] = await Promise.all([
     getPublicProductsBaseRows(),
     getMarketplaceCategories(),
     getMarketplaceBrands(),
+    filters.campaignId ? getActiveMarketplaceSaleCampaigns() : Promise.resolve([]),
   ]);
+  const selectedCampaign = filters.campaignId
+    ? activeSaleCampaigns.find((campaign) => campaign.id === filters.campaignId) ??
+      null
+    : null;
+  const campaignProductIds = filters.campaignId
+    ? new Set(selectedCampaign?.productIds ?? [])
+    : null;
   const lockedCategory = categoryPath
     ? categoriesList.find((category) => category.path === categoryPath) ?? null
     : categorySlug
@@ -1215,6 +1224,7 @@ export async function getMarketplaceCatalogPage({
     omitFacet: MarketplaceCatalogOmittedFacet = null,
   ) =>
     matchesCatalogRecord({
+      campaignProductIds,
       categoryPathByFilterValue,
       context,
       currencyContext,
@@ -1234,37 +1244,44 @@ export async function getMarketplaceCatalogPage({
     page * pageSize,
   );
   const pageProductIds = paginatedRecords.map((record) => record.row.id);
-  const [productMediaByProductId, saleBadgeTextByProductId] = await Promise.all([
+  const [productMediaByProductId, saleBadgeByProductId] = await Promise.all([
     getProductCardMediaByProductId(pageProductIds),
-    getActiveSaleBadgeTextByProductId(pageProductIds),
+    getActiveSaleBadgeByProductId(pageProductIds, filters.campaignId),
   ]);
-  const productsList = paginatedRecords.map((record): MarketplaceProductCard => ({
-    averageRating: record.ratingSummary.averageRating,
-    brandId: record.row.brandId,
-    brandName: record.row.brandName,
-    brandSlug: record.row.brandSlug,
-    category: toCategory(record.row),
-    coverImageUrl:
-      productMediaByProductId.get(record.row.id)?.coverImageUrl ?? null,
-    fulfillmentMode: record.row.fulfillmentMode,
-    hasExchangeOption: getRecordExchangeSupported(record),
-    id: record.row.id,
-    inStock: getRecordInStock(record),
-    lowStockQuantity: getMarketplaceProductLowStockQuantity(record.variants),
-    priceLabel: getPriceLabel(record.variants, currencyContext),
-    previewVideo:
-      productMediaByProductId.get(record.row.id)?.previewVideo ?? null,
-    ...getProductCardSaleData(record.variants, currencyContext),
-    saleBadgeText: saleBadgeTextByProductId.get(record.row.id) ?? null,
-    quickAddVariantId: getQuickAddVariantId(record.variants),
-    reviewCount: record.ratingSummary.reviewCount,
-    shortDescription: record.row.shortDescription,
-    slug: record.row.slug,
-    soldQuantity: record.soldQuantity,
-    stockStatus: getMarketplaceProductStockStatus(record.variants),
-    title: record.row.title,
-    variantCount: record.variants.length,
-  }));
+  const productsList = paginatedRecords.map(
+    (record): MarketplaceProductCard => {
+      const saleBadge = saleBadgeByProductId.get(record.row.id) ?? null;
+
+      return {
+        averageRating: record.ratingSummary.averageRating,
+        brandId: record.row.brandId,
+        brandName: record.row.brandName,
+        brandSlug: record.row.brandSlug,
+        category: toCategory(record.row),
+        coverImageUrl:
+          productMediaByProductId.get(record.row.id)?.coverImageUrl ?? null,
+        fulfillmentMode: record.row.fulfillmentMode,
+        hasExchangeOption: getRecordExchangeSupported(record),
+        id: record.row.id,
+        inStock: getRecordInStock(record),
+        lowStockQuantity: getMarketplaceProductLowStockQuantity(record.variants),
+        priceLabel: getPriceLabel(record.variants, currencyContext),
+        previewVideo:
+          productMediaByProductId.get(record.row.id)?.previewVideo ?? null,
+        ...getProductCardSaleData(record.variants, currencyContext),
+        saleBadge,
+        saleBadgeText: saleBadge?.text ?? null,
+        quickAddVariantId: getQuickAddVariantId(record.variants),
+        reviewCount: record.ratingSummary.reviewCount,
+        shortDescription: record.row.shortDescription,
+        slug: record.row.slug,
+        soldQuantity: record.soldQuantity,
+        stockStatus: getMarketplaceProductStockStatus(record.variants),
+        title: record.row.title,
+        variantCount: record.variants.length,
+      };
+    },
+  );
   const priceRecords = records.filter((record) => matches(record, "price"));
   const availablePrices = priceRecords
     .flatMap((record) => [record.minimumPrice, record.maximumPrice])
@@ -2009,9 +2026,10 @@ export async function getMarketplaceProductBySlug(
     )
     .orderBy(desc(reviews.approvedAt), desc(reviews.createdAt))
     .limit(12);
-  const saleBadgeTextByProductId = await getActiveSaleBadgeTextByProductId([
+  const saleBadgeByProductId = await getActiveSaleBadgeByProductId([
     product.id,
   ]);
+  const saleBadge = saleBadgeByProductId.get(product.id) ?? null;
 
   return {
     averageRating: ratingSummary.averageRating,
@@ -2034,7 +2052,8 @@ export async function getMarketplaceProductBySlug(
     priceLabel: getPriceLabel(variants, currencyContext),
     previewVideo,
     ...getProductCardSaleData(variants, currencyContext),
-    saleBadgeText: saleBadgeTextByProductId.get(product.id) ?? null,
+    saleBadge,
+    saleBadgeText: saleBadge?.text ?? null,
     quickAddVariantId: getQuickAddVariantId(activeVariantRows),
     ratingSummary,
     reviewCount: ratingSummary.reviewCount,

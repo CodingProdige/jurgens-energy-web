@@ -14,6 +14,7 @@ import {
   Layers3Icon,
   Loader2Icon,
   PackageSearchIcon,
+  PaletteIcon,
   RotateCcwIcon,
   SearchIcon,
   Trash2Icon,
@@ -73,7 +74,16 @@ import {
   createSaleCampaignAction,
   deleteSaleCampaignAction,
   endSaleCampaignAction,
+  updateSaleCampaignAppearanceAction,
 } from "./actions";
+import {
+  CampaignAppearanceEditor,
+  defaultCampaignAppearance,
+  getCampaignTextColor,
+  isCampaignHexColor,
+  type CampaignAppearanceValue,
+} from "./campaign-appearance-editor";
+import { CampaignDynamicIcon } from "./campaign-icon-picker";
 
 const saleSelectionLimit = 200;
 const defaultPageSize = 10;
@@ -434,12 +444,14 @@ function CampaignCard({
   campaign,
   onDelete,
   onEnd,
+  onEditAppearance,
   pending,
   productBySlug,
 }: {
   campaign: AdminSaleCampaign;
   onDelete: (campaign: AdminSaleCampaign) => void;
   onEnd: (campaign: AdminSaleCampaign) => void;
+  onEditAppearance: (campaign: AdminSaleCampaign) => void;
   pending: boolean;
   productBySlug: ReadonlyMap<string, AdminSaleProduct>;
 }) {
@@ -455,6 +467,7 @@ function CampaignCard({
       new Map<string, AdminSaleCampaign["variants"]>(),
     ),
   );
+  const campaignTextColor = getCampaignTextColor(campaign.badgeColor);
 
   return (
     <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#151719]">
@@ -464,11 +477,34 @@ function CampaignCard({
             <h3 className="text-base font-bold text-zinc-950 dark:text-white">
               {campaign.name}
             </h3>
-            <Badge className="bg-primary text-white">{campaign.badgeText}</Badge>
+            <Badge
+              className="gap-1 border-transparent"
+              style={{
+                backgroundColor: campaign.badgeColor,
+                color: campaignTextColor,
+              }}
+            >
+              <CampaignDynamicIcon
+                className="size-3.5"
+                iconName={campaign.badgeIcon}
+              />
+              {campaign.badgeText}
+            </Badge>
             <Badge variant="secondary">
               {Number(campaign.discountPercent)}% off
             </Badge>
+            <Badge variant={campaign.headerVisible ? "default" : "secondary"}>
+              {campaign.headerVisible
+                ? `Header · priority ${campaign.headerPriority}`
+                : "Header hidden"}
+            </Badge>
           </div>
+          <p className="mt-1 truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+            {campaign.publicHeadline || campaign.name}
+            <span className="font-normal text-slate-500 dark:text-zinc-400">
+              {` · ${campaign.ctaLabel}`}
+            </span>
+          </p>
           <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
             {groupedVariants.length} product
             {groupedVariants.length === 1 ? "" : "s"} · {campaign.variants.length}{" "}
@@ -477,6 +513,14 @@ function CampaignCard({
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          <DashboardButton
+            disabled={pending}
+            onClick={() => onEditAppearance(campaign)}
+            type="button"
+          >
+            <PaletteIcon className="size-3.5" />
+            Edit appearance
+          </DashboardButton>
           <DashboardButton
             aria-expanded={expanded}
             disabled={campaign.variants.length === 0}
@@ -572,6 +616,9 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
   const [name, setName] = useState("");
   const [badgeText, setBadgeText] = useState("Sale");
   const [discountPercent, setDiscountPercent] = useState("10");
+  const [appearance, setAppearance] = useState<CampaignAppearanceValue>(
+    defaultCampaignAppearance,
+  );
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -589,6 +636,10 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [campaignToEdit, setCampaignToEdit] =
+    useState<AdminSaleCampaign | null>(null);
+  const [appearanceDraft, setAppearanceDraft] =
+    useState<CampaignAppearanceValue>(defaultCampaignAppearance);
   const [campaignToDelete, setCampaignToDelete] =
     useState<AdminSaleCampaign | null>(null);
   const [campaignToEnd, setCampaignToEnd] =
@@ -721,6 +772,11 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
     selectedVariants.length === 0 ||
     !name.trim() ||
     !badgeText.trim() ||
+    !appearance.ctaLabel.trim() ||
+    !isCampaignHexColor(appearance.badgeColor) ||
+    !Number.isInteger(appearance.headerPriority) ||
+    appearance.headerPriority < 0 ||
+    appearance.headerPriority > 32767 ||
     !Number.isFinite(numericDiscount) ||
     numericDiscount < 1 ||
     numericDiscount > 95;
@@ -914,6 +970,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
 
     startTransition(async () => {
       const response = await createSaleCampaignAction({
+        ...appearance,
         badgeText,
         discountPercent: numericDiscount,
         name,
@@ -926,6 +983,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
         setName("");
         setBadgeText("Sale");
         setDiscountPercent("10");
+        setAppearance(defaultCampaignAppearance);
         setSelectedVariantIds(new Set());
         setConfirmLossSaleOpen(false);
         router.refresh();
@@ -966,6 +1024,38 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
       }
 
       router.refresh();
+    });
+  }
+
+  function editCampaignAppearance(campaign: AdminSaleCampaign) {
+    setResult(null);
+    setCampaignToEdit(campaign);
+    setAppearanceDraft({
+      badgeColor: campaign.badgeColor,
+      badgeIcon: campaign.badgeIcon,
+      ctaLabel: campaign.ctaLabel,
+      headerPriority: campaign.headerPriority,
+      headerVisible: campaign.headerVisible,
+      publicHeadline: campaign.publicHeadline ?? "",
+    });
+  }
+
+  function saveCampaignAppearance() {
+    if (!campaignToEdit) {
+      return;
+    }
+
+    startTransition(async () => {
+      const response = await updateSaleCampaignAppearanceAction({
+        campaignId: campaignToEdit.id,
+        ...appearanceDraft,
+      });
+      setResult(response);
+
+      if (response.ok) {
+        setCampaignToEdit(null);
+        router.refresh();
+      }
     });
   }
 
@@ -1049,6 +1139,25 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
               value={discountPercent}
             />
           </label>
+        </div>
+
+        <div className="grid min-w-0 gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div>
+            <h3 className="text-sm font-bold text-zinc-950 dark:text-white">
+              Campaign appearance
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-zinc-400">
+              Control how this sale appears in product badges and the storefront
+              header spotlight.
+            </p>
+          </div>
+          <CampaignAppearanceEditor
+            badgeText={badgeText}
+            campaignName={name}
+            disabled={isPending || !data.salesAvailable}
+            onChange={setAppearance}
+            value={appearance}
+          />
         </div>
 
         <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -1472,6 +1581,7 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
                   setResult(null);
                   setCampaignToEnd(nextCampaign);
                 }}
+                onEditAppearance={editCampaignAppearance}
                 pending={isPending || !data.salesAvailable}
                 productBySlug={productBySlug}
               />
@@ -1493,6 +1603,63 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
           </div>
         )}
       </section>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setCampaignToEdit(null);
+          }
+        }}
+        open={Boolean(campaignToEdit)}
+      >
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit campaign appearance</DialogTitle>
+            <DialogDescription>
+              Update the public headline, campaign colour, icon and header
+              spotlight placement without changing prices or selected variants.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="grid gap-4">
+            {result && !result.ok ? <StatusMessage result={result} /> : null}
+            {campaignToEdit ? (
+              <CampaignAppearanceEditor
+                badgeText={campaignToEdit.badgeText}
+                campaignName={campaignToEdit.name}
+                disabled={isPending}
+                onChange={setAppearanceDraft}
+                value={appearanceDraft}
+              />
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <DashboardButton
+              disabled={isPending}
+              onClick={() => setCampaignToEdit(null)}
+              type="button"
+            >
+              Cancel
+            </DashboardButton>
+            <DashboardButton
+              className="border-primary bg-primary text-white hover:bg-[#e84d18] dark:border-primary dark:bg-primary dark:text-white"
+              disabled={
+                isPending ||
+                !campaignToEdit ||
+                !isCampaignHexColor(appearanceDraft.badgeColor) ||
+                !appearanceDraft.ctaLabel.trim() ||
+                !Number.isInteger(appearanceDraft.headerPriority) ||
+                appearanceDraft.headerPriority < 0 ||
+                appearanceDraft.headerPriority > 32767
+              }
+              onClick={saveCampaignAppearance}
+              type="button"
+            >
+              {isPending ? <Loader2Icon className="size-3.5 animate-spin" /> : null}
+              Save appearance
+            </DashboardButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         onOpenChange={(open) => {

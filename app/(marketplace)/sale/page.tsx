@@ -8,6 +8,7 @@ import {
   parseMarketplaceCatalogFilters,
   type MarketplaceCatalogSearchParams,
 } from "@/src/modules/marketplace/catalog-filters";
+import { getActiveMarketplaceSaleCampaigns } from "@/src/modules/marketplace/sales";
 import { getPriceTaxDisclosure } from "@/src/modules/tax/vat-display";
 
 export const metadata: Metadata = {
@@ -20,12 +21,20 @@ export default async function SalePage({
 }: {
   searchParams: Promise<MarketplaceCatalogSearchParams>;
 }) {
-  const [currencyContext, resolvedSearchParams] = await Promise.all([
+  const [currencyContext, resolvedSearchParams, saleCampaigns] = await Promise.all([
     getCurrencyContext(),
     searchParams,
+    getActiveMarketplaceSaleCampaigns(),
   ]);
+  const parsedFilters = parseMarketplaceCatalogFilters(resolvedSearchParams);
+  const selectedSaleCampaign = parsedFilters.campaignId
+    ? saleCampaigns.find(
+        (campaign) => campaign.id === parsedFilters.campaignId,
+      ) ?? null
+    : null;
   const filters = {
-    ...parseMarketplaceCatalogFilters(resolvedSearchParams),
+    ...parsedFilters,
+    campaignId: selectedSaleCampaign?.id ?? null,
     onSale: true,
   };
   const [data, vatStatus] = await Promise.all([
@@ -42,6 +51,8 @@ export default async function SalePage({
       data={data}
       filters={filters}
       priceTaxDisclosure={getPriceTaxDisclosure(vatStatus)}
+      saleCampaigns={saleCampaigns}
+      selectedSaleCampaign={selectedSaleCampaign}
     />
   );
 }

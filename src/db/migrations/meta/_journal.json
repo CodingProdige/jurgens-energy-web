@@ -743,6 +743,13 @@
       "when": 1788516000000,
       "tag": "0105_cart_journey_analytics",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1788602400000,
+      "tag": "0106_sale_campaign_appearance",
+      "breakpoints": true
     }
   ]
 }

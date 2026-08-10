@@ -5,9 +5,11 @@ import { MarketplaceCatalogControls } from "@/components/marketplace/catalog-con
 import { MarketplaceFooter } from "@/components/marketplace/marketplace-footer";
 import { MarketplaceGate } from "@/components/marketplace/marketplace-gate";
 import { MarketplaceHeader } from "@/components/marketplace/marketplace-header";
+import { MarketplaceSaleCampaignHeader } from "@/components/marketplace/marketplace-sale-campaign-header";
 import { ProgressiveProductGrid } from "@/components/marketplace/progressive-product-grid";
 import type { MarketplaceCatalogPageData } from "@/src/modules/marketplace/catalog";
 import type { MarketplaceCatalogFilters } from "@/src/modules/marketplace/catalog-filters";
+import type { MarketplaceSaleCampaign } from "@/src/modules/marketplace/sales";
 
 function getContextDescription(data: MarketplaceCatalogPageData) {
   if (data.context?.kind === "category") {
@@ -37,16 +39,26 @@ export function MarketplaceCatalogSurface({
   data,
   filters,
   priceTaxDisclosure = "Final price",
+  saleCampaigns,
+  selectedSaleCampaign = null,
 }: {
   data: MarketplaceCatalogPageData;
   filters: MarketplaceCatalogFilters;
   priceTaxDisclosure?: string;
+  saleCampaigns?: readonly MarketplaceSaleCampaign[];
+  selectedSaleCampaign?: MarketplaceSaleCampaign | null;
 }) {
   if (!data.context) {
     return null;
   }
 
-  const title = data.context.name;
+  const isSaleCatalog = saleCampaigns !== undefined;
+  const title = isSaleCatalog
+    ? selectedSaleCampaign?.publicHeadline ?? "Sales"
+    : data.context.name;
+  const clearFiltersHref = isSaleCatalog
+    ? selectedSaleCampaign?.href ?? "/sale"
+    : getBaseHref(data);
   const feedKey = JSON.stringify({ context: data.context, filters });
   const controlsData = {
     context: data.context,
@@ -73,7 +85,7 @@ export function MarketplaceCatalogSurface({
                   Home
                 </Link>
                 <ChevronRightIcon className="size-3.5 shrink-0" />
-                {data.context?.kind !== "all" ? (
+                {!isSaleCatalog && data.context?.kind !== "all" ? (
                   <>
                     <Link className="hover:text-[#ff5a1f]" href="/products">
                       Products
@@ -85,15 +97,29 @@ export function MarketplaceCatalogSurface({
                   {title}
                 </span>
               </nav>
-              <h1 className="mt-3 text-[28px] font-black leading-tight sm:text-[38px]">
-                {title}
-              </h1>
-              <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-[#666660] dark:text-[#aaa9a1] sm:text-sm">
-                {getContextDescription(data)}
-              </p>
+              {isSaleCatalog ? (
+                <MarketplaceSaleCampaignHeader
+                  campaigns={saleCampaigns}
+                  selectedCampaign={selectedSaleCampaign}
+                  totalCount={data.totalCount}
+                />
+              ) : (
+                <>
+                  <h1 className="mt-3 text-[28px] font-black leading-tight sm:text-[38px]">
+                    {title}
+                  </h1>
+                  <p className="mt-1.5 max-w-2xl text-[13px] leading-5 text-[#666660] dark:text-[#aaa9a1] sm:text-sm">
+                    {getContextDescription(data)}
+                  </p>
+                </>
+              )}
             </header>
 
-            <MarketplaceCatalogControls data={controlsData} filters={filters}>
+            <MarketplaceCatalogControls
+              data={controlsData}
+              filters={filters}
+              lockOnSale={isSaleCatalog}
+            >
               {data.products.length > 0 ? (
                 <ProgressiveProductGrid
                   context={data.context}
@@ -115,7 +141,7 @@ export function MarketplaceCatalogSurface({
                     </p>
                     <Link
                       className="mt-5 inline-flex h-9 items-center justify-center rounded-md border border-[#d8d8d1] px-3 text-sm font-semibold transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] dark:border-white/15"
-                      href={getBaseHref(data)}
+                      href={clearFiltersHref}
                     >
                       Clear filters
                     </Link>

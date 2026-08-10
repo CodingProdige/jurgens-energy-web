@@ -42,6 +42,7 @@ type CatalogControlsProps = {
   children: ReactNode;
   data: Omit<MarketplaceCatalogPageData, "products">;
   filters: MarketplaceCatalogFilters;
+  lockOnSale?: boolean;
 };
 
 type FilterFieldsProps = {
@@ -49,6 +50,7 @@ type FilterFieldsProps = {
   filters: MarketplaceCatalogFilters;
   hideBrands: boolean;
   hideCategories: boolean;
+  lockOnSale: boolean;
   onChange: (filters: MarketplaceCatalogFilters, immediate?: boolean) => void;
 };
 
@@ -69,7 +71,10 @@ function toggleValue<T extends string>(values: T[], value: T) {
     : [...values, value];
 }
 
-function clearFacetFilters(filters: MarketplaceCatalogFilters) {
+function clearFacetFilters(
+  filters: MarketplaceCatalogFilters,
+  lockOnSale: boolean,
+) {
   return {
     ...filters,
     brandSlugs: [],
@@ -78,7 +83,7 @@ function clearFacetFilters(filters: MarketplaceCatalogFilters) {
     inStock: false,
     maxPrice: null,
     minPrice: null,
-    onSale: false,
+    onSale: lockOnSale,
     page: 1,
   };
 }
@@ -193,6 +198,7 @@ function FilterFields({
   filters,
   hideBrands,
   hideCategories,
+  lockOnSale,
   onChange,
 }: FilterFieldsProps) {
   function update(next: Partial<MarketplaceCatalogFilters>, immediate = true) {
@@ -247,13 +253,15 @@ function FilterFields({
             update({ exchangeSupported: !filters.exchangeSupported })
           }
         />
-        <FilterOption
-          checked={filters.onSale}
-          count={data.facets.onSaleCount}
-          disabled={data.facets.onSaleCount === 0 && !filters.onSale}
-          label="On sale"
-          onChange={() => update({ onSale: !filters.onSale })}
-        />
+        {!lockOnSale ? (
+          <FilterOption
+            checked={filters.onSale}
+            count={data.facets.onSaleCount}
+            disabled={data.facets.onSaleCount === 0 && !filters.onSale}
+            label="On sale"
+            onChange={() => update({ onSale: !filters.onSale })}
+          />
+        ) : null}
       </FilterSection>
 
       <FilterSection title={`Price (${data.currencyCode})`}>
@@ -310,6 +318,7 @@ export function MarketplaceCatalogControls({
   children,
   data,
   filters,
+  lockOnSale = false,
 }: CatalogControlsProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -319,9 +328,12 @@ export function MarketplaceCatalogControls({
   const [desktopFilters, setDesktopFilters] = useState(filters);
   const [mobileFilters, setMobileFilters] = useState(filters);
   const priceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeFilterCount = getMarketplaceCatalogActiveFilterCount(filters);
+  const activeFilterCount =
+    getMarketplaceCatalogActiveFilterCount(filters) -
+    Number(lockOnSale && filters.onSale);
   const mobileActiveFilterCount =
-    getMarketplaceCatalogActiveFilterCount(mobileFilters);
+    getMarketplaceCatalogActiveFilterCount(mobileFilters) -
+    Number(lockOnSale && mobileFilters.onSale);
   const hideCategories = data.context?.kind === "category";
   const hideBrands = data.context?.kind === "brand";
 
@@ -341,7 +353,10 @@ export function MarketplaceCatalogControls({
   );
 
   function navigate(nextFilters: MarketplaceCatalogFilters) {
-    const searchParams = createMarketplaceCatalogSearchParams(nextFilters);
+    const normalizedFilters = lockOnSale
+      ? { ...nextFilters, onSale: true }
+      : nextFilters;
+    const searchParams = createMarketplaceCatalogSearchParams(normalizedFilters);
     const href = searchParams.size > 0 ? `${pathname}?${searchParams}` : pathname;
 
     startTransition(() => router.push(href, { scroll: false }));
@@ -419,7 +434,7 @@ export function MarketplaceCatalogControls({
       });
     }
 
-    if (filters.onSale) {
+    if (filters.onSale && !lockOnSale) {
       chips.push({
         key: "sale",
         label: "On sale",
@@ -441,7 +456,13 @@ export function MarketplaceCatalogControls({
     }
 
     return chips;
-  }, [data.currencyCode, data.facets.brands, data.facets.categories, filters]);
+  }, [
+    data.currencyCode,
+    data.facets.brands,
+    data.facets.categories,
+    filters,
+    lockOnSale,
+  ]);
 
   return (
     <>
@@ -532,7 +553,7 @@ export function MarketplaceCatalogControls({
         {activeFilterCount > 1 ? (
           <button
             className="h-7 px-1 text-[11px] font-semibold text-[#666660] underline underline-offset-4 hover:text-[#ff5a1f] dark:text-[#aaa9a1]"
-            onClick={() => navigate(clearFacetFilters(filters))}
+            onClick={() => navigate(clearFacetFilters(filters, lockOnSale))}
             type="button"
           >
             Clear all
@@ -552,7 +573,7 @@ export function MarketplaceCatalogControls({
             {activeFilterCount > 0 ? (
               <button
                 className="text-[11px] font-semibold text-[#666660] hover:text-[#ff5a1f] dark:text-[#aaa9a1]"
-                onClick={() => navigate(clearFacetFilters(filters))}
+                onClick={() => navigate(clearFacetFilters(filters, lockOnSale))}
                 type="button"
               >
                 Clear
@@ -564,6 +585,7 @@ export function MarketplaceCatalogControls({
             filters={desktopFilters}
             hideBrands={hideBrands}
             hideCategories={hideCategories}
+            lockOnSale={lockOnSale}
             onChange={updateDesktopFilters}
           />
         </aside>
@@ -597,13 +619,16 @@ export function MarketplaceCatalogControls({
               filters={mobileFilters}
               hideBrands={hideBrands}
               hideCategories={hideCategories}
+              lockOnSale={lockOnSale}
               onChange={(nextFilters) => setMobileFilters(nextFilters)}
             />
           </DialogBody>
           <DialogFooter className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 bg-white p-3 dark:bg-[#101010] sm:grid-cols-[auto_minmax(0,1fr)]">
             <Button
               className="h-11 rounded-md px-3"
-              onClick={() => setMobileFilters(clearFacetFilters(mobileFilters))}
+              onClick={() =>
+                setMobileFilters(clearFacetFilters(mobileFilters, lockOnSale))
+              }
               type="button"
               variant="outline"
             >

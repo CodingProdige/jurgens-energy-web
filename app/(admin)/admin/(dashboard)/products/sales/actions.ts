@@ -4,6 +4,7 @@ import {
   createSaleCampaign,
   deleteSaleCampaign,
   endSaleCampaign,
+  updateSaleCampaignAppearance,
 } from "@/src/modules/admin/sales";
 
 export async function createSaleCampaignAction(input: unknown) {
@@ -16,4 +17,8 @@ export async function endSaleCampaignAction(input: unknown) {
 
 export async function deleteSaleCampaignAction(input: unknown) {
   return deleteSaleCampaign(input);
+}
+
+export async function updateSaleCampaignAppearanceAction(input: unknown) {
+  return updateSaleCampaignAppearance(input);
 }

@@ -12,6 +12,7 @@ import {
 import { z } from "zod";
 
 import { db } from "@/src/db";
+import { lucideCampaignIconNames } from "@/src/generated/lucide-campaign-icon-names";
 import {
   auditLogs,
   brands,
@@ -28,16 +29,73 @@ import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import { getFriendlySalesErrorMessage } from "@/src/modules/sales/database-errors";
 
+const saleCampaignBadgeIconNameSet = new Set<string>(
+  lucideCampaignIconNames,
+);
+
+const saleCampaignColorSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9A-Fa-f]{6}$/, "Choose a valid six-digit hex colour.")
+  .transform((value) => value.toUpperCase());
+
+const nullableSaleCampaignTextSchema = (maximumLength: number) =>
+  z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim().length === 0 ? null : value,
+    z.string().trim().min(1).max(maximumLength).nullable().default(null),
+  );
+
+const saleCampaignBadgeIconSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim().length === 0 ? null : value,
+  z
+    .string()
+    .trim()
+    .max(80)
+    .refine(
+      (value) => saleCampaignBadgeIconNameSet.has(value),
+      "Choose a valid Lucide icon.",
+    )
+    .nullable()
+    .default(null),
+);
+
+const saleCampaignAppearanceFieldsSchema = z.object({
+  badgeColor: saleCampaignColorSchema.default("#FF5A1F"),
+  badgeIcon: saleCampaignBadgeIconSchema,
+  ctaLabel: z.string().trim().min(1).max(80).default("Shop sale"),
+  headerPriority: z.coerce.number().int().min(0).max(32767).default(0),
+  headerVisible: z.boolean().default(true),
+  publicHeadline: nullableSaleCampaignTextSchema(200),
+});
+
 const createSaleCampaignSchema = z.object({
   badgeText: z.string().trim().min(1).max(80).default("Sale"),
   discountPercent: z.coerce.number().min(1).max(95),
   name: z.string().trim().min(1).max(160),
   variantIds: z.array(z.string().uuid()).min(1).max(200),
-});
+}).extend(saleCampaignAppearanceFieldsSchema.shape);
 
 const saleCampaignIdSchema = z.object({
   campaignId: z.string().uuid(),
 });
+
+const updateSaleCampaignAppearanceSchema = saleCampaignIdSchema.extend(
+  saleCampaignAppearanceFieldsSchema.shape,
+);
+
+export type SaleCampaignAppearanceInput = z.infer<
+  typeof saleCampaignAppearanceFieldsSchema
+>;
+
+export type CreateSaleCampaignInput = z.infer<
+  typeof createSaleCampaignSchema
+>;
+
+export type UpdateSaleCampaignAppearanceInput = z.infer<
+  typeof updateSaleCampaignAppearanceSchema
+>;
 
 export type SaleActionResult = {
   message?: string;
@@ -101,11 +159,17 @@ export type AdminSaleCampaignVariant = {
 };
 
 export type AdminSaleCampaign = {
+  badgeColor: string;
+  badgeIcon: string | null;
   badgeText: string;
+  ctaLabel: string;
   createdAt: string;
   discountPercent: string;
+  headerPriority: number;
+  headerVisible: boolean;
   id: string;
   name: string;
+  publicHeadline: string | null;
   status: "active" | "ended";
   variants: AdminSaleCampaignVariant[];
 };
@@ -135,16 +199,22 @@ type VariantForSale = {
 };
 
 type ActiveSaleRow = {
+  badgeColor: string;
+  badgeIcon: string | null;
   badgeText: string;
   campaignId: string;
   campaignName: string;
+  ctaLabel: string;
   createdAt: Date;
   discountPercent: string;
+  headerPriority: number;
+  headerVisible: boolean;
   originalCompareAtPrice: string | null;
   originalPrice: string;
   productId: string;
   productSlug: string;
   productTitle: string;
+  publicHeadline: string | null;
   salePrice: string;
   sku: string;
   title: string;
@@ -152,11 +222,17 @@ type ActiveSaleRow = {
 };
 
 type ActiveSaleCampaignHeader = {
+  badgeColor: string;
+  badgeIcon: string | null;
   badgeText: string;
+  ctaLabel: string;
   createdAt: Date;
   discountPercent: string;
+  headerPriority: number;
+  headerVisible: boolean;
   id: string;
   name: string;
+  publicHeadline: string | null;
 };
 
 const publicProductStatuses = new Set(["active", "live"]);
@@ -304,16 +380,22 @@ async function getActiveSaleRows(variantIds?: string[], campaignId?: string) {
   try {
     const rows = await db
       .select({
+        badgeColor: saleCampaigns.badgeColor,
+        badgeIcon: saleCampaigns.badgeIcon,
         badgeText: saleCampaigns.badgeText,
         campaignId: saleCampaigns.id,
         campaignName: saleCampaigns.name,
+        ctaLabel: saleCampaigns.ctaLabel,
         createdAt: saleCampaigns.createdAt,
         discountPercent: saleCampaigns.discountPercent,
+        headerPriority: saleCampaigns.headerPriority,
+        headerVisible: saleCampaigns.headerVisible,
         originalCompareAtPrice: saleCampaignVariants.originalCompareAtPrice,
         originalPrice: saleCampaignVariants.originalPrice,
         productId: products.id,
         productSlug: products.slug,
         productTitle: products.title,
+        publicHeadline: saleCampaigns.publicHeadline,
         salePrice: saleCampaignVariants.salePrice,
         sku: productVariants.sku,
         title: productVariants.title,
@@ -352,11 +434,17 @@ async function getActiveSaleCampaignHeaders(campaignId?: string) {
   try {
     const rows = await db
       .select({
+        badgeColor: saleCampaigns.badgeColor,
+        badgeIcon: saleCampaigns.badgeIcon,
         badgeText: saleCampaigns.badgeText,
+        ctaLabel: saleCampaigns.ctaLabel,
         createdAt: saleCampaigns.createdAt,
         discountPercent: saleCampaigns.discountPercent,
+        headerPriority: saleCampaigns.headerPriority,
+        headerVisible: saleCampaigns.headerVisible,
         id: saleCampaigns.id,
         name: saleCampaigns.name,
+        publicHeadline: saleCampaigns.publicHeadline,
       })
       .from(saleCampaigns)
       .where(
@@ -367,7 +455,10 @@ async function getActiveSaleCampaignHeaders(campaignId?: string) {
             )
           : eq(saleCampaigns.status, "active" as const),
       )
-      .orderBy(desc(saleCampaigns.createdAt));
+      .orderBy(
+        desc(saleCampaigns.headerPriority),
+        desc(saleCampaigns.createdAt),
+      );
 
     return {
       ok: true as const,
@@ -385,7 +476,7 @@ async function getActiveSaleCampaignHeaders(campaignId?: string) {
 }
 
 function revalidateSalePaths(productSlugs: Iterable<string>) {
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   revalidatePath("/admin/products/all");
   revalidatePath("/admin/products/sales");
   revalidatePath("/products");
@@ -553,11 +644,17 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
 
   for (const campaign of activeCampaignHeaderResult.rows) {
     campaignById.set(campaign.id, {
+      badgeColor: campaign.badgeColor.toUpperCase(),
+      badgeIcon: campaign.badgeIcon,
       badgeText: campaign.badgeText,
+      ctaLabel: campaign.ctaLabel,
       createdAt: campaign.createdAt.toISOString(),
       discountPercent: campaign.discountPercent,
+      headerPriority: campaign.headerPriority,
+      headerVisible: campaign.headerVisible,
       id: campaign.id,
       name: campaign.name,
+      publicHeadline: campaign.publicHeadline,
       status: "active",
       variants: [],
     });
@@ -565,11 +662,17 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
 
   for (const row of activeSaleRows) {
     const campaign = campaignById.get(row.campaignId) ?? {
+      badgeColor: row.badgeColor.toUpperCase(),
+      badgeIcon: row.badgeIcon,
       badgeText: row.badgeText,
+      ctaLabel: row.ctaLabel,
       createdAt: row.createdAt.toISOString(),
       discountPercent: row.discountPercent,
+      headerPriority: row.headerPriority,
+      headerVisible: row.headerVisible,
       id: row.campaignId,
       name: row.campaignName,
+      publicHeadline: row.publicHeadline,
       status: "active" as const,
       variants: [],
     };
@@ -723,11 +826,17 @@ export async function createSaleCampaign(input: unknown): Promise<SaleActionResu
       const [campaign] = await tx
         .insert(saleCampaigns)
         .values({
+          badgeColor: parsed.data.badgeColor,
+          badgeIcon: parsed.data.badgeIcon,
           badgeText: parsed.data.badgeText,
+          ctaLabel: parsed.data.ctaLabel,
           createdAt: now,
           createdByUserId: access.session.user.id,
           discountPercent: toMoney(discountPercent),
+          headerPriority: parsed.data.headerPriority,
+          headerVisible: parsed.data.headerVisible,
           name: parsed.data.name,
+          publicHeadline: parsed.data.publicHeadline,
           updatedAt: now,
         })
         .returning({ id: saleCampaigns.id });
@@ -771,9 +880,15 @@ export async function createSaleCampaign(input: unknown): Promise<SaleActionResu
         entityId: campaign.id,
         entityType: "sale_campaign",
         metadata: JSON.stringify({
+          badgeColor: parsed.data.badgeColor,
+          badgeIcon: parsed.data.badgeIcon,
           badgeText: parsed.data.badgeText,
+          ctaLabel: parsed.data.ctaLabel,
           discountPercent,
+          headerPriority: parsed.data.headerPriority,
+          headerVisible: parsed.data.headerVisible,
           name: parsed.data.name,
+          publicHeadline: parsed.data.publicHeadline,
           variantIds,
         }),
       });
@@ -794,6 +909,126 @@ export async function createSaleCampaign(input: unknown): Promise<SaleActionResu
     message: `Sale created for ${saleRows.length} variant${
       saleRows.length === 1 ? "" : "s"
     }.`,
+  };
+}
+
+export async function updateSaleCampaignAppearance(
+  input: unknown,
+): Promise<SaleActionResult> {
+  const parsed = updateSaleCampaignAppearanceSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Check the campaign appearance.",
+    };
+  }
+
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  if (!access.ok) {
+    return {
+      ok: false,
+      message: "You do not have permission to manage product sales.",
+    };
+  }
+
+  const activeSaleResult = await getActiveSaleRows(
+    undefined,
+    parsed.data.campaignId,
+  );
+
+  if (!activeSaleResult.ok) {
+    return {
+      ok: false,
+      message: activeSaleResult.message,
+    };
+  }
+
+  const now = new Date();
+
+  try {
+    await db.transaction(async (tx) => {
+      const [currentCampaign] = await tx
+        .select({
+          badgeColor: saleCampaigns.badgeColor,
+          badgeIcon: saleCampaigns.badgeIcon,
+          ctaLabel: saleCampaigns.ctaLabel,
+          headerPriority: saleCampaigns.headerPriority,
+          headerVisible: saleCampaigns.headerVisible,
+          publicHeadline: saleCampaigns.publicHeadline,
+        })
+        .from(saleCampaigns)
+        .where(
+          and(
+            eq(saleCampaigns.id, parsed.data.campaignId),
+            eq(saleCampaigns.status, "active" as const),
+          ),
+        )
+        .limit(1);
+
+      if (!currentCampaign) {
+        throw new Error("This sale campaign is not active.");
+      }
+
+      const nextAppearance = {
+        badgeColor: parsed.data.badgeColor,
+        badgeIcon: parsed.data.badgeIcon,
+        ctaLabel: parsed.data.ctaLabel,
+        headerPriority: parsed.data.headerPriority,
+        headerVisible: parsed.data.headerVisible,
+        publicHeadline: parsed.data.publicHeadline,
+      };
+
+      const [updatedCampaign] = await tx
+        .update(saleCampaigns)
+        .set({
+          ...nextAppearance,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(saleCampaigns.id, parsed.data.campaignId),
+            eq(saleCampaigns.status, "active" as const),
+          ),
+        )
+        .returning({ id: saleCampaigns.id });
+
+      if (!updatedCampaign) {
+        throw new Error("This sale campaign is not active.");
+      }
+
+      await tx.insert(auditLogs).values({
+        action: "sale_campaign.appearance_updated",
+        actorUserId: access.session.user.id,
+        entityId: parsed.data.campaignId,
+        entityType: "sale_campaign",
+        metadata: JSON.stringify({
+          next: nextAppearance,
+          previous: currentCampaign,
+        }),
+      });
+    });
+  } catch (error: unknown) {
+    console.error("Failed to update sale campaign appearance:", error);
+
+    return {
+      ok: false,
+      message: getFriendlySalesErrorMessage("read", error).replace(
+        "read sale campaign",
+        "update sale campaign",
+      ),
+    };
+  }
+
+  revalidateSalePaths(
+    activeSaleResult.rows.map((row) => row.productSlug),
+  );
+
+  return {
+    ok: true,
+    message: "Campaign appearance updated.",
   };
 }
 

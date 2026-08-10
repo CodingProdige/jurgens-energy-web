@@ -12,6 +12,7 @@ import { MarketplaceCartLink } from "@/components/marketplace/marketplace-cart-l
 import { MarketplaceDesktopNav } from "@/components/marketplace/marketplace-desktop-nav";
 import { MarketplaceHeaderSearch } from "@/components/marketplace/marketplace-header-search";
 import { MarketplaceHeaderShell } from "@/components/marketplace/marketplace-header-shell";
+import { MarketplaceSaleSpotlight } from "@/components/marketplace/marketplace-sale-spotlight";
 import {
   MarketplaceMobileMenu,
   type MarketplaceNavItem,
@@ -29,15 +30,23 @@ import { getCurrencyPreference } from "@/src/modules/currency/server";
 import {
   getMarketplaceShopMenuData,
 } from "@/src/modules/marketplace/catalog";
+import { getActiveMarketplaceSaleCampaigns } from "@/src/modules/marketplace/sales";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 
 export async function MarketplaceHeader() {
-  const [session, currencyPreference, shopMenuData, marketplaceSettings] =
+  const [
+    session,
+    currencyPreference,
+    shopMenuData,
+    marketplaceSettings,
+    saleCampaigns,
+  ] =
     await Promise.all([
       auth(),
       getCurrencyPreference(),
       getMarketplaceShopMenuData(),
       getMarketplaceSettings(),
+      getActiveMarketplaceSaleCampaigns(),
     ]);
   const whatsappHref = marketplaceSettings.whatsappOrderingEnabled
     ? createMarketplaceWhatsAppHref(
@@ -48,8 +57,6 @@ export async function MarketplaceHeader() {
     ["Home", "/"],
     ["Shop", "/products"],
     ["Brands", "/brands"],
-    ["Delivery", "/delivery-information"],
-    ["Blog", "/blog"],
     ["About Us", "/about"],
     ["Support", "/support"],
   ];
@@ -67,16 +74,25 @@ export async function MarketplaceHeader() {
         userId: session.user.id,
       })
     : emptyNotificationCenter;
+  const hasFeaturedSaleCampaign = saleCampaigns.some(
+    (campaign) => campaign.headerVisible,
+  );
 
   return (
     <MarketplaceHeaderShell>
       <div className="border-b border-[#ecece6] bg-[#f7f7f2]/92 dark:border-white/10 dark:bg-[#101010]/92">
-        <div className="mx-auto flex w-full items-center justify-end gap-2 overflow-hidden px-2 py-1.5 sm:w-[min(1500px,calc(100%-1rem))] sm:justify-between sm:px-6 sm:py-2 lg:px-10">
-          <p className="hidden text-[11px] font-bold uppercase tracking-[0.16em] text-[#5c5c57] dark:text-[#c8c8c0] md:block">
-            South African online store · Nationwide delivery across South
-            Africa.
-          </p>
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:ml-auto sm:flex-none sm:gap-2">
+        <div className="mx-auto flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 overflow-hidden px-2 py-1.5 sm:w-[min(1500px,calc(100%-1rem))] sm:flex-nowrap sm:px-6 sm:py-2 lg:px-10">
+          <div
+            className={cn(
+              "min-w-0",
+              hasFeaturedSaleCampaign
+                ? "order-2 basis-full sm:order-1 sm:basis-auto sm:flex-1"
+                : "hidden md:order-1 md:block md:flex-1",
+            )}
+          >
+            <MarketplaceSaleSpotlight campaigns={saleCampaigns} />
+          </div>
+          <div className="order-1 ml-auto flex min-w-0 items-center justify-end gap-1.5 sm:order-2 sm:flex-none sm:gap-2">
             <CurrencySelector
               className="min-w-0 rounded-full border border-[#e8e8e2] bg-white/80 px-1 py-1 dark:border-white/10 dark:bg-white/[0.04]"
               compact
@@ -104,6 +120,7 @@ export async function MarketplaceHeader() {
         <MarketplaceMobileMenu
           accountUser={accountUser}
           navItems={navItems}
+          saleCampaignCount={saleCampaigns.length}
           shopMenuData={shopMenuData}
           whatsappHref={whatsappHref}
         />
@@ -120,6 +137,7 @@ export async function MarketplaceHeader() {
 
         <MarketplaceDesktopNav
           navItems={navItems}
+          saleCampaignCount={saleCampaigns.length}
           shopMenuData={shopMenuData}
           whatsappHref={whatsappHref}
         />

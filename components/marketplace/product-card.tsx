@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FlameIcon, RefreshCcwIcon, StarIcon } from "lucide-react";
 
+import { MarketplaceCampaignIcon } from "@/components/marketplace/marketplace-campaign-icon";
 import { MarketplaceProductFulfillmentBadge } from "@/components/marketplace/product-fulfillment-badge";
 import { ProductCardQuickAddButton } from "@/components/marketplace/product-card-quick-add-button";
 import { ProductCardQuickLook } from "@/components/marketplace/product-card-quick-look";
@@ -14,6 +15,10 @@ import {
   getMarketplaceStockStatusLabel,
   type MarketplaceStockStatus,
 } from "@/src/modules/marketplace/stock-status";
+import {
+  getReadableSaleCampaignForeground,
+  normalizeSaleCampaignColor,
+} from "@/src/modules/sales/campaign-presentation";
 
 export function MarketplaceProductCard({
   priceTaxDisclosure = "Final price",
@@ -33,6 +38,9 @@ export function MarketplaceProductCard({
   const lowStockLabel = getProductCardLowStockLabel(product.lowStockQuantity);
   const displayImageUrl =
     product.coverImageUrl ?? product.previewVideo?.posterUrl ?? null;
+  const saleBadgeColor = normalizeSaleCampaignColor(product.saleBadge?.color);
+  const saleBadgeForeground =
+    getReadableSaleCampaignForeground(saleBadgeColor);
   const imageBadgeStackClassName = cn(
     "absolute left-0 top-0 z-10 flex flex-col items-start gap-px",
     product.isOnSale
@@ -112,7 +120,18 @@ export function MarketplaceProductCard({
             </Badge>
           </div>
           {product.isOnSale ? (
-            <Badge className="marketplace-card-sale-badge absolute right-0 top-0 z-20 inline-flex h-[15px] max-w-[88px] items-center rounded-l-[3px] rounded-r-none bg-[#ff5a1f] px-1 text-[6.5px] font-black uppercase leading-none text-white shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:max-w-[104px] sm:text-[8px]">
+            <Badge
+              className="marketplace-card-sale-badge absolute right-0 top-0 z-20 inline-flex h-[15px] max-w-[104px] items-center gap-0.5 rounded-l-[3px] rounded-r-none border-0 px-1 text-[6.5px] font-black uppercase leading-none shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:max-w-[124px] sm:text-[8px]"
+              style={{
+                backgroundColor: saleBadgeColor,
+                color: saleBadgeForeground,
+              }}
+            >
+              <MarketplaceCampaignIcon
+                aria-hidden="true"
+                className="size-2.5 shrink-0 sm:size-3"
+                name={product.saleBadge?.iconName}
+              />
               <span className="truncate">{product.saleBadgeText ?? "Sale"}</span>
             </Badge>
           ) : null}

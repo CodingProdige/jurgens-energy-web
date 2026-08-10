@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FlameIcon } from "lucide-react";
 
 import type { MarketplaceNavItem } from "@/components/marketplace/marketplace-mobile-menu";
 import { MarketplaceShopMenu } from "@/components/marketplace/marketplace-shop-menu";
@@ -10,6 +11,7 @@ import type { MarketplaceShopMenuData } from "@/src/modules/marketplace/catalog"
 
 type MarketplaceDesktopNavProps = {
   navItems: readonly MarketplaceNavItem[];
+  saleCampaignCount: number;
   shopMenuData: MarketplaceShopMenuData;
   whatsappHref: string | null;
 };
@@ -43,13 +45,37 @@ function isActiveNavItem(pathname: string, href: string, label: string) {
 
 export function MarketplaceDesktopNav({
   navItems,
+  saleCampaignCount,
   shopMenuData,
   whatsappHref,
 }: MarketplaceDesktopNavProps) {
   const pathname = usePathname();
+  const saleActive = isActiveNavItem(pathname, "/sale", "Sale");
 
   return (
-    <nav className="hidden min-w-0 flex-1 items-center justify-center gap-7 text-[12px] font-black uppercase text-[#080808] dark:text-[#f7f7f2] xl:flex 2xl:gap-8">
+    <nav className="hidden min-w-0 flex-1 items-center justify-center gap-5 text-[12px] font-black uppercase text-[#080808] dark:text-[#f7f7f2] xl:flex 2xl:gap-7">
+      <Link
+        aria-current={saleActive ? "page" : undefined}
+        aria-label={
+          saleCampaignCount > 0
+            ? `Shop sales. ${saleCampaignCount} active campaign${saleCampaignCount === 1 ? "" : "s"}.`
+            : "Shop current sales."
+        }
+        className={cn(
+          "group inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#ff5a1f] px-3 text-white shadow-[0_8px_20px_rgba(255,90,31,0.25)] transition hover:-translate-y-0.5 hover:bg-[#e84c15] hover:shadow-[0_10px_24px_rgba(255,90,31,0.32)] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/30 motion-reduce:transform-none",
+          saleActive && "ring-2 ring-[#ffb000] ring-offset-2 dark:ring-offset-[#080808]",
+        )}
+        href="/sale"
+        prefetch={false}
+      >
+        <FlameIcon aria-hidden="true" className="size-3.5 fill-current" />
+        <span>Sale</span>
+        {saleCampaignCount > 0 ? (
+          <span className="grid min-w-5 place-items-center rounded-full bg-white/95 px-1.5 py-0.5 text-[9px] leading-none text-[#c73708]">
+            {saleCampaignCount > 99 ? "99+" : saleCampaignCount}
+          </span>
+        ) : null}
+      </Link>
       {navItems.map(([label, href]) => {
         const active = isActiveNavItem(pathname, href, label);
 

@@ -13,6 +13,7 @@ export type MarketplaceCatalogSort =
 
 export type MarketplaceCatalogFilters = {
   brandSlugs: string[];
+  campaignId: string | null;
   categoryPaths: string[];
   exchangeSupported: boolean;
   inStock: boolean;
@@ -37,6 +38,7 @@ const categoryPathSchema = z
   .regex(/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/)
   .max(760);
 const sortSchema = z.enum(marketplaceCatalogSortValues);
+const campaignIdSchema = z.string().trim().uuid();
 
 function valuesFromParam(value: string | string[] | undefined) {
   const values = Array.isArray(value) ? value : value ? [value] : [];
@@ -97,12 +99,16 @@ export function parseMarketplaceCatalogFilters(
   searchParams: MarketplaceCatalogSearchParams,
 ): MarketplaceCatalogFilters {
   const parsedSort = sortSchema.safeParse(firstValue(searchParams.sort));
+  const parsedCampaignId = campaignIdSchema.safeParse(
+    firstValue(searchParams.campaign),
+  );
   const query = String(firstValue(searchParams.q) ?? "").trim().slice(0, 120);
   const minPrice = parsePositiveNumber(searchParams.min);
   const maxPrice = parsePositiveNumber(searchParams.max);
 
   return {
     brandSlugs: parseSlugs(searchParams.brand),
+    campaignId: parsedCampaignId.success ? parsedCampaignId.data : null,
     categoryPaths: parseCategoryPaths(searchParams.category),
     exchangeSupported: parseBoolean(searchParams.exchange),
     inStock: parseBoolean(searchParams.stock),
@@ -146,6 +152,10 @@ export function createMarketplaceCatalogSearchParams(
 
   for (const brandSlug of filters.brandSlugs) {
     searchParams.append("brand", brandSlug);
+  }
+
+  if (filters.campaignId) {
+    searchParams.set("campaign", filters.campaignId);
   }
 
   if (filters.inStock) {

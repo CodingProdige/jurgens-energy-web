@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  FlameIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   MapPinIcon,
@@ -46,6 +47,7 @@ export type MarketplaceNavItem = readonly [label: string, href: string];
 type MarketplaceMobileMenuProps = {
   accountUser: MarketplaceAccountSummary | null;
   navItems: readonly MarketplaceNavItem[];
+  saleCampaignCount: number;
   shopMenuData: MarketplaceShopMenuData;
   whatsappHref: string | null;
 };
@@ -233,6 +235,7 @@ function MobileShopPage({
 export function MarketplaceMobileMenu({
   accountUser,
   navItems,
+  saleCampaignCount,
   shopMenuData,
   whatsappHref,
 }: MarketplaceMobileMenuProps) {
@@ -351,6 +354,40 @@ export function MarketplaceMobileMenu({
                 ) : null}
 
             <nav className="grid gap-1">
+              <Link
+                aria-current={pathname === "/sale" ? "page" : undefined}
+                aria-label={
+                  saleCampaignCount > 0
+                    ? `Shop sales. ${saleCampaignCount} active campaign${saleCampaignCount === 1 ? "" : "s"}.`
+                    : "Shop current sales."
+                }
+                className="mb-2 flex min-h-14 items-center gap-3 rounded-lg bg-[#ff5a1f] px-3 py-2.5 text-white shadow-[0_8px_20px_rgba(255,90,31,0.22)] transition hover:bg-[#e84c15] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/30"
+                href="/sale"
+                onClick={closeMenu}
+                prefetch={false}
+              >
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white/15">
+                  <FlameIcon
+                    aria-hidden="true"
+                    className="size-4.5 fill-current"
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-black uppercase">
+                    Sale
+                  </span>
+                  <span className="block truncate text-[10px] font-bold text-white/80">
+                    {saleCampaignCount > 0
+                      ? `${saleCampaignCount} active offer${saleCampaignCount === 1 ? "" : "s"}`
+                      : "View current offers"}
+                  </span>
+                </span>
+                {saleCampaignCount > 0 ? (
+                  <span className="grid min-w-7 shrink-0 place-items-center rounded-full bg-white px-2 py-1 text-[10px] font-black text-[#c73708]">
+                    {saleCampaignCount > 99 ? "99+" : saleCampaignCount}
+                  </span>
+                ) : null}
+              </Link>
               {navItems.map(([label, href]) => {
                 const active = isActiveNavItem(pathname, href, label);
 

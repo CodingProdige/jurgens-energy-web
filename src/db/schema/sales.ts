@@ -1,10 +1,13 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
+  check,
   index,
   numeric,
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   timestamp,
   uniqueIndex,
   uuid,
@@ -29,7 +32,17 @@ export const saleCampaigns = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     name: varchar("name", { length: 160 }).notNull(),
+    publicHeadline: varchar("public_headline", { length: 200 }),
     badgeText: varchar("badge_text", { length: 80 }).notNull().default("Sale"),
+    badgeColor: varchar("badge_color", { length: 7 })
+      .notNull()
+      .default("#FF5A1F"),
+    badgeIcon: varchar("badge_icon", { length: 80 }),
+    headerVisible: boolean("header_visible").notNull().default(true),
+    headerPriority: smallint("header_priority").notNull().default(0),
+    ctaLabel: varchar("cta_label", { length: 80 })
+      .notNull()
+      .default("Shop sale"),
     discountPercent: numeric("discount_percent", {
       precision: 5,
       scale: 2,
@@ -43,7 +56,16 @@ export const saleCampaigns = pgTable(
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (campaign) => ({
+    badgeColorCheck: check(
+      "sale_campaigns_badge_color_check",
+      sql`${campaign.badgeColor} ~ '^#[0-9A-F]{6}$'`,
+    ),
     createdAtIdx: index("sale_campaigns_created_at_idx").on(campaign.createdAt),
+    headerIdx: index("sale_campaigns_header_idx").on(
+      campaign.status,
+      campaign.headerVisible,
+      campaign.headerPriority,
+    ),
     statusIdx: index("sale_campaigns_status_idx").on(campaign.status),
   }),
 );

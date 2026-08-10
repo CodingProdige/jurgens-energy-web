@@ -32,6 +32,8 @@ test("marketplace header navigation highlights the current route", () => {
   assert.match(headerSearchSource, /action="\/products"/);
   assert.match(headerSearchSource, /name="q"/);
   assert.match(headerSearchSource, /type="search"/);
+  assert.doesNotMatch(headerSource, /\["Delivery", "\/delivery-information"\]/);
+  assert.doesNotMatch(headerSource, /\["Blog", "\/blog"\]/);
   assert.doesNotMatch(headerSource, /import \{ MarketplaceShopMenu \}/);
   assert.doesNotMatch(headerSource, /<MarketplaceShopMenu/);
 });
