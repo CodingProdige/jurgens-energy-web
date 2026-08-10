@@ -150,6 +150,13 @@ body {
   }
 }
 
+@media (any-pointer: coarse) {
+  html[data-pull-to-refresh-enabled="true"],
+  html[data-pull-to-refresh-enabled="true"] body {
+    overscroll-behavior-y: none;
+  }
+}
+
 body {
   min-width: 0;
   position: relative;

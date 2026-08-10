@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { themeStorageKey } from "@/components/theme/theme-sync";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { buildGoogleConsentDefaultsScript } from "@/src/modules/analytics/google-consent";
 import { getMarketplaceCanonicalBaseUrl } from "@/src/modules/marketplace/seo";
 import "./globals.css";
@@ -64,6 +65,7 @@ export default function RootLayout({
           storageKey={themeStorageKey}
           disableTransitionOnChange
         >
+          <PullToRefresh />
           {children}
         </ThemeProvider>
       </body>
