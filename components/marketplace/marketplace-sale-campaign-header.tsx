@@ -89,6 +89,7 @@ export function MarketplaceSaleCampaignHeader({
             )}
             href="/sale"
             prefetch={false}
+            style={selectedCampaign ? undefined : { color: "#FFFFFF" }}
           >
             <FlameIcon aria-hidden="true" className="size-3.5 fill-current" />
             All sales

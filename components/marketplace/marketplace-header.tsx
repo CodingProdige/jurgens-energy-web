@@ -30,7 +30,10 @@ import { getCurrencyPreference } from "@/src/modules/currency/server";
 import {
   getMarketplaceShopMenuData,
 } from "@/src/modules/marketplace/catalog";
-import { getActiveMarketplaceSaleCampaigns } from "@/src/modules/marketplace/sales";
+import {
+  getActiveMarketplaceSaleCampaigns,
+  getMarketplaceSaleProductCount,
+} from "@/src/modules/marketplace/sales";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 
 export async function MarketplaceHeader() {
@@ -40,6 +43,7 @@ export async function MarketplaceHeader() {
     shopMenuData,
     marketplaceSettings,
     saleCampaigns,
+    saleProductCount,
   ] =
     await Promise.all([
       auth(),
@@ -47,6 +51,7 @@ export async function MarketplaceHeader() {
       getMarketplaceShopMenuData(),
       getMarketplaceSettings(),
       getActiveMarketplaceSaleCampaigns(),
+      getMarketplaceSaleProductCount(),
     ]);
   const whatsappHref = marketplaceSettings.whatsappOrderingEnabled
     ? createMarketplaceWhatsAppHref(
@@ -120,7 +125,7 @@ export async function MarketplaceHeader() {
         <MarketplaceMobileMenu
           accountUser={accountUser}
           navItems={navItems}
-          saleCampaignCount={saleCampaigns.length}
+          saleProductCount={saleProductCount}
           shopMenuData={shopMenuData}
           whatsappHref={whatsappHref}
         />
@@ -137,7 +142,7 @@ export async function MarketplaceHeader() {
 
         <MarketplaceDesktopNav
           navItems={navItems}
-          saleCampaignCount={saleCampaigns.length}
+          saleProductCount={saleProductCount}
           shopMenuData={shopMenuData}
           whatsappHref={whatsappHref}
         />

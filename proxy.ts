@@ -12,7 +12,7 @@ const ROOT_STATIC_ASSET_PATHS = new Set([
   "/sitemap.xml",
   "/sw.js",
 ]);
-const ROOT_STATIC_ASSET_PREFIXES = ["/brand/", "/media/"];
+const ROOT_STATIC_ASSET_PREFIXES = ["/brand/", "/generated/", "/media/"];
 
 function getHostname(request: NextRequest) {
   const forwardedHost = request.headers.get("x-forwarded-host");

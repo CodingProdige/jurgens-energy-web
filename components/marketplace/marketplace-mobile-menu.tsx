@@ -47,7 +47,7 @@ export type MarketplaceNavItem = readonly [label: string, href: string];
 type MarketplaceMobileMenuProps = {
   accountUser: MarketplaceAccountSummary | null;
   navItems: readonly MarketplaceNavItem[];
-  saleCampaignCount: number;
+  saleProductCount: number;
   shopMenuData: MarketplaceShopMenuData;
   whatsappHref: string | null;
 };
@@ -235,7 +235,7 @@ function MobileShopPage({
 export function MarketplaceMobileMenu({
   accountUser,
   navItems,
-  saleCampaignCount,
+  saleProductCount,
   shopMenuData,
   whatsappHref,
 }: MarketplaceMobileMenuProps) {
@@ -357,8 +357,8 @@ export function MarketplaceMobileMenu({
               <Link
                 aria-current={pathname === "/sale" ? "page" : undefined}
                 aria-label={
-                  saleCampaignCount > 0
-                    ? `Shop sales. ${saleCampaignCount} active campaign${saleCampaignCount === 1 ? "" : "s"}.`
+                  saleProductCount > 0
+                    ? `Shop sales. ${saleProductCount} product${saleProductCount === 1 ? "" : "s"} currently on sale.`
                     : "Shop current sales."
                 }
                 className="mb-2 flex min-h-14 items-center gap-3 rounded-lg bg-[#ff5a1f] px-3 py-2.5 text-white shadow-[0_8px_20px_rgba(255,90,31,0.22)] transition hover:bg-[#e84c15] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff5a1f]/30"
@@ -377,14 +377,14 @@ export function MarketplaceMobileMenu({
                     Sale
                   </span>
                   <span className="block truncate text-[10px] font-bold text-white/80">
-                    {saleCampaignCount > 0
-                      ? `${saleCampaignCount} active offer${saleCampaignCount === 1 ? "" : "s"}`
+                    {saleProductCount > 0
+                      ? `${saleProductCount} product${saleProductCount === 1 ? "" : "s"} currently on sale`
                       : "View current offers"}
                   </span>
                 </span>
-                {saleCampaignCount > 0 ? (
+                {saleProductCount > 0 ? (
                   <span className="grid min-w-7 shrink-0 place-items-center rounded-full bg-white px-2 py-1 text-[10px] font-black text-[#c73708]">
-                    {saleCampaignCount > 99 ? "99+" : saleCampaignCount}
+                    {saleProductCount > 99 ? "99+" : saleProductCount}
                   </span>
                 ) : null}
               </Link>

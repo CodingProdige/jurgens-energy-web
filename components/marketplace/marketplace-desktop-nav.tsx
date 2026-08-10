@@ -11,7 +11,7 @@ import type { MarketplaceShopMenuData } from "@/src/modules/marketplace/catalog"
 
 type MarketplaceDesktopNavProps = {
   navItems: readonly MarketplaceNavItem[];
-  saleCampaignCount: number;
+  saleProductCount: number;
   shopMenuData: MarketplaceShopMenuData;
   whatsappHref: string | null;
 };
@@ -45,7 +45,7 @@ function isActiveNavItem(pathname: string, href: string, label: string) {
 
 export function MarketplaceDesktopNav({
   navItems,
-  saleCampaignCount,
+  saleProductCount,
   shopMenuData,
   whatsappHref,
 }: MarketplaceDesktopNavProps) {
@@ -57,8 +57,8 @@ export function MarketplaceDesktopNav({
       <Link
         aria-current={saleActive ? "page" : undefined}
         aria-label={
-          saleCampaignCount > 0
-            ? `Shop sales. ${saleCampaignCount} active campaign${saleCampaignCount === 1 ? "" : "s"}.`
+          saleProductCount > 0
+            ? `Shop sales. ${saleProductCount} product${saleProductCount === 1 ? "" : "s"} currently on sale.`
             : "Shop current sales."
         }
         className={cn(
@@ -70,9 +70,9 @@ export function MarketplaceDesktopNav({
       >
         <FlameIcon aria-hidden="true" className="size-3.5 fill-current" />
         <span>Sale</span>
-        {saleCampaignCount > 0 ? (
+        {saleProductCount > 0 ? (
           <span className="grid min-w-5 place-items-center rounded-full bg-white/95 px-1.5 py-0.5 text-[9px] leading-none text-[#c73708]">
-            {saleCampaignCount > 99 ? "99+" : saleCampaignCount}
+            {saleProductCount > 99 ? "99+" : saleProductCount}
           </span>
         ) : null}
       </Link>

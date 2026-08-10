@@ -46,3 +46,24 @@ test("shared campaign icon renderer does not import Lucide's dynamic graph", asy
   assert.doesNotMatch(rendererSource, /lucide-react\/(?:dynamic|dynamicIconImports)/);
   assert.match(rendererSource, /maskImage/);
 });
+
+test("campaign icons remain available on rewritten admin and seller hosts", async () => {
+  const proxySource = await readFile("proxy.ts", "utf8");
+
+  assert.match(
+    proxySource,
+    /ROOT_STATIC_ASSET_PREFIXES = \["\/brand\/", "\/generated\/", "\/media\/"\]/,
+  );
+});
+
+test("the active all-sales control keeps a readable foreground", async () => {
+  const campaignHeaderSource = await readFile(
+    "components/marketplace/marketplace-sale-campaign-header.tsx",
+    "utf8",
+  );
+
+  assert.match(
+    campaignHeaderSource,
+    /style=\{selectedCampaign \? undefined : \{ color: "#FFFFFF" \}\}/,
+  );
+});

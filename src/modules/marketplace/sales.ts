@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { cache } from "react";
 
 import { db } from "@/src/db";
@@ -161,3 +161,28 @@ export const getActiveMarketplaceSaleCampaigns = cache(
     return groupMarketplaceSaleCampaigns(rows);
   },
 );
+
+/**
+ * Mirrors the public `/sale` eligibility rule and counts products, not variants.
+ * Campaign discounts are represented by their active compare-at markdown while
+ * deliberate compare-at markdowns outside a campaign are included as well.
+ */
+export const getMarketplaceSaleProductCount = cache(async () => {
+  const [row] = await db
+    .select({
+      total: sql<number>`count(distinct ${products.id})::int`,
+    })
+    .from(products)
+    .innerJoin(productVariants, eq(productVariants.productId, products.id))
+    .where(
+      and(
+        or(eq(products.status, "live"), eq(products.status, "active")),
+        eq(productVariants.status, "active"),
+        eq(productVariants.isActive, true),
+        sql`${productVariants.price} > 0`,
+        sql`${productVariants.compareAtPrice} > ${productVariants.price}`,
+      ),
+    );
+
+  return Number(row?.total) || 0;
+});

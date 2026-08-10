@@ -37,3 +37,46 @@ test("marketplace header navigation highlights the current route", () => {
   assert.doesNotMatch(headerSource, /import \{ MarketplaceShopMenu \}/);
   assert.doesNotMatch(headerSource, /<MarketplaceShopMenu/);
 });
+
+test("marketplace sale navigation counts unique public sale products", () => {
+  const desktopNavSource = readFileSync(
+    "components/marketplace/marketplace-desktop-nav.tsx",
+    "utf8",
+  );
+  const mobileNavSource = readFileSync(
+    "components/marketplace/marketplace-mobile-menu.tsx",
+    "utf8",
+  );
+  const headerSource = readFileSync(
+    "components/marketplace/marketplace-header.tsx",
+    "utf8",
+  );
+  const salesSource = readFileSync(
+    "src/modules/marketplace/sales.ts",
+    "utf8",
+  );
+
+  assert.match(headerSource, /getMarketplaceSaleProductCount/);
+  assert.equal(
+    headerSource.match(/saleProductCount=\{saleProductCount\}/g)?.length,
+    2,
+  );
+  assert.doesNotMatch(headerSource, /saleCampaignCount=|saleCampaigns\.length/);
+  assert.match(desktopNavSource, /saleProductCount/);
+  assert.match(mobileNavSource, /saleProductCount/);
+  assert.match(desktopNavSource, /currently on sale/);
+  assert.match(mobileNavSource, /currently on sale/);
+  assert.doesNotMatch(
+    `${desktopNavSource}\n${mobileNavSource}`,
+    /active campaign/i,
+  );
+  assert.match(
+    salesSource,
+    /count\(distinct \$\{products\.id\}\)::int/,
+  );
+  assert.match(
+    salesSource,
+    /\$\{productVariants\.compareAtPrice\} > \$\{productVariants\.price\}/,
+  );
+  assert.match(salesSource, /eq\(productVariants\.isActive, true\)/);
+});

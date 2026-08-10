@@ -27,11 +27,23 @@ import {
   DashboardTablePagination,
   dashboardControlClass,
   dashboardPanelClass,
+  dashboardTableActionCellClass,
+  dashboardTableActionHeadClass,
+  dashboardTableCellClass,
+  dashboardTableClass,
+  dashboardTableContainerClass,
+  dashboardTableHeadClass,
+  dashboardTableHeaderRowClass,
+  dashboardTableMutedTextClass,
+  dashboardTablePrimaryTextClass,
+  dashboardTableRowClass,
+  dashboardTableSecondaryTextClass,
 } from "@/components/dashboard/dashboard-controls";
 import {
   DashboardCompactMetrics,
   type DashboardMetricDefinition,
 } from "@/components/dashboard/dashboard-compact-metrics";
+import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -50,6 +62,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type {
   AdminSaleCampaign,
@@ -440,7 +460,7 @@ function VariantAvailabilityBadge({ variant }: { variant: AdminSaleVariant }) {
   return <Badge variant="secondary">Unavailable</Badge>;
 }
 
-function CampaignCard({
+function CampaignTableRows({
   campaign,
   onDelete,
   onEnd,
@@ -468,15 +488,33 @@ function CampaignCard({
     ),
   );
   const campaignTextColor = getCampaignTextColor(campaign.badgeColor);
+  const campaignHeadingId = `sale-campaign-${campaign.id}-heading`;
+  const campaignDetailsId = `sale-campaign-${campaign.id}-details`;
+  const menuItemClass =
+    "flex h-12 w-full items-center gap-3 border-b border-slate-200 px-4 text-sm text-zinc-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 dark:border-white/10 dark:text-zinc-100 dark:hover:bg-white/[0.06]";
 
   return (
-    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#151719]">
-      <div className="flex flex-col gap-3 border-b border-slate-200 p-4 dark:border-white/10 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-bold text-zinc-950 dark:text-white">
+    <>
+      <TableRow
+        aria-busy={pending}
+        className={dashboardTableRowClass}
+        data-state={expanded ? "selected" : undefined}
+      >
+        <TableCell className={cn("min-w-0", dashboardTableCellClass)}>
+          <div className="min-w-0">
+            <p
+              className={cn("truncate", dashboardTablePrimaryTextClass)}
+              id={campaignHeadingId}
+            >
               {campaign.name}
-            </h3>
+            </p>
+            <p className={cn("max-w-sm truncate", dashboardTableSecondaryTextClass)}>
+              {campaign.publicHeadline || campaign.name} · {campaign.ctaLabel}
+            </p>
+          </div>
+        </TableCell>
+        <TableCell className={dashboardTableCellClass}>
+          <div className="grid justify-items-start gap-1.5">
             <Badge
               className="gap-1 border-transparent"
               style={{
@@ -490,121 +528,159 @@ function CampaignCard({
               />
               {campaign.badgeText}
             </Badge>
-            <Badge variant="secondary">
-              {Number(campaign.discountPercent)}% off
-            </Badge>
-            <Badge variant={campaign.headerVisible ? "default" : "secondary"}>
+            <span className={dashboardTableSecondaryTextClass}>
               {campaign.headerVisible
                 ? `Header · priority ${campaign.headerPriority}`
                 : "Header hidden"}
-            </Badge>
-          </div>
-          <p className="mt-1 truncate text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-            {campaign.publicHeadline || campaign.name}
-            <span className="font-normal text-slate-500 dark:text-zinc-400">
-              {` · ${campaign.ctaLabel}`}
             </span>
+          </div>
+        </TableCell>
+        <TableCell className={dashboardTableCellClass}>
+          <p className={dashboardTablePrimaryTextClass}>
+            {campaign.variants.length} variant
+            {campaign.variants.length === 1 ? "" : "s"}
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+          <p className={dashboardTableSecondaryTextClass}>
             {groupedVariants.length} product
-            {groupedVariants.length === 1 ? "" : "s"} · {campaign.variants.length}{" "}
-            variant{campaign.variants.length === 1 ? "" : "s"} · started{" "}
-            {formatDate(campaign.createdAt)}
+            {groupedVariants.length === 1 ? "" : "s"}
           </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <DashboardButton
-            disabled={pending}
-            onClick={() => onEditAppearance(campaign)}
-            type="button"
-          >
-            <PaletteIcon className="size-3.5" />
-            Edit appearance
-          </DashboardButton>
-          <DashboardButton
-            aria-expanded={expanded}
-            disabled={campaign.variants.length === 0}
-            onClick={() => setExpanded((current) => !current)}
-            type="button"
-          >
-            {expanded ? (
-              <ChevronDownIcon className="size-3.5" />
-            ) : (
-              <ChevronRightIcon className="size-3.5" />
-            )}
-            {expanded ? "Hide details" : "Show details"}
-          </DashboardButton>
-          <DashboardButton
-            disabled={pending}
-            onClick={() => onEnd(campaign)}
-            type="button"
-          >
-            <RotateCcwIcon className="size-3.5" />
-            End & restore
-          </DashboardButton>
-          <DashboardButton
-            className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-400/20 dark:text-red-300 dark:hover:bg-red-500/10"
-            disabled={pending}
-            onClick={() => onDelete(campaign)}
-            type="button"
-          >
-            <Trash2Icon className="size-3.5" />
-            Delete
-          </DashboardButton>
-        </div>
-      </div>
+        </TableCell>
+        <TableCell
+          className={cn(dashboardTableCellClass, dashboardTablePrimaryTextClass)}
+        >
+          {Number(campaign.discountPercent)}% off
+        </TableCell>
+        <TableCell
+          className={cn(dashboardTableCellClass, dashboardTableMutedTextClass)}
+        >
+          {formatDate(campaign.createdAt)}
+        </TableCell>
+        <TableCell
+          className={cn(
+            dashboardTableActionCellClass,
+            "sticky right-0 z-10 bg-white shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.7)] dark:bg-[#151719]",
+          )}
+        >
+          <div className="flex justify-end">
+            <DashboardRowActionMenu
+              ariaLabel={`Open actions for ${campaign.name}`}
+              className="w-64"
+            >
+              <button
+                className={menuItemClass}
+                disabled={pending}
+                onClick={() => onEditAppearance(campaign)}
+                type="button"
+              >
+                <PaletteIcon className="size-4" />
+                Edit appearance
+              </button>
+              <button
+                aria-controls={campaignDetailsId}
+                aria-expanded={expanded}
+                className={menuItemClass}
+                disabled={campaign.variants.length === 0}
+                onClick={() => setExpanded((current) => !current)}
+                type="button"
+              >
+                {expanded ? (
+                  <ChevronDownIcon className="size-4" />
+                ) : (
+                  <ChevronRightIcon className="size-4" />
+                )}
+                {expanded ? "Hide details" : "Show details"}
+              </button>
+              <button
+                className={menuItemClass}
+                disabled={pending}
+                onClick={() => onEnd(campaign)}
+                type="button"
+              >
+                <RotateCcwIcon className="size-4" />
+                End & restore
+              </button>
+              <button
+                className="flex h-12 w-full items-center gap-3 bg-red-50/80 px-4 text-sm text-red-600 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
+                disabled={pending}
+                onClick={() => onDelete(campaign)}
+                type="button"
+              >
+                <Trash2Icon className="size-4" />
+                Delete
+              </button>
+            </DashboardRowActionMenu>
+          </div>
+        </TableCell>
+      </TableRow>
 
       {expanded ? (
-        <div className="divide-y divide-slate-200 dark:divide-white/10">
-        {groupedVariants.map(([productSlug, variants]) => {
-          const product = productBySlug.get(productSlug);
+        <TableRow
+          className="border-slate-200 bg-slate-50/70 hover:bg-slate-50/70 dark:border-white/10 dark:bg-black/10 dark:hover:bg-black/10"
+          id={campaignDetailsId}
+        >
+          <TableCell className="whitespace-normal p-0" colSpan={6}>
+            <div
+              aria-labelledby={campaignHeadingId}
+              className="divide-y divide-slate-200 dark:divide-white/10"
+              role="region"
+            >
+              {groupedVariants.map(([productSlug, variants]) => {
+                const product = productBySlug.get(productSlug);
 
-          return (
-            <div className="grid gap-3 p-4" key={`${campaign.id}-${productSlug}`}>
-              <div className="flex min-w-0 items-center gap-3">
-                <ProductImage
-                  alt={product?.title ?? variants[0]?.productTitle ?? "Product"}
-                  className="size-12"
-                  src={product?.coverMediaUrl ?? null}
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-zinc-950 dark:text-white">
-                    {product?.title ?? variants[0]?.productTitle}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400">
-                    {variants.length} variant{variants.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-2 pl-0 sm:pl-[60px]">
-                {variants.map((variant) => (
+                return (
                   <div
-                    className="flex flex-col gap-1 rounded-md bg-slate-50 px-3 py-2 text-sm dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between"
-                    key={`${campaign.id}-${variant.variantId}`}
+                    className="grid gap-3 p-4 md:px-5"
+                    key={`${campaign.id}-${productSlug}`}
                   >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-zinc-950 dark:text-white">
-                        {variant.title}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-zinc-400">
-                        SKU {variant.sku}
-                      </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ProductImage
+                        alt={
+                          product?.title ?? variants[0]?.productTitle ?? "Product"
+                        }
+                        className="size-12"
+                        src={product?.coverMediaUrl ?? null}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-zinc-950 dark:text-white">
+                          {product?.title ?? variants[0]?.productTitle}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-zinc-400">
+                          {variants.length} variant
+                          {variants.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-zinc-950 dark:text-white">
-                      <span className="text-slate-400 line-through">
-                        {formatMoney(variant.originalPrice)}
-                      </span>{" "}
-                      → {formatMoney(variant.salePrice)}
-                    </p>
+                    <div className="grid gap-2 pl-0 sm:pl-[60px]">
+                      {variants.map((variant) => (
+                        <div
+                          className="flex flex-col gap-1 rounded-md bg-white px-3 py-2 text-sm shadow-sm ring-1 ring-slate-200 dark:bg-white/[0.04] dark:ring-white/10 sm:flex-row sm:items-center sm:justify-between"
+                          key={`${campaign.id}-${variant.variantId}`}
+                        >
+                          <div className="min-w-0">
+                            <p className="font-semibold text-zinc-950 dark:text-white">
+                              {variant.title}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-zinc-400">
+                              SKU {variant.sku}
+                            </p>
+                          </div>
+                          <p className="shrink-0 text-sm font-semibold text-zinc-950 dark:text-white">
+                            <span className="text-slate-400 line-through">
+                              {formatMoney(variant.originalPrice)}
+                            </span>{" "}
+                            → {formatMoney(variant.salePrice)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          );
-        })}
-        </div>
+          </TableCell>
+        </TableRow>
       ) : null}
-    </article>
+    </>
   );
 }
 
@@ -1550,8 +1626,14 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
         </div>
       </section>
 
-      <section className={cn(dashboardPanelClass, "grid min-w-0 gap-3 p-4")}>
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <section
+        className={cn(
+          dashboardPanelClass,
+          dashboardTableContainerClass,
+          "min-w-0 overflow-hidden",
+        )}
+      >
+        <div className="flex flex-col gap-1 border-b border-slate-200 p-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold text-zinc-950 dark:text-white">
               Active sale campaigns
@@ -1567,41 +1649,75 @@ export function AdminSaleManager({ data }: { data: AdminSalesData }) {
             {data.activeCampaigns.length} active
           </Badge>
         </div>
-        {data.activeCampaigns.length > 0 ? (
-          <div className="grid gap-3">
-            {data.activeCampaigns.map((campaign) => (
-              <CampaignCard
-                campaign={campaign}
-                key={campaign.id}
-                onDelete={(nextCampaign) => {
-                  setResult(null);
-                  setCampaignToDelete(nextCampaign);
-                }}
-                onEnd={(nextCampaign) => {
-                  setResult(null);
-                  setCampaignToEnd(nextCampaign);
-                }}
-                onEditAppearance={editCampaignAppearance}
-                pending={isPending || !data.salesAvailable}
-                productBySlug={productBySlug}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="grid place-items-center gap-2 rounded-lg border border-dashed border-slate-200 p-8 text-center dark:border-white/10">
-            <span className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-zinc-400">
-              <BadgePercentIcon className="size-5" />
-            </span>
-            <div>
-              <p className="text-sm font-bold text-zinc-950 dark:text-white">
-                No active sale campaigns
-              </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-                Select eligible variants above to create the first one.
-              </p>
-            </div>
-          </div>
-        )}
+        <Table className={cn(dashboardTableClass, "min-w-[880px] table-fixed")}>
+          <TableHeader>
+            <TableRow className={dashboardTableHeaderRowClass}>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[30%]")}>
+                Campaign
+              </TableHead>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[22%]")}>
+                Appearance
+              </TableHead>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[16%]")}>
+                Scope
+              </TableHead>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[12%]")}>
+                Discount
+              </TableHead>
+              <TableHead className={cn(dashboardTableHeadClass, "w-[14%]")}>
+                Started
+              </TableHead>
+              <TableHead
+                className={cn(
+                  dashboardTableHeadClass,
+                  dashboardTableActionHeadClass,
+                  "sticky right-0 z-20 bg-white shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.7)] dark:bg-[#151719]",
+                )}
+              >
+                Actions
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.activeCampaigns.length > 0 ? (
+              data.activeCampaigns.map((campaign) => (
+                <CampaignTableRows
+                  campaign={campaign}
+                  key={campaign.id}
+                  onDelete={(nextCampaign) => {
+                    setResult(null);
+                    setCampaignToDelete(nextCampaign);
+                  }}
+                  onEnd={(nextCampaign) => {
+                    setResult(null);
+                    setCampaignToEnd(nextCampaign);
+                  }}
+                  onEditAppearance={editCampaignAppearance}
+                  pending={isPending || !data.salesAvailable}
+                  productBySlug={productBySlug}
+                />
+              ))
+            ) : (
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableCell className="whitespace-normal px-5 py-12" colSpan={6}>
+                  <div className="mx-auto grid max-w-sm place-items-center gap-2 text-center">
+                    <span className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-zinc-400">
+                      <BadgePercentIcon className="size-5" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-zinc-950 dark:text-white">
+                        No active sale campaigns
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
+                        Select eligible variants above to create the first one.
+                      </p>
+                    </div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </section>
 
       <Dialog
