@@ -1,5 +1,14 @@
 import { revalidatePath } from "next/cache";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  like,
+  or,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/src/db";
@@ -7,12 +16,16 @@ import {
   auditLogs,
   brands,
   categories,
+  media,
+  productMedia,
   productVariants,
   products,
   saleCampaigns,
   saleCampaignVariants,
 } from "@/src/db/schema";
 import { requireAdminCapability } from "@/src/modules/auth/permissions";
+import { getMediaPublicUrl } from "@/src/modules/media/paths";
+import { createMarketplaceCanonicalUrl } from "@/src/modules/marketplace/seo";
 import { getFriendlySalesErrorMessage } from "@/src/modules/sales/database-errors";
 
 const createSaleCampaignSchema = z.object({
@@ -31,13 +44,24 @@ export type SaleActionResult = {
   ok: boolean;
 };
 
+export type AdminSaleAvailabilityCode =
+  | "active_campaign"
+  | "compare_at_sale"
+  | "eligible"
+  | "invalid_price"
+  | "product_inactive"
+  | "variant_inactive";
+
 export type AdminSaleVariant = {
   activeCampaignId: string | null;
   activeCampaignName: string | null;
+  availabilityCode: AdminSaleAvailabilityCode;
   compareAtPrice: string | null;
   costPrice: string | null;
   id: string;
+  imageUrl: string | null;
   isActive: boolean;
+  optionValues: string[];
   price: string;
   productId: string;
   productSlug: string;
@@ -52,8 +76,11 @@ export type AdminSaleVariant = {
 };
 
 export type AdminSaleProduct = {
+  brandId: string | null;
   brandName: string | null;
+  categoryId: string | null;
   categoryPath: string | null;
+  coverMediaUrl: string | null;
   id: string;
   slug: string;
   status: string;
@@ -64,6 +91,7 @@ export type AdminSaleProduct = {
 export type AdminSaleCampaignVariant = {
   originalCompareAtPrice: string | null;
   originalPrice: string;
+  productId: string;
   productSlug: string;
   productTitle: string;
   salePrice: string;
@@ -85,6 +113,7 @@ export type AdminSaleCampaign = {
 export type AdminSalesData = {
   activeCampaigns: AdminSaleCampaign[];
   products: AdminSaleProduct[];
+  publicSaleUrl: string;
   salesAvailable: boolean;
   salesUnavailableMessage: string | null;
 };
@@ -113,6 +142,7 @@ type ActiveSaleRow = {
   discountPercent: string;
   originalCompareAtPrice: string | null;
   originalPrice: string;
+  productId: string;
   productSlug: string;
   productTitle: string;
   salePrice: string;
@@ -121,7 +151,27 @@ type ActiveSaleRow = {
   variantId: string;
 };
 
+type ActiveSaleCampaignHeader = {
+  badgeText: string;
+  createdAt: Date;
+  discountPercent: string;
+  id: string;
+  name: string;
+};
+
 const publicProductStatuses = new Set(["active", "live"]);
+
+type SaleAvailability = {
+  availabilityCode: AdminSaleAvailabilityCode;
+  selectable: boolean;
+  unavailableReason: string | null;
+};
+
+type MediaImageRow = {
+  mimeType: string | null;
+  relativePath: string | null;
+  thumbnailRelativePath: string | null;
+};
 
 function toMoney(value: number) {
   return (Math.round(value * 100) / 100).toFixed(2);
@@ -142,6 +192,26 @@ function getDiscountedPrice(price: number, discountPercent: number) {
   return (discountedCents / 100).toFixed(2);
 }
 
+function getMediaImageUrl({
+  mimeType,
+  relativePath,
+  thumbnailRelativePath,
+}: MediaImageRow) {
+  if (mimeType?.startsWith("video/")) {
+    return thumbnailRelativePath
+      ? getMediaPublicUrl(thumbnailRelativePath)
+      : null;
+  }
+
+  if (!mimeType?.startsWith("image/")) {
+    return null;
+  }
+
+  const imagePath = thumbnailRelativePath ?? relativePath;
+
+  return imagePath ? getMediaPublicUrl(imagePath) : null;
+}
+
 function variantHasCompareAtSale(variant: { compareAtPrice: string | null; price: string }) {
   const price = toNumber(variant.price);
   const compareAtPrice = toNumber(variant.compareAtPrice);
@@ -156,11 +226,12 @@ function variantHasCompareAtSale(variant: { compareAtPrice: string | null; price
 function getSaleAvailability(
   variant: VariantForSale,
   activeSaleByVariantId: ReadonlyMap<string, ActiveSaleRow>,
-) {
+): SaleAvailability {
   const activeSale = activeSaleByVariantId.get(variant.id);
 
   if (activeSale) {
     return {
+      availabilityCode: "active_campaign",
       selectable: false,
       unavailableReason: `Already on ${activeSale.campaignName}.`,
     };
@@ -168,6 +239,7 @@ function getSaleAvailability(
 
   if (!publicProductStatuses.has(variant.productStatus)) {
     return {
+      availabilityCode: "product_inactive",
       selectable: false,
       unavailableReason: "Product is not active.",
     };
@@ -175,6 +247,7 @@ function getSaleAvailability(
 
   if (variant.status !== "active" || !variant.isActive) {
     return {
+      availabilityCode: "variant_inactive",
       selectable: false,
       unavailableReason: "Variant is not active.",
     };
@@ -184,6 +257,7 @@ function getSaleAvailability(
 
   if (price === null || price <= 0) {
     return {
+      availabilityCode: "invalid_price",
       selectable: false,
       unavailableReason: "Variant has no valid price.",
     };
@@ -191,25 +265,34 @@ function getSaleAvailability(
 
   if (variantHasCompareAtSale(variant)) {
     return {
+      availabilityCode: "compare_at_sale",
       selectable: false,
       unavailableReason: "Already has compare-at sale pricing.",
     };
   }
 
   return {
+    availabilityCode: "eligible",
     selectable: true,
     unavailableReason: null,
   };
 }
 
-async function getActiveSaleRows(variantIds?: string[]) {
+async function getActiveSaleRows(variantIds?: string[], campaignId?: string) {
   const baseFilters = [
     eq(saleCampaigns.status, "active" as const),
     eq(saleCampaignVariants.status, "active" as const),
   ];
-  const whereCondition = variantIds
-    ? and(...baseFilters, inArray(saleCampaignVariants.variantId, variantIds))
-    : and(...baseFilters);
+
+  if (variantIds) {
+    baseFilters.push(inArray(saleCampaignVariants.variantId, variantIds));
+  }
+
+  if (campaignId) {
+    baseFilters.push(eq(saleCampaigns.id, campaignId));
+  }
+
+  const whereCondition = and(...baseFilters);
 
   if (variantIds && variantIds.length === 0) {
     return {
@@ -228,6 +311,7 @@ async function getActiveSaleRows(variantIds?: string[]) {
         discountPercent: saleCampaigns.discountPercent,
         originalCompareAtPrice: saleCampaignVariants.originalCompareAtPrice,
         originalPrice: saleCampaignVariants.originalPrice,
+        productId: products.id,
         productSlug: products.slug,
         productTitle: products.title,
         salePrice: saleCampaignVariants.salePrice,
@@ -264,6 +348,42 @@ async function getActiveSaleRows(variantIds?: string[]) {
   }
 }
 
+async function getActiveSaleCampaignHeaders(campaignId?: string) {
+  try {
+    const rows = await db
+      .select({
+        badgeText: saleCampaigns.badgeText,
+        createdAt: saleCampaigns.createdAt,
+        discountPercent: saleCampaigns.discountPercent,
+        id: saleCampaigns.id,
+        name: saleCampaigns.name,
+      })
+      .from(saleCampaigns)
+      .where(
+        campaignId
+          ? and(
+              eq(saleCampaigns.status, "active" as const),
+              eq(saleCampaigns.id, campaignId),
+            )
+          : eq(saleCampaigns.status, "active" as const),
+      )
+      .orderBy(desc(saleCampaigns.createdAt));
+
+    return {
+      ok: true as const,
+      rows: rows satisfies ActiveSaleCampaignHeader[],
+    };
+  } catch (error: unknown) {
+    console.error("Failed to load active sale campaign headers:", error);
+
+    return {
+      message: getFriendlySalesErrorMessage("read", error),
+      ok: false as const,
+      rows: [] as ActiveSaleCampaignHeader[],
+    };
+  }
+}
+
 function revalidateSalePaths(productSlugs: Iterable<string>) {
   revalidatePath("/");
   revalidatePath("/admin/products/all");
@@ -285,18 +405,24 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
     return {
       activeCampaigns: [],
       products: [],
+      publicSaleUrl: createMarketplaceCanonicalUrl("/sale"),
       salesAvailable: false,
       salesUnavailableMessage: "You do not have permission to manage product sales.",
     };
   }
 
-  const activeSaleResult = await getActiveSaleRows();
+  const [activeSaleResult, activeCampaignHeaderResult] = await Promise.all([
+    getActiveSaleRows(),
+    getActiveSaleCampaignHeaders(),
+  ]);
   const activeSaleRows = activeSaleResult.rows;
 
-  const [productRows, variantRows] = await Promise.all([
+  const [productRows, variantRows, productMediaRows] = await Promise.all([
     db
       .select({
+        brandId: products.brandId,
         brandName: brands.name,
+        categoryId: products.categoryId,
         categoryPath: categories.path,
         id: products.id,
         slug: products.slug,
@@ -313,6 +439,10 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
         costPrice: productVariants.costPrice,
         id: productVariants.id,
         isActive: productVariants.isActive,
+        mediaMimeType: media.mimeType,
+        mediaRelativePath: media.relativePath,
+        mediaThumbnailRelativePath: media.thumbnailRelativePath,
+        optionValues: productVariants.optionValues,
         price: productVariants.price,
         productId: productVariants.productId,
         productSlug: products.slug,
@@ -325,12 +455,63 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
       })
       .from(productVariants)
       .innerJoin(products, eq(products.id, productVariants.productId))
+      .leftJoin(
+        media,
+        and(
+          eq(media.id, productVariants.mediaId),
+          eq(media.isPublic, true),
+        ),
+      )
       .orderBy(asc(products.title), asc(productVariants.title)),
+    db
+      .selectDistinctOn([productMedia.productId], {
+        isCover: productMedia.isCover,
+        mediaId: productMedia.mediaId,
+        mimeType: media.mimeType,
+        productId: productMedia.productId,
+        relativePath: media.relativePath,
+        sortOrder: productMedia.sortOrder,
+        thumbnailRelativePath: media.thumbnailRelativePath,
+      })
+      .from(productMedia)
+      .innerJoin(media, eq(media.id, productMedia.mediaId))
+      .where(
+        and(
+          eq(media.isPublic, true),
+          or(
+            like(media.mimeType, "image/%"),
+            and(
+              like(media.mimeType, "video/%"),
+              isNotNull(media.thumbnailRelativePath),
+            ),
+          ),
+        ),
+      )
+      .orderBy(
+        asc(productMedia.productId),
+        desc(productMedia.isCover),
+        asc(productMedia.sortOrder),
+        asc(productMedia.mediaId),
+      ),
   ]);
 
   const activeSaleByVariantId = new Map(
     activeSaleRows.map((row) => [row.variantId, row]),
   );
+  const coverMediaUrlByProductId = new Map<string, string>();
+
+  for (const row of productMediaRows) {
+    if (coverMediaUrlByProductId.has(row.productId)) {
+      continue;
+    }
+
+    const imageUrl = getMediaImageUrl(row);
+
+    if (imageUrl) {
+      coverMediaUrlByProductId.set(row.productId, imageUrl);
+    }
+  }
+
   const variantsByProductId = new Map<string, AdminSaleVariant[]>();
 
   for (const variant of variantRows) {
@@ -341,10 +522,18 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
     variants.push({
       activeCampaignId: activeSale?.campaignId ?? null,
       activeCampaignName: activeSale?.campaignName ?? null,
+      availabilityCode: availability.availabilityCode,
       compareAtPrice: variant.compareAtPrice,
       costPrice: variant.costPrice,
       id: variant.id,
+      imageUrl:
+        getMediaImageUrl({
+          mimeType: variant.mediaMimeType,
+          relativePath: variant.mediaRelativePath,
+          thumbnailRelativePath: variant.mediaThumbnailRelativePath,
+        }) ?? coverMediaUrlByProductId.get(variant.productId) ?? null,
       isActive: variant.isActive,
+      optionValues: variant.optionValues,
       price: variant.price,
       productId: variant.productId,
       productSlug: variant.productSlug,
@@ -362,6 +551,18 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
 
   const campaignById = new Map<string, AdminSaleCampaign>();
 
+  for (const campaign of activeCampaignHeaderResult.rows) {
+    campaignById.set(campaign.id, {
+      badgeText: campaign.badgeText,
+      createdAt: campaign.createdAt.toISOString(),
+      discountPercent: campaign.discountPercent,
+      id: campaign.id,
+      name: campaign.name,
+      status: "active",
+      variants: [],
+    });
+  }
+
   for (const row of activeSaleRows) {
     const campaign = campaignById.get(row.campaignId) ?? {
       badgeText: row.badgeText,
@@ -376,6 +577,7 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
     campaign.variants.push({
       originalCompareAtPrice: row.originalCompareAtPrice,
       originalPrice: row.originalPrice,
+      productId: row.productId,
       productSlug: row.productSlug,
       productTitle: row.productTitle,
       salePrice: row.salePrice,
@@ -388,19 +590,38 @@ export async function getAdminSalesData(): Promise<AdminSalesData> {
 
   return {
     activeCampaigns: Array.from(campaignById.values()),
-    products: productRows.map((product) => ({
-      brandName: product.brandName,
-      categoryPath: product.categoryPath,
-      id: product.id,
-      slug: product.slug,
-      status: product.status,
-      title: product.title,
-      variants: variantsByProductId.get(product.id) ?? [],
-    })),
-    salesAvailable: activeSaleResult.ok,
-    salesUnavailableMessage: activeSaleResult.ok
-      ? null
-      : activeSaleResult.message,
+    products: productRows.flatMap((product) => {
+      const variants = variantsByProductId.get(product.id) ?? [];
+
+      return variants.length > 0
+        ? [
+            {
+              brandId: product.brandId,
+              brandName: product.brandName,
+              categoryId: product.categoryId,
+              categoryPath: product.categoryPath,
+              coverMediaUrl:
+                coverMediaUrlByProductId.get(product.id) ??
+                variants.find((variant) => variant.imageUrl)?.imageUrl ??
+                null,
+              id: product.id,
+              slug: product.slug,
+              status: product.status,
+              title: product.title,
+              variants,
+            },
+          ]
+        : [];
+    }),
+    publicSaleUrl: createMarketplaceCanonicalUrl("/sale"),
+    salesAvailable: activeSaleResult.ok && activeCampaignHeaderResult.ok,
+    salesUnavailableMessage:
+      activeSaleResult.ok && activeCampaignHeaderResult.ok
+        ? null
+        : activeSaleResult.ok
+          ? (activeCampaignHeaderResult.message ??
+            "Active sale campaigns could not be loaded.")
+          : (activeSaleResult.message ?? "Active sale pricing could not be loaded."),
   };
 }
 
@@ -595,20 +816,23 @@ export async function endSaleCampaign(input: unknown): Promise<SaleActionResult>
     };
   }
 
-  const activeSaleResult = await getActiveSaleRows();
+  const [activeSaleResult, activeCampaignHeaderResult] = await Promise.all([
+    getActiveSaleRows(undefined, parsed.data.campaignId),
+    getActiveSaleCampaignHeaders(parsed.data.campaignId),
+  ]);
 
-  if (!activeSaleResult.ok) {
+  if (!activeSaleResult.ok || !activeCampaignHeaderResult.ok) {
     return {
       ok: false,
-      message: activeSaleResult.message,
+      message: activeSaleResult.ok
+        ? activeCampaignHeaderResult.message
+        : activeSaleResult.message,
     };
   }
 
-  const campaignRows = activeSaleResult.rows.filter(
-    (row) => row.campaignId === parsed.data.campaignId,
-  );
+  const campaignRows = activeSaleResult.rows;
 
-  if (campaignRows.length === 0) {
+  if (activeCampaignHeaderResult.rows.length === 0) {
     return {
       ok: false,
       message: "This sale campaign is not active.",
@@ -629,40 +853,60 @@ export async function endSaleCampaign(input: unknown): Promise<SaleActionResult>
           .where(eq(productVariants.id, row.variantId));
       }
 
-    await tx
-      .update(saleCampaignVariants)
-      .set({
-        endedAt: now,
-        status: "ended",
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(saleCampaignVariants.campaignId, parsed.data.campaignId),
-          eq(saleCampaignVariants.status, "active"),
-        ),
-      );
-
-    await tx
-      .update(saleCampaigns)
-      .set({
-        endedAt: now,
-        status: "ended",
-        updatedAt: now,
-      })
-      .where(eq(saleCampaigns.id, parsed.data.campaignId));
-
-    const affectedProductRows = await tx
-      .select({ productId: productVariants.productId })
-      .from(productVariants)
-      .where(inArray(productVariants.id, campaignRows.map((row) => row.variantId)));
-
-    for (const productId of new Set(affectedProductRows.map((row) => row.productId))) {
       await tx
-        .update(products)
-        .set({ updatedAt: now })
-        .where(eq(products.id, productId));
-    }
+        .update(saleCampaignVariants)
+        .set({
+          endedAt: now,
+          status: "ended",
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(saleCampaignVariants.campaignId, parsed.data.campaignId),
+            eq(saleCampaignVariants.status, "active"),
+          ),
+        );
+
+      const [endedCampaign] = await tx
+        .update(saleCampaigns)
+        .set({
+          endedAt: now,
+          status: "ended",
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(saleCampaigns.id, parsed.data.campaignId),
+            eq(saleCampaigns.status, "active" as const),
+          ),
+        )
+        .returning({ id: saleCampaigns.id });
+
+      if (!endedCampaign) {
+        throw new Error("This sale campaign is not active.");
+      }
+
+      const affectedProductRows =
+        campaignRows.length > 0
+          ? await tx
+              .select({ productId: productVariants.productId })
+              .from(productVariants)
+              .where(
+                inArray(
+                  productVariants.id,
+                  campaignRows.map((row) => row.variantId),
+                ),
+              )
+          : [];
+
+      for (const productId of new Set(
+        affectedProductRows.map((row) => row.productId),
+      )) {
+        await tx
+          .update(products)
+          .set({ updatedAt: now })
+          .where(eq(products.id, productId));
+      }
 
       await tx.insert(auditLogs).values({
         action: "sale_campaign.ended",
@@ -710,7 +954,10 @@ export async function deleteSaleCampaign(input: unknown): Promise<SaleActionResu
     };
   }
 
-  const activeSaleResult = await getActiveSaleRows();
+  const activeSaleResult = await getActiveSaleRows(
+    undefined,
+    parsed.data.campaignId,
+  );
 
   if (!activeSaleResult.ok) {
     return {
@@ -719,36 +966,61 @@ export async function deleteSaleCampaign(input: unknown): Promise<SaleActionResu
     };
   }
 
-  const activeRows = activeSaleResult.rows.filter(
-    (row) => row.campaignId === parsed.data.campaignId,
-  );
+  const activeRows = activeSaleResult.rows;
   const now = new Date();
+  let restoredVariantIds: string[] = [];
 
   try {
     await db.transaction(async (tx) => {
-      for (const row of activeRows) {
-        await tx
-          .update(productVariants)
-          .set({
-            compareAtPrice: row.originalCompareAtPrice,
-            price: row.originalPrice,
-          })
-          .where(eq(productVariants.id, row.variantId));
+      const [claimedActiveCampaign] = await tx
+        .update(saleCampaigns)
+        .set({
+          endedAt: now,
+          status: "ended",
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(saleCampaigns.id, parsed.data.campaignId),
+            eq(saleCampaigns.status, "active" as const),
+          ),
+        )
+        .returning({ id: saleCampaigns.id });
+
+      if (claimedActiveCampaign) {
+        for (const row of activeRows) {
+          await tx
+            .update(productVariants)
+            .set({
+              compareAtPrice: row.originalCompareAtPrice,
+              price: row.originalPrice,
+            })
+            .where(eq(productVariants.id, row.variantId));
+        }
+
+        restoredVariantIds = activeRows.map((row) => row.variantId);
       }
 
-    if (activeRows.length > 0) {
-      const affectedProductRows = await tx
-        .select({ productId: productVariants.productId })
-        .from(productVariants)
-        .where(inArray(productVariants.id, activeRows.map((row) => row.variantId)));
+      if (restoredVariantIds.length > 0) {
+        const affectedProductRows = await tx
+          .select({ productId: productVariants.productId })
+          .from(productVariants)
+          .where(
+            inArray(
+              productVariants.id,
+              restoredVariantIds,
+            ),
+          );
 
-      for (const productId of new Set(affectedProductRows.map((row) => row.productId))) {
-        await tx
-          .update(products)
-          .set({ updatedAt: now })
-          .where(eq(products.id, productId));
+        for (const productId of new Set(
+          affectedProductRows.map((row) => row.productId),
+        )) {
+          await tx
+            .update(products)
+            .set({ updatedAt: now })
+            .where(eq(products.id, productId));
+        }
       }
-    }
 
       const [deletedCampaign] = await tx
         .delete(saleCampaigns)
@@ -765,7 +1037,7 @@ export async function deleteSaleCampaign(input: unknown): Promise<SaleActionResu
         entityId: parsed.data.campaignId,
         entityType: "sale_campaign",
         metadata: JSON.stringify({
-          restoredActiveVariants: activeRows.map((row) => row.variantId),
+          restoredActiveVariants: restoredVariantIds,
         }),
       });
     });
@@ -783,7 +1055,7 @@ export async function deleteSaleCampaign(input: unknown): Promise<SaleActionResu
   return {
     ok: true,
     message:
-      activeRows.length > 0
+      restoredVariantIds.length > 0
         ? "Sale deleted and variant prices restored."
         : "Sale deleted.",
   };
