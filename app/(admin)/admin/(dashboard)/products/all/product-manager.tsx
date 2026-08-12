@@ -44,6 +44,7 @@ import {
 } from "@/components/dashboard/dashboard-compact-metrics";
 import { DashboardRowActionMenu } from "@/components/dashboard/dashboard-row-action-menu";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogBody,
@@ -70,6 +71,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import {
+  bulkUpdateAdminProductStatus,
   deleteOrArchiveAdminProduct,
   updateAdminProductStatus,
 } from "@/app/(admin)/admin/(dashboard)/products/all/actions";
@@ -87,6 +89,8 @@ type StatusFilter = "all" | AdminProductReviewStatus;
 type ProductTableStatusMutation = "active" | "draft";
 type FulfillmentFilter = "all" | "seller_fulfilled" | "jurgens_fulfilled";
 type CategoryFilter = "all" | string;
+type BrandFilter = "all" | "__no_brand__" | string;
+type BulkProductStatusMutation = "active" | "draft" | "archived";
 
 const selectContentClass =
   "border border-slate-200 bg-white p-1 text-zinc-950 shadow-xl dark:border-white/10 dark:bg-[#151719] dark:text-white";
@@ -271,20 +275,26 @@ function FulfillmentBadge({
 }
 
 function ProductFilterPanel({
+  brandFilter,
+  brandOptions,
   categoryFilter,
   categoryOptions,
   fulfillmentFilter,
   statusFilter,
+  onChangeBrand,
   onChangeCategory,
   onChangeFulfillment,
   onChangeStatus,
   onClear,
   onClose,
 }: {
+  brandFilter: BrandFilter;
+  brandOptions: string[];
   categoryFilter: CategoryFilter;
   categoryOptions: string[];
   fulfillmentFilter: FulfillmentFilter;
   statusFilter: StatusFilter;
+  onChangeBrand: (value: BrandFilter) => void;
   onChangeCategory: (value: CategoryFilter) => void;
   onChangeFulfillment: (value: FulfillmentFilter) => void;
   onChangeStatus: (value: StatusFilter) => void;
@@ -297,7 +307,7 @@ function ProductFilterPanel({
         <div>
           <p className="text-sm font-semibold">Filter products</p>
           <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-            Narrow products by status, category, and delivery method.
+            Narrow products by status, brand, category, and delivery method.
           </p>
         </div>
         <button
@@ -311,6 +321,36 @@ function ProductFilterPanel({
       </div>
 
       <div className="grid gap-3">
+        <label className="grid gap-1.5">
+          <span className="text-xs font-semibold text-slate-600 dark:text-zinc-300">
+            Brand
+          </span>
+          <Select
+            value={brandFilter}
+            onValueChange={(value) => onChangeBrand(value as BrandFilter)}
+          >
+            <SelectTrigger className="h-9 border-slate-300 bg-white dark:border-white/18 dark:bg-[#101214]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent
+              className={cn(selectContentClass, "max-h-[min(18rem,var(--available-height))]")}
+              collisionPadding={12}
+            >
+              <SelectItem value="all" className={selectItemClass}>
+                All brands
+              </SelectItem>
+              <SelectItem value="__no_brand__" className={selectItemClass}>
+                No brand
+              </SelectItem>
+              {brandOptions.map((brand) => (
+                <SelectItem key={brand} value={brand} className={selectItemClass}>
+                  {brand}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+
         <label className="grid gap-1.5">
           <span className="text-xs font-semibold text-slate-600 dark:text-zinc-300">
             Status
@@ -731,9 +771,13 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
   const [fulfillmentFilter, setFulfillmentFilter] =
     useState<FulfillmentFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [brandFilter, setBrandFilter] = useState<BrandFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [viewProduct, setViewProduct] = useState<AdminProductRow | null>(
     null,
   );
@@ -749,8 +793,12 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
   const [pendingDeleteProductId, setPendingDeleteProductId] = useState<
     string | null
   >(null);
+  const [pendingBulkStatus, setPendingBulkStatus] =
+    useState<BulkProductStatusMutation | null>(null);
+  const [pendingBulkArchive, setPendingBulkArchive] = useState(false);
   const [, startStatusTransition] = useTransition();
   const [, startDeleteTransition] = useTransition();
+  const [, startBulkStatusTransition] = useTransition();
 
   const productMetrics = useMemo<DashboardMetricDefinition[]>(
     () => [
@@ -818,6 +866,17 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
       ).sort((a, b) => a.localeCompare(b)),
     [products],
   );
+  const brandOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          products
+            .map((product) => product.brandName)
+            .filter((brand): brand is string => Boolean(brand)),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
+    [products],
+  );
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -830,6 +889,11 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
         product.fulfillmentMode === fulfillmentFilter;
       const matchesCategory =
         categoryFilter === "all" || product.categoryPath === categoryFilter;
+      const matchesBrand =
+        brandFilter === "all" ||
+        (brandFilter === "__no_brand__"
+          ? !product.brandName
+          : product.brandName === brandFilter);
       const matchesSearch =
         !normalizedSearch ||
         [
@@ -840,18 +904,33 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(normalizedSearch));
 
-      return matchesStatus && matchesFulfillment && matchesCategory && matchesSearch;
+      return (
+        matchesStatus &&
+        matchesFulfillment &&
+        matchesCategory &&
+        matchesBrand &&
+        matchesSearch
+      );
     });
-  }, [categoryFilter, fulfillmentFilter, products, searchTerm, statusFilter]);
+  }, [
+    brandFilter,
+    categoryFilter,
+    fulfillmentFilter,
+    products,
+    searchTerm,
+    statusFilter,
+  ]);
   const activeFilterCount =
     Number(statusFilter !== "all") +
     Number(categoryFilter !== "all") +
-    Number(fulfillmentFilter !== "all");
+    Number(fulfillmentFilter !== "all") +
+    Number(brandFilter !== "all");
 
   function clearFilters() {
     setStatusFilter("all");
     setCategoryFilter("all");
     setFulfillmentFilter("all");
+    setBrandFilter("all");
     setCurrentPage(1);
   }
 
@@ -863,6 +942,13 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
     (activePage - 1) * pageSize,
     activePage * pageSize,
   );
+  const selectedVisibleCount = pageProducts.filter((product) =>
+    selectedProductIds.has(product.id),
+  ).length;
+  const allVisibleProductsSelected =
+    pageProducts.length > 0 && selectedVisibleCount === pageProducts.length;
+  const someVisibleProductsSelected =
+    selectedVisibleCount > 0 && !allVisibleProductsSelected;
 
   function exportProductsCsv() {
     const headers = [
@@ -970,6 +1056,78 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
     });
   }
 
+  function toggleProductSelection(productId: string, checked: boolean) {
+    setSelectedProductIds((current) => {
+      const next = new Set(current);
+
+      if (checked) {
+        next.add(productId);
+      } else {
+        next.delete(productId);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleVisibleProductSelection(checked: boolean) {
+    setSelectedProductIds((current) => {
+      const next = new Set(current);
+
+      for (const product of pageProducts) {
+        if (checked) {
+          next.add(product.id);
+        } else {
+          next.delete(product.id);
+        }
+      }
+
+      return next;
+    });
+  }
+
+  function selectAllFilteredProducts() {
+    setSelectedProductIds(new Set(filteredProducts.map((product) => product.id)));
+  }
+
+  function handleBulkStatusChange(status: BulkProductStatusMutation) {
+    const productIds = [...selectedProductIds];
+
+    if (productIds.length === 0) {
+      return;
+    }
+
+    setStatusFeedback(null);
+    setPendingBulkStatus(status);
+    startBulkStatusTransition(() => {
+      void bulkUpdateAdminProductStatus({ productIds, status })
+        .then((result) => {
+          setPendingBulkStatus(null);
+          setStatusFeedback({
+            message:
+              result.message ??
+              (result.ok
+                ? "Selected products updated."
+                : "Selected products could not be updated."),
+            tone: result.ok ? "success" : "error",
+          });
+
+          if (result.ok) {
+            setPendingBulkArchive(false);
+            setSelectedProductIds(new Set());
+            router.refresh();
+          }
+        })
+        .catch(() => {
+          setPendingBulkStatus(null);
+          setStatusFeedback({
+            message: "Selected products could not be updated.",
+            tone: "error",
+          });
+        });
+    });
+  }
+
   return (
     <>
       <DashboardPageHeader
@@ -1027,10 +1185,16 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                     type="button"
                   />
                   <ProductFilterPanel
+                    brandFilter={brandFilter}
+                    brandOptions={brandOptions}
                     categoryFilter={categoryFilter}
                     categoryOptions={categoryOptions}
                     fulfillmentFilter={fulfillmentFilter}
                     statusFilter={statusFilter}
+                    onChangeBrand={(value) => {
+                      setBrandFilter(value);
+                      setCurrentPage(1);
+                    }}
                     onChangeCategory={(value) => {
                       setCategoryFilter(value);
                       setCurrentPage(1);
@@ -1069,6 +1233,61 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           </div>
         ) : null}
 
+        {selectedProductIds.size > 0 ? (
+          <section className="flex min-w-0 flex-col gap-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-3 text-zinc-950 dark:border-primary/30 dark:bg-primary/10 dark:text-white sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">
+                {selectedProductIds.size} {selectedProductIds.size === 1 ? "product" : "products"} selected
+              </p>
+              <p className="mt-0.5 text-xs text-slate-600 dark:text-zinc-300">
+                Bulk updates are recorded in each product&apos;s history.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <DashboardButton
+                disabled={Boolean(pendingBulkStatus)}
+                onClick={() => handleBulkStatusChange("active")}
+                type="button"
+              >
+                {pendingBulkStatus === "active" ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <CheckCircleIcon className="size-3.5" />
+                )}
+                Set active
+              </DashboardButton>
+              <DashboardButton
+                disabled={Boolean(pendingBulkStatus)}
+                onClick={() => handleBulkStatusChange("draft")}
+                type="button"
+              >
+                {pendingBulkStatus === "draft" ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <ArchiveIcon className="size-3.5" />
+                )}
+                Set as draft
+              </DashboardButton>
+              <DashboardButton
+                className="border-red-200 text-red-700 hover:border-red-300 hover:bg-red-50 dark:border-red-400/30 dark:text-red-300 dark:hover:bg-red-500/10"
+                disabled={Boolean(pendingBulkStatus)}
+                onClick={() => setPendingBulkArchive(true)}
+                type="button"
+              >
+                <ArchiveIcon className="size-3.5" />
+                Archive
+              </DashboardButton>
+              <DashboardButton
+                disabled={Boolean(pendingBulkStatus)}
+                onClick={() => setSelectedProductIds(new Set())}
+                type="button"
+              >
+                Clear selection
+              </DashboardButton>
+            </div>
+          </section>
+        ) : null}
+
         <section
           className={cn(
             dashboardPanelClass,
@@ -1079,6 +1298,17 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           <Table className={cn(dashboardTableClass, "md:min-w-[960px] md:table-fixed")}>
             <TableHeader>
               <TableRow className={dashboardTableHeaderRowClass}>
+                <TableHead className={cn(dashboardTableHeadClass, "w-12 px-4")}>
+                  <Checkbox
+                    aria-label="Select all products on this page"
+                    checked={allVisibleProductsSelected}
+                    disabled={pageProducts.length === 0 || Boolean(pendingBulkStatus)}
+                    indeterminate={someVisibleProductsSelected}
+                    onCheckedChange={(checked) =>
+                      toggleVisibleProductSelection(checked === true)
+                    }
+                  />
+                </TableHead>
                 <TableHead className={cn(dashboardTableHeadClass, "w-[52%]")}>
                   Product
                 </TableHead>
@@ -1111,6 +1341,16 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
               {pageProducts.length > 0 ? (
                 pageProducts.map((product) => (
                   <TableRow key={product.id} className={dashboardTableRowClass}>
+                    <TableCell className={cn("w-12 px-4", dashboardTableCellClass)}>
+                      <Checkbox
+                        aria-label={`Select ${product.title}`}
+                        checked={selectedProductIds.has(product.id)}
+                        disabled={Boolean(pendingBulkStatus)}
+                        onCheckedChange={(checked) =>
+                          toggleProductSelection(product.id, checked === true)
+                        }
+                      />
+                    </TableCell>
                     <TableCell className={cn("min-w-0", dashboardTableCellClass)}>
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="relative hidden size-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 sm:block">
@@ -1213,7 +1453,7 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
                 ))
               ) : (
                 <TableRow className="border-slate-200 dark:border-white/10">
-                  <TableCell colSpan={5} className="px-5 py-12 text-center">
+                  <TableCell colSpan={6} className="px-5 py-12 text-center">
                     <div className="mx-auto grid max-w-sm gap-1">
                       <p className="text-sm font-semibold text-zinc-950 dark:text-white">
                         No products found
@@ -1229,6 +1469,20 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
               )}
             </TableBody>
           </Table>
+
+          {selectedVisibleCount > 0 &&
+          selectedVisibleCount < filteredProducts.length ? (
+            <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-white/10 dark:bg-white/[0.03]">
+              <button
+                className="font-medium text-primary hover:underline"
+                disabled={Boolean(pendingBulkStatus)}
+                onClick={selectAllFilteredProducts}
+                type="button"
+              >
+                Select all {filteredProducts.length} filtered products
+              </button>
+            </div>
+          ) : null}
 
           <DashboardTablePagination
             currentPage={activePage}
@@ -1258,6 +1512,53 @@ export function AdminProductManager({ metrics, products }: AdminProductsData) {
           </DialogHeader>
           {viewProduct ? <ProductDetails product={viewProduct} /> : null}
           <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pendingBulkArchive}
+        onOpenChange={(open) => {
+          if (!open && !pendingBulkStatus) {
+            setPendingBulkArchive(false);
+          }
+        }}
+      >
+        <DialogContent className="border border-red-200 bg-white text-zinc-950 shadow-2xl dark:border-red-400/25 dark:bg-[#101214] dark:text-white">
+          <DialogHeader>
+            <DialogTitle>Archive selected products?</DialogTitle>
+            <DialogDescription>
+              This removes the selected products from sale while preserving their
+              records and any order history. Suspended products are left unchanged.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody>
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800 dark:border-red-400/25 dark:bg-red-500/10 dark:text-red-100">
+              {selectedProductIds.size} {selectedProductIds.size === 1 ? "product" : "products"} will be archived.
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-md border border-red-600 bg-red-600 px-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+              disabled={Boolean(pendingBulkStatus)}
+              onClick={() => handleBulkStatusChange("archived")}
+              type="button"
+            >
+              {pendingBulkStatus === "archived" ? (
+                <Loader2Icon className="mr-2 size-4 animate-spin" />
+              ) : (
+                <ArchiveIcon className="mr-2 size-4" />
+              )}
+              Archive products
+            </button>
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-zinc-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:hover:bg-white/10"
+              disabled={Boolean(pendingBulkStatus)}
+              onClick={() => setPendingBulkArchive(false)}
+              type="button"
+            >
+              Cancel
+            </button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

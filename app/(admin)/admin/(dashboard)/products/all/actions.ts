@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/src/db";
@@ -19,10 +19,150 @@ const productStatusUpdateSchema = z.object({
   status: z.enum(["active", "draft"]),
 });
 
+const bulkProductStatusUpdateSchema = z.object({
+  productIds: z.array(z.string().uuid()).min(1).max(500),
+  status: z.enum(["active", "draft", "archived"]),
+});
+
 export type ProductStatusUpdateResult = {
   message?: string;
   ok: boolean;
 };
+
+export type BulkProductStatusUpdateResult = ProductStatusUpdateResult & {
+  changedCount?: number;
+  skippedCount?: number;
+};
+
+function revalidateProductCatalogPaths(slugs: string[] = []) {
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/products/all");
+  revalidatePath("/products");
+  revalidatePath("/products/all");
+  revalidatePath("/feeds/google-merchant.xml");
+
+  for (const slug of slugs) {
+    revalidatePath(`/products/${slug}`);
+  }
+}
+
+export async function bulkUpdateAdminProductStatus(
+  input: unknown,
+): Promise<BulkProductStatusUpdateResult> {
+  const access = await requireAdminCapability("admin.catalog.manage");
+
+  if (!access.ok) {
+    return {
+      ok: false,
+      message: "Catalog access could not be confirmed.",
+    };
+  }
+
+  const parsed = bulkProductStatusUpdateSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Select between 1 and 500 products to update.",
+    };
+  }
+
+  const productIds = [...new Set(parsed.data.productIds)];
+  const selectedProducts = await db
+    .select({
+      id: products.id,
+      slug: products.slug,
+      status: products.status,
+      title: products.title,
+    })
+    .from(products)
+    .where(inArray(products.id, productIds));
+  const targetStatus = parsed.data.status;
+  const eligibleProducts = selectedProducts.filter(
+    (product) =>
+      product.status !== targetStatus &&
+      product.status !== "admin_suspended" &&
+      (targetStatus === "archived" || product.status !== "archived"),
+  );
+  const now = new Date();
+
+  if (eligibleProducts.length > 0) {
+    const action =
+      targetStatus === "draft"
+        ? "set_as_draft"
+        : targetStatus === "active"
+          ? "set_as_active"
+          : "archived";
+    const statusNote =
+      targetStatus === "draft"
+        ? "Admin set this product to draft in a bulk catalogue update."
+        : targetStatus === "active"
+          ? "Admin set this product active in a bulk catalogue update."
+          : "Admin archived this product in a bulk catalogue update.";
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(products)
+        .set({ status: targetStatus, updatedAt: now })
+        .where(inArray(products.id, eligibleProducts.map((product) => product.id)));
+
+      await tx.insert(productReviewEvents).values(
+        eligibleProducts.map((product) => ({
+          action,
+          actorUserId: access.session.user.id,
+          fromStatus: product.status,
+          note: statusNote,
+          productId: product.id,
+          toStatus: targetStatus,
+        })),
+      );
+
+      await tx.insert(auditLogs).values(
+        eligibleProducts.map((product) => ({
+          action: `product.${action}`,
+          actorUserId: access.session.user.id,
+          entityId: product.id,
+          entityType: "product",
+          metadata: JSON.stringify({
+            fromStatus: product.status,
+            title: product.title,
+            toStatus: targetStatus,
+          }),
+        })),
+      );
+    });
+  }
+
+  const skippedCount = productIds.length - eligibleProducts.length;
+  const changedCount = eligibleProducts.length;
+
+  if (changedCount > 0) {
+    revalidateProductCatalogPaths(
+      eligibleProducts.map((product) => product.slug),
+    );
+  }
+
+  const targetLabel =
+    targetStatus === "draft"
+      ? "draft"
+      : targetStatus === "active"
+        ? "active"
+        : "archived";
+
+  return {
+    ok: true,
+    changedCount,
+    skippedCount,
+    message:
+      changedCount === 0
+        ? "None of the selected products needed updating."
+        : `${changedCount} ${changedCount === 1 ? "product" : "products"} set to ${targetLabel}.${
+            skippedCount > 0
+              ? ` ${skippedCount} ${skippedCount === 1 ? "product was" : "products were"} skipped because ${skippedCount === 1 ? "it is" : "they are"} already in that state, archived, or suspended.`
+              : ""
+          }`,
+  };
+}
 
 export async function updateAdminProductStatus(
   input: unknown,
