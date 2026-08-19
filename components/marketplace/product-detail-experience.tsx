@@ -13,7 +13,6 @@ import {
 } from "react";
 import {
   CheckIcon,
-  CheckCircle2Icon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -136,22 +135,6 @@ const productPolicyLinks = [
     label: "Support",
   },
 ].filter((link): link is ProductPolicyLink => Boolean(link));
-
-const exchangeSteps = [
-  {
-    description: "Exchange orders can be delivered to your address.",
-    icon: TruckIcon,
-  },
-  {
-    description:
-      "Hand over your compatible empty cylinder to our delivery representative.",
-    icon: RefreshCcwIcon,
-  },
-  {
-    description: "The exchange is completed after the handover checks.",
-    icon: CheckCircle2Icon,
-  },
-] as const;
 
 function getDisplayedCurrencyValue(
   amount: string | number,
@@ -366,7 +349,6 @@ export function ProductDetailExperience({
   const deliveryBenefit = deliveryCopy.benefit;
   const deliveryDetail = deliveryCopy.detail;
   const sizeLabel = getSizeLabel(selectedVariant?.title ?? product.title);
-  const isSelectedVariantExchange = isExchangeVariant(selectedVariant);
 
   function showPreviousMedia() {
     setActiveMediaId((current) =>
@@ -420,8 +402,6 @@ export function ProductDetailExperience({
       </section>
 
       <section className="grid min-w-0 gap-2 overflow-x-clip sm:gap-5">
-        {isSelectedVariantExchange ? <ExchangeStepsPanel /> : null}
-
         <ProductDescriptionSection product={product} />
 
         <ProductReviewsSection product={product} />
@@ -3658,40 +3638,6 @@ function ProductReviewsSection({
           </Link>
         </div>
       )}
-    </section>
-  );
-}
-
-function ExchangeStepsPanel() {
-  return (
-    <section className="min-w-0 overflow-hidden border-y border-[#e8e8e2] bg-white px-4 py-3 dark:border-white/10 dark:bg-white/[0.04] sm:rounded-lg sm:border sm:p-5 sm:shadow-sm">
-      <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-center">
-        <h2 className="text-base font-black text-[#080808] dark:text-[#f7f7f2] sm:text-lg">
-          How cylinder exchange works
-        </h2>
-        <div className="grid gap-3 md:grid-cols-3">
-          {exchangeSteps.map((step, index) => {
-            const Icon = step.icon;
-
-            return (
-              <article
-                className="grid min-w-0 grid-cols-[1.5rem_2.25rem_minmax(0,1fr)] items-center gap-2.5 border-t border-[#f0f0ea] py-2.5 first:border-t-0 dark:border-white/10 sm:grid-cols-[2rem_3rem_minmax(0,1fr)] sm:gap-3 sm:rounded-lg sm:border sm:bg-[#f7f7f2]/45 sm:p-3 sm:dark:bg-white/[0.03]"
-                key={step.description}
-              >
-                <span className="grid size-6 place-items-center rounded-full bg-[#ff5a1f] text-xs font-black text-white">
-                  {index + 1}
-                </span>
-                <span className="grid size-10 place-items-center rounded-full border border-[#ff5a1f]/15 bg-orange-50 text-[#ff5a1f] dark:bg-orange-500/10 sm:size-12">
-                  <Icon className="size-5 stroke-[1.6] sm:size-6" />
-                </span>
-                <p className="text-xs leading-5 text-slate-700 dark:text-zinc-300 sm:text-sm">
-                  {step.description}
-                </p>
-              </article>
-            );
-          })}
-        </div>
-      </div>
     </section>
   );
 }
