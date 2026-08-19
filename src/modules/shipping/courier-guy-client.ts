@@ -308,6 +308,8 @@ export const courierGuyPickupPointsInputSchema = z
 const providerServiceLevelSchema = z
   .object({
     code: z.string().trim().min(1),
+    delivery_date_from: z.string().nullable().optional(),
+    delivery_date_to: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
     id: identifierSchema.nullable().optional(),
     name: z.string().trim().min(1).optional(),
@@ -852,8 +854,14 @@ async function getRates(
   return {
     rates: response.rates.map<CourierGuyRate>((rate) => ({
       currency: "ZAR",
-      estimatedDeliveryFrom: rate.estimated_delivery_from ?? null,
-      estimatedDeliveryTo: rate.estimated_delivery_to ?? null,
+      estimatedDeliveryFrom:
+        rate.estimated_delivery_from ??
+        rate.service_level.delivery_date_from ??
+        null,
+      estimatedDeliveryTo:
+        rate.estimated_delivery_to ??
+        rate.service_level.delivery_date_to ??
+        null,
       providerAmount: roundMoney(rate.rate),
       providerAmountExcludingVat:
         rate.rate_excluding_vat === null ||

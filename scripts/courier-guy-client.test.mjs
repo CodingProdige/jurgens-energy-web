@@ -267,6 +267,42 @@ test("gets internal rates from a pickup-point drop-off without requesting collec
   });
 });
 
+test("reads delivery dates nested in Courier Guy's service level", async () => {
+  const client = createCourierGuyClient(config, {
+    fetchImpl: async () =>
+      jsonResponse({
+        message: "Success",
+        rates: [
+          {
+            rate: "201.88",
+            service_level: {
+              code: "K2DL - ECO",
+              delivery_date_from: "2026-08-25T08:00:00+02:00",
+              delivery_date_to: "2026-08-27T17:00:00+02:00",
+              id: 246312,
+              name: "Kiosk to Door Large",
+            },
+          },
+        ],
+      }),
+  });
+
+  const result = await client.getRates({
+    collectionOrigin: pickupPointOrigin,
+    deliveryAddress,
+    parcels: [parcel],
+  });
+
+  assert.equal(
+    result.rates[0]?.estimatedDeliveryFrom,
+    "2026-08-25T08:00:00+02:00",
+  );
+  assert.equal(
+    result.rates[0]?.estimatedDeliveryTo,
+    "2026-08-27T17:00:00+02:00",
+  );
+});
+
 test("creates a drop-off shipment with customer reference and no custom tracking reference", async () => {
   let capturedBody;
   const client = createCourierGuyClient(config, {

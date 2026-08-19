@@ -13,6 +13,7 @@ import {
 } from "@/src/modules/marketplace/settings";
 import { getPublicDeliveryTiming } from "@/src/modules/marketplace/public-delivery-copy";
 import {
+  CourierGuyApiError,
   createCourierGuyClient,
   type CourierGuyRate,
 } from "@/src/modules/shipping/courier-guy-client";
@@ -284,6 +285,7 @@ export async function getPublicProductDeliveryEstimate(
 
   const collectionMinDate = getCourierCollectionDate(settings);
   const cacheKey = getCacheKey(parsed, {
+    estimateStrategy: "courier_guy_eta_probe_v2",
     courier: {
       defaultServiceCode: courierConfig.defaultServiceCode,
       dropoffPickupPointId: courierConfig.dropoffPickupPointId,
@@ -354,9 +356,26 @@ export async function getPublicProductDeliveryEstimate(
         await cacheEstimate(cacheKey, result);
         return result;
       }
-    } catch {
-      // The public fallback below keeps a delivery time visible when the
-      // carrier's live ETA lookup is temporarily unavailable.
+      console.warn("Courier Guy public ETA returned no dated service", {
+        addressPostalCode: parsed.deliveryAddress.postalCode,
+        preferredServiceCode: courierConfig.defaultServiceCode,
+        rateCount: rateResponse.rates.length,
+        serviceCodes: rateResponse.rates.map((candidate) => candidate.serviceCode),
+      });
+    } catch (error) {
+      const courierError =
+        error instanceof CourierGuyApiError
+          ? {
+              code: error.code,
+              operation: error.operation,
+              status: error.status,
+            }
+          : { code: "unknown", operation: "get Courier Guy rates", status: null };
+
+      console.error("Courier Guy public ETA lookup failed", {
+        ...courierError,
+        addressPostalCode: parsed.deliveryAddress.postalCode,
+      });
     }
   }
 
@@ -367,6 +386,7 @@ export async function getPublicProductDeliveryEstimate(
     provider: "standard_delivery",
   };
 
-  await cacheEstimate(cacheKey, result);
+  // Do not cache the fallback. The carrier can recover at any time, and a
+  // previous failed lookup must never suppress a fresh Courier Guy ETA.
   return result;
 }
