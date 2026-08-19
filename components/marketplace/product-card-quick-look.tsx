@@ -11,12 +11,14 @@ import {
   PackageCheckIcon,
   PlusIcon,
   StarIcon,
-  TruckIcon,
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
+import { MarketplaceCampaignIcon } from "@/components/marketplace/marketplace-campaign-icon";
+import { MarketplaceSaleCountdown } from "@/components/marketplace/marketplace-sale-countdown";
+import { ProductCardDeliveryContext } from "@/components/marketplace/product-card-delivery-context";
 import {
   Dialog,
   DialogClose,
@@ -32,6 +34,11 @@ import {
 } from "@/src/modules/analytics/google";
 import type { MarketplaceProductCard as MarketplaceProductCardData } from "@/src/modules/marketplace/catalog";
 import { getSoldQuantityLabel } from "@/src/modules/marketplace/product-variant-presentation";
+import { getMarketplaceStockStatusLabel } from "@/src/modules/marketplace/stock-status";
+import {
+  getReadableSaleCampaignForeground,
+  normalizeSaleCampaignColor,
+} from "@/src/modules/sales/campaign-presentation";
 
 type ProductCardQuickLookProps = {
   className?: string;
@@ -54,6 +61,10 @@ export function ProductCardQuickLook({
     product.averageRating && product.reviewCount > 0
       ? `${formatQuickLookRating(product.averageRating)} (${product.reviewCount})`
       : null;
+  const saleBadgeColor = normalizeSaleCampaignColor(product.saleBadge?.color);
+  const saleBadgeForeground = getReadableSaleCampaignForeground(saleBadgeColor);
+  const saleDiscountLabel = getQuickLookSaleDiscountLabel(product);
+  const lowStockLabel = getQuickLookLowStockLabel(product.lowStockQuantity);
 
   useEffect(
     () => () => {
@@ -237,13 +248,67 @@ export function ProductCardQuickLook({
               </header>
 
               <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:none] dark:[color-scheme:dark] md:px-5 [&::-webkit-scrollbar]:hidden">
+                {product.isOnSale ? (
+                  <div
+                    className="mb-3 inline-flex max-w-full items-start gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-black uppercase leading-tight shadow-sm"
+                    style={{
+                      backgroundColor: saleBadgeColor,
+                      color: saleBadgeForeground,
+                    }}
+                  >
+                    <MarketplaceCampaignIcon
+                      className="mt-px size-3.5 shrink-0"
+                      name={product.saleBadge?.iconName}
+                    />
+                    <span className="min-w-0">
+                      <span className="block break-words">
+                        {product.saleBadgeText ?? "Sale"}
+                      </span>
+                      {saleDiscountLabel ? (
+                        <span className="mt-0.5 block text-[9px]">
+                          {saleDiscountLabel}
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
+                ) : null}
+
                 <ProductQuickLookPrice product={product} />
 
-                <div className="mt-4 flex min-w-0 flex-wrap gap-2 text-[11px] font-black uppercase leading-none">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-600 px-2.5 py-1.5 text-emerald-700 dark:border-emerald-300 dark:text-emerald-300">
-                    <TruckIcon className="size-3.5" />
-                    Delivery details before payment
-                  </span>
+                {product.saleBadge?.endsAt ? (
+                  <MarketplaceSaleCountdown
+                    className="mt-3"
+                    endsAt={product.saleBadge.endsAt}
+                    label={product.saleBadge.text}
+                    variant="prominent"
+                  />
+                ) : null}
+
+                <div className="mt-4 grid gap-2.5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] font-black uppercase leading-none">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-[3px] px-1.5 py-1",
+                        getQuickLookStockBadgeClassName(product.stockStatus),
+                      )}
+                    >
+                      {getMarketplaceStockStatusLabel(product.stockStatus)}
+                    </span>
+                    {lowStockLabel ? (
+                      <span className="inline-flex items-center rounded-[3px] bg-[#fff0e9] px-1.5 py-1 font-semibold text-[#d94514] dark:bg-[#ff5a1f]/10 dark:text-[#ffb19a]">
+                        {lowStockLabel}
+                      </span>
+                    ) : null}
+                    {product.variantCount > 1 ? (
+                      <span className="rounded-[3px] bg-[#f7f7f2] px-1.5 py-1 text-[#6a6a63] dark:bg-white/10 dark:text-zinc-300">
+                        {product.variantCount} options
+                      </span>
+                    ) : null}
+                  </div>
+                  <ProductCardDeliveryContext
+                    className="text-xs leading-4"
+                    estimateLabel={product.deliveryEstimateLabel}
+                  />
                 </div>
 
                 {product.shortDescription ? (
@@ -361,14 +426,41 @@ function ProductQuickLookPrice({
             {product.compareAtPriceLabel}
           </span>
         ) : null}
-        {product.discountLabel ? (
-          <span className="rounded-sm bg-[#ff5a1f] px-1.5 py-0.5 text-[10px] font-black uppercase leading-none text-white">
-            {product.discountLabel}
-          </span>
-        ) : null}
       </div>
     </div>
   );
+}
+
+function getQuickLookStockBadgeClassName(
+  status: MarketplaceProductCardData["stockStatus"],
+) {
+  if (status === "low_stock") {
+    return "bg-[#ffb000] text-[#080808]";
+  }
+
+  if (status === "in_stock") {
+    return "bg-[#ff5a1f] text-white";
+  }
+
+  return "bg-[#1a1a1a] text-white dark:bg-[#f7f7f2] dark:text-[#080808]";
+}
+
+function getQuickLookLowStockLabel(quantity: number | null) {
+  if (!quantity) {
+    return null;
+  }
+
+  return quantity === 1 ? "Only 1 left" : `Only ${quantity} left`;
+}
+
+function getQuickLookSaleDiscountLabel(product: MarketplaceProductCardData) {
+  const campaignDiscount = Number(product.saleBadge?.discountPercent);
+
+  if (Number.isFinite(campaignDiscount) && campaignDiscount > 0) {
+    return `${campaignDiscount}% off`;
+  }
+
+  return product.discountLabel;
 }
 
 function formatQuickLookRating(value: number) {
