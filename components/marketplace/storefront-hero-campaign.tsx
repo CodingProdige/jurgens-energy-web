@@ -160,9 +160,28 @@ export function StorefrontHeroCampaign({ settings }: { settings: HeroSettings })
 
 function SplitHeroSlide({ slide }: { slide: HeroSlide }) {
   return (
-    <div className="grid min-h-[inherit] min-w-0 max-w-full gap-5 px-4 py-5 sm:gap-8 sm:px-10 sm:py-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-16 lg:py-12">
-      <HeroCopy className="relative z-10 min-w-0 max-w-[650px]" slide={slide} slideIndex={0} />
-      <div className="relative z-0 aspect-[1672/941] min-w-0 max-w-full overflow-hidden lg:overflow-visible">
+    <div className="relative grid min-h-[inherit] min-w-0 max-w-full gap-5 px-4 py-5 sm:gap-8 sm:px-10 sm:py-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-16 lg:py-12">
+      {slide.href ? (
+        <HeroLink
+          ariaLabel={slide.heading || "Open campaign"}
+          className="absolute inset-0 z-0"
+          href={slide.href}
+        />
+      ) : null}
+      <HeroCopy
+        className={cn(
+          "relative z-10 min-w-0 max-w-[650px]",
+          slide.href && "pointer-events-none",
+        )}
+        slide={slide}
+        slideIndex={0}
+      />
+      <div
+        className={cn(
+          "relative z-10 aspect-[1672/941] min-w-0 max-w-full overflow-hidden lg:overflow-visible",
+          slide.href && "pointer-events-none",
+        )}
+      >
         <HeroImage
           alt={slide.imageAlt}
           fit="contain"
@@ -180,7 +199,6 @@ function BannerHeroSlides({ activeIndex, settings }: { activeIndex: number; sett
     <div className="relative min-h-[inherit]">
       {settings.slides.map((slide, index) => {
         const isActive = index === activeIndex;
-        const hasActions = slide.actions.length > 0;
         const contentPosition =
           slide.contentPosition === "center"
             ? "items-center text-center"
@@ -199,8 +217,12 @@ function BannerHeroSlides({ activeIndex, settings }: { activeIndex: number; sett
             key={`${slide.desktopImageUrl}-${index}`}
             role="group"
           >
-            {!hasActions && slide.href ? (
-              <HeroLink ariaLabel={slide.heading || `Open campaign ${index + 1}`} className="absolute inset-0 z-0" href={slide.href} />
+            {slide.href ? (
+              <HeroLink
+                ariaLabel={slide.heading || `Open campaign ${index + 1}`}
+                className="absolute inset-0 z-10"
+                href={slide.href}
+              />
             ) : null}
             <HeroImage
               alt={isActive ? slide.imageAlt : ""}
@@ -211,7 +233,13 @@ function BannerHeroSlides({ activeIndex, settings }: { activeIndex: number; sett
               mobileSrc={slide.mobileImageUrl}
             />
             <div className={cn("absolute inset-0", overlayClass(slide.overlay))} />
-            <div className={cn("relative z-10 flex min-h-[inherit] px-5 py-10 sm:px-12 sm:py-14 lg:px-16", contentPosition)}>
+            <div
+              className={cn(
+                "relative z-20 flex min-h-[inherit] px-5 py-10 sm:px-12 sm:py-14 lg:px-16",
+                slide.href && "pointer-events-none",
+                contentPosition,
+              )}
+            >
               <HeroCopy
                 className={cn(
                   "w-full max-w-[650px] text-white",
@@ -271,7 +299,7 @@ function HeroImage({ alt, className, fit, mobileSrc, priority = false, src }: { 
 
 function HeroActionList({ actions, className }: { actions: StorefrontButtonAction[]; className?: string }) {
   return (
-    <div className={cn("flex flex-wrap gap-3 sm:gap-4", className)}>
+    <div className={cn("pointer-events-auto flex flex-wrap gap-3 sm:gap-4", className)}>
       {actions.map((action, index) => (
         <HeroLink
           className={cn(

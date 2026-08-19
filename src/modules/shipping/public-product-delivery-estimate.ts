@@ -11,15 +11,23 @@ import {
   getCourierGuyIntegrationConfig,
   getMarketplaceSettings,
 } from "@/src/modules/marketplace/settings";
+import { getPublicDeliveryTiming } from "@/src/modules/marketplace/public-delivery-copy";
 import {
   createCourierGuyClient,
   type CourierGuyRate,
 } from "@/src/modules/shipping/courier-guy-client";
 import { selectCourierGuyRate } from "@/src/modules/shipping/courier-guy-booking-quote-rules";
-import { calculateCustomerShippingPrice } from "@/src/modules/shipping/customer-shipping-policy";
 import { checkJurgensDeliveryAvailability } from "@/src/modules/shipping/jurgens-delivery";
 
 const estimateCacheLifetimeSeconds = 10 * 60;
+const courierGuyEstimateProbeParcel = {
+  description: "Delivery time estimate",
+  heightMm: 200,
+  itemCount: 1,
+  lengthMm: 300,
+  weightGrams: 1_000,
+  widthMm: 300,
+} as const;
 
 const zarCurrencyContext: CurrencyContext = {
   country: "ZA",
@@ -36,11 +44,15 @@ export const publicProductDeliveryEstimateInputSchema = z.object({
 
 export const publicProductDeliveryEstimateResultSchema = z.object({
   available: z.boolean(),
-  deliveryFeeLabel: z.string(),
   estimatedDeliveryFrom: z.string().nullable(),
   estimatedDeliveryTo: z.string().nullable(),
   message: z.string(),
-  provider: z.enum(["courier_guy", "jurgens_local", "unknown"]),
+  provider: z.enum([
+    "courier_guy",
+    "jurgens_local",
+    "standard_delivery",
+    "unknown",
+  ]),
 });
 
 export type PublicProductDeliveryEstimateInput = z.infer<
@@ -50,29 +62,21 @@ export type PublicProductDeliveryEstimateResult = z.infer<
   typeof publicProductDeliveryEstimateResultSchema
 >;
 
-function formatZar(amount: number) {
-  return new Intl.NumberFormat("en-ZA", {
-    currency: "ZAR",
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-    style: "currency",
-  }).format(amount);
-}
+function getCacheKey(
+  input: PublicProductDeliveryEstimateInput,
+  cacheVersion: Record<string, unknown>,
+) {
+  const normalized = {
+    cacheVersion,
+    deliveryAddress: toCourierGuyAddress(input.deliveryAddress),
+    variantId: input.variantId,
+  };
+  const fingerprint = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(normalized))
+    .digest("hex");
 
-function getDeliveryFeeLabel({
-  amount,
-  freeOverAmount,
-}: {
-  amount: number;
-  freeOverAmount: number | null;
-}) {
-  if (amount === 0) {
-    return "Free delivery";
-  }
-
-  return freeOverAmount
-    ? `${formatZar(amount)} delivery · Free over ${formatZar(freeOverAmount)}`
-    : `${formatZar(amount)} delivery`;
+  return `public-product-delivery-estimate:${fingerprint}`;
 }
 
 function toCourierGuyAddress(
@@ -91,23 +95,6 @@ function toCourierGuyAddress(
       .join(", "),
     zone: address.province.trim(),
   };
-}
-
-function getCacheKey(
-  input: PublicProductDeliveryEstimateInput,
-  cacheVersion: Record<string, unknown>,
-) {
-  const normalized = {
-    cacheVersion,
-    deliveryAddress: toCourierGuyAddress(input.deliveryAddress),
-    variantId: input.variantId,
-  };
-  const fingerprint = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(normalized))
-    .digest("hex");
-
-  return `public-product-delivery-estimate:${fingerprint}`;
 }
 
 async function readCachedEstimate(cacheKey: string) {
@@ -145,12 +132,10 @@ async function cacheEstimate(
 }
 
 function unavailableEstimate(
-  deliveryFeeLabel: string,
   message: string,
 ): PublicProductDeliveryEstimateResult {
   return {
     available: false,
-    deliveryFeeLabel,
     estimatedDeliveryFrom: null,
     estimatedDeliveryTo: null,
     message,
@@ -165,7 +150,7 @@ function selectedCourierRate(
   return selectCourierGuyRate(rates, defaultServiceCode);
 }
 
-function getEarliestCourierCollectionDate(cutoffTime: string, now = new Date()) {
+function getEarliestDispatchDate(cutoffTime: string, now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     day: "2-digit",
     hour: "2-digit",
@@ -199,6 +184,48 @@ function getEarliestCourierCollectionDate(cutoffTime: string, now = new Date()) 
   return currentDate.toISOString().slice(0, 10);
 }
 
+function addBusinessDays(startDate: string, businessDays: number) {
+  const date = new Date(`${startDate}T12:00:00Z`);
+  let remainingDays = businessDays;
+
+  while (remainingDays > 0) {
+    date.setUTCDate(date.getUTCDate() + 1);
+
+    if (date.getUTCDay() !== 0 && date.getUTCDay() !== 6) {
+      remainingDays -= 1;
+    }
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getDeliveryWindow(settings: Awaited<ReturnType<typeof getMarketplaceSettings>>) {
+  const timing = getPublicDeliveryTiming(settings);
+  const dispatchDate = getEarliestDispatchDate(settings.jurgensDeliveryCutoffTime);
+
+  return {
+    estimatedDeliveryFrom: addBusinessDays(
+      dispatchDate,
+      timing.totalMinBusinessDays,
+    ),
+    estimatedDeliveryTo: addBusinessDays(
+      dispatchDate,
+      timing.totalMaxBusinessDays,
+    ),
+  };
+}
+
+function getCourierCollectionDate(
+  settings: Awaited<ReturnType<typeof getMarketplaceSettings>>,
+) {
+  const timing = getPublicDeliveryTiming(settings);
+
+  return addBusinessDays(
+    getEarliestDispatchDate(settings.jurgensDeliveryCutoffTime),
+    timing.handlingMaxBusinessDays,
+  );
+}
+
 export async function getPublicProductDeliveryEstimate(
   input: PublicProductDeliveryEstimateInput,
 ): Promise<PublicProductDeliveryEstimateResult> {
@@ -221,23 +248,16 @@ export async function getPublicProductDeliveryEstimate(
     getCourierGuyIntegrationConfig(),
   ]);
   const item = cart.items[0];
-  const deliveryPrice = calculateCustomerShippingPrice({
-    flatRate: settings.shippingFlatRate,
-    freeOverAmount: settings.shippingFreeOverAmount,
-    orderSubtotal: item?.unitPriceZar ?? 0,
-  });
-  const deliveryFeeLabel = getDeliveryFeeLabel(deliveryPrice);
+  const deliveryWindow = getDeliveryWindow(settings);
 
   if (!settings.shippingEnabled) {
     return unavailableEstimate(
-      deliveryFeeLabel,
       "Online delivery is temporarily unavailable.",
     );
   }
 
   if (!item?.available) {
     return unavailableEstimate(
-      deliveryFeeLabel,
       "This option is no longer available for delivery.",
     );
   }
@@ -249,15 +269,12 @@ export async function getPublicProductDeliveryEstimate(
     const result: PublicProductDeliveryEstimateResult = localDelivery.eligible
       ? {
           available: true,
-          deliveryFeeLabel,
-          estimatedDeliveryFrom: null,
-          estimatedDeliveryTo: null,
+          ...deliveryWindow,
           message:
-            "Delivery is available to this address. Choose your delivery date at checkout.",
+            "Estimated delivery to your selected address.",
           provider: "jurgens_local",
         }
       : unavailableEstimate(
-          deliveryFeeLabel,
           localDelivery.unavailableReason ??
             "Delivery is not available to this address.",
         );
@@ -265,22 +282,7 @@ export async function getPublicProductDeliveryEstimate(
     return result;
   }
 
-  if (
-    !courierConfig.isConfigured ||
-    !courierConfig.enabled ||
-    courierConfig.mode !== "live" ||
-    !courierConfig.apiKey ||
-    !courierConfig.dropoffPickupPointId
-  ) {
-    return unavailableEstimate(
-      deliveryFeeLabel,
-      "Courier delivery estimates are temporarily unavailable. Delivery is confirmed at checkout.",
-    );
-  }
-
-  const collectionMinDate = getEarliestCourierCollectionDate(
-    settings.jurgensDeliveryCutoffTime,
-  );
+  const collectionMinDate = getCourierCollectionDate(settings);
   const cacheKey = getCacheKey(parsed, {
     courier: {
       defaultServiceCode: courierConfig.defaultServiceCode,
@@ -292,18 +294,15 @@ export async function getPublicProductDeliveryEstimate(
     product: {
       available: item.available,
       fulfillmentMode: item.fulfillmentMode,
-      heightMm: item.heightMm,
-      lengthMm: item.lengthMm,
-      price: item.unitPriceZar,
-      weightGrams: item.weightGrams,
-      widthMm: item.widthMm,
     },
     shipping: {
       cutoffTime: settings.jurgensDeliveryCutoffTime,
       collectionMinDate,
       enabled: settings.shippingEnabled,
-      flatRate: settings.shippingFlatRate,
-      freeOverAmount: settings.shippingFreeOverAmount,
+      handlingMaximum: settings.shippingHandlingMaxBusinessDays,
+      handlingMinimum: settings.shippingHandlingMinBusinessDays,
+      transitMaximum: settings.shippingTransitMaxBusinessDays,
+      transitMinimum: settings.shippingTransitMinBusinessDays,
     },
   });
   const cached = await readCachedEstimate(cacheKey);
@@ -313,70 +312,61 @@ export async function getPublicProductDeliveryEstimate(
   }
 
   if (
-    !item.heightMm ||
-    !item.lengthMm ||
-    !item.weightGrams ||
-    !item.widthMm
+    courierConfig.isConfigured &&
+    courierConfig.enabled &&
+    courierConfig.mode === "live" &&
+    courierConfig.apiKey &&
+    courierConfig.dropoffPickupPointId
   ) {
-    return unavailableEstimate(
-      deliveryFeeLabel,
-      "This item needs a delivery check. Please contact support for help.",
-    );
-  }
-
-  try {
-    const client = createCourierGuyClient({
-      apiBaseUrl: courierConfig.apiBaseUrl,
-      apiKey: courierConfig.apiKey,
-      timeoutMs: 5_000,
-    });
-    const rateResponse = await client.getRates({
-      collectionMinDate,
-      collectionOrigin: {
-        kind: "pickup_point",
-        pickupPointId: courierConfig.dropoffPickupPointId,
-        provider: courierConfig.dropoffProvider,
-      },
-      deliveryAddress: toCourierGuyAddress(parsed.deliveryAddress),
-      parcels: [
-        {
-          description: `${item.productTitle} - ${item.variantTitle}`.slice(0, 255),
-          heightMm: item.heightMm,
-          itemCount: 1,
-          lengthMm: item.lengthMm,
-          weightGrams: item.weightGrams,
-          widthMm: item.widthMm,
+    try {
+      const client = createCourierGuyClient({
+        apiBaseUrl: courierConfig.apiBaseUrl,
+        apiKey: courierConfig.apiKey,
+        timeoutMs: 5_000,
+      });
+      const rateResponse = await client.getRates({
+        collectionMinDate,
+        collectionOrigin: {
+          kind: "pickup_point",
+          pickupPointId: courierConfig.dropoffPickupPointId,
+          provider: courierConfig.dropoffProvider,
         },
-      ],
-    });
-    const rate = selectedCourierRate(
-      rateResponse.rates,
-      courierConfig.defaultServiceCode,
-    );
+        deliveryAddress: toCourierGuyAddress(parsed.deliveryAddress),
+        // Courier Guy requires a parcel to calculate its ETA. This fixed probe
+        // is used only for the public delivery-time lookup—never for pricing,
+        // checkout validation, shipment booking, or product parcel data.
+        parcels: [courierGuyEstimateProbeParcel],
+      });
+      const rate = selectedCourierRate(
+        rateResponse.rates,
+        courierConfig.defaultServiceCode,
+      );
 
-    const result: PublicProductDeliveryEstimateResult = rate
-      ? {
+      if (rate?.estimatedDeliveryFrom || rate?.estimatedDeliveryTo) {
+        const result: PublicProductDeliveryEstimateResult = {
           available: true,
-          deliveryFeeLabel,
           estimatedDeliveryFrom: rate.estimatedDeliveryFrom,
           estimatedDeliveryTo: rate.estimatedDeliveryTo,
-          message:
-            rate.estimatedDeliveryFrom || rate.estimatedDeliveryTo
-              ? "Courier Guy estimated delivery window."
-              : "Courier delivery is available to this address. Your delivery timing is confirmed at checkout.",
+          message: "Courier Guy estimated delivery to your selected address.",
           provider: "courier_guy",
-        }
-      : unavailableEstimate(
-          deliveryFeeLabel,
-          "This item cannot be delivered to the selected address.",
-        );
+        };
 
-    await cacheEstimate(cacheKey, result);
-    return result;
-  } catch {
-    return unavailableEstimate(
-      deliveryFeeLabel,
-      "We could not confirm a Courier Guy estimate right now. Please try again or continue to checkout.",
-    );
+        await cacheEstimate(cacheKey, result);
+        return result;
+      }
+    } catch {
+      // The public fallback below keeps a delivery time visible when the
+      // carrier's live ETA lookup is temporarily unavailable.
+    }
   }
+
+  const result: PublicProductDeliveryEstimateResult = {
+    available: true,
+    ...deliveryWindow,
+    message: "Typical delivery window. Courier Guy's live estimate is temporarily unavailable.",
+    provider: "standard_delivery",
+  };
+
+  await cacheEstimate(cacheKey, result);
+  return result;
 }

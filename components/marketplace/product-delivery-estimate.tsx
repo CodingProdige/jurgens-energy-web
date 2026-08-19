@@ -16,11 +16,10 @@ type DeliveryAddress = MarketplaceDeliveryAddress;
 
 type DeliveryEstimate = {
   available: boolean;
-  deliveryFeeLabel: string;
   estimatedDeliveryFrom: string | null;
   estimatedDeliveryTo: string | null;
   message: string;
-  provider: "courier_guy" | "jurgens_local" | "unknown";
+  provider: "courier_guy" | "jurgens_local" | "standard_delivery" | "unknown";
 };
 
 type DeliveryEstimateResponse = DeliveryEstimate | { message?: string };
@@ -29,8 +28,6 @@ function isDeliveryEstimate(value: DeliveryEstimateResponse): value is DeliveryE
   return (
     "available" in value &&
     typeof value.available === "boolean" &&
-    "deliveryFeeLabel" in value &&
-    typeof value.deliveryFeeLabel === "string" &&
     "message" in value &&
     typeof value.message === "string"
   );
@@ -86,11 +83,11 @@ function getEstimateHeadline(estimate: DeliveryEstimate) {
 
 export function ProductDeliveryEstimate({
   className,
-  deliveryFeeDescription,
+  deliveryTimingDescription,
   variantId,
 }: {
   className?: string;
-  deliveryFeeDescription: string;
+  deliveryTimingDescription: string;
   variantId: string | null;
 }) {
   const inputId = useId();
@@ -191,7 +188,7 @@ export function ProductDeliveryEstimate({
               Check delivery to your area
             </h2>
             <p className="mt-0.5 text-[11px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
-              {deliveryFeeDescription}
+              {deliveryTimingDescription}
             </p>
           </div>
         </div>
@@ -242,7 +239,7 @@ export function ProductDeliveryEstimate({
           <p className="text-[10px] leading-4 text-[#777770] dark:text-[#aaa9a1]">
             {isUsingSavedAddress
               ? "Using the address saved on this device. Change or clear it from the delivery button in the header."
-              : "Your address is used only to calculate this estimate and is not saved here."}
+              : "Your address is used to confirm the delivery window and is not saved here."}
           </p>
 
           {error ? (
@@ -271,11 +268,11 @@ export function ProductDeliveryEstimate({
                 {getEstimateHeadline(estimate)}
               </p>
               <p className="mt-0.5 text-[10px] leading-4 text-[#666660] dark:text-[#c8c8c0]">
-                {estimate.deliveryFeeLabel} · {estimate.message}
+                {estimate.message}
               </p>
               {estimate.available && estimate.provider === "courier_guy" ? (
                 <p className="mt-1 text-[10px] leading-4 text-[#777770] dark:text-[#aaa9a1]">
-                  This is a Courier Guy estimate, not a guaranteed delivery appointment.
+                  Courier Guy delivery timing is an estimate, not a guaranteed appointment.
                 </p>
               ) : null}
             </div>

@@ -847,7 +847,7 @@ function CategoryCard({
         />
       </div>
       <div className="grid gap-1 px-2 pb-2 pt-2 sm:px-3 sm:pb-3">
-        <h3 className="line-clamp-2 text-[13px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2] sm:text-[15px]">
+        <h3 className="truncate text-[13px] font-black leading-tight text-[#080808] dark:text-[#f7f7f2] sm:text-[15px]">
           {category.name}
         </h3>
         <p className="line-clamp-1 text-[10px] font-bold uppercase text-[#7a7a73] dark:text-[#b8b8ae] sm:text-[11px]">

@@ -1237,7 +1237,7 @@ function HeroSettings({
               title="Slide actions"
             />
             <LinkDestinationField onChange={(href) => updateSlide(index, { ...slide, href })} value={slide.href} />
-            <p className="-mt-2 text-xs text-slate-500 dark:text-zinc-400">Optional whole-banner link. It applies when this slide has no buttons.</p>
+            <p className="-mt-2 text-xs text-slate-500 dark:text-zinc-400">Optional whole-banner link. It covers the slide artwork; any CTA buttons remain individually clickable.</p>
             <MediaImageField
               altValue={slide.imageAlt}
               imageUrl={slide.desktopImageUrl}

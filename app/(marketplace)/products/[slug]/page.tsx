@@ -24,7 +24,7 @@ import {
   createMarketplaceDynamicPageMetadata,
 } from "@/src/modules/marketplace/dynamic-page-metadata";
 import {
-  getPublicDeliveryFeeDescription,
+  getPublicDeliveryTimingDescription,
   getPublicProductDeliveryCopy,
 } from "@/src/modules/marketplace/public-delivery-copy";
 import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
@@ -180,7 +180,7 @@ export default async function ProductPage({
           catalogProducts={catalog.products}
           currencyContext={currencyContext}
           deliveryCopy={deliveryCopy}
-          deliveryFeeDescription={getPublicDeliveryFeeDescription(settings)}
+          deliveryTimingDescription={getPublicDeliveryTimingDescription(settings)}
           initialVariantId={initialVariantId}
           jurgensDeliveryCutoffTime={settings.jurgensDeliveryCutoffTime}
           priceTaxDisclosure={getPriceTaxDisclosure(businessIdentity)}

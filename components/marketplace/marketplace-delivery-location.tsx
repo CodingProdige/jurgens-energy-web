@@ -188,7 +188,7 @@ export function MarketplaceDeliveryLocationControl({
                 Remember this address on this device
               </span>
               <span className="mt-0.5 block text-[11px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
-                This lets product pages prefill a more accurate Courier Guy estimate. Without it, we only save your area.
+                This lets product pages prefill a delivery-window estimate. Without it, we only save your area.
               </span>
             </span>
           </label>

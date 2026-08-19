@@ -90,7 +90,7 @@ type ProductDetailExperienceProps = {
     detail: string;
     label: string;
   };
-  deliveryFeeDescription: string;
+  deliveryTimingDescription: string;
   initialVariantId?: string;
   jurgensDeliveryCutoffTime: string;
   priceTaxDisclosure?: string;
@@ -194,7 +194,7 @@ export function ProductDetailExperience({
   catalogProducts,
   currencyContext,
   deliveryCopy,
-  deliveryFeeDescription,
+  deliveryTimingDescription,
   initialVariantId,
   priceTaxDisclosure = "Final price",
   product,
@@ -406,7 +406,7 @@ export function ProductDetailExperience({
           deliveryAvailable={deliveryAvailable}
           deliveryBenefit={deliveryBenefit}
           deliveryDetail={deliveryDetail}
-          deliveryFeeDescription={deliveryFeeDescription}
+          deliveryTimingDescription={deliveryTimingDescription}
           priceTaxDisclosure={priceTaxDisclosure}
           product={product}
           quantity={quantity}
@@ -1521,7 +1521,7 @@ function ProductBuyBox({
   deliveryAvailable,
   deliveryBenefit,
   deliveryDetail,
-  deliveryFeeDescription,
+  deliveryTimingDescription,
   priceTaxDisclosure,
   product,
   quantity,
@@ -1536,7 +1536,7 @@ function ProductBuyBox({
   deliveryAvailable: boolean;
   deliveryBenefit: string;
   deliveryDetail: string;
-  deliveryFeeDescription: string;
+  deliveryTimingDescription: string;
   priceTaxDisclosure: string;
   product: MarketplaceProductDetailView;
   quantity: number;
@@ -1663,7 +1663,7 @@ function ProductBuyBox({
         deliveryAvailable={deliveryAvailable}
         deliveryBenefit={deliveryBenefit}
         deliveryDetail={deliveryDetail}
-        deliveryFeeDescription={deliveryFeeDescription}
+        deliveryTimingDescription={deliveryTimingDescription}
         onOpenOptions={() => setIsOptionsDialogOpen(true)}
         onSelectVariant={setSelectedVariantId}
         product={product}
@@ -1795,7 +1795,7 @@ function ProductBuyBox({
       </div>
 
       <ProductDeliveryEstimate
-        deliveryFeeDescription={deliveryFeeDescription}
+        deliveryTimingDescription={deliveryTimingDescription}
         variantId={selectedVariant?.id ?? null}
       />
 
@@ -1909,7 +1909,7 @@ function MobileProductPurchaseSummary({
   deliveryAvailable,
   deliveryBenefit,
   deliveryDetail,
-  deliveryFeeDescription,
+  deliveryTimingDescription,
   onOpenOptions,
   onSelectVariant,
   product,
@@ -1928,7 +1928,7 @@ function MobileProductPurchaseSummary({
   deliveryAvailable: boolean;
   deliveryBenefit: string;
   deliveryDetail: string;
-  deliveryFeeDescription: string;
+  deliveryTimingDescription: string;
   onOpenOptions: () => void;
   onSelectVariant: (variantId: string) => void;
   product: MarketplaceProductDetailView;
@@ -2000,7 +2000,7 @@ function MobileProductPurchaseSummary({
         <ProductPolicyLinks />
 
         <ProductDeliveryEstimate
-          deliveryFeeDescription={deliveryFeeDescription}
+          deliveryTimingDescription={deliveryTimingDescription}
           variantId={selectedVariant?.id ?? null}
         />
       </section>
