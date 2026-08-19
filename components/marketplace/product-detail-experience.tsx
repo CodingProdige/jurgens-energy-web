@@ -575,7 +575,7 @@ function ProductGallery({
     <div
       className={cn(
         "grid min-w-0 gap-3 lg:sticky lg:top-36 lg:self-start lg:items-start",
-        hasMultipleMedia && "lg:grid-cols-[5.75rem_minmax(0,1fr)]",
+        hasMultipleMedia && "lg:relative lg:block lg:pl-[6.5rem]",
       )}
     >
       {hasMultipleMedia ? (
@@ -807,7 +807,7 @@ function ProductMediaThumbnailRail({
   }
 
   return (
-    <div className="hidden min-w-0 lg:grid lg:content-start lg:gap-2">
+    <div className="hidden min-w-0 lg:absolute lg:inset-y-0 lg:left-0 lg:grid lg:w-[5.75rem] lg:grid-rows-[auto_minmax(0,1fr)_auto_auto] lg:gap-2">
       <button
         aria-label="Scroll product media thumbnails upward"
         className="grid h-7 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-white/[0.06] dark:text-[#f7f7f2]"
@@ -820,7 +820,7 @@ function ProductMediaThumbnailRail({
 
       <div
         aria-label="Product media thumbnails"
-        className="flex max-h-[min(42rem,calc(100vh-13rem))] flex-col gap-2 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex min-h-0 flex-col gap-2 overflow-y-auto overscroll-y-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onScroll={updateScrollState}
         ref={railRef}
         role="group"

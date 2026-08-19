@@ -43,6 +43,10 @@ export const publicProductDeliveryEstimateInputSchema = z.object({
   variantId: z.string().uuid(),
 });
 
+export const publicDeliveryWindowInputSchema = z.object({
+  deliveryAddress: checkoutDeliveryAddressSchema,
+});
+
 export const publicProductDeliveryEstimateResultSchema = z.object({
   available: z.boolean(),
   estimatedDeliveryFrom: z.string().nullable(),
@@ -59,18 +63,20 @@ export const publicProductDeliveryEstimateResultSchema = z.object({
 export type PublicProductDeliveryEstimateInput = z.infer<
   typeof publicProductDeliveryEstimateInputSchema
 >;
+export type PublicDeliveryWindowInput = z.infer<
+  typeof publicDeliveryWindowInputSchema
+>;
 export type PublicProductDeliveryEstimateResult = z.infer<
   typeof publicProductDeliveryEstimateResultSchema
 >;
 
 function getCacheKey(
-  input: PublicProductDeliveryEstimateInput,
+  deliveryAddress: z.infer<typeof checkoutDeliveryAddressSchema>,
   cacheVersion: Record<string, unknown>,
 ) {
   const normalized = {
     cacheVersion,
-    deliveryAddress: toCourierGuyAddress(input.deliveryAddress),
-    variantId: input.variantId,
+    deliveryAddress: toCourierGuyAddress(deliveryAddress),
   };
   const fingerprint = crypto
     .createHash("sha256")
@@ -227,75 +233,25 @@ function getCourierCollectionDate(
   );
 }
 
-export async function getPublicProductDeliveryEstimate(
-  input: PublicProductDeliveryEstimateInput,
-): Promise<PublicProductDeliveryEstimateResult> {
-  const parsed = publicProductDeliveryEstimateInputSchema.parse(input);
-  const [cart, settings, courierConfig] = await Promise.all([
-    validateCartLines(
-      {
-        items: [
-          {
-            exchangeEmptyConfirmed: false,
-            purchaseType: "standard",
-            quantity: 1,
-            variantId: parsed.variantId,
-          },
-        ],
-      },
-      zarCurrencyContext,
-    ),
-    getMarketplaceSettings(),
-    getCourierGuyIntegrationConfig(),
-  ]);
-  const item = cart.items[0];
+async function getCourierGuyDeliveryWindow({
+  courierConfig,
+  deliveryAddress,
+  settings,
+}: {
+  courierConfig: Awaited<ReturnType<typeof getCourierGuyIntegrationConfig>>;
+  deliveryAddress: z.infer<typeof checkoutDeliveryAddressSchema>;
+  settings: Awaited<ReturnType<typeof getMarketplaceSettings>>;
+}): Promise<PublicProductDeliveryEstimateResult> {
   const deliveryWindow = getDeliveryWindow(settings);
-
-  if (!settings.shippingEnabled) {
-    return unavailableEstimate(
-      "Online delivery is temporarily unavailable.",
-    );
-  }
-
-  if (!item?.available) {
-    return unavailableEstimate(
-      "This option is no longer available for delivery.",
-    );
-  }
-
-  if (item.fulfillmentMode === "jurgens_fulfilled") {
-    const localDelivery = await checkJurgensDeliveryAvailability({
-      postalCode: parsed.deliveryAddress.postalCode,
-    });
-    const result: PublicProductDeliveryEstimateResult = localDelivery.eligible
-      ? {
-          available: true,
-          ...deliveryWindow,
-          message:
-            "Estimated delivery to your selected address.",
-          provider: "jurgens_local",
-        }
-      : unavailableEstimate(
-          localDelivery.unavailableReason ??
-            "Delivery is not available to this address.",
-        );
-
-    return result;
-  }
-
   const collectionMinDate = getCourierCollectionDate(settings);
-  const cacheKey = getCacheKey(parsed, {
-    estimateStrategy: "courier_guy_eta_probe_v2",
+  const cacheKey = getCacheKey(deliveryAddress, {
+    estimateStrategy: "courier_guy_address_delivery_window_v1",
     courier: {
       defaultServiceCode: courierConfig.defaultServiceCode,
       dropoffPickupPointId: courierConfig.dropoffPickupPointId,
       dropoffProvider: courierConfig.dropoffProvider,
       enabled: courierConfig.enabled,
       mode: courierConfig.mode,
-    },
-    product: {
-      available: item.available,
-      fulfillmentMode: item.fulfillmentMode,
     },
     shipping: {
       cutoffTime: settings.jurgensDeliveryCutoffTime,
@@ -333,7 +289,7 @@ export async function getPublicProductDeliveryEstimate(
           pickupPointId: courierConfig.dropoffPickupPointId,
           provider: courierConfig.dropoffProvider,
         },
-        deliveryAddress: toCourierGuyAddress(parsed.deliveryAddress),
+        deliveryAddress: toCourierGuyAddress(deliveryAddress),
         // Courier Guy requires a parcel to calculate its ETA. This fixed probe
         // is used only for the public delivery-time lookup—never for pricing,
         // checkout validation, shipment booking, or product parcel data.
@@ -357,7 +313,7 @@ export async function getPublicProductDeliveryEstimate(
         return result;
       }
       console.warn("Courier Guy public ETA returned no dated service", {
-        addressPostalCode: parsed.deliveryAddress.postalCode,
+        addressPostalCode: deliveryAddress.postalCode,
         preferredServiceCode: courierConfig.defaultServiceCode,
         rateCount: rateResponse.rates.length,
         serviceCodes: rateResponse.rates.map((candidate) => candidate.serviceCode),
@@ -374,19 +330,99 @@ export async function getPublicProductDeliveryEstimate(
 
       console.error("Courier Guy public ETA lookup failed", {
         ...courierError,
-        addressPostalCode: parsed.deliveryAddress.postalCode,
+        addressPostalCode: deliveryAddress.postalCode,
       });
     }
   }
 
-  const result: PublicProductDeliveryEstimateResult = {
+  // Do not cache the fallback. The carrier can recover at any time, and a
+  // previous failed lookup must never suppress a fresh Courier Guy ETA.
+  return {
     available: true,
     ...deliveryWindow,
     message: "Typical delivery window. Courier Guy's live estimate is temporarily unavailable.",
     provider: "standard_delivery",
   };
+}
 
-  // Do not cache the fallback. The carrier can recover at any time, and a
-  // previous failed lookup must never suppress a fresh Courier Guy ETA.
-  return result;
+export async function getPublicDeliveryWindow(
+  input: PublicDeliveryWindowInput,
+): Promise<PublicProductDeliveryEstimateResult> {
+  const parsed = publicDeliveryWindowInputSchema.parse(input);
+  const [settings, courierConfig] = await Promise.all([
+    getMarketplaceSettings(),
+    getCourierGuyIntegrationConfig(),
+  ]);
+
+  if (!settings.shippingEnabled) {
+    return unavailableEstimate("Online delivery is temporarily unavailable.");
+  }
+
+  return getCourierGuyDeliveryWindow({
+    courierConfig,
+    deliveryAddress: parsed.deliveryAddress,
+    settings,
+  });
+}
+
+export async function getPublicProductDeliveryEstimate(
+  input: PublicProductDeliveryEstimateInput,
+): Promise<PublicProductDeliveryEstimateResult> {
+  const parsed = publicProductDeliveryEstimateInputSchema.parse(input);
+  const [cart, settings, courierConfig] = await Promise.all([
+    validateCartLines(
+      {
+        items: [
+          {
+            exchangeEmptyConfirmed: false,
+            purchaseType: "standard",
+            quantity: 1,
+            variantId: parsed.variantId,
+          },
+        ],
+      },
+      zarCurrencyContext,
+    ),
+    getMarketplaceSettings(),
+    getCourierGuyIntegrationConfig(),
+  ]);
+  const item = cart.items[0];
+  if (!settings.shippingEnabled) {
+    return unavailableEstimate(
+      "Online delivery is temporarily unavailable.",
+    );
+  }
+
+  if (!item?.available) {
+    return unavailableEstimate(
+      "This option is no longer available for delivery.",
+    );
+  }
+
+  if (item.fulfillmentMode === "jurgens_fulfilled") {
+    const deliveryWindow = getDeliveryWindow(settings);
+    const localDelivery = await checkJurgensDeliveryAvailability({
+      postalCode: parsed.deliveryAddress.postalCode,
+    });
+    const result: PublicProductDeliveryEstimateResult = localDelivery.eligible
+      ? {
+          available: true,
+          ...deliveryWindow,
+          message:
+            "Estimated delivery to your selected address.",
+          provider: "jurgens_local",
+        }
+      : unavailableEstimate(
+          localDelivery.unavailableReason ??
+            "Delivery is not available to this address.",
+        );
+
+    return result;
+  }
+
+  return getCourierGuyDeliveryWindow({
+    courierConfig,
+    deliveryAddress: parsed.deliveryAddress,
+    settings,
+  });
 }

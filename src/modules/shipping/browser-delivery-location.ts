@@ -56,6 +56,22 @@ export function formatMarketplaceDeliveryLocation(
   return [place, postalCode].filter(Boolean).join(", ");
 }
 
+export function getMarketplaceDeliveryAddressKey(
+  address: MarketplaceDeliveryAddress,
+) {
+  return [
+    address.addressLine1,
+    address.addressLine2,
+    address.city,
+    address.countryCode,
+    address.postalCode,
+    address.province,
+    address.suburb,
+  ]
+    .map((part) => part.trim().toLocaleLowerCase("en-ZA"))
+    .join("|");
+}
+
 export function getMarketplaceDeliveryLocation() {
   if (typeof window === "undefined") {
     return null;
