@@ -210,6 +210,26 @@ a {
   }
 }
 
+@keyframes marketplace-sale-card-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marketplace-sale-card-marquee-track {
+  animation: marketplace-sale-card-marquee 9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketplace-sale-card-marquee-track {
+    animation: none;
+  }
+}
+
 @keyframes marketplace-whatsapp-shimmer {
   0%,
   82% {

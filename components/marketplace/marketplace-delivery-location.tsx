@@ -221,7 +221,6 @@ export function MarketplaceDeliveryLocationControl({
               </Label>
               <GooglePlacesAddressAutocomplete
                 countryCode="ZA"
-                disabled={isResolvingAddress}
                 id={`marketplace-delivery-location-${inputId}`}
                 inputClassName={deliveryAddressFieldClass}
                 leadingIcon={<MapPinIcon className="size-4 text-[#ff5a1f]" />}

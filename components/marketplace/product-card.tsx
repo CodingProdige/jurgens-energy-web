@@ -183,14 +183,6 @@ export function MarketplaceProductCard({
             />
           </div>
 
-          {product.saleBadge?.endsAt ? (
-            <MarketplaceSaleCountdown
-              className="w-fit"
-              endsAt={product.saleBadge.endsAt}
-              label={product.saleBadge.text}
-            />
-          ) : null}
-
           <div className="flex min-w-0 flex-wrap items-center gap-0.5 sm:gap-1">
             <span
               className={cn(
@@ -216,6 +208,14 @@ export function MarketplaceProductCard({
           />
           <ProductCardPerformanceMarquee badge={performanceBadge} />
         </div>
+        {product.saleBadge?.endsAt ? (
+          <MarketplaceSaleCountdown
+            className="mt-auto"
+            endsAt={product.saleBadge.endsAt}
+            label={product.saleBadge.text}
+            variant="card_marquee"
+          />
+        ) : null}
       </div>
     </article>
   );

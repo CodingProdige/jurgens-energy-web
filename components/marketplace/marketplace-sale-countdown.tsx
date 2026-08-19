@@ -11,7 +11,7 @@ type MarketplaceSaleCountdownProps = {
   className?: string;
   endsAt: string | null;
   label?: string;
-  variant?: "compact" | "menu" | "prominent";
+  variant?: "card_marquee" | "compact" | "menu" | "prominent";
 };
 
 type ExpiryRefreshState = {
@@ -143,6 +143,15 @@ export function MarketplaceSaleCountdown({
   }
 
   if (hasExpired) {
+    if (variant === "card_marquee") {
+      return (
+        <SaleCountdownMarquee
+          className={className}
+          label={`${label} ending now`}
+        />
+      );
+    }
+
     return (
       <span
         aria-live="polite"
@@ -164,6 +173,15 @@ export function MarketplaceSaleCountdown({
   }
 
   const display = getMarketplaceSaleCountdownDisplay(deadline - now);
+
+  if (variant === "card_marquee") {
+    return (
+      <SaleCountdownMarquee
+        className={className}
+        label={`${label} ends in ${display.visual}`}
+      />
+    );
+  }
 
   return (
     <span
@@ -188,6 +206,40 @@ export function MarketplaceSaleCountdown({
       />
       <span aria-hidden="true" className="truncate">
         {label} ends in {display.visual}
+      </span>
+    </span>
+  );
+}
+
+function SaleCountdownMarquee({
+  className,
+  label,
+}: {
+  className?: string;
+  label: string;
+}) {
+  const message = (
+    <span className="inline-flex items-center gap-1.5 px-3">
+      <Clock3Icon aria-hidden="true" className="size-3 shrink-0 text-[#ff5a1f]" />
+      <span>{label}</span>
+      <span aria-hidden="true" className="text-[#ff5a1f]">
+        •
+      </span>
+    </span>
+  );
+
+  return (
+    <span
+      aria-label={label}
+      className={cn(
+        "block w-full overflow-hidden bg-[#080808] py-1 text-[8px] font-black uppercase leading-none text-white dark:bg-[#f7f7f2] dark:text-[#080808] sm:py-1.5 sm:text-[9px]",
+        className,
+      )}
+      role="timer"
+    >
+      <span className="marketplace-sale-card-marquee-track inline-flex w-max whitespace-nowrap">
+        {message}
+        <span aria-hidden="true">{message}</span>
       </span>
     </span>
   );
