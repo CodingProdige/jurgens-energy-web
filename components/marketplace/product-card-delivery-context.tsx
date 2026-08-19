@@ -4,11 +4,15 @@ import { cn } from "@/lib/utils";
 
 export function ProductCardDeliveryContext({
   className,
+  compactOnMobile = false,
   estimateLabel = "Delivery estimate available",
 }: {
   className?: string;
+  compactOnMobile?: boolean;
   estimateLabel?: string;
 }) {
+  const compactLabel = `Delivery: ${estimateLabel.replace(/\bbusiness\s+/i, "")}`;
+
   return (
     <p
       className={cn(
@@ -17,9 +21,16 @@ export function ProductCardDeliveryContext({
       )}
     >
       <TruckIcon aria-hidden="true" className="size-2.5 shrink-0 sm:size-3" />
-      <span className="truncate">
-        Estimated delivery: {estimateLabel}
-      </span>
+      {compactOnMobile ? (
+        <>
+          <span className="truncate sm:hidden">{compactLabel}</span>
+          <span className="hidden truncate sm:inline">
+            Estimated delivery: {estimateLabel}
+          </span>
+        </>
+      ) : (
+        <span className="truncate">Estimated delivery: {estimateLabel}</span>
+      )}
     </p>
   );
 }

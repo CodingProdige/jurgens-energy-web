@@ -1699,9 +1699,11 @@ function ProductBuyBox({
             markdown={selectedPriceMarkdown}
             price={selectedPrice}
           />
-          <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400 sm:text-[11px]">
-            {priceTaxDisclosure}
-          </p>
+          {shouldShowPriceTaxDisclosure(priceTaxDisclosure) ? (
+            <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400 sm:text-[11px]">
+              {priceTaxDisclosure}
+            </p>
+          ) : null}
           {selectedVariant?.saleBadge?.endsAt ? (
             <MarketplaceSaleCountdown
               className="mt-3 w-fit"
@@ -1969,9 +1971,11 @@ function MobileProductPurchaseSummary({
             markdown={selectedPriceMarkdown}
             price={selectedPrice}
           />
-          <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400">
-            {priceTaxDisclosure}
-          </p>
+          {shouldShowPriceTaxDisclosure(priceTaxDisclosure) ? (
+            <p className="-mt-px text-[10px] font-medium leading-3 text-slate-500 dark:text-zinc-400">
+              {priceTaxDisclosure}
+            </p>
+          ) : null}
           {selectedVariant?.saleBadge?.endsAt ? (
             <MarketplaceSaleCountdown
               className="mt-1.5 w-fit"
@@ -2744,9 +2748,11 @@ function ProductOptionsDialog({
               markdown={selectedPriceMarkdown}
               price={selectedPrice}
             />
-            <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
-              <p>{priceTaxDisclosure}</p>
-            </div>
+            {shouldShowPriceTaxDisclosure(priceTaxDisclosure) ? (
+              <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
+                <p>{priceTaxDisclosure}</p>
+              </div>
+            ) : null}
             <ProductStockStatusBadge
               className="mt-1"
               compact
@@ -2972,6 +2978,10 @@ function VariantOptionCard({
   );
 }
 
+function shouldShowPriceTaxDisclosure(value: string) {
+  return value.trim().toLowerCase() !== "final price";
+}
+
 function MobileTrustTicker({
   priceTaxDisclosure,
 }: {
@@ -2980,7 +2990,9 @@ function MobileTrustTicker({
   const items = [
     { icon: ShieldCheckIcon, label: "Careful handling" },
     { icon: CreditCardIcon, label: "Secure payments" },
-    { icon: FileTextIcon, label: priceTaxDisclosure },
+    ...(shouldShowPriceTaxDisclosure(priceTaxDisclosure)
+      ? [{ icon: FileTextIcon, label: priceTaxDisclosure }]
+      : []),
   ] as const;
 
   return (

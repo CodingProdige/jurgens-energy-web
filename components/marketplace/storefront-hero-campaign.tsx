@@ -85,7 +85,7 @@ export function StorefrontHeroCampaign({ settings }: { settings: HeroSettings })
       aria-roledescription={isCarousel ? "carousel" : undefined}
       aria-label={isCarousel ? "Featured campaigns" : undefined}
       className={cn(
-        "relative isolate overflow-hidden border-b border-[#ecece6] dark:border-white/10",
+        "relative isolate min-w-0 max-w-full overflow-hidden border-b border-[#ecece6] dark:border-white/10",
         settings.layout === "split"
           ? "bg-[radial-gradient(circle_at_72%_28%,rgba(255,90,31,0.09),transparent_30%),linear-gradient(110deg,#ffffff_0%,#ffffff_54%,#f4f4ef_100%)] dark:bg-[radial-gradient(circle_at_72%_28%,rgba(255,90,31,0.18),transparent_34%),linear-gradient(110deg,#101010_0%,#101010_54%,#1a1a1a_100%)]"
           : "bg-[#191919]",
@@ -160,10 +160,16 @@ export function StorefrontHeroCampaign({ settings }: { settings: HeroSettings })
 
 function SplitHeroSlide({ slide }: { slide: HeroSlide }) {
   return (
-    <div className="grid min-h-[inherit] gap-8 px-4 py-6 sm:px-10 sm:py-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-16 lg:py-12">
-      <HeroCopy className="relative z-10 max-w-[650px]" slide={slide} slideIndex={0} />
-      <div className="relative z-0 aspect-[1672/941] w-full overflow-visible">
-        <HeroImage alt={slide.imageAlt} fit="contain" priority src={slide.desktopImageUrl} />
+    <div className="grid min-h-[inherit] min-w-0 max-w-full gap-5 px-4 py-5 sm:gap-8 sm:px-10 sm:py-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-16 lg:py-12">
+      <HeroCopy className="relative z-10 min-w-0 max-w-[650px]" slide={slide} slideIndex={0} />
+      <div className="relative z-0 aspect-[1672/941] min-w-0 max-w-full overflow-hidden lg:overflow-visible">
+        <HeroImage
+          alt={slide.imageAlt}
+          fit="contain"
+          mobileSrc={slide.mobileImageUrl}
+          priority
+          src={slide.desktopImageUrl}
+        />
       </div>
     </div>
   );
@@ -227,16 +233,16 @@ function HeroCopy({ className, slide, slideIndex }: { className?: string; slide:
   const Heading = (slide.headingTag === "h1" && slideIndex > 0 ? "h2" : slide.headingTag) as StorefrontTitleTag;
 
   return (
-    <div className={className}>
+    <div className={cn("min-w-0 max-w-full", className)}>
       {slide.heading ? (
         <Heading
-          className="font-black uppercase leading-[1.08] tracking-normal"
+          className="max-w-full break-words font-black uppercase leading-[1.08] tracking-normal [overflow-wrap:anywhere]"
           style={{ fontSize: `clamp(2rem, 4vw, ${slide.headingSize}px)` }}
         >
           {renderAccentHeading(slide.heading, slide.accentText)}
         </Heading>
       ) : null}
-      {slide.copy ? <p className="mt-5 max-w-[380px] text-[16px] font-semibold leading-7 text-current/90">{slide.copy}</p> : null}
+      {slide.copy ? <p className="mt-5 max-w-[380px] break-words text-[16px] font-semibold leading-7 text-current/90 [overflow-wrap:anywhere]">{slide.copy}</p> : null}
       {slide.actions.length > 0 ? <HeroActionList actions={slide.actions} className="mt-7" /> : null}
     </div>
   );
@@ -244,7 +250,7 @@ function HeroCopy({ className, slide, slideIndex }: { className?: string; slide:
 
 function HeroImage({ alt, className, fit, mobileSrc, priority = false, src }: { alt: string; className?: string; fit: HeroSlide["imageFit"]; mobileSrc?: string; priority?: boolean; src: string }) {
   return (
-    <picture className={cn("block", className)}>
+    <picture className={cn("block size-full min-w-0 max-w-full", className)}>
       {mobileSrc ? <source media="(max-width: 639px)" srcSet={mobileSrc} /> : null}
       {/* The media library may return remote URLs, so this responsive source pair deliberately uses picture rather than Next Image. */}
       <img

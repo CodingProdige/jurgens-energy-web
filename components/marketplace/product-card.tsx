@@ -204,6 +204,7 @@ export function MarketplaceProductCard({
             ) : null}
           </div>
           <ProductCardDeliveryContext
+            compactOnMobile
             estimateLabel={product.deliveryEstimateLabel}
           />
           <ProductCardPerformanceMarquee badge={performanceBadge} />
