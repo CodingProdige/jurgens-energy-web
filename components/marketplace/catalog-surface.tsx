@@ -39,13 +39,11 @@ function getBaseHref(data: MarketplaceCatalogPageData) {
 export function MarketplaceCatalogSurface({
   data,
   filters,
-  priceTaxDisclosure = "Final price",
   saleCampaigns,
   selectedSaleCampaign = null,
 }: {
   data: MarketplaceCatalogPageData;
   filters: MarketplaceCatalogFilters;
-  priceTaxDisclosure?: string;
   saleCampaigns?: readonly MarketplaceSaleCampaign[];
   selectedSaleCampaign?: MarketplaceSaleCampaign | null;
 }) {
@@ -137,7 +135,6 @@ export function MarketplaceCatalogSurface({
                   initialTotalCount={data.totalCount}
                   initialTotalPages={data.totalPages}
                   key={feedKey}
-                  priceTaxDisclosure={priceTaxDisclosure}
                 />
               ) : (
                 <section className="grid min-h-[320px] place-items-center border-y border-[#e8e8e2] px-5 py-10 text-center dark:border-white/10 sm:rounded-md sm:border">

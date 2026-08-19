@@ -189,6 +189,27 @@ a {
   animation: marketplace-whatsapp-shimmer 10s ease-in-out infinite;
 }
 
+.marketplace-delivery-location-nudge {
+  animation: marketplace-delivery-location-nudge 800ms ease-in-out both;
+}
+
+@keyframes marketplace-delivery-location-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20%,
+  60% {
+    transform: translateX(-2px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(2px);
+  }
+}
+
 @keyframes marketplace-whatsapp-shimmer {
   0%,
   82% {
@@ -213,6 +234,10 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
   .marketplace-whatsapp-shimmer {
+    animation: none;
+  }
+
+  .marketplace-delivery-location-nudge {
     animation: none;
   }
 }

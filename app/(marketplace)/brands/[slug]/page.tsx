@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { MarketplaceCatalogSurface } from "@/components/marketplace/catalog-surface";
-import { getBusinessVatStatus } from "@/src/modules/business-information";
 import { getCurrencyContext } from "@/src/modules/currency/server";
 import {
   getMarketplaceBrands,
@@ -13,7 +12,6 @@ import {
   type MarketplaceCatalogSearchParams,
 } from "@/src/modules/marketplace/catalog-filters";
 import { createMarketplaceDynamicPageMetadata } from "@/src/modules/marketplace/dynamic-page-metadata";
-import { getPriceTaxDisclosure } from "@/src/modules/tax/vat-display";
 
 export async function generateMetadata({
   params,
@@ -64,25 +62,18 @@ export default async function BrandPage({
     ...parseMarketplaceCatalogFilters(resolvedSearchParams),
     brandSlugs: [],
   };
-  const [data, vatStatus] = await Promise.all([
-    getMarketplaceCatalogPage({
-      accumulate: true,
-      brandSlug: slug,
-      currencyContext,
-      filters,
-    }),
-    getBusinessVatStatus(),
-  ]);
+  const data = await getMarketplaceCatalogPage({
+    accumulate: true,
+    brandSlug: slug,
+    currencyContext,
+    filters,
+  });
 
   if (!data.context) {
     notFound();
   }
 
   return (
-    <MarketplaceCatalogSurface
-      data={data}
-      filters={filters}
-      priceTaxDisclosure={getPriceTaxDisclosure(vatStatus)}
-    />
+    <MarketplaceCatalogSurface data={data} filters={filters} />
   );
 }

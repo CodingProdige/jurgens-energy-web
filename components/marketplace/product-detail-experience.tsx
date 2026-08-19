@@ -38,6 +38,7 @@ import {
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
 import { MarketplaceSaleCountdown } from "@/components/marketplace/marketplace-sale-countdown";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
+import { ProductDeliveryEstimate } from "@/components/marketplace/product-delivery-estimate";
 import {
   Dialog,
   DialogClose,
@@ -89,6 +90,7 @@ type ProductDetailExperienceProps = {
     detail: string;
     label: string;
   };
+  deliveryFeeDescription: string;
   initialVariantId?: string;
   jurgensDeliveryCutoffTime: string;
   priceTaxDisclosure?: string;
@@ -192,6 +194,7 @@ export function ProductDetailExperience({
   catalogProducts,
   currencyContext,
   deliveryCopy,
+  deliveryFeeDescription,
   initialVariantId,
   priceTaxDisclosure = "Final price",
   product,
@@ -403,6 +406,7 @@ export function ProductDetailExperience({
           deliveryAvailable={deliveryAvailable}
           deliveryBenefit={deliveryBenefit}
           deliveryDetail={deliveryDetail}
+          deliveryFeeDescription={deliveryFeeDescription}
           priceTaxDisclosure={priceTaxDisclosure}
           product={product}
           quantity={quantity}
@@ -427,7 +431,6 @@ export function ProductDetailExperience({
             href={
               product.category ? `/categories/${product.category.path}` : "/products"
             }
-            priceTaxDisclosure={priceTaxDisclosure}
             products={relatedProducts}
             title="More in this category"
             viewAllLabel="View category"
@@ -437,7 +440,6 @@ export function ProductDetailExperience({
         {previouslyViewedProducts.length > 0 ? (
           <ProductRail
             href="/products"
-            priceTaxDisclosure={priceTaxDisclosure}
             products={previouslyViewedProducts}
             title="Previously viewed"
             viewAllLabel="Continue shopping"
@@ -1519,6 +1521,7 @@ function ProductBuyBox({
   deliveryAvailable,
   deliveryBenefit,
   deliveryDetail,
+  deliveryFeeDescription,
   priceTaxDisclosure,
   product,
   quantity,
@@ -1533,6 +1536,7 @@ function ProductBuyBox({
   deliveryAvailable: boolean;
   deliveryBenefit: string;
   deliveryDetail: string;
+  deliveryFeeDescription: string;
   priceTaxDisclosure: string;
   product: MarketplaceProductDetailView;
   quantity: number;
@@ -1659,6 +1663,7 @@ function ProductBuyBox({
         deliveryAvailable={deliveryAvailable}
         deliveryBenefit={deliveryBenefit}
         deliveryDetail={deliveryDetail}
+        deliveryFeeDescription={deliveryFeeDescription}
         onOpenOptions={() => setIsOptionsDialogOpen(true)}
         onSelectVariant={setSelectedVariantId}
         product={product}
@@ -1787,6 +1792,11 @@ function ProductBuyBox({
         </button>
       </div>
 
+      <ProductDeliveryEstimate
+        deliveryFeeDescription={deliveryFeeDescription}
+        variantId={selectedVariant?.id ?? null}
+      />
+
       <ProductPolicyLinks />
 
       </aside>
@@ -1897,6 +1907,7 @@ function MobileProductPurchaseSummary({
   deliveryAvailable,
   deliveryBenefit,
   deliveryDetail,
+  deliveryFeeDescription,
   onOpenOptions,
   onSelectVariant,
   product,
@@ -1915,6 +1926,7 @@ function MobileProductPurchaseSummary({
   deliveryAvailable: boolean;
   deliveryBenefit: string;
   deliveryDetail: string;
+  deliveryFeeDescription: string;
   onOpenOptions: () => void;
   onSelectVariant: (variantId: string) => void;
   product: MarketplaceProductDetailView;
@@ -1982,6 +1994,11 @@ function MobileProductPurchaseSummary({
         ) : null}
 
         <ProductPolicyLinks />
+
+        <ProductDeliveryEstimate
+          deliveryFeeDescription={deliveryFeeDescription}
+          variantId={selectedVariant?.id ?? null}
+        />
       </section>
 
       <ProductVariantSelector
@@ -3328,13 +3345,11 @@ function TopVariantBadge({ className }: { className?: string }) {
 
 function ProductRail({
   href,
-  priceTaxDisclosure,
   products,
   title,
   viewAllLabel,
 }: {
   href: string;
-  priceTaxDisclosure: string;
   products: MarketplaceProductCardData[];
   title: string;
   viewAllLabel: string;
@@ -3400,7 +3415,6 @@ function ProductRail({
             key={item.id}
           >
             <MarketplaceProductCard
-              priceTaxDisclosure={priceTaxDisclosure}
               product={item}
             />
           </div>

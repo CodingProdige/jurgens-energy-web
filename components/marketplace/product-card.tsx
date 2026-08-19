@@ -2,13 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { FlameIcon, RefreshCcwIcon, StarIcon } from "lucide-react";
 
+import { ProductCardDeliveryContext } from "@/components/marketplace/product-card-delivery-context";
 import { MarketplaceCampaignIcon } from "@/components/marketplace/marketplace-campaign-icon";
 import { MarketplaceSaleCountdown } from "@/components/marketplace/marketplace-sale-countdown";
-import { MarketplaceProductFulfillmentBadge } from "@/components/marketplace/product-fulfillment-badge";
+import { ProductCardImageScrubber } from "@/components/marketplace/product-card-image-scrubber";
 import { ProductCardQuickAddButton } from "@/components/marketplace/product-card-quick-add-button";
 import { ProductCardQuickLook } from "@/components/marketplace/product-card-quick-look";
 import { ProductCardVideoPreview } from "@/components/marketplace/product-card-video-preview";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { MarketplaceProductCard as MarketplaceProductCardData } from "@/src/modules/marketplace/catalog";
 import { getSoldQuantityLabel } from "@/src/modules/marketplace/product-variant-presentation";
@@ -22,10 +22,8 @@ import {
 } from "@/src/modules/sales/campaign-presentation";
 
 export function MarketplaceProductCard({
-  priceTaxDisclosure = "Final price",
   product,
 }: {
-  priceTaxDisclosure?: string;
   product: MarketplaceProductCardData;
 }) {
   const productHref = `/products/${product.slug}`;
@@ -42,13 +40,22 @@ export function MarketplaceProductCard({
   const saleBadgeColor = normalizeSaleCampaignColor(product.saleBadge?.color);
   const saleBadgeForeground =
     getReadableSaleCampaignForeground(saleBadgeColor);
-  const imageBadgeStackClassName = cn(
-    "absolute left-0 top-0 z-10 flex flex-col items-start gap-px",
-    product.isOnSale
-      ? "right-7 max-w-[calc(100%-1.75rem)] sm:right-8 sm:max-w-[calc(100%-2rem)]"
-      : "max-w-[78%]",
-  );
-  const productImage = displayImageUrl ? (
+  const saleDiscountLabel = getSaleBadgeDiscountLabel(product);
+  const imageBadgeStackClassName =
+    "absolute left-1.5 top-1.5 z-30 flex max-w-[calc(100%-0.75rem)] flex-col items-start gap-1 sm:left-2 sm:top-2 sm:max-w-[calc(100%-1rem)]";
+  const productImage = !product.previewVideo && product.imageUrls.length > 0 ? (
+    <ProductCardImageScrubber
+      alt={product.title}
+      analytics={{
+        brandName: product.brandName,
+        categoryName: product.category?.name ?? null,
+        productId: product.id,
+        productName: product.title,
+      }}
+      href={productHref}
+      imageUrls={product.imageUrls}
+    />
+  ) : displayImageUrl ? (
     <Image
       alt={product.title}
       className="marketplace-product-card-media object-cover"
@@ -100,44 +107,40 @@ export function MarketplaceProductCard({
           )}
 
           <div className={imageBadgeStackClassName}>
-            <MarketplaceProductFulfillmentBadge
-              className="rounded-r-[3px]"
-              fulfillmentMode={product.fulfillmentMode}
-            />
-            {product.hasExchangeOption ? (
-              <Badge className="inline-flex h-[15px] max-w-full items-center gap-0.5 rounded-l-none rounded-r-[3px] bg-[#ffb000] px-1 text-[6.5px] font-black uppercase leading-none text-[#080808] shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]">
-                <RefreshCcwIcon className="size-2.5 shrink-0 sm:size-3" />
-                <span className="truncate">Exchange</span>
-              </Badge>
+            {product.isOnSale ? (
+              <div
+                className="flex max-w-full items-start gap-1 rounded-[5px] px-1 py-0.5 text-[7px] font-black uppercase leading-[1.05] shadow-[0_3px_8px_rgba(8,8,8,0.18)] sm:px-1.5 sm:py-1 sm:text-[8px]"
+                style={{
+                  backgroundColor: saleBadgeColor,
+                  color: saleBadgeForeground,
+                }}
+              >
+                <MarketplaceCampaignIcon
+                  aria-hidden="true"
+                  className="mt-px size-2.5 shrink-0 sm:size-3"
+                  name={product.saleBadge?.iconName}
+                />
+                <span className="min-w-0">
+                  <span className="block max-w-20 break-words">
+                    {product.saleBadgeText ?? "Sale"}
+                  </span>
+                  {saleDiscountLabel ? (
+                    <span className="mt-0.5 block text-[7px] sm:text-[8px]">
+                      {saleDiscountLabel}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
             ) : null}
 
-            <Badge
-              className={cn(
-                "h-[15px] rounded-l-none rounded-r-[3px] px-1 text-[6.5px] font-black uppercase leading-none shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:text-[8px]",
-                getProductCardStockBadgeClassName(product.stockStatus),
-              )}
-            >
-              {getMarketplaceStockStatusLabel(product.stockStatus)}
-            </Badge>
+            {product.hasExchangeOption ? (
+              <span className="inline-flex max-w-full items-center gap-1 rounded-[5px] bg-[#ffb000] px-1 py-0.5 text-[7px] font-black uppercase leading-none text-[#080808] shadow-[0_3px_8px_rgba(8,8,8,0.16)] sm:px-1.5 sm:py-1 sm:text-[8px]">
+                <RefreshCcwIcon className="size-2.5 shrink-0 sm:size-3" />
+                <span className="truncate">Exchange</span>
+              </span>
+            ) : null}
           </div>
-          {product.isOnSale ? (
-            <Badge
-              className="marketplace-card-sale-badge absolute right-0 top-0 z-20 inline-flex h-[15px] max-w-[104px] items-center gap-0.5 rounded-l-[3px] rounded-r-none border-0 px-1 text-[6.5px] font-black uppercase leading-none shadow-[0_4px_8px_rgba(8,8,8,0.14)] sm:h-4 sm:max-w-[124px] sm:text-[8px]"
-              style={{
-                backgroundColor: saleBadgeColor,
-                color: saleBadgeForeground,
-              }}
-            >
-              <MarketplaceCampaignIcon
-                aria-hidden="true"
-                className="size-2.5 shrink-0 sm:size-3"
-                name={product.saleBadge?.iconName}
-              />
-              <span className="truncate">{product.saleBadgeText ?? "Sale"}</span>
-            </Badge>
-          ) : null}
           <ProductCardQuickLook
-            priceTaxDisclosure={priceTaxDisclosure}
             product={product}
           />
         </div>
@@ -172,9 +175,7 @@ export function MarketplaceProductCard({
           <div className="flex min-w-0 items-start gap-1">
             <ProductCardPrice
               compareAtLabel={product.compareAtPriceLabel}
-              discountLabel={product.discountLabel}
               label={product.priceLabel}
-              priceTaxDisclosure={priceTaxDisclosure}
             />
             <ProductCardQuickAddButton
               className="pointer-events-auto relative z-30 ml-auto"
@@ -191,8 +192,16 @@ export function MarketplaceProductCard({
           ) : null}
 
           <div className="flex min-w-0 flex-wrap items-center gap-0.5 sm:gap-1">
+            <span
+              className={cn(
+                "inline-flex items-center whitespace-nowrap rounded-[3px] px-1 py-0.5 text-[7px] font-black uppercase leading-none sm:px-1.5 sm:text-[9px]",
+                getProductCardStockBadgeClassName(product.stockStatus),
+              )}
+            >
+              {getMarketplaceStockStatusLabel(product.stockStatus)}
+            </span>
             {lowStockLabel ? (
-              <span className="inline-flex items-center whitespace-nowrap text-[8px] font-semibold leading-none text-[#ff5a1f] sm:text-[10px]">
+              <span className="inline-flex items-center whitespace-nowrap rounded-[3px] bg-[#fff0e9] px-1 py-0.5 text-[8px] font-semibold leading-none text-[#d94514] dark:bg-[#ff5a1f]/10 dark:text-[#ffb19a] sm:px-1.5 sm:text-[10px]">
                 {lowStockLabel}
               </span>
             ) : null}
@@ -202,6 +211,9 @@ export function MarketplaceProductCard({
               </span>
             ) : null}
           </div>
+          <ProductCardDeliveryContext
+            estimateLabel={product.deliveryEstimateLabel}
+          />
           <ProductCardPerformanceMarquee badge={performanceBadge} />
         </div>
       </div>
@@ -231,6 +243,16 @@ function getProductCardLowStockLabel(quantity: number | null) {
   }
 
   return quantity === 1 ? "Only 1 left" : `Only ${quantity} left`;
+}
+
+function getSaleBadgeDiscountLabel(product: MarketplaceProductCardData) {
+  const campaignDiscount = Number(product.saleBadge?.discountPercent);
+
+  if (Number.isFinite(campaignDiscount) && campaignDiscount > 0) {
+    return `${campaignDiscount}% off`;
+  }
+
+  return product.discountLabel;
 }
 
 type ProductCardPerformanceBadge = {
@@ -296,14 +318,10 @@ function getProductCardPerformanceBadge(
 
 function ProductCardPrice({
   compareAtLabel,
-  discountLabel,
   label,
-  priceTaxDisclosure,
 }: {
   compareAtLabel: string | null;
-  discountLabel: string | null;
   label: string;
-  priceTaxDisclosure: string;
 }) {
   const fromPrefix = "From ";
   const currentLabel = label.startsWith(fromPrefix)
@@ -319,20 +337,12 @@ function ProductCardPrice({
           {compareAtLabel}
         </span>
       ) : null}
-      {discountLabel ? (
-        <span className="rounded-sm bg-[#ff5a1f] px-1 py-0.5 text-[7px] font-bold uppercase leading-none text-white sm:px-1.5 sm:text-[8px]">
-          {discountLabel}
-        </span>
-      ) : null}
     </span>
   );
 
   return (
     <div className="min-w-0 flex-1 leading-none">
       {priceRow}
-      <span className="mt-0.5 block text-[7px] font-medium leading-none text-[#6a6a63] dark:text-zinc-400 sm:text-[8px]">
-        {priceTaxDisclosure}
-      </span>
     </div>
   );
 }

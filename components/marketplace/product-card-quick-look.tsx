@@ -35,13 +35,11 @@ import { getSoldQuantityLabel } from "@/src/modules/marketplace/product-variant-
 
 type ProductCardQuickLookProps = {
   className?: string;
-  priceTaxDisclosure?: string;
   product: MarketplaceProductCardData;
 };
 
 export function ProductCardQuickLook({
   className,
-  priceTaxDisclosure = "Final price",
   product,
 }: ProductCardQuickLookProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -239,18 +237,12 @@ export function ProductCardQuickLook({
               </header>
 
               <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:none] dark:[color-scheme:dark] md:px-5 [&::-webkit-scrollbar]:hidden">
-                <ProductQuickLookPrice
-                  priceTaxDisclosure={priceTaxDisclosure}
-                  product={product}
-                />
+                <ProductQuickLookPrice product={product} />
 
                 <div className="mt-4 flex min-w-0 flex-wrap gap-2 text-[11px] font-black uppercase leading-none">
                   <span className="inline-flex items-center gap-1 rounded-full border border-emerald-600 px-2.5 py-1.5 text-emerald-700 dark:border-emerald-300 dark:text-emerald-300">
                     <TruckIcon className="size-3.5" />
                     Delivery details before payment
-                  </span>
-                  <span className="rounded-full border border-[#d8d8d2] px-2.5 py-1.5 text-[#080808] dark:border-white/15 dark:text-[#f7f7f2]">
-                    {priceTaxDisclosure}
                   </span>
                 </div>
 
@@ -349,10 +341,8 @@ export function ProductCardQuickLook({
 }
 
 function ProductQuickLookPrice({
-  priceTaxDisclosure,
   product,
 }: {
-  priceTaxDisclosure: string;
   product: MarketplaceProductCardData;
 }) {
   const fromPrefix = "From ";
@@ -377,9 +367,6 @@ function ProductQuickLookPrice({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500 dark:text-zinc-400">
-        {priceTaxDisclosure}
-      </p>
     </div>
   );
 }

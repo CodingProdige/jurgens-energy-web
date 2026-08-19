@@ -193,6 +193,22 @@ export async function listCustomerAddresses(
     );
 }
 
+export async function hasCustomerDefaultAddress(userId: string) {
+  const parsedUserId = parseUserId(userId);
+  const [defaultAddress] = await db
+    .select({ id: customerAddresses.id })
+    .from(customerAddresses)
+    .where(
+      and(
+        eq(customerAddresses.userId, parsedUserId),
+        eq(customerAddresses.isDefault, true),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(defaultAddress);
+}
+
 export async function getCheckoutAddressBook(
   userId: string,
   database: CustomerAddressDatabase = db,

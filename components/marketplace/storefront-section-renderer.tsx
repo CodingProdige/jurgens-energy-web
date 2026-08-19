@@ -50,7 +50,6 @@ type StorefrontPageRendererProps = {
   blogPosts: PublicBlogPostSummary[];
   categories: MarketplaceCategorySummary[];
   className?: string;
-  priceTaxDisclosure?: string;
   products: MarketplaceProductCardData[];
   sections: StorefrontSection[];
   selectedSectionId?: string | null;
@@ -61,7 +60,6 @@ export function StorefrontPageRenderer({
   blogPosts,
   categories,
   className,
-  priceTaxDisclosure = "Final price",
   products,
   sections,
   selectedSectionId,
@@ -84,7 +82,6 @@ export function StorefrontPageRenderer({
               brands,
               blogPosts,
               categories,
-              priceTaxDisclosure,
               products,
               section,
             })}
@@ -98,14 +95,12 @@ function renderStorefrontSection({
   brands,
   blogPosts,
   categories,
-  priceTaxDisclosure,
   products,
   section,
 }: {
   brands: MarketplaceBrandSummary[];
   blogPosts: PublicBlogPostSummary[];
   categories: MarketplaceCategorySummary[];
-  priceTaxDisclosure: string;
   products: MarketplaceProductCardData[];
   section: StorefrontSection;
 }) {
@@ -129,7 +124,6 @@ function renderStorefrontSection({
     return (
       <StorefrontProductCollectionSectionView
         categories={categories}
-        priceTaxDisclosure={priceTaxDisclosure}
         products={products}
         section={section}
       />
@@ -268,12 +262,10 @@ function StorefrontCylinderShowcaseSectionView({
 
 function StorefrontProductCollectionSectionView({
   categories,
-  priceTaxDisclosure,
   products,
   section,
 }: {
   categories: MarketplaceCategorySummary[];
-  priceTaxDisclosure: string;
   products: MarketplaceProductCardData[];
   section: StorefrontProductCollectionSection;
 }) {
@@ -302,7 +294,6 @@ function StorefrontProductCollectionSectionView({
       <ProductCollectionList
         emptyLabel={`No live ${settings.title.toLowerCase()} products yet.`}
         layout={settings.layout}
-        priceTaxDisclosure={priceTaxDisclosure}
         products={selectedProducts}
       />
     </section>
@@ -655,12 +646,10 @@ function getCollectionSectionId(
 function ProductCollectionList({
   emptyLabel,
   layout,
-  priceTaxDisclosure,
   products,
 }: {
   emptyLabel: string;
   layout: StorefrontCollectionLayout;
-  priceTaxDisclosure: string;
   products: MarketplaceProductCardData[];
 }) {
   const isCarousel = layout === "carousel";
@@ -674,7 +663,6 @@ function ProductCollectionList({
       key={product.id}
     >
       <MarketplaceProductCard
-        priceTaxDisclosure={priceTaxDisclosure}
         product={product}
       />
     </div>

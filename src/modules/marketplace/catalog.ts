@@ -35,6 +35,8 @@ import {
 } from "@/src/modules/marketplace/stock-status";
 import { filterPopulatedShopMenuCategories } from "@/src/modules/marketplace/shop-menu-categories";
 import { getActiveMarketplaceSaleCampaigns } from "@/src/modules/marketplace/sales";
+import { getPublicProductDeliveryTimingLabel } from "@/src/modules/marketplace/public-delivery-copy";
+import { getMarketplaceSettings } from "@/src/modules/marketplace/settings";
 import { getMediaPublicUrl } from "@/src/modules/media/paths";
 import {
   getEmptyProductRatingSummary,
@@ -104,9 +106,11 @@ export type MarketplaceProductCard = {
   coverImageUrl: string | null;
   compareAtPriceLabel: string | null;
   discountLabel: string | null;
+  deliveryEstimateLabel?: string;
   fulfillmentMode: "seller_fulfilled" | "jurgens_fulfilled";
   hasExchangeOption: boolean;
   id: string;
+  imageUrls: string[];
   inStock: boolean;
   isOnSale: boolean;
   saleBadge: MarketplaceSaleBadge | null;
@@ -127,6 +131,7 @@ export type MarketplaceProductCard = {
 export type MarketplaceSaleBadge = {
   campaignId: string;
   color: string;
+  discountPercent: string;
   endsAt: string | null;
   iconName: string | null;
   text: string;
@@ -295,6 +300,7 @@ async function getActiveSaleBadgeByProductId(
         badgeByProductId.set(productId, {
           campaignId: campaign.id,
           color: campaign.badgeColor,
+          discountPercent: campaign.discountPercent,
           endsAt: campaign.endsAt,
           iconName: campaign.badgeIcon,
           text: campaign.badgeText,
@@ -326,6 +332,7 @@ async function getActiveSaleBadgeByVariantId(variantIds: string[]) {
         badgeByVariantId.set(variantId, {
           campaignId: campaign.id,
           color: campaign.badgeColor,
+          discountPercent: campaign.discountPercent,
           endsAt: campaign.endsAt,
           iconName: campaign.badgeIcon,
           text: campaign.badgeText,
@@ -552,6 +559,7 @@ export async function getMarketplaceCatalog({
     saleBadgeByProductId,
     categoriesList,
     brandsList,
+    marketplaceSettings,
   ] =
     await Promise.all([
       db
@@ -575,6 +583,7 @@ export async function getMarketplaceCatalog({
       getActiveSaleBadgeByProductId(productIds),
       getMarketplaceCategories(),
       getMarketplaceBrands(),
+      getMarketplaceSettings(),
     ]);
 
   const variantsByProductId = new Map<
@@ -614,9 +623,13 @@ export async function getMarketplaceCatalog({
       category: toCategory(row),
       coverImageUrl:
         productMediaByProductId.get(row.id)?.coverImageUrl ?? null,
+      deliveryEstimateLabel: marketplaceSettings.shippingEnabled
+        ? getPublicProductDeliveryTimingLabel(marketplaceSettings)
+        : "Delivery unavailable",
       fulfillmentMode: row.fulfillmentMode,
       hasExchangeOption: variants.some((variant) => variant.requiresExchangeEmpty),
       id: row.id,
+      imageUrls: productMediaByProductId.get(row.id)?.imageUrls ?? [],
       inStock: variants.some(getVariantInStock),
       lowStockQuantity: getMarketplaceProductLowStockQuantity(variants),
       priceLabel: getPriceLabel(variants, currencyContext),
@@ -1126,11 +1139,18 @@ export async function getMarketplaceCatalogPage({
   filters: MarketplaceCatalogFilters;
   pageSize?: number;
 }): Promise<MarketplaceCatalogPageData> {
-  const [rows, categoriesList, brandsList, activeSaleCampaigns] = await Promise.all([
+  const [
+    rows,
+    categoriesList,
+    brandsList,
+    activeSaleCampaigns,
+    marketplaceSettings,
+  ] = await Promise.all([
     getPublicProductsBaseRows(),
     getMarketplaceCategories(),
     getMarketplaceBrands(),
     filters.campaignId ? getActiveMarketplaceSaleCampaigns() : Promise.resolve([]),
+    getMarketplaceSettings(),
   ]);
   const selectedCampaign = filters.campaignId
     ? activeSaleCampaigns.find((campaign) => campaign.id === filters.campaignId) ??
@@ -1294,9 +1314,14 @@ export async function getMarketplaceCatalogPage({
         category: toCategory(record.row),
         coverImageUrl:
           productMediaByProductId.get(record.row.id)?.coverImageUrl ?? null,
+        deliveryEstimateLabel: marketplaceSettings.shippingEnabled
+          ? getPublicProductDeliveryTimingLabel(marketplaceSettings)
+          : "Delivery unavailable",
         fulfillmentMode: record.row.fulfillmentMode,
         hasExchangeOption: getRecordExchangeSupported(record),
         id: record.row.id,
+        imageUrls:
+          productMediaByProductId.get(record.row.id)?.imageUrls ?? [],
         inStock: getRecordInStock(record),
         lowStockQuantity: getMarketplaceProductLowStockQuantity(record.variants),
         priceLabel: getPriceLabel(record.variants, currencyContext),

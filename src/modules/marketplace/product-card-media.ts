@@ -8,6 +8,7 @@ export type MarketplaceProductPreviewVideo = {
 
 export type MarketplaceProductCardMedia = {
   coverImageUrl: string | null;
+  imageUrls: string[];
   previewVideo: MarketplaceProductPreviewVideo | null;
 };
 
@@ -59,9 +60,14 @@ export function selectMarketplaceProductCardMedia(
 
     const current = mediaByProductId.get(row.productId) ?? {
       coverImageUrl: null,
+      imageUrls: [],
       previewVideo: null,
     };
     const coverUrl = getMarketplaceProductImageUrl(row);
+
+    if (row.mimeType.startsWith("image/") && coverUrl) {
+      current.imageUrls.push(coverUrl);
+    }
 
     if (
       row.isCover &&
@@ -94,6 +100,17 @@ export function selectMarketplaceProductCardMedia(
     }
 
     mediaByProductId.set(row.productId, current);
+  }
+
+  for (const selection of mediaByProductId.values()) {
+    const uniqueImageUrls = Array.from(new Set(selection.imageUrls));
+
+    selection.imageUrls = selection.coverImageUrl
+      ? [
+          selection.coverImageUrl,
+          ...uniqueImageUrls.filter((url) => url !== selection.coverImageUrl),
+        ]
+      : uniqueImageUrls;
   }
 
   return mediaByProductId;

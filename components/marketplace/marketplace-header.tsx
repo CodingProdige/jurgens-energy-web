@@ -10,6 +10,7 @@ import {
 import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/action-styles";
 import { MarketplaceCartLink } from "@/components/marketplace/marketplace-cart-link";
 import { MarketplaceDesktopNav } from "@/components/marketplace/marketplace-desktop-nav";
+import { MarketplaceDeliveryLocationControl } from "@/components/marketplace/marketplace-delivery-location";
 import { MarketplaceHeaderSearch } from "@/components/marketplace/marketplace-header-search";
 import { MarketplaceHeaderShell } from "@/components/marketplace/marketplace-header-shell";
 import { MarketplaceSaleSpotlight } from "@/components/marketplace/marketplace-sale-spotlight";
@@ -27,6 +28,7 @@ import {
   getNotificationCenter,
 } from "@/src/modules/notifications/in-app";
 import { getCurrencyPreference } from "@/src/modules/currency/server";
+import { hasCustomerDefaultAddress } from "@/src/modules/marketplace/account/addresses";
 import {
   getMarketplaceShopMenuData,
 } from "@/src/modules/marketplace/catalog";
@@ -79,6 +81,9 @@ export async function MarketplaceHeader() {
         userId: session.user.id,
       })
     : emptyNotificationCenter;
+  const hasDefaultDeliveryAddress = session?.user?.id
+    ? await hasCustomerDefaultAddress(session.user.id)
+    : false;
   const hasFeaturedSaleCampaign = saleCampaigns.some(
     (campaign) => campaign.headerVisible,
   );
@@ -98,6 +103,9 @@ export async function MarketplaceHeader() {
             <MarketplaceSaleSpotlight campaigns={saleCampaigns} />
           </div>
           <div className="order-1 ml-auto flex min-w-0 items-center justify-end gap-1.5 sm:order-2 sm:flex-none sm:gap-2">
+            <MarketplaceDeliveryLocationControl
+              hasDefaultDeliveryAddress={hasDefaultDeliveryAddress}
+            />
             <CurrencySelector
               className="min-w-0 rounded-full border border-[#e8e8e2] bg-white/80 px-1 py-1 dark:border-white/10 dark:bg-white/[0.04]"
               compact
