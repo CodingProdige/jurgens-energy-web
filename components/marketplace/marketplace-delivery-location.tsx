@@ -3,10 +3,7 @@
 import { MapPinIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-import {
-  GooglePlacesAddressAutocomplete,
-  type GooglePlacesResolvedAddress,
-} from "@/components/address/google-places-address-autocomplete";
+import { MarketplaceDeliveryAddressFields } from "@/components/address/marketplace-delivery-address-fields";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -18,10 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { SOUTH_AFRICAN_PROVINCES } from "@/src/modules/marketplace/account/address-options";
 import {
   clearMarketplaceDeliveryLocation,
   formatMarketplaceDeliveryLocation,
@@ -34,18 +28,6 @@ import {
 
 const deliveryLocationNudgeStorageKey =
   "jurgens-energy:delivery-location-nudge:v1";
-const deliveryAddressFieldClass =
-  "h-10 rounded-md border-[#d8d8d1] bg-white px-3 text-sm shadow-none focus-visible:border-[#ff5a1f] focus-visible:ring-[#ff5a1f]/15 dark:border-white/12 dark:bg-[#101010]";
-
-const emptyDeliveryAddress: MarketplaceDeliveryAddress = {
-  addressLine1: "",
-  addressLine2: "",
-  city: "",
-  countryCode: "ZA",
-  postalCode: "",
-  province: "",
-  suburb: "",
-};
 
 function isCompleteAddress(
   address: MarketplaceDeliveryAddress | null,
@@ -56,28 +38,6 @@ function isCompleteAddress(
       address.countryCode === "ZA" &&
       address.postalCode &&
       address.province,
-  );
-}
-
-function toDeliveryAddress(
-  address: GooglePlacesResolvedAddress,
-): MarketplaceDeliveryAddress {
-  return {
-    addressLine1: address.addressLine1,
-    addressLine2: address.addressLine2,
-    city: address.city,
-    countryCode: address.countryCode,
-    postalCode: address.postalCode,
-    province: address.province,
-    suburb: address.suburb,
-  };
-}
-
-function RequiredMark() {
-  return (
-    <span aria-hidden="true" className="text-red-500">
-      *
-    </span>
   );
 }
 
@@ -129,14 +89,6 @@ export function MarketplaceDeliveryLocationControl({
     setAddressInput("");
     setIsResolvingAddress(false);
     setRememberFullAddress(false);
-  }
-
-  function updateDraft(patch: Partial<MarketplaceDeliveryAddress>) {
-    setDraftAddress((current) => ({
-      ...(current ?? emptyDeliveryAddress),
-      ...patch,
-      countryCode: "ZA",
-    }));
   }
 
   function openDeliveryLocationDialog() {
@@ -214,113 +166,14 @@ export function MarketplaceDeliveryLocationControl({
           <p className="text-xs leading-5 text-[#666660] dark:text-[#aaa9a1]">
             Search for an address to fill the fields automatically, or complete them manually.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label htmlFor={`marketplace-delivery-location-${inputId}`}>
-                Street address <RequiredMark />
-              </Label>
-              <GooglePlacesAddressAutocomplete
-                countryCode="ZA"
-                id={`marketplace-delivery-location-${inputId}`}
-                inputClassName={deliveryAddressFieldClass}
-                leadingIcon={<MapPinIcon className="size-4 text-[#ff5a1f]" />}
-                onAddressSelect={(address) => {
-                  setDraftAddress(toDeliveryAddress(address));
-                }}
-                onResolvingChange={setIsResolvingAddress}
-                onValueChange={(addressLine1) => {
-                  setAddressInput(addressLine1);
-                  setDraftAddress({
-                    ...emptyDeliveryAddress,
-                    addressLine1,
-                  });
-                }}
-                placeholder="Street number and name"
-                required
-                value={addressInput}
-              />
-            </div>
-
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label htmlFor={`marketplace-delivery-address-line-2-${inputId}`}>
-                Complex, unit or building
-              </Label>
-              <Input
-                autoComplete="address-line2"
-                className={deliveryAddressFieldClass}
-                id={`marketplace-delivery-address-line-2-${inputId}`}
-                maxLength={240}
-                onChange={(event) => updateDraft({ addressLine2: event.currentTarget.value })}
-                value={draftAddress?.addressLine2 ?? ""}
-              />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor={`marketplace-delivery-suburb-${inputId}`}>
-                Suburb (optional)
-              </Label>
-              <Input
-                autoComplete="address-level3"
-                className={deliveryAddressFieldClass}
-                id={`marketplace-delivery-suburb-${inputId}`}
-                maxLength={120}
-                onChange={(event) => updateDraft({ suburb: event.currentTarget.value })}
-                value={draftAddress?.suburb ?? ""}
-              />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor={`marketplace-delivery-city-${inputId}`}>
-                City <RequiredMark />
-              </Label>
-              <Input
-                autoComplete="address-level2"
-                className={deliveryAddressFieldClass}
-                id={`marketplace-delivery-city-${inputId}`}
-                maxLength={120}
-                onChange={(event) => updateDraft({ city: event.currentTarget.value })}
-                required
-                value={draftAddress?.city ?? ""}
-              />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor={`marketplace-delivery-province-${inputId}`}>
-                Province <RequiredMark />
-              </Label>
-              <select
-                autoComplete="address-level1"
-                className={cn(deliveryAddressFieldClass, "border outline-none")}
-                id={`marketplace-delivery-province-${inputId}`}
-                onChange={(event) => updateDraft({ province: event.currentTarget.value })}
-                required
-                value={draftAddress?.province ?? ""}
-              >
-                <option value="">Select province</option>
-                {SOUTH_AFRICAN_PROVINCES.map((province) => (
-                  <option key={province} value={province}>
-                    {province}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor={`marketplace-delivery-postal-code-${inputId}`}>
-                Postal code <RequiredMark />
-              </Label>
-              <Input
-                autoComplete="postal-code"
-                className={deliveryAddressFieldClass}
-                id={`marketplace-delivery-postal-code-${inputId}`}
-                inputMode="numeric"
-                maxLength={40}
-                onChange={(event) => updateDraft({ postalCode: event.currentTarget.value })}
-                required
-                value={draftAddress?.postalCode ?? ""}
-              />
-            </div>
-          </div>
+          <MarketplaceDeliveryAddressFields
+            address={draftAddress}
+            addressInput={addressInput}
+            idPrefix={`marketplace-delivery-location-${inputId}`}
+            onAddressChange={setDraftAddress}
+            onAddressInputChange={setAddressInput}
+            onResolvingChange={setIsResolvingAddress}
+          />
 
           <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-[#e4e4de] bg-[#f7f7f2] p-3 text-left dark:border-white/10 dark:bg-white/[0.035]">
             <Checkbox
