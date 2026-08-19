@@ -18,6 +18,7 @@ import {
 import { MarketplaceBlogCard } from "@/components/marketplace/blog-card";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
 import { StorefrontCarousel } from "@/components/marketplace/storefront-carousel";
+import { StorefrontHeroCampaign } from "@/components/marketplace/storefront-hero-campaign";
 import { StorefrontLoadMoreGrid } from "@/components/marketplace/storefront-load-more-grid";
 import { cn } from "@/lib/utils";
 import type { PublicBlogPostSummary } from "@/src/modules/blog";
@@ -165,34 +166,7 @@ function StorefrontHeroSectionView({
 }: {
   section: StorefrontHeroSection;
 }) {
-  const { settings } = section;
-
-  return (
-    <section className="relative overflow-hidden border-b border-[#ecece6] bg-[radial-gradient(circle_at_72%_28%,rgba(255,90,31,0.09),transparent_30%),linear-gradient(110deg,#ffffff_0%,#ffffff_54%,#f4f4ef_100%)] px-4 pb-6 pt-6 dark:border-white/10 dark:bg-[radial-gradient(circle_at_72%_28%,rgba(255,90,31,0.18),transparent_34%),linear-gradient(110deg,#101010_0%,#101010_54%,#1a1a1a_100%)] sm:px-10 sm:pb-7 sm:pt-8 lg:min-h-[520px] lg:px-16 lg:pb-9 lg:pt-12">
-      <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-        <div className="relative z-10 max-w-[650px]">
-          <StorefrontTitle
-            as={settings.headingTag}
-            className="max-w-[640px] font-black uppercase leading-[1.08] tracking-normal text-[#080808] dark:text-[#f7f7f2]"
-            size={settings.headingSize}
-          >
-            {renderAccentHeading(settings.heading, settings.accentText)}
-          </StorefrontTitle>
-          <p className="mt-5 max-w-[360px] text-[17px] font-semibold leading-7 text-[#1a1a1a] dark:text-[#deded7]">
-            {settings.copy}
-          </p>
-          {settings.actions.length > 0 ? (
-            <StorefrontActionList
-              actions={settings.actions}
-              className="mt-7"
-            />
-          ) : null}
-        </div>
-
-        <HeroVisual alt={settings.imageAlt} src={settings.imageUrl} />
-      </div>
-    </section>
-  );
+  return <StorefrontHeroCampaign settings={section.settings} />;
 }
 
 function StorefrontQuickActionsSectionView({
@@ -525,33 +499,6 @@ function StorefrontFeatureGridSectionView({
       </div>
     </section>
   );
-}
-
-function renderAccentHeading(heading: string, accentText: string) {
-  const accentWords = new Set(
-    accentText
-      .split("|")
-      .map((word) => word.trim().toLowerCase())
-      .filter(Boolean),
-  );
-
-  if (accentWords.size === 0) {
-    return heading;
-  }
-
-  return heading.split(/(\s+)/).map((part, index) => {
-    const normalized = part.replace(/[^a-z0-9]/gi, "").toLowerCase();
-
-    if (!accentWords.has(normalized)) {
-      return part;
-    }
-
-    return (
-      <span className="text-[#ff5a1f]" key={`${part}-${index}`}>
-        {part}
-      </span>
-    );
-  });
 }
 
 function StorefrontCollectionHeader({
@@ -1148,30 +1095,6 @@ function StorefrontLink({
     <Link className={className} href={href} prefetch={false}>
       {children}
     </Link>
-  );
-}
-
-function HeroVisual({ alt, src }: { alt: string; src: string }) {
-  const imageClass =
-    "size-full object-contain object-center drop-shadow-[0_26px_42px_rgba(8,8,8,0.18)] dark:drop-shadow-[0_28px_46px_rgba(0,0,0,0.42)]";
-  const isRemoteImage = src.startsWith("http://") || src.startsWith("https://");
-
-  return (
-    <div className="relative z-0 aspect-[1672/941] w-full overflow-visible">
-      {isRemoteImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img alt={alt} className={imageClass} src={src} />
-      ) : (
-        <Image
-          alt={alt}
-          className={imageClass}
-          fill
-          priority
-          sizes="(min-width: 1024px) 52vw, 100vw"
-          src={src}
-        />
-      )}
-    </div>
   );
 }
 

@@ -64,6 +64,11 @@ import {
   storefrontCategoryScopeOptions,
   storefrontCategoryVisibilityOptions,
   storefrontCollectionLayouts,
+  storefrontHeroContentPositions,
+  storefrontHeroHeights,
+  storefrontHeroImageFits,
+  storefrontHeroLayouts,
+  storefrontHeroOverlays,
   storefrontSectionCodePrefixes,
   storefrontSectionLabels,
   storefrontTitleTags,
@@ -73,6 +78,11 @@ import {
   type StorefrontCategoryScope,
   type StorefrontCategoryVisibility,
   type StorefrontCollectionLayout,
+  type StorefrontHeroContentPosition,
+  type StorefrontHeroHeight,
+  type StorefrontHeroImageFit,
+  type StorefrontHeroLayout,
+  type StorefrontHeroOverlay,
   type StorefrontIconKey,
   type StorefrontProductSource,
   type StorefrontSection,
@@ -173,6 +183,44 @@ const titleTagOptions: Array<{ label: string; value: StorefrontTitleTag }> =
   storefrontTitleTags.map((tag) => ({
     label: tag.toUpperCase(),
     value: tag,
+  }));
+
+const heroLayoutOptions: Array<{ label: string; value: StorefrontHeroLayout }> =
+  storefrontHeroLayouts.map((layout) => ({
+    label:
+      layout === "split"
+        ? "Split content and artwork"
+        : layout === "full_bleed"
+          ? "Full-width banner"
+          : "Auto-cycling campaign carousel",
+    value: layout,
+  }));
+const heroHeightOptions: Array<{ label: string; value: StorefrontHeroHeight }> =
+  storefrontHeroHeights.map((height) => ({
+    label: height.charAt(0).toUpperCase() + height.slice(1),
+    value: height,
+  }));
+const heroContentPositionOptions: Array<{
+  label: string;
+  value: StorefrontHeroContentPosition;
+}> = storefrontHeroContentPositions.map((position) => ({
+  label: position.charAt(0).toUpperCase() + position.slice(1),
+  value: position,
+}));
+const heroOverlayOptions: Array<{ label: string; value: StorefrontHeroOverlay }> =
+  storefrontHeroOverlays.map((overlay) => ({
+    label:
+      overlay === "none"
+        ? "No overlay"
+        : overlay === "dark_left"
+          ? "Dark on the left"
+          : "Dark in the centre",
+    value: overlay,
+  }));
+const heroImageFitOptions: Array<{ label: string; value: StorefrontHeroImageFit }> =
+  storefrontHeroImageFits.map((fit) => ({
+    label: fit === "cover" ? "Cover banner" : "Contain artwork",
+    value: fit,
   }));
 
 const sectionLibraryGroups: Array<{
@@ -1022,62 +1070,193 @@ function HeroSettings({
 }) {
   const settings = section.settings;
 
+  function updateSlide(
+    index: number,
+    nextSlide: (typeof settings.slides)[number],
+  ) {
+    updateSettings({
+      ...settings,
+      slides: settings.slides.map((slide, slideIndex) =>
+        slideIndex === index ? nextSlide : slide,
+      ),
+    });
+  }
+
+  function addSlide() {
+    updateSettings({
+      ...settings,
+      layout: settings.layout === "carousel" ? settings.layout : "carousel",
+      slides: [
+        ...settings.slides,
+        {
+          accentText: "",
+          actions: [],
+          contentPosition: "left",
+          copy: "",
+          desktopImageUrl: settings.slides[0]?.desktopImageUrl ?? "",
+          heading: "New campaign",
+          headingSize: 52,
+          headingTag: "h2",
+          href: "",
+          imageAlt: "",
+          imageFit: "cover",
+          mobileImageUrl: "",
+          overlay: "dark_left",
+        },
+      ],
+    });
+  }
+
+  function removeSlide(index: number) {
+    if (settings.slides.length <= 1) {
+      return;
+    }
+
+    updateSettings({
+      ...settings,
+      slides: settings.slides.filter((_, slideIndex) => slideIndex !== index),
+    });
+  }
+
+  function moveSlide(index: number, direction: -1 | 1) {
+    const destination = index + direction;
+
+    if (destination < 0 || destination >= settings.slides.length) {
+      return;
+    }
+
+    const slides = [...settings.slides];
+    const [slide] = slides.splice(index, 1);
+
+    if (!slide) {
+      return;
+    }
+
+    slides.splice(destination, 0, slide);
+    updateSettings({ ...settings, slides });
+  }
+
   return (
     <>
-      <TextField
-        label="Heading"
-        onChange={(heading) => updateSettings({ ...settings, heading })}
-        value={settings.heading}
-      />
-      <TextField
-        help="Separate highlighted words with a pipe, for example full|exchange."
-        label="Accent words"
-        onChange={(accentText) => updateSettings({ ...settings, accentText })}
-        value={settings.accentText}
-      />
-      <TitleStyleFields
-        label="Heading"
-        onChange={({ size, tag }) =>
-          updateSettings({
-            ...settings,
-            headingSize: size,
-            headingTag: tag,
-          })
-        }
-        size={settings.headingSize}
-        tag={settings.headingTag}
-      />
-      <TextareaField
-        label="Supporting copy"
-        onChange={(copy) => updateSettings({ ...settings, copy })}
-        value={settings.copy}
-      />
-      <ButtonActionSettings
-        actions={settings.actions}
-        addHref="#products"
-        addLabel="New Action"
-        description="Add, remove, and order hero buttons."
-        onChange={(actions) => updateSettings({ ...settings, actions })}
-        title="Actions"
-      />
-      <MediaImageField
-        altValue={settings.imageAlt}
-        imageUrl={settings.imageUrl}
-        label="Hero image"
-        mediaLibrary={mediaLibrary}
-        onImageChange={(imageUrl, imageAlt) =>
-          updateSettings({
-            ...settings,
-            imageAlt: imageAlt ?? settings.imageAlt,
-            imageUrl,
-          })
-        }
-      />
-      <TextField
-        label="Hero image alt text"
-        onChange={(imageAlt) => updateSettings({ ...settings, imageAlt })}
-        value={settings.imageAlt}
-      />
+      <NestedEditorGroup title="Hero layout">
+        <SelectField
+          label="Presentation"
+          onChange={(layout) =>
+            updateSettings({ ...settings, layout: layout as StorefrontHeroLayout })
+          }
+          options={heroLayoutOptions}
+          value={settings.layout}
+        />
+        <SelectField
+          label="Section height"
+          onChange={(height) =>
+            updateSettings({ ...settings, height: height as StorefrontHeroHeight })
+          }
+          options={heroHeightOptions}
+          value={settings.height}
+        />
+        {settings.layout === "carousel" ? (
+          <>
+            <CheckboxField
+              checked={settings.autoplay}
+              help="Stops automatically for visitors who prefer reduced motion, or while the hero is hovered or focused."
+              label="Auto-cycle campaigns"
+              onChange={(autoplay) => updateSettings({ ...settings, autoplay })}
+            />
+            <NumberField
+              label="Seconds between slides"
+              max={12}
+              min={3}
+              onChange={(autoplayInterval) =>
+                updateSettings({ ...settings, autoplayInterval })
+              }
+              value={settings.autoplayInterval}
+            />
+            <CheckboxField
+              checked={settings.showControls}
+              label="Show carousel controls"
+              onChange={(showControls) =>
+                updateSettings({ ...settings, showControls })
+              }
+            />
+          </>
+        ) : null}
+      </NestedEditorGroup>
+
+      <section className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-zinc-950 dark:text-white">Campaign slides</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">Each slide has its own desktop and mobile art, content, buttons, and destination.</p>
+          </div>
+          <Button
+            className="h-8 shrink-0 rounded-md border-slate-300 bg-white px-2.5 text-xs font-semibold text-zinc-950 shadow-none hover:bg-slate-50 dark:border-white/18 dark:bg-[#151719] dark:text-white dark:hover:bg-white/10"
+            disabled={settings.slides.length >= 6}
+            onClick={addSlide}
+            type="button"
+            variant="outline"
+          >
+            <PlusIcon className="size-3.5" />
+            Add slide
+          </Button>
+        </div>
+
+        {settings.slides.map((slide, index) => (
+          <NestedEditorGroup
+            headerAction={
+              <div className="flex shrink-0 gap-1">
+                <IconButton disabled={index === 0} label="Move slide up" onClick={() => moveSlide(index, -1)}><ArrowUpIcon className="size-3.5" /></IconButton>
+                <IconButton disabled={index === settings.slides.length - 1} label="Move slide down" onClick={() => moveSlide(index, 1)}><ArrowDownIcon className="size-3.5" /></IconButton>
+                <IconButton disabled={settings.slides.length <= 1} label="Remove slide" onClick={() => removeSlide(index)}><Trash2Icon className="size-3.5" /></IconButton>
+              </div>
+            }
+            key={`${slide.desktopImageUrl}-${index}`}
+            title={`Slide ${index + 1}`}
+          >
+            <TextField label="Heading (optional)" onChange={(heading) => updateSlide(index, { ...slide, heading })} value={slide.heading} />
+            <TextField help="Separate highlighted words with a pipe, for example full|exchange." label="Accent words" onChange={(accentText) => updateSlide(index, { ...slide, accentText })} value={slide.accentText} />
+            <TitleStyleFields
+              label="Heading"
+              onChange={({ size, tag }) => updateSlide(index, { ...slide, headingSize: size, headingTag: tag })}
+              size={slide.headingSize}
+              tag={slide.headingTag}
+            />
+            <TextareaField label="Supporting copy (optional)" onChange={(copy) => updateSlide(index, { ...slide, copy })} value={slide.copy} />
+            {settings.layout !== "split" ? (
+              <>
+                <SelectField label="Content position" onChange={(contentPosition) => updateSlide(index, { ...slide, contentPosition: contentPosition as StorefrontHeroContentPosition })} options={heroContentPositionOptions} value={slide.contentPosition} />
+                <SelectField label="Readability overlay" onChange={(overlay) => updateSlide(index, { ...slide, overlay: overlay as StorefrontHeroOverlay })} options={heroOverlayOptions} value={slide.overlay} />
+              </>
+            ) : null}
+            <ButtonActionSettings
+              actions={slide.actions}
+              addHref="#products"
+              addLabel="New Action"
+              description="Buttons override the whole-banner link so visitors have a clear choice."
+              onChange={(actions) => updateSlide(index, { ...slide, actions })}
+              title="Slide actions"
+            />
+            <LinkDestinationField onChange={(href) => updateSlide(index, { ...slide, href })} value={slide.href} />
+            <p className="-mt-2 text-xs text-slate-500 dark:text-zinc-400">Optional whole-banner link. It applies when this slide has no buttons.</p>
+            <MediaImageField
+              altValue={slide.imageAlt}
+              imageUrl={slide.desktopImageUrl}
+              label="Desktop image"
+              mediaLibrary={mediaLibrary}
+              onImageChange={(desktopImageUrl, imageAlt) => updateSlide(index, { ...slide, desktopImageUrl, imageAlt: imageAlt ?? slide.imageAlt })}
+            />
+            <MediaImageField
+              altValue={slide.imageAlt}
+              imageUrl={slide.mobileImageUrl}
+              label="Mobile image (optional)"
+              mediaLibrary={mediaLibrary}
+              onImageChange={(mobileImageUrl) => updateSlide(index, { ...slide, mobileImageUrl })}
+            />
+            <SelectField label="Image fit" onChange={(imageFit) => updateSlide(index, { ...slide, imageFit: imageFit as StorefrontHeroImageFit })} options={heroImageFitOptions} value={slide.imageFit} />
+            <TextField label="Image alt text" onChange={(imageAlt) => updateSlide(index, { ...slide, imageAlt })} value={slide.imageAlt} />
+          </NestedEditorGroup>
+        ))}
+      </section>
     </>
   );
 }
@@ -2436,6 +2615,32 @@ function Field({
   );
 }
 
+function CheckboxField({
+  checked,
+  help,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  help?: string;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <Field help={help} label={label}>
+      <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-zinc-950 dark:border-white/10 dark:bg-[#151719] dark:text-white">
+        <input
+          checked={checked}
+          className="size-4 accent-[#ff5a1f]"
+          onChange={(event) => onChange(event.currentTarget.checked)}
+          type="checkbox"
+        />
+        Enabled
+      </label>
+    </Field>
+  );
+}
+
 function MultiSelectField({
   emptyLabel,
   help,
@@ -2746,7 +2951,7 @@ function NestedEditorGroup({
 
 function getSectionTitle(section: StorefrontSection) {
   if (section.type === "hero") {
-    return section.settings.heading;
+    return section.settings.slides[0]?.heading || "Hero campaign";
   }
 
   if (section.type === "quick_actions") {

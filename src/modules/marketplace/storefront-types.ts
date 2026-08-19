@@ -81,6 +81,31 @@ export type StorefrontButtonAction = StorefrontAction & {
 
 export type StorefrontHeroAction = StorefrontButtonAction;
 
+export const storefrontHeroLayouts = [
+  "split",
+  "full_bleed",
+  "carousel",
+] as const;
+
+export type StorefrontHeroLayout = (typeof storefrontHeroLayouts)[number];
+
+export const storefrontHeroHeights = ["compact", "standard", "tall"] as const;
+
+export type StorefrontHeroHeight = (typeof storefrontHeroHeights)[number];
+
+export const storefrontHeroContentPositions = ["left", "center", "right"] as const;
+
+export type StorefrontHeroContentPosition =
+  (typeof storefrontHeroContentPositions)[number];
+
+export const storefrontHeroOverlays = ["none", "dark_left", "dark_center"] as const;
+
+export type StorefrontHeroOverlay = (typeof storefrontHeroOverlays)[number];
+
+export const storefrontHeroImageFits = ["cover", "contain"] as const;
+
+export type StorefrontHeroImageFit = (typeof storefrontHeroImageFits)[number];
+
 export const storefrontTitleTags = ["h1", "h2", "h3", "h4"] as const;
 
 export type StorefrontTitleTag = (typeof storefrontTitleTags)[number];
@@ -105,14 +130,26 @@ type StorefrontSectionBase<TType extends StorefrontSectionType, TSettings> = {
 export type StorefrontHeroSection = StorefrontSectionBase<
   "hero",
   {
-    accentText: string;
-    actions: StorefrontHeroAction[];
-    copy: string;
-    heading: string;
-    headingSize: number;
-    headingTag: StorefrontTitleTag;
-    imageAlt: string;
-    imageUrl: string;
+    autoplay: boolean;
+    autoplayInterval: number;
+    height: StorefrontHeroHeight;
+    layout: StorefrontHeroLayout;
+    showControls: boolean;
+    slides: Array<{
+      accentText: string;
+      actions: StorefrontHeroAction[];
+      contentPosition: StorefrontHeroContentPosition;
+      copy: string;
+      desktopImageUrl: string;
+      heading: string;
+      headingSize: number;
+      headingTag: StorefrontTitleTag;
+      href: string;
+      imageAlt: string;
+      imageFit: StorefrontHeroImageFit;
+      mobileImageUrl: string;
+      overlay: StorefrontHeroOverlay;
+    }>;
   }
 >;
 
@@ -268,32 +305,45 @@ export const defaultStorefrontSections: StorefrontSection[] = [
     enabled: true,
     id: "hero-main",
     settings: {
-      accentText: "home|energy|online",
-      actions: [
+      autoplay: true,
+      autoplayInterval: 5,
+      height: "standard",
+      layout: "split",
+      showControls: true,
+      slides: [
         {
-          href: "#products",
-          label: "Shop Products",
-          variant: "primary",
-        },
-        {
-          href: "#categories",
-          label: "Browse Categories",
-          variant: "primary",
-        },
-        {
-          href: "/support",
-          label: "Get Support",
-          variant: "secondary",
+          accentText: "home|energy|online",
+          actions: [
+            {
+              href: "#products",
+              label: "Shop Products",
+              variant: "primary",
+            },
+            {
+              href: "#categories",
+              label: "Browse Categories",
+              variant: "primary",
+            },
+            {
+              href: "/support",
+              label: "Get Support",
+              variant: "secondary",
+            },
+          ],
+          contentPosition: "left",
+          copy:
+            "Jurgens Energy is a South African online store for practical home, energy, appliance and lifestyle products, with clear product details, secure checkout and straightforward customer support.",
+          desktopImageUrl: "/brand/hero_images/multi-cylinder-hero.png",
+          heading: "Shop home, energy and lifestyle products online.",
+          headingSize: 52,
+          headingTag: "h1",
+          href: "",
+          imageAlt: "Jurgens Energy online store products ready for delivery",
+          imageFit: "contain",
+          mobileImageUrl: "",
+          overlay: "dark_left",
         },
       ],
-      copy:
-        "Jurgens Energy is a South African online store for practical home, energy, appliance and lifestyle products, with clear product details, secure checkout and straightforward customer support.",
-      heading:
-        "Shop home, energy and lifestyle products online.",
-      headingSize: 52,
-      headingTag: "h1",
-      imageAlt: "Jurgens Energy online store products ready for delivery",
-      imageUrl: "/brand/hero_images/multi-cylinder-hero.png",
     },
     type: "hero",
   },

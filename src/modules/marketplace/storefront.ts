@@ -12,6 +12,11 @@ import {
   storefrontCategoryScopeOptions,
   storefrontCategoryVisibilityOptions,
   storefrontCollectionLayouts,
+  storefrontHeroContentPositions,
+  storefrontHeroHeights,
+  storefrontHeroImageFits,
+  storefrontHeroLayouts,
+  storefrontHeroOverlays,
   storefrontSectionCodePrefixes,
   storefrontSectionLabels,
   storefrontSectionTypes,
@@ -91,6 +96,10 @@ const optionalStorefrontMediaUrlSchema = boundedText(500).refine(
   (value) => !value || isAllowedStorefrontMediaUrl(value),
   "Use a relative image path or full http/https image URL.",
 );
+const optionalStorefrontHrefSchema = boundedText(500).refine(
+  (value) => !value || isAllowedStorefrontHref(value),
+  "Use an anchor, relative path, query string, or full http/https link.",
+);
 
 const actionSchema = z.object({
   href: storefrontHrefSchema,
@@ -103,6 +112,11 @@ const buttonActionSchema = actionSchema.extend({
 
 const titleTagSchema = z.enum(storefrontTitleTags);
 const titleSizeSchema = z.coerce.number().int().min(16).max(86);
+const heroLayoutSchema = z.enum(storefrontHeroLayouts);
+const heroHeightSchema = z.enum(storefrontHeroHeights);
+const heroContentPositionSchema = z.enum(storefrontHeroContentPositions);
+const heroOverlaySchema = z.enum(storefrontHeroOverlays);
+const heroImageFitSchema = z.enum(storefrontHeroImageFits);
 
 const iconKeySchema = z.enum([
   "accessories",
@@ -133,45 +147,88 @@ const sectionBaseSchema = z.object({
   id: boundedText(80).min(1, "Every section needs an id."),
 });
 
-const heroSectionSchema = sectionBaseSchema.extend({
-  settings: z
-    .object({
-      accentText: boundedText(160),
-      actions: z.array(buttonActionSchema).max(6).optional(),
-      copy: boundedText(300),
-      heading: boundedText(220).min(1, "Hero heading is required."),
-      headingSize: titleSizeSchema.default(52),
-      headingTag: titleTagSchema.default("h1"),
-      imageAlt: boundedText(160),
-      imageUrl: storefrontMediaUrlSchema,
-      primaryAction: actionSchema.optional(),
-      secondaryAction: actionSchema.optional(),
-      tertiaryAction: actionSchema.optional(),
-    })
-    .transform(
-      ({
-        actions,
-        primaryAction,
-        secondaryAction,
-        tertiaryAction,
-        ...settings
-      }) => {
-        const legacyActions = [
-          primaryAction ? { ...primaryAction, variant: "primary" as const } : null,
-          secondaryAction
-            ? { ...secondaryAction, variant: "primary" as const }
-            : null,
-          tertiaryAction
-            ? { ...tertiaryAction, variant: "secondary" as const }
-            : null,
-        ].filter((action) => action !== null);
+const heroSlideSchema = z.object({
+  accentText: boundedText(160).default(""),
+  actions: z.array(buttonActionSchema).max(6).default([]),
+  contentPosition: heroContentPositionSchema.default("left"),
+  copy: boundedText(300).default(""),
+  desktopImageUrl: storefrontMediaUrlSchema,
+  heading: boundedText(220).default(""),
+  headingSize: titleSizeSchema.default(52),
+  headingTag: titleTagSchema.default("h1"),
+  href: optionalStorefrontHrefSchema.default(""),
+  imageAlt: boundedText(160).default(""),
+  imageFit: heroImageFitSchema.default("cover"),
+  mobileImageUrl: optionalStorefrontMediaUrlSchema.default(""),
+  overlay: heroOverlaySchema.default("dark_left"),
+});
 
-        return {
-          ...settings,
-          actions: actions ?? legacyActions,
-        };
-      },
-    ),
+const heroSettingsSchema = z.object({
+  autoplay: z.coerce.boolean().default(true),
+  autoplayInterval: z.coerce.number().int().min(3).max(12).default(5),
+  height: heroHeightSchema.default("standard"),
+  layout: heroLayoutSchema.default("split"),
+  showControls: z.coerce.boolean().default(true),
+  slides: z.array(heroSlideSchema).min(1).max(6),
+});
+
+const legacyHeroSettingsSchema = z
+  .object({
+    accentText: boundedText(160),
+    actions: z.array(buttonActionSchema).max(6).optional(),
+    copy: boundedText(300),
+    heading: boundedText(220).min(1, "Hero heading is required."),
+    headingSize: titleSizeSchema.default(52),
+    headingTag: titleTagSchema.default("h1"),
+    imageAlt: boundedText(160),
+    imageUrl: storefrontMediaUrlSchema,
+    primaryAction: actionSchema.optional(),
+    secondaryAction: actionSchema.optional(),
+    tertiaryAction: actionSchema.optional(),
+  })
+  .transform(
+    ({
+      actions,
+      primaryAction,
+      secondaryAction,
+      tertiaryAction,
+      imageUrl,
+      ...settings
+    }) => {
+      const legacyActions = [
+        primaryAction ? { ...primaryAction, variant: "primary" as const } : null,
+        secondaryAction
+          ? { ...secondaryAction, variant: "primary" as const }
+          : null,
+        tertiaryAction
+          ? { ...tertiaryAction, variant: "secondary" as const }
+          : null,
+      ].filter((action) => action !== null);
+
+      return {
+        autoplay: true,
+        autoplayInterval: 5,
+        height: "standard" as const,
+        layout: "split" as const,
+        showControls: true,
+        slides: [
+          {
+            ...settings,
+            actions: actions ?? legacyActions,
+            contentPosition: "left" as const,
+            desktopImageUrl: imageUrl,
+            href: "",
+            imageFit: "contain" as const,
+            mobileImageUrl: "",
+            overlay: "dark_left" as const,
+          },
+        ],
+      };
+    },
+  );
+
+const heroSectionSchema = sectionBaseSchema.extend({
+  settings: z.union([heroSettingsSchema, legacyHeroSettingsSchema]),
   type: z.literal("hero"),
 });
 
