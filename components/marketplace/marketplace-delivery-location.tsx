@@ -20,6 +20,7 @@ import {
   clearMarketplaceDeliveryLocation,
   formatMarketplaceDeliveryLocation,
   getMarketplaceDeliveryLocation,
+  hasPersistentMarketplaceDeliveryAddress,
   setMarketplaceDeliveryLocation,
   type MarketplaceDeliveryAddress,
   type MarketplaceDeliveryLocation,
@@ -43,9 +44,11 @@ function isCompleteAddress(
 
 export function MarketplaceDeliveryLocationControl({
   className,
+  defaultDeliveryAddress = null,
   hasDefaultDeliveryAddress,
 }: {
   className?: string;
+  defaultDeliveryAddress?: MarketplaceDeliveryAddress | null;
   hasDefaultDeliveryAddress: boolean;
 }) {
   const inputId = useId();
@@ -92,11 +95,11 @@ export function MarketplaceDeliveryLocationControl({
   }
 
   function openDeliveryLocationDialog() {
-    const savedAddress = location?.address ?? null;
+    const savedAddress = location?.address ?? defaultDeliveryAddress;
 
     setDraftAddress(savedAddress);
     setAddressInput(savedAddress?.addressLine1 ?? "");
-    setRememberFullAddress(Boolean(savedAddress));
+    setRememberFullAddress(hasPersistentMarketplaceDeliveryAddress());
     setOpen(true);
   }
 
@@ -116,6 +119,8 @@ export function MarketplaceDeliveryLocationControl({
     setMarketplaceDeliveryLocation({
       address: rememberFullAddress ? draftAddress : null,
       label: formatMarketplaceDeliveryLocation(draftAddress),
+    }, {
+      sessionAddress: draftAddress,
     });
     setOpen(false);
     resetDraft();
@@ -188,7 +193,7 @@ export function MarketplaceDeliveryLocationControl({
                 Remember this address on this device
               </span>
               <span className="mt-0.5 block text-[11px] leading-4 text-[#666660] dark:text-[#aaa9a1]">
-                This lets product pages prefill a delivery-window estimate. Without it, we only save your area.
+                This keeps the full address on this device. Without it, we keep it only for this browser session and save your area after that.
               </span>
             </span>
           </label>

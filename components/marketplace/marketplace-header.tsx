@@ -28,7 +28,7 @@ import {
   getNotificationCenter,
 } from "@/src/modules/notifications/in-app";
 import { getCurrencyPreference } from "@/src/modules/currency/server";
-import { hasCustomerDefaultAddress } from "@/src/modules/marketplace/account/addresses";
+import { getCheckoutAddressBook } from "@/src/modules/marketplace/account/addresses";
 import {
   getMarketplaceShopMenuData,
 } from "@/src/modules/marketplace/catalog";
@@ -75,15 +75,30 @@ export async function MarketplaceHeader() {
         roles: session.user.roles ?? [],
       }
     : null;
-  const notificationCenter = session?.user?.id
-    ? await getNotificationCenter({
-        surface: "marketplace",
-        userId: session.user.id,
-      })
-    : emptyNotificationCenter;
-  const hasDefaultDeliveryAddress = session?.user?.id
-    ? await hasCustomerDefaultAddress(session.user.id)
-    : false;
+  const [notificationCenter, addressBook] = await Promise.all([
+    session?.user?.id
+      ? getNotificationCenter({
+          surface: "marketplace",
+          userId: session.user.id,
+        })
+      : Promise.resolve(emptyNotificationCenter),
+    session?.user?.id
+      ? getCheckoutAddressBook(session.user.id)
+      : Promise.resolve(null),
+  ]);
+  const defaultAddress = addressBook?.defaultAddress;
+  const defaultDeliveryAddress = defaultAddress
+    ? {
+        addressLine1: defaultAddress.addressLine1,
+        addressLine2: defaultAddress.addressLine2 ?? "",
+        city: defaultAddress.city,
+        countryCode: defaultAddress.countryCode,
+        postalCode: defaultAddress.postalCode,
+        province: defaultAddress.province,
+        suburb: defaultAddress.suburb,
+      }
+    : null;
+  const hasDefaultDeliveryAddress = Boolean(defaultDeliveryAddress);
   const hasFeaturedSaleCampaign = saleCampaigns.some(
     (campaign) => campaign.headerVisible,
   );
@@ -104,6 +119,7 @@ export async function MarketplaceHeader() {
           </div>
           <div className="order-1 ml-auto flex min-w-0 items-center justify-end gap-1.5 sm:order-2 sm:flex-none sm:gap-2">
             <MarketplaceDeliveryLocationControl
+              defaultDeliveryAddress={defaultDeliveryAddress}
               hasDefaultDeliveryAddress={hasDefaultDeliveryAddress}
             />
             <CurrencySelector
