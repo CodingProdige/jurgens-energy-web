@@ -38,6 +38,7 @@ import { marketplacePrimaryActionBaseClass } from "@/components/marketplace/acti
 import { MarketplaceSaleCountdown } from "@/components/marketplace/marketplace-sale-countdown";
 import { MarketplaceProductCard } from "@/components/marketplace/product-card";
 import { ProductDeliveryEstimate } from "@/components/marketplace/product-delivery-estimate";
+import { useMarketplaceDeliveryWindow } from "@/components/marketplace/marketplace-delivery-window-provider";
 import {
   Dialog,
   DialogClose,
@@ -135,6 +136,45 @@ const productPolicyLinks = [
     label: "Support",
   },
 ].filter((link): link is ProductPolicyLink => Boolean(link));
+
+function getMarketplaceDeliveryWindowLabel(
+  deliveryWindow: ReturnType<typeof useMarketplaceDeliveryWindow>,
+) {
+  if (!deliveryWindow?.available) {
+    return null;
+  }
+
+  const { estimatedDeliveryFrom: from, estimatedDeliveryTo: to } =
+    deliveryWindow;
+
+  if (!from && !to) {
+    return null;
+  }
+
+  if (!from || from === to) {
+    return `Expected by ${formatMarketplaceDeliveryDate(to ?? from!)}`;
+  }
+
+  if (!to) {
+    return `Expected from ${formatMarketplaceDeliveryDate(from)}`;
+  }
+
+  return `Expected ${formatMarketplaceDeliveryDate(from)}–${formatMarketplaceDeliveryDate(to)}`;
+}
+
+function formatMarketplaceDeliveryDate(value: string) {
+  const datePart = value.slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Africa/Johannesburg",
+  }).format(new Date(`${datePart}T12:00:00+02:00`));
+}
 
 function getDisplayedCurrencyValue(
   amount: string | number,
@@ -345,9 +385,14 @@ export function ProductDetailExperience({
       value,
     });
   }, [currencyContext, product, selectedVariant]);
+  const deliveryWindow = useMarketplaceDeliveryWindow();
+  const deliveryWindowLabel = getMarketplaceDeliveryWindowLabel(deliveryWindow);
   const deliveryAvailable = deliveryCopy.available;
-  const deliveryBenefit = deliveryCopy.benefit;
-  const deliveryDetail = deliveryCopy.detail;
+  const deliveryBenefit = deliveryWindowLabel ?? deliveryCopy.benefit;
+  const deliveryDetail = deliveryWindowLabel ?? deliveryCopy.detail;
+  const resolvedDeliveryTimingDescription = deliveryWindowLabel
+    ? `${deliveryWindowLabel} for your saved delivery address.`
+    : deliveryTimingDescription;
   const sizeLabel = getSizeLabel(selectedVariant?.title ?? product.title);
 
   function showPreviousMedia() {
@@ -388,7 +433,7 @@ export function ProductDetailExperience({
           deliveryAvailable={deliveryAvailable}
           deliveryBenefit={deliveryBenefit}
           deliveryDetail={deliveryDetail}
-          deliveryTimingDescription={deliveryTimingDescription}
+          deliveryTimingDescription={resolvedDeliveryTimingDescription}
           priceTaxDisclosure={priceTaxDisclosure}
           product={product}
           quantity={quantity}
@@ -589,7 +634,7 @@ function ProductGallery({
 
       <div className="grid min-w-0 gap-3">
         <div
-          className="relative aspect-[1/1] w-full touch-pan-y overflow-hidden border-b border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-white/[0.04] sm:rounded-lg sm:border sm:shadow-sm"
+          className="relative aspect-[4/5] w-full touch-pan-y overflow-hidden border-b border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-white/[0.04] sm:aspect-square sm:rounded-lg sm:border sm:shadow-sm"
           data-product-gallery-media-container=""
           onPointerCancel={handleMediaPointerCancel}
           onPointerDown={handleMediaPointerDown}
@@ -641,7 +686,7 @@ function ProductGallery({
               >
                 <ChevronRightIcon className="size-5" />
               </button>
-              <span className="absolute bottom-4 right-4 z-20 rounded-full bg-[#080808]/62 px-2.5 py-1 text-xs font-black leading-none text-white shadow-sm backdrop-blur-sm sm:hidden">
+              <span className="absolute bottom-4 left-4 z-20 rounded-full bg-[#080808]/62 px-2.5 py-1 text-xs font-black leading-none text-white shadow-sm backdrop-blur-sm sm:left-auto sm:right-16">
                 {activeIndex + 1}/{galleryMedia.length}
               </span>
             </>
@@ -662,6 +707,18 @@ function ProductGallery({
             <ZoomInIcon className="size-5" />
           </button>
         </div>
+
+        {hasMultipleMedia ? (
+          <div className="lg:hidden">
+            <ProductMediaThumbnailStrip
+              activeMediaId={activeMedia?.id ?? null}
+              galleryMedia={galleryMedia}
+              onSelectMedia={onSelectMedia}
+              productTitle={productTitle}
+              tone="light"
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -711,7 +768,7 @@ function ProductGalleryMediaContent({
       fill
       priority={priority}
       quality={90}
-      sizes="(min-width: 1024px) 680px, calc(100vw - 2rem)"
+      sizes="(min-width: 1280px) 680px, (min-width: 1024px) 52vw, calc(100vw - 2rem)"
       src={media.url}
     />
   );
@@ -731,11 +788,6 @@ function ProductMediaThumbnailRail({
   const railRef = useRef<HTMLDivElement>(null);
   const [canScrollBackward, setCanScrollBackward] = useState(false);
   const [canScrollForward, setCanScrollForward] = useState(false);
-  const activeIndex = Math.max(
-    0,
-    galleryMedia.findIndex((media) => media.id === activeMediaId),
-  );
-
   const updateScrollState = useCallback(() => {
     const rail = railRef.current;
 
@@ -807,7 +859,7 @@ function ProductMediaThumbnailRail({
   }
 
   return (
-    <div className="hidden min-w-0 lg:absolute lg:inset-y-0 lg:left-0 lg:grid lg:w-[5.75rem] lg:grid-rows-[auto_minmax(0,1fr)_auto_auto] lg:gap-2">
+    <div className="hidden min-w-0 lg:absolute lg:inset-y-0 lg:left-0 lg:grid lg:w-[5.75rem] lg:grid-rows-[auto_minmax(0,1fr)_auto] lg:gap-2">
       <button
         aria-label="Scroll product media thumbnails upward"
         className="grid h-7 place-items-center rounded-full border border-[#e8e8e2] bg-white text-[#080808] transition hover:border-[#ff5a1f] hover:text-[#ff5a1f] disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:bg-white/[0.06] dark:text-[#f7f7f2]"
@@ -859,13 +911,6 @@ function ProductMediaThumbnailRail({
       >
         <ChevronDownIcon className="size-4" />
       </button>
-
-      <p
-        aria-live="polite"
-        className="text-center text-[10px] font-black uppercase leading-none text-[#6a6a63] dark:text-zinc-300"
-      >
-        {activeIndex + 1}/{galleryMedia.length}
-      </p>
     </div>
   );
 }
