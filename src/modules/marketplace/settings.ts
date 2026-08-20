@@ -515,6 +515,7 @@ export type MarketplaceSettings = {
   googleLocalInventoryEnabled: boolean;
   googleLocalInventoryStoreCode: string | null;
   googleMerchantCenterId: string | null;
+  googleMerchantMinimumProductPrice: number;
   googlePlacesEnabled: boolean;
   googleReviewUrl: string | null;
   googleSiteVerificationToken: string | null;
@@ -691,6 +692,7 @@ const defaultSettings: MarketplaceSettings = {
   googleLocalInventoryEnabled: false,
   googleLocalInventoryStoreCode: null,
   googleMerchantCenterId: null,
+  googleMerchantMinimumProductPrice: 0,
   googlePlacesEnabled: false,
   googleReviewUrl: null,
   googleSiteVerificationToken: null,
@@ -831,6 +833,8 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
       googleLocalInventoryStoreCode:
         marketplaceSettings.googleLocalInventoryStoreCode,
       googleMerchantCenterId: marketplaceSettings.googleMerchantCenterId,
+      googleMerchantMinimumProductPrice:
+        marketplaceSettings.googleMerchantMinimumProductPrice,
       googlePlacesApiKeyEncrypted:
         marketplaceSettings.googlePlacesApiKeyEncrypted,
       googlePlacesEnabled: marketplaceSettings.googlePlacesEnabled,
@@ -1099,6 +1103,10 @@ const readMarketplaceSettings = async (): Promise<MarketplaceSettings> => {
     ),
     hasGooglePlacesApiKey: Boolean(
       decryptOptionalSecret(googlePlacesApiKeyEncrypted),
+    ),
+    googleMerchantMinimumProductPrice: Math.max(
+      0,
+      Number(settings.googleMerchantMinimumProductPrice) || 0,
     ),
     shippingFlatRate: Math.max(0, Number(settings.shippingFlatRate) || 0),
     shippingFreeOverAmount:
@@ -3322,6 +3330,7 @@ export async function updateMarketplaceGoogleMarketingSettings({
   googleAdsConversionLabel,
   googleAnalyticsMeasurementId,
   googleMerchantCenterId,
+  googleMerchantMinimumProductPrice,
   googleSiteVerificationToken,
   googleTagManagerId,
 }: {
@@ -3329,6 +3338,7 @@ export async function updateMarketplaceGoogleMarketingSettings({
   googleAdsConversionLabel?: string;
   googleAnalyticsMeasurementId?: string;
   googleMerchantCenterId?: string;
+  googleMerchantMinimumProductPrice: number;
   googleSiteVerificationToken?: string;
   googleTagManagerId?: string;
 }) {
@@ -3343,6 +3353,7 @@ export async function updateMarketplaceGoogleMarketingSettings({
       googleLocalInventoryEnabled: false,
       googleLocalInventoryStoreCode: null,
       googleMerchantCenterId: googleMerchantCenterId || null,
+      googleMerchantMinimumProductPrice,
       googleSiteVerificationToken: googleSiteVerificationToken || null,
       googleTagManagerId: googleTagManagerId || null,
       updatedAt: new Date(),
@@ -3357,6 +3368,7 @@ export async function updateMarketplaceGoogleMarketingSettings({
         googleLocalInventoryEnabled: false,
         googleLocalInventoryStoreCode: null,
         googleMerchantCenterId: googleMerchantCenterId || null,
+        googleMerchantMinimumProductPrice,
         googleSiteVerificationToken: googleSiteVerificationToken || null,
         googleTagManagerId: googleTagManagerId || null,
         updatedAt: new Date(),

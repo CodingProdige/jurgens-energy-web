@@ -14,6 +14,7 @@ import {
   getGoogleMerchantCustomLabel0,
   getGoogleMerchantDestinationControls,
   getGoogleMerchantShippingLabel,
+  meetsGoogleMerchantMinimumProductPrice,
   shouldPublishGoogleMerchantOffer,
   type GoogleMerchantDestination,
   type GoogleMerchantShippingLabel,
@@ -122,8 +123,10 @@ export async function getGoogleMerchantFeedItems() {
 
     return (
       row.googleFulfillmentChannel !== "excluded" &&
-      Number.isFinite(price) &&
-      price > 0
+      meetsGoogleMerchantMinimumProductPrice(
+        price,
+        settings.googleMerchantMinimumProductPrice,
+      )
     );
   });
   const productIds = uniqueStrings(eligibleRows.map((row) => row.productId));

@@ -31,6 +31,25 @@ export type GoogleMerchantDeliveryConfiguration = {
   shippingEnabled: boolean;
 };
 
+/**
+ * Merchant Center receives the price a customer pays today, including an
+ * active sale price. A zero threshold keeps every otherwise eligible offer.
+ */
+export function meetsGoogleMerchantMinimumProductPrice(
+  productPrice: number,
+  minimumProductPrice: number,
+) {
+  const normalizedMinimum = Number.isFinite(minimumProductPrice)
+    ? Math.max(0, minimumProductPrice)
+    : 0;
+
+  return (
+    Number.isFinite(productPrice) &&
+    productPrice > 0 &&
+    productPrice >= normalizedMinimum
+  );
+}
+
 export function getGoogleMerchantCustomLabel0(
   channel: GoogleMerchantShippingLabel,
 ): GoogleMerchantShippingLabel {

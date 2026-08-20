@@ -279,6 +279,11 @@ const googleMarketingSettingsSchema = z.object({
   googleAdsConversionLabel: optionalGoogleAdsConversionLabelSchema,
   googleAnalyticsMeasurementId: optionalGoogleAnalyticsMeasurementIdSchema,
   googleMerchantCenterId: optionalGoogleMerchantCenterIdSchema,
+  googleMerchantMinimumProductPrice: z.coerce
+    .number()
+    .finite()
+    .min(0, "Minimum Merchant Center product price cannot be negative.")
+    .max(1_000_000, "Minimum Merchant Center product price is too high."),
   googleSiteVerificationToken: optionalGoogleVerificationTokenSchema,
   googleTagManagerId: optionalGoogleTagManagerIdSchema,
 });
@@ -307,6 +312,9 @@ export async function updateGoogleMarketingSettings(
     googleMerchantCenterId: String(
       formData.get("googleMerchantCenterId") ?? "",
     ),
+    googleMerchantMinimumProductPrice: String(
+      formData.get("googleMerchantMinimumProductPrice") ?? "0",
+    ),
     googleSiteVerificationToken: extractGoogleSiteVerificationToken(
       String(formData.get("googleSiteVerificationToken") ?? ""),
     ),
@@ -323,6 +331,7 @@ export async function updateGoogleMarketingSettings(
   const result = await updateMarketplaceGoogleMarketingSettings(parsed.data);
 
   revalidatePath("/");
+  revalidatePath("/feeds/google-merchant.xml");
   revalidatePath("/settings/platform");
 
   return result;

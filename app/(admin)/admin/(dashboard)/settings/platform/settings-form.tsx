@@ -774,6 +774,7 @@ type GoogleMarketingSettingsFormProps = {
   googleAdsConversionLabel: string | null;
   googleAnalyticsMeasurementId: string | null;
   googleMerchantCenterId: string | null;
+  googleMerchantMinimumProductPrice: number;
   googleSiteVerificationToken: string | null;
   googleTagManagerId: string | null;
 };
@@ -783,6 +784,7 @@ export function GoogleMarketingSettingsForm({
   googleAdsConversionLabel,
   googleAnalyticsMeasurementId,
   googleMerchantCenterId,
+  googleMerchantMinimumProductPrice,
   googleSiteVerificationToken,
   googleTagManagerId,
 }: GoogleMarketingSettingsFormProps) {
@@ -888,6 +890,26 @@ export function GoogleMarketingSettingsForm({
         </div>
 
         <div className="grid gap-2">
+          <Label htmlFor="googleMerchantMinimumProductPrice">
+            Minimum product price for ads (ZAR)
+          </Label>
+          <Input
+            defaultValue={googleMerchantMinimumProductPrice}
+            id="googleMerchantMinimumProductPrice"
+            inputMode="decimal"
+            max={1_000_000}
+            min={0}
+            name="googleMerchantMinimumProductPrice"
+            step="0.01"
+            type="number"
+          />
+          <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            VAT-inclusive offers below this price are excluded from the
+            Merchant Center feed. Set to 0 to include every eligible offer.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
           <Label htmlFor="googleSiteVerificationToken">
             Search Console verification
           </Label>
@@ -920,8 +942,9 @@ export function GoogleMarketingSettingsForm({
             </h3>
             <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-zinc-400">
               Merchant Center can fetch the primary online product feed below.
-              Delivery availability and pricing continue to be calculated from
-              the customer&apos;s checkout details.
+              The configured minimum applies to each variant&apos;s current,
+              VAT-inclusive selling price. Delivery availability and pricing
+              continue to be calculated from the customer&apos;s checkout details.
             </p>
           </div>
         </div>

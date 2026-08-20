@@ -31,6 +31,16 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   googleAdsConversionId: text("google_ads_conversion_id"),
   googleAdsConversionLabel: text("google_ads_conversion_label"),
   googleMerchantCenterId: text("google_merchant_center_id"),
+  googleMerchantMinimumProductPrice: numeric(
+    "google_merchant_minimum_product_price",
+    {
+      mode: "number",
+      precision: 12,
+      scale: 2,
+    },
+  )
+    .notNull()
+    .default(0),
   googlePlacesEnabled: boolean("google_places_enabled")
     .notNull()
     .default(false),
@@ -411,6 +421,10 @@ export const marketplaceSettings = pgTable("marketplace_settings", {
   shippingFlatRateNonnegative: check(
     "marketplace_settings_shipping_flat_rate_nonnegative",
     sql`${settings.shippingFlatRate} >= 0`,
+  ),
+  googleMerchantMinimumProductPriceNonnegative: check(
+    "marketplace_settings_google_merchant_minimum_product_price_nonnegative",
+    sql`${settings.googleMerchantMinimumProductPrice} >= 0`,
   ),
   shippingFreeOverNonnegative: check(
     "marketplace_settings_shipping_free_over_nonnegative",

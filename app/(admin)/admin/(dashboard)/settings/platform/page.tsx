@@ -557,6 +557,9 @@ function SettingsSection({
           googleAdsConversionLabel={settings.googleAdsConversionLabel}
           googleAnalyticsMeasurementId={settings.googleAnalyticsMeasurementId}
           googleMerchantCenterId={settings.googleMerchantCenterId}
+          googleMerchantMinimumProductPrice={
+            settings.googleMerchantMinimumProductPrice
+          }
           googleSiteVerificationToken={settings.googleSiteVerificationToken}
           googleTagManagerId={settings.googleTagManagerId}
         />

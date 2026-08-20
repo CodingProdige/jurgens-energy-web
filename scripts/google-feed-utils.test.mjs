@@ -6,6 +6,7 @@ import {
   getGoogleMerchantCustomLabel0,
   getGoogleMerchantDestinationControls,
   getGoogleMerchantShippingLabel,
+  meetsGoogleMerchantMinimumProductPrice,
   shouldPublishGoogleMerchantOffer,
 } from "../src/modules/marketplace/google-feed-utils.ts";
 
@@ -75,6 +76,14 @@ test("preserves an explicit Merchant Center exclusion", () => {
     getGoogleMerchantShippingLabel("excluded", "seller_fulfilled"),
     null,
   );
+});
+
+test("excludes offers below the configured Merchant Center price floor", () => {
+  assert.equal(meetsGoogleMerchantMinimumProductPrice(99.99, 100), false);
+  assert.equal(meetsGoogleMerchantMinimumProductPrice(100, 100), true);
+  assert.equal(meetsGoogleMerchantMinimumProductPrice(100.01, 100), true);
+  assert.equal(meetsGoogleMerchantMinimumProductPrice(0, 0), false);
+  assert.equal(meetsGoogleMerchantMinimumProductPrice(99.99, 0), true);
 });
 
 test("publishes nationwide offers only with enabled shipping and a usable active Courier Guy environment", () => {
