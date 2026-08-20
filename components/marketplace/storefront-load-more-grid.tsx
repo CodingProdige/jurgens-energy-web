@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 type StorefrontLoadMoreGridProps = {
   children: ReactNode;
   className?: string;
+  gridClassName?: string;
   increment?: number;
   initialCount?: number;
 };
@@ -14,6 +15,7 @@ type StorefrontLoadMoreGridProps = {
 export function StorefrontLoadMoreGrid({
   children,
   className,
+  gridClassName,
   increment = 8,
   initialCount = 8,
 }: StorefrontLoadMoreGridProps) {
@@ -26,7 +28,12 @@ export function StorefrontLoadMoreGrid({
 
   return (
     <div className={cn("mt-2.5 px-1.5 sm:mt-5 sm:px-0", className)}>
-      <div className="grid grid-cols-2 items-start gap-1.5 sm:gap-4 md:grid-cols-4">
+      <div
+        className={cn(
+          "grid grid-cols-2 items-start gap-1.5 sm:gap-4 md:grid-cols-4",
+          gridClassName,
+        )}
+      >
         {visibleItems}
       </div>
       {remainingCount > 0 ? (

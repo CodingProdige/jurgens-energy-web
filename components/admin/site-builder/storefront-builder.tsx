@@ -1777,6 +1777,28 @@ function ProductCollectionSettings({
         options={collectionLayoutOptions}
         value={settings.layout}
       />
+      {settings.layout !== "carousel" ? (
+        <>
+          <NumberField
+            label="Small-screen cards per row"
+            max={3}
+            min={1}
+            onChange={(smallScreenColumns) =>
+              updateSettings({ ...settings, smallScreenColumns })
+            }
+            value={settings.smallScreenColumns}
+          />
+          <NumberField
+            label="Large-screen cards per row"
+            max={6}
+            min={3}
+            onChange={(largeScreenColumns) =>
+              updateSettings({ ...settings, largeScreenColumns })
+            }
+            value={settings.largeScreenColumns}
+          />
+        </>
+      ) : null}
       <SelectField
         label="Product source"
         onChange={(productSource) =>

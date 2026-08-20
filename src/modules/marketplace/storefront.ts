@@ -299,6 +299,12 @@ const productCollectionSectionSchema = sectionBaseSchema.extend({
     .object({
       actions: z.array(buttonActionSchema).max(6).optional(),
       eyebrow: boundedText(80),
+      largeScreenColumns: z.coerce
+        .number()
+        .int()
+        .min(3, "Large-screen cards per row must be at least 3.")
+        .max(6, "Large-screen cards per row must be 6 or fewer.")
+        .default(5),
       layout: collectionLayoutSchema.default("grid"),
       productLimit: z.coerce
         .number()
@@ -312,6 +318,12 @@ const productCollectionSectionSchema = sectionBaseSchema.extend({
       categoryScope: categoryScopeSchema.default("all"),
       selectedBrandIds: z.array(boundedText(80)).max(24).default([]),
       selectedCategoryIds: z.array(boundedText(80)).max(24).default([]),
+      smallScreenColumns: z.coerce
+        .number()
+        .int()
+        .min(1, "Small-screen cards per row must be at least 1.")
+        .max(3, "Small-screen cards per row must be 3 or fewer.")
+        .default(2),
       title: boundedText(120).min(1, "Product collection title is required."),
       titleSize: titleSizeSchema.default(24),
       titleTag: titleTagSchema.default("h2"),
@@ -508,11 +520,13 @@ const storefrontValidationFieldLabels: Record<string, string> = {
   href: "Link destination",
   imageUrl: "Image URL",
   layout: "Layout",
+  largeScreenColumns: "Large-screen cards per row",
   postLimit: "Post limit",
   productLimit: "Product limit",
   productSource: "Product source",
   selectedBrandIds: "Selected brands",
   selectedCategoryIds: "Selected categories",
+  smallScreenColumns: "Small-screen cards per row",
   title: "Title",
 };
 

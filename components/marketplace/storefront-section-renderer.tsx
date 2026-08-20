@@ -267,8 +267,10 @@ function StorefrontProductCollectionSectionView({
       />
       <ProductCollectionList
         emptyLabel={`No live ${settings.title.toLowerCase()} products yet.`}
+        largeScreenColumns={settings.largeScreenColumns}
         layout={settings.layout}
         products={selectedProducts}
+        smallScreenColumns={settings.smallScreenColumns}
       />
     </section>
   );
@@ -592,14 +594,22 @@ function getCollectionSectionId(
 
 function ProductCollectionList({
   emptyLabel,
+  largeScreenColumns,
   layout,
   products,
+  smallScreenColumns,
 }: {
   emptyLabel: string;
+  largeScreenColumns: StorefrontProductCollectionSection["settings"]["largeScreenColumns"];
   layout: StorefrontCollectionLayout;
   products: MarketplaceProductCardData[];
+  smallScreenColumns: StorefrontProductCollectionSection["settings"]["smallScreenColumns"];
 }) {
   const isCarousel = layout === "carousel";
+  const gridClassName = getProductCollectionGridClassName({
+    largeScreenColumns,
+    smallScreenColumns,
+  });
   const productCards = products.map((product) => (
     <div
       className={
@@ -625,7 +635,11 @@ function ProductCollectionList({
 
   if (layout === "load_more") {
     return (
-      <StorefrontLoadMoreGrid increment={8} initialCount={8}>
+      <StorefrontLoadMoreGrid
+        gridClassName={gridClassName}
+        increment={8}
+        initialCount={8}
+      >
         {productCards}
       </StorefrontLoadMoreGrid>
     );
@@ -644,9 +658,50 @@ function ProductCollectionList({
   }
 
   return (
-    <div className="mt-2.5 grid grid-cols-2 items-start gap-1.5 px-1.5 sm:mt-5 sm:gap-4 sm:px-0 md:grid-cols-4">
+    <div
+      className={cn(
+        "mt-2.5 grid items-start gap-1.5 px-1.5 sm:mt-5 sm:gap-4 sm:px-0",
+        gridClassName,
+      )}
+    >
       {productCards}
     </div>
+  );
+}
+
+const productCollectionSmallScreenGridClasses = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+} as const;
+
+const productCollectionLargeScreenGridClasses = {
+  3: "xl:grid-cols-3",
+  4: "xl:grid-cols-4",
+  5: "xl:grid-cols-5",
+  6: "xl:grid-cols-6",
+} as const;
+
+function getProductCollectionGridClassName({
+  largeScreenColumns,
+  smallScreenColumns,
+}: {
+  largeScreenColumns: StorefrontProductCollectionSection["settings"]["largeScreenColumns"];
+  smallScreenColumns: StorefrontProductCollectionSection["settings"]["smallScreenColumns"];
+}) {
+  const resolvedSmallScreenColumns = Math.min(
+    3,
+    Math.max(1, smallScreenColumns),
+  ) as keyof typeof productCollectionSmallScreenGridClasses;
+  const resolvedLargeScreenColumns = Math.min(
+    6,
+    Math.max(3, largeScreenColumns),
+  ) as keyof typeof productCollectionLargeScreenGridClasses;
+
+  return cn(
+    productCollectionSmallScreenGridClasses[resolvedSmallScreenColumns],
+    "sm:grid-cols-3 md:grid-cols-4",
+    productCollectionLargeScreenGridClasses[resolvedLargeScreenColumns],
   );
 }
 

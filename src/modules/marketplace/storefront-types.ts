@@ -203,8 +203,10 @@ export type StorefrontProductCollectionSection = StorefrontSectionBase<
     productLimit: number;
     productSource: StorefrontProductSource;
     categoryScope: StorefrontCategoryScope;
+    largeScreenColumns: number;
     selectedBrandIds: string[];
     selectedCategoryIds: string[];
+    smallScreenColumns: number;
     actions: StorefrontButtonAction[];
     title: string;
     titleSize: number;
@@ -445,8 +447,10 @@ export const defaultStorefrontSections: StorefrontSection[] = [
       productLimit: 4,
       productSource: "accessories",
       categoryScope: "all",
+      largeScreenColumns: 5,
       selectedBrandIds: [],
       selectedCategoryIds: [],
+      smallScreenColumns: 2,
       title: "Shop Accessories",
       titleSize: 24,
       titleTag: "h2",

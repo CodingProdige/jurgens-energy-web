@@ -416,39 +416,45 @@ export function ProductDetailExperience({
   return (
     <div className="grid min-w-0 gap-0 overflow-x-clip pb-24 sm:gap-5 lg:pb-0">
       <section className="grid min-w-0 gap-0 overflow-x-clip sm:gap-6 lg:grid-cols-[minmax(0,1.12fr)_minmax(24rem,0.88fr)]">
-        <ProductGallery
-          activeMedia={activeMedia}
-          galleryMedia={galleryMedia}
-          isLightboxOpen={isGalleryOpen}
-          onNext={showNextMedia}
-          onOpenGallery={openGallery}
-          onPrevious={showPreviousMedia}
-          onSelectMedia={setActiveMediaId}
-          productTitle={product.title}
-          sizeLabel={sizeLabel}
-        />
+        <div className="contents lg:col-start-1 lg:row-start-1 lg:grid lg:min-w-0 lg:content-start lg:gap-6">
+          <ProductGallery
+            activeMedia={activeMedia}
+            galleryMedia={galleryMedia}
+            isLightboxOpen={isGalleryOpen}
+            onNext={showNextMedia}
+            onOpenGallery={openGallery}
+            onPrevious={showPreviousMedia}
+            onSelectMedia={setActiveMediaId}
+            productTitle={product.title}
+            sizeLabel={sizeLabel}
+          />
 
-        <ProductBuyBox
-          currencyContext={currencyContext}
-          deliveryAvailable={deliveryAvailable}
-          deliveryBenefit={deliveryBenefit}
-          deliveryDetail={deliveryDetail}
-          deliveryTimingDescription={resolvedDeliveryTimingDescription}
-          priceTaxDisclosure={priceTaxDisclosure}
-          product={product}
-          quantity={quantity}
-          sellerName={sellerName}
-          selectedPrice={selectedPrice}
-          selectedVariant={selectedVariant}
-          selectedVariantId={selectedVariantId}
-          setQuantity={setQuantity}
-          setSelectedVariantId={setSelectedVariantId}
-        />
+          <div className="order-3 min-w-0 lg:order-none">
+            <ProductDescriptionSection product={product} />
+          </div>
+        </div>
+
+        <div className="order-2 min-w-0 lg:col-start-2 lg:row-start-1">
+          <ProductBuyBox
+            currencyContext={currencyContext}
+            deliveryAvailable={deliveryAvailable}
+            deliveryBenefit={deliveryBenefit}
+            deliveryDetail={deliveryDetail}
+            deliveryTimingDescription={resolvedDeliveryTimingDescription}
+            priceTaxDisclosure={priceTaxDisclosure}
+            product={product}
+            quantity={quantity}
+            sellerName={sellerName}
+            selectedPrice={selectedPrice}
+            selectedVariant={selectedVariant}
+            selectedVariantId={selectedVariantId}
+            setQuantity={setQuantity}
+            setSelectedVariantId={setSelectedVariantId}
+          />
+        </div>
       </section>
 
       <section className="grid min-w-0 gap-2 overflow-x-clip sm:gap-5">
-        <ProductDescriptionSection product={product} />
-
         <ProductReviewsSection product={product} />
 
         {relatedProducts.length > 0 ? (
@@ -617,29 +623,30 @@ function ProductGallery({
   }
 
   return (
-    <div
-      className={cn(
-        "grid min-w-0 gap-3 lg:sticky lg:top-36 lg:self-start lg:items-start",
-        hasMultipleMedia && "lg:relative lg:block lg:pl-[6.5rem]",
-      )}
-    >
-      {hasMultipleMedia ? (
-        <ProductMediaThumbnailRail
-          activeMediaId={activeMedia?.id ?? null}
-          galleryMedia={galleryMedia}
-          onSelectMedia={onSelectMedia}
-          productTitle={productTitle}
-        />
-      ) : null}
+    <div className="min-w-0 lg:-mt-36 lg:self-start lg:pb-36">
+      <div
+        className={cn(
+          "grid min-w-0 gap-3 lg:sticky lg:top-36 lg:items-start",
+          hasMultipleMedia && "lg:relative lg:block lg:pl-[6.5rem]",
+        )}
+      >
+        {hasMultipleMedia ? (
+          <ProductMediaThumbnailRail
+            activeMediaId={activeMedia?.id ?? null}
+            galleryMedia={galleryMedia}
+            onSelectMedia={onSelectMedia}
+            productTitle={productTitle}
+          />
+        ) : null}
 
-      <div className="grid min-w-0 gap-3">
-        <div
-          className="relative aspect-[4/5] w-full touch-pan-y overflow-hidden border-b border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-white/[0.04] sm:aspect-square sm:rounded-lg sm:border sm:shadow-sm"
-          data-product-gallery-media-container=""
-          onPointerCancel={handleMediaPointerCancel}
-          onPointerDown={handleMediaPointerDown}
-          onPointerUp={handleMediaPointerUp}
-        >
+        <div className="grid min-w-0 gap-3">
+          <div
+            className="relative aspect-[4/5] w-full touch-pan-y overflow-hidden border-b border-[#e8e8e2] bg-white dark:border-white/10 dark:bg-white/[0.04] sm:aspect-square sm:rounded-lg sm:border sm:shadow-sm"
+            data-product-gallery-media-container=""
+            onPointerCancel={handleMediaPointerCancel}
+            onPointerDown={handleMediaPointerDown}
+            onPointerUp={handleMediaPointerUp}
+          >
           {sizeLabel ? (
             <span className="absolute left-4 top-4 z-10 rounded-md bg-white px-3 py-1.5 text-sm font-black text-[#080808] shadow-sm dark:bg-[#1a1a1a] dark:text-[#f7f7f2]">
               {sizeLabel}
@@ -708,17 +715,18 @@ function ProductGallery({
           </button>
         </div>
 
-        {hasMultipleMedia ? (
-          <div className="lg:hidden">
-            <ProductMediaThumbnailStrip
-              activeMediaId={activeMedia?.id ?? null}
-              galleryMedia={galleryMedia}
-              onSelectMedia={onSelectMedia}
-              productTitle={productTitle}
-              tone="light"
-            />
-          </div>
-        ) : null}
+          {hasMultipleMedia ? (
+            <div className="lg:hidden">
+              <ProductMediaThumbnailStrip
+                activeMediaId={activeMedia?.id ?? null}
+                galleryMedia={galleryMedia}
+                onSelectMedia={onSelectMedia}
+                productTitle={productTitle}
+                tone="light"
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
